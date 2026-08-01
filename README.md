@@ -2,14 +2,22 @@
 
 The Forest Gym向け予約フロントエンド。
 
-## 公開手順
+## 今回の版
 
-1. `index.html`、`style.css`、`app.js`をリポジトリ直下へアップロード
-2. GitHubの `Settings` → `Pages`
-3. `Deploy from a branch`
-4. Branch: `main`
-5. Folder: `/(root)`
-6. 保存
+- 7日分の空き時間を一括表示
+- 前の週・次の週ボタン
+- 7日分を並列取得
+- 日付と空き時間を同時比較
+- 会員番号・登録メールによる会員マスター照合
+- PT60予約登録
+- スマートフォン対応
 
-公開URL:
-`https://forestgym-tokyo.github.io/anauts-os-reserve/`
+## GitHubへの反映
+
+リポジトリ直下の以下3ファイルを差し替えてください。
+
+- `index.html`
+- `style.css`
+- `app.js`
+
+`README.md`は任意です。

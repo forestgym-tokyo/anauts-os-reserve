@@ -11,24 +11,40 @@
   <main class="page">
     <header class="hero">
       <p class="eyebrow">A-nauts OS Reserve</p>
-      <h1>パーソナルトレーニング60分</h1>
-      <p class="lead">ご希望の日付と時間を選択し、会員情報をご入力ください。</p>
+      <h1>パーソナルトレーニング予約</h1>
+      <p class="lead">7日分の空き時間を比較して、ご都合のよい日時をお選びください。</p>
     </header>
 
-    <section class="card">
-      <div class="step-heading"><span class="step-number">1</span><h2>日付を選択</h2></div>
-      <label class="field">
-        <span>予約日</span>
-        <input id="dateInput" type="date" required>
-      </label>
-      <button id="loadSlotsButton" class="button button-primary" type="button">空き時間を確認</button>
-      <p id="slotStatus" class="status" aria-live="polite"></p>
-      <div id="slotList" class="slot-grid" aria-label="空き時間"></div>
+    <section class="card" aria-labelledby="availability-title">
+      <div class="step-heading">
+        <span class="step-number">1</span>
+        <h2 id="availability-title">日時を選択</h2>
+      </div>
+
+      <div class="week-toolbar" aria-label="表示週の切り替え">
+        <button id="prevWeekButton" class="week-button" type="button">‹ 前の週</button>
+        <strong id="weekRange" class="week-range">読み込み中</strong>
+        <button id="nextWeekButton" class="week-button" type="button">次の週 ›</button>
+      </div>
+
+      <button id="reloadButton" class="button button-secondary reload-button" type="button">
+        空き状況を更新
+      </button>
+
+      <p id="weekStatus" class="status" aria-live="polite"></p>
+      <div id="weekList" class="week-list" aria-label="7日分の空き時間"></div>
     </section>
 
-    <section id="customerSection" class="card is-hidden">
-      <div class="step-heading"><span class="step-number">2</span><h2>会員情報を入力</h2></div>
-      <div class="selected-summary"><span>選択中</span><strong id="selectedSlotText">—</strong></div>
+    <section id="customerSection" class="card is-hidden" aria-labelledby="customer-title">
+      <div class="step-heading">
+        <span class="step-number">2</span>
+        <h2 id="customer-title">会員情報を入力</h2>
+      </div>
+
+      <div class="selected-summary">
+        <span>選択中の日時</span>
+        <strong id="selectedSlotText">—</strong>
+      </div>
 
       <form id="reservationForm" novalidate>
         <label class="field">
@@ -53,7 +69,10 @@
         </label>
 
         <div id="formError" class="alert alert-error is-hidden" role="alert"></div>
-        <button id="submitButton" class="button button-primary" type="submit">この内容で予約する</button>
+
+        <button id="submitButton" class="button button-primary" type="submit">
+          この内容で予約する
+        </button>
       </form>
     </section>
 
@@ -62,7 +81,9 @@
       <h2>予約が完了しました</h2>
       <p id="completeSummary"></p>
       <p class="reservation-id">予約番号：<strong id="reservationId"></strong></p>
-      <button id="newReservationButton" class="button button-secondary" type="button">別の予約をする</button>
+      <button id="newReservationButton" class="button button-secondary" type="button">
+        別の予約をする
+      </button>
     </section>
   </main>
 
