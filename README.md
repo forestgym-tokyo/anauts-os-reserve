@@ -1,20 +1,20 @@
-# A-nauts OS Reserve Release 1 Front
+# A-nauts OS Reserve 共通フロント v2
 
-## 実装済み
+対応URL:
+
 - `/personal/`
-  - 4プランカード選択
-  - 7日表示
-  - 前週・次週
-  - 会員マスター照合予約
 - `/trial/`
-  - 無料体験専用URLの入口
-- 共通CSS/JS構成
+- `/tour/`
+- `/counsel/`
+- `/procedure/`
+- `/meal-planning/`
+- `/unsubscribe/`
 
-## servicesシートに必要なservice_code
-- PT_DIET60
-- PT_ENTRY60
-- PT_PURPOSE60
-- PT_PRIME60
-- PT_TRIAL60
+主な機能:
 
-4つの通常プランが未登録の場合、フロントは表示されても空き枠APIはSERVICE_NOT_FOUNDになります。
+- `getServices`でservicesシートを読込
+- `/personal/`はcategory=PERSONALの公開サービスをカード表示
+- `PT60`と`PT_TRIAL60`は通常プラン一覧から除外
+- `form_type`に応じてMEMBER / VISITOR / BOTHを切替
+- 7日表示＋前週・次週
+- 共通HTML・共通JavaScript
