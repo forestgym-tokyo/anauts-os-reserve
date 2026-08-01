@@ -1,0 +1,77 @@
+:root{
+  color-scheme:dark;
+  --bg:#050a08;
+  --surface:#0d1712;
+  --surface2:#111f18;
+  --line:#2b4136;
+  --text:#f5f7f5;
+  --muted:#a8b7af;
+  --accent:#d7b66f;
+  --accent2:#efd48e;
+  --danger:#ffaaa5;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:radial-gradient(circle at top,rgba(60,98,77,.22),transparent 34rem),var(--bg);
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;
+}
+button,input,textarea{font:inherit}
+button{touch-action:manipulation}
+.page{width:min(100% - 20px,820px);margin:auto;padding:32px 0 72px}
+.eyebrow{color:var(--accent);font-weight:800;letter-spacing:.15em;font-size:.8rem;margin:0 0 8px}
+h1{font-size:clamp(2rem,7vw,3.4rem);line-height:1.15;margin:0 0 10px}
+.lead{color:var(--muted);margin:0}
+.card{
+  margin-top:18px;padding:clamp(20px,4vw,32px);
+  border:1px solid var(--line);border-radius:22px;
+  background:linear-gradient(180deg,rgba(18,32,25,.98),rgba(9,18,14,.98))
+}
+.is-hidden{display:none!important}
+.step{display:flex;align-items:center;gap:10px;margin-bottom:20px}
+.step-num{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:var(--accent);color:#171208;font-weight:900}
+.step h2{margin:0;font-size:1.3rem}
+.plan-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.plan-card{
+  border:1px solid var(--line);border-radius:16px;background:#0a1510;color:var(--text);
+  padding:18px;text-align:left;cursor:pointer;font-weight:800;min-height:84px
+}
+.plan-card small{display:block;color:var(--muted);font-weight:400;margin-top:4px}
+.plan-card.is-selected{border-color:var(--accent);background:rgba(215,182,111,.12);color:var(--accent2)}
+.week-toolbar{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;margin-bottom:14px}
+.week-button,.button{
+  border:0;border-radius:14px;min-height:48px;padding:12px 16px;cursor:pointer;font-weight:900
+}
+.week-button{border:1px solid var(--line);background:var(--surface2);color:var(--text)}
+.week-button:disabled,.button:disabled{opacity:.45;cursor:not-allowed}
+.week-range{text-align:center}
+.button{width:100%}
+.button-primary{background:linear-gradient(135deg,var(--accent2),var(--accent));color:#171208}
+.button-secondary{border:1px solid var(--line);background:var(--surface2);color:var(--text)}
+.status{min-height:1.5em;color:var(--muted);margin:14px 0}
+.week-list{display:grid;gap:11px}
+.day-row{display:grid;grid-template-columns:108px 1fr;gap:14px;padding:14px;border:1px solid var(--line);border-radius:15px;background:#07100c}
+.day-label strong{display:block}.day-label span{color:var(--muted);font-size:.84rem}
+.day-slots{display:flex;gap:8px;flex-wrap:wrap}
+.slot-button{border:1px solid #3c594b;border-radius:11px;background:#0b1912;color:var(--text);padding:9px 11px;font-weight:800;cursor:pointer}
+.slot-button.is-selected{border-color:var(--accent);background:rgba(215,182,111,.14);color:var(--accent2)}
+.no-slots{margin:0;color:var(--muted);padding:8px 0}
+.selected{display:flex;justify-content:space-between;gap:12px;padding:14px 16px;border-radius:14px;background:#07100c;margin-bottom:20px}
+.selected span{color:var(--muted)}
+.field{display:grid;gap:7px;margin-bottom:17px;font-weight:700}
+.field small{color:var(--muted);font-size:.8rem;font-weight:400}
+input,textarea{width:100%;border:1px solid #385046;border-radius:14px;background:#07100c;color:var(--text);padding:14px 15px;outline:none}
+input:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(215,182,111,.15)}
+.alert{padding:13px 14px;border-radius:13px;margin:0 0 16px}
+.alert-error{border:1px solid #743833;background:#321817;color:var(--danger)}
+.complete{text-align:center}
+.complete-mark{display:grid;place-items:center;width:64px;height:64px;margin:0 auto 16px;border-radius:50%;background:var(--accent);color:#171208;font-size:2rem;font-weight:900}
+@media(max-width:620px){
+  .plan-grid{grid-template-columns:1fr}
+  .week-toolbar{grid-template-columns:1fr 1fr}
+  .week-range{grid-column:1/-1;grid-row:1}
+  .week-button{grid-row:2}
+  .day-row{grid-template-columns:1fr}
+  .selected{display:grid}
+}

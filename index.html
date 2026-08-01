@@ -2,91 +2,11 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#07110d">
-  <title>パーソナルトレーニング予約 | The Forest Gym</title>
-  <link rel="stylesheet" href="./style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="refresh" content="0; url=./personal/">
+  <title>A-nauts OS Reserve</title>
 </head>
 <body>
-  <main class="page">
-    <header class="hero">
-      <p class="eyebrow">A-nauts OS Reserve</p>
-      <h1>パーソナルトレーニング予約</h1>
-      <p class="lead">7日分の空き時間を比較して、ご都合のよい日時をお選びください。</p>
-    </header>
-
-    <section class="card" aria-labelledby="availability-title">
-      <div class="step-heading">
-        <span class="step-number">1</span>
-        <h2 id="availability-title">日時を選択</h2>
-      </div>
-
-      <div class="week-toolbar" aria-label="表示週の切り替え">
-        <button id="prevWeekButton" class="week-button" type="button">‹ 前の週</button>
-        <strong id="weekRange" class="week-range">読み込み中</strong>
-        <button id="nextWeekButton" class="week-button" type="button">次の週 ›</button>
-      </div>
-
-      <button id="reloadButton" class="button button-secondary reload-button" type="button">
-        空き状況を更新
-      </button>
-
-      <p id="weekStatus" class="status" aria-live="polite"></p>
-      <div id="weekList" class="week-list" aria-label="7日分の空き時間"></div>
-    </section>
-
-    <section id="customerSection" class="card is-hidden" aria-labelledby="customer-title">
-      <div class="step-heading">
-        <span class="step-number">2</span>
-        <h2 id="customer-title">会員情報を入力</h2>
-      </div>
-
-      <div class="selected-summary">
-        <span>選択中の日時</span>
-        <strong id="selectedSlotText">—</strong>
-      </div>
-
-      <form id="reservationForm" novalidate>
-        <label class="field">
-          <span>会員番号</span>
-          <input id="memberNo" type="text" autocomplete="off" placeholder="例：108035" required>
-        </label>
-
-        <label class="field">
-          <span>登録メールアドレス</span>
-          <input id="customerEmail" type="email" autocomplete="email" placeholder="example@gmail.com" required>
-        </label>
-
-        <label class="field">
-          <span>電話番号</span>
-          <input id="customerPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="09012345678">
-          <small>会員番号と登録メールアドレスで会員マスターを照合します。</small>
-        </label>
-
-        <label class="field">
-          <span>ご要望・備考</span>
-          <textarea id="note" rows="4" placeholder="担当者への連絡事項があればご入力ください"></textarea>
-        </label>
-
-        <div id="formError" class="alert alert-error is-hidden" role="alert"></div>
-
-        <button id="submitButton" class="button button-primary" type="submit">
-          この内容で予約する
-        </button>
-      </form>
-    </section>
-
-    <section id="completeSection" class="card complete-card is-hidden" aria-live="polite">
-      <div class="complete-mark">✓</div>
-      <h2>予約が完了しました</h2>
-      <p id="completeSummary"></p>
-      <p class="reservation-id">予約番号：<strong id="reservationId"></strong></p>
-      <button id="newReservationButton" class="button button-secondary" type="button">
-        別の予約をする
-      </button>
-    </section>
-  </main>
-
-  <script src="./app.js" defer></script>
+  <p><a href="./personal/">パーソナルトレーニング予約へ進む</a></p>
 </body>
 </html>

@@ -1,23 +1,20 @@
-# anauts-os-reserve
+# A-nauts OS Reserve Release 1 Front
 
-The Forest Gym向け予約フロントエンド。
+## 実装済み
+- `/personal/`
+  - 4プランカード選択
+  - 7日表示
+  - 前週・次週
+  - 会員マスター照合予約
+- `/trial/`
+  - 無料体験専用URLの入口
+- 共通CSS/JS構成
 
-## 今回の版
+## servicesシートに必要なservice_code
+- PT_DIET60
+- PT_ENTRY60
+- PT_PURPOSE60
+- PT_PRIME60
+- PT_TRIAL60
 
-- 7日分の空き時間を一括表示
-- 前の週・次の週ボタン
-- 7日分を並列取得
-- 日付と空き時間を同時比較
-- 会員番号・登録メールによる会員マスター照合
-- PT60予約登録
-- スマートフォン対応
-
-## GitHubへの反映
-
-リポジトリ直下の以下3ファイルを差し替えてください。
-
-- `index.html`
-- `style.css`
-- `app.js`
-
-`README.md`は任意です。
+4つの通常プランが未登録の場合、フロントは表示されても空き枠APIはSERVICE_NOT_FOUNDになります。
