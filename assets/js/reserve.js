@@ -39,6 +39,12 @@ const ROUTES = {
     mode: "FIXED",
     serviceCode: "MEAL_PLANNING"
   },
+"training-support": {
+  title: "トレーニングサポート",
+  lead: "会員向けトレーニングサポート（45分）のご予約です。",
+  mode: "FIXED",
+  serviceCode: "TRAINING_SUPPORT45"
+},
   unsubscribe: {
     title: "退会手続き",
     lead: "退会手続きのご来店予約です。",

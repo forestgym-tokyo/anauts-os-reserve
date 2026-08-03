@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#07110d">
+  <title>A-nauts OS Reserve</title>
+  <link rel="stylesheet" href="../assets/css/reserve.css">
+</head>
+<body>
+<main class="page">
+  <header>
+    <p class="eyebrow">A-nauts OS Reserve</p>
+    <h1 id="pageTitle">予約</h1>
+    <p id="pageLead" class="lead"></p>
+  </header>
+
+  <section id="serviceSection" class="card is-hidden">
+    <div class="step">
+      <span class="step-num">1</span>
+      <h2>サービスを選択</h2>
+    </div>
+    <div id="serviceGrid" class="service-grid"></div>
+  </section>
+
+  <section id="availabilitySection" class="card is-hidden">
+    <div class="step">
+      <span id="availabilityStep" class="step-num">2</span>
+      <h2>日時を選択</h2>
+    </div>
+
+    <div class="week-toolbar">
+      <button id="prevWeekButton" class="week-button" type="button">‹ 前の週</button>
+      <strong id="weekRange" class="week-range"></strong>
+      <button id="nextWeekButton" class="week-button" type="button">次の週 ›</button>
+    </div>
+
+    <button id="reloadButton" class="button button-secondary" type="button">空き状況を更新</button>
+    <p id="weekStatus" class="status" aria-live="polite"></p>
+    <div id="weekList" class="week-list"></div>
+  </section>
+
+  <section id="customerSection" class="card is-hidden">
+    <div class="step">
+      <span id="customerStep" class="step-num">3</span>
+      <h2>お客様情報</h2>
+    </div>
+
+    <div class="selected-summary">
+      <span>選択中</span>
+      <strong id="selectedSlotText"></strong>
+    </div>
+
+    <form id="reservationForm" novalidate>
+      <fieldset id="customerTypeField" class="field is-hidden">
+        <legend>会員区分</legend>
+        <div class="choice-row">
+          <label><input type="radio" name="customer_type" value="MEMBER"> 会員</label>
+          <label><input type="radio" name="customer_type" value="VISITOR"> 非会員</label>
+        </div>
+      </fieldset>
+
+      <label id="memberNoField" class="field is-hidden">
+        <span>会員番号</span>
+        <input id="memberNo" type="text" placeholder="例：108035">
+      </label>
+
+      <label id="nameField" class="field is-hidden">
+        <span>氏名</span>
+        <input id="customerName" type="text" autocomplete="name">
+      </label>
+
+      <label class="field">
+        <span>メールアドレス</span>
+        <input id="customerEmail" type="email" autocomplete="email" placeholder="example@gmail.com" required>
+      </label>
+
+      <label id="phoneField" class="field">
+        <span>電話番号</span>
+        <input id="customerPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="09012345678">
+      </label>
+
+      <label id="postalField" class="field is-hidden">
+        <span>郵便番号</span>
+        <input id="postalCode" type="text" inputmode="numeric" placeholder="1234567">
+      </label>
+
+      <label id="addressField" class="field is-hidden">
+        <span>住所</span>
+        <input id="address" type="text" autocomplete="street-address">
+      </label>
+
+      <label class="field">
+        <span>ご要望・備考</span>
+        <textarea id="note" rows="4"></textarea>
+      </label>
+
+      <div id="formError" class="alert alert-error is-hidden" role="alert"></div>
+
+      <button id="submitButton" class="button button-primary" type="submit">
+        この内容で予約する
+      </button>
+    </form>
+  </section>
+
+  <section id="completeSection" class="card complete is-hidden">
+    <div class="complete-mark">✓</div>
+    <h2>予約が完了しました</h2>
+    <p id="completeSummary"></p>
+    <p>予約番号：<strong id="reservationId"></strong></p>
+    <button id="newReservationButton" class="button button-secondary" type="button">別の予約をする</button>
+  </section>
+
+  <section id="fatalErrorSection" class="card is-hidden">
+    <div class="alert alert-error" id="fatalError"></div>
+  </section>
+</main>
+
+<script src="../assets/js/reserve.js" defer></script>
+</body>
+</html>
