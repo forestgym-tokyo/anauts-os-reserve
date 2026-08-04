@@ -12,24 +12,30 @@
     <header class="topbar">
       <div class="brand">
         <div class="brand-mark">A</div>
-        <div><strong>A-nauts</strong><span>OS Reserve</span></div>
+        <div><strong>A-nauts OS</strong><span>Reserve / Admin</span></div>
       </div>
-      <nav class="topnav" aria-label="主要メニュー">
-        <button class="nav-button is-active" data-view="staffSchedule">スタッフ予定</button>
-        <button class="nav-button" data-view="trainerSchedule">トレーナー予定</button>
-        <button class="nav-button" data-view="registration">登録</button>
-        <button class="nav-button" data-view="dailyReport">業務日報</button>
-      </nav>
+      <div class="topbar-right">
+        <div class="context-meta">
+          <span class="store-chip">YACHIYO</span>
+          <span id="todayLabel" class="today-label"></span>
+        </div>
+        <nav class="topnav" aria-label="主要メニュー">
+          <button class="nav-button is-active" data-view="staffSchedule"><span>👤</span>スタッフ予定</button>
+          <button class="nav-button" data-view="trainerSchedule"><span>🏋️</span>トレーナー予定</button>
+          <button class="nav-button" data-view="registration"><span>＋</span>登録</button>
+          <button class="nav-button" data-view="dailyReport"><span>📝</span>業務日報</button>
+        </nav>
+      </div>
     </header>
 
     <main class="main">
       <section id="staffScheduleView" class="view is-active">
         <div class="page-heading">
-          <div><p class="eyebrow">STAFF SCHEDULE</p><h1>スタッフ予定</h1><p>見学・カウンセリング・各種手続きなど、スタッフ担当業務を表示します。</p></div>
+          <div><p class="eyebrow">STAFF SCHEDULE</p><h1>スタッフ予定</h1><p>見学・カウンセリング・各種手続きなど、スタッフ担当業務。</p></div>
           <div class="segmented"><button class="segment is-active" type="button">1週間</button><button class="segment" type="button">1か月</button></div>
         </div>
-        <div class="schedule-toolbar card"><button class="ghost-button" type="button">‹ 前へ</button><strong>今週</strong><button class="ghost-button" type="button">次へ ›</button><button class="ghost-button" type="button">今日</button></div>
-        <div class="empty-state card"><div class="empty-icon">📅</div><h2>予定一覧APIの接続待ちです</h2><p>スタッフ管理を先に完成させた後、予約一覧APIと接続します。</p></div>
+        <div class="schedule-toolbar card"><div class="toolbar-group"><button class="icon-button" type="button" aria-label="前へ">‹</button><button class="ghost-button" type="button">今日</button><button class="icon-button" type="button" aria-label="次へ">›</button></div><strong class="period-title">今週</strong><div class="schedule-summary"><span>表示期間</span><b>7日</b></div></div>
+        <div class="schedule-board card"><div class="schedule-board-head"><span>日時</span><span>予定</span><span>担当</span></div><div class="schedule-placeholder"><div class="placeholder-date"><b>8/4</b><span>火</span></div><div><strong>予定一覧APIの接続待ちです</strong><p>接続後、見学・カウンセリング・手続き予定がここに表示されます。</p></div><div class="assignee-pill">STAFF</div></div></div>
       </section>
 
       <section id="trainerScheduleView" class="view">
@@ -37,14 +43,14 @@
           <div><p class="eyebrow">TRAINER SCHEDULE</p><h1>トレーナー予定</h1><p>パーソナルトレーニングと無料体験のみを表示する専用画面です。</p></div>
           <div class="segmented"><button class="segment is-active" type="button">1週間</button><button class="segment" type="button">1か月</button></div>
         </div>
-        <div class="schedule-toolbar card"><button class="ghost-button" type="button">‹ 前へ</button><strong>今週</strong><button class="ghost-button" type="button">次へ ›</button><button class="ghost-button" type="button">今日</button></div>
-        <div class="empty-state card"><div class="empty-icon">🏋️</div><h2>トレーナー予定APIの接続待ちです</h2><p>スタッフ予定とは別のデータ条件・表示構成で実装します。</p></div>
+        <div class="schedule-toolbar card"><div class="toolbar-group"><button class="icon-button" type="button" aria-label="前へ">‹</button><button class="ghost-button" type="button">今日</button><button class="icon-button" type="button" aria-label="次へ">›</button></div><strong class="period-title">今週</strong><div class="schedule-summary"><span>表示期間</span><b>7日</b></div></div>
+        <div class="trainer-board card"><div class="trainer-placeholder-icon">🏋️</div><div><h2>トレーナー予定APIの接続待ちです</h2><p>パーソナルと無料体験のみを、トレーナー別に表示します。</p></div></div>
       </section>
 
       <section id="registrationView" class="view">
         <div class="page-heading"><div><p class="eyebrow">REGISTRATION</p><h1>各種登録</h1><p>スタッフ、シフト、サービスなどのマスター情報を管理します。</p></div></div>
         <div class="registration-grid">
-          <button class="registration-card" data-registration="staff"><span class="registration-icon">👥</span><strong>スタッフ登録</strong><small>登録・編集・担当サービス設定</small></button>
+          <button class="registration-card is-primary" data-registration="staff"><span class="registration-icon">👥</span><strong>スタッフ登録</strong><small>登録・編集・担当サービス設定</small></button>
           <button class="registration-card" data-registration="shift"><span class="registration-icon">🗓️</span><strong>シフト登録</strong><small>月次アップロード・個別入力</small></button>
           <button class="registration-card" data-registration="service"><span class="registration-icon">🏷️</span><strong>サービス登録</strong><small>サービス内容と予約ルール</small></button>
           <button class="registration-card" data-registration="hours"><span class="registration-icon">🕒</span><strong>サービス提供時間</strong><small>曜日・開始・終了時刻</small></button>
