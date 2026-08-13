@@ -1,106 +1,13 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#f4f6f8">
-  <title>A-nauts OS Reserve | Admin</title>
-  <link rel="stylesheet" href="./admin.css">
-</head>
-<body>
-  <div class="app-shell">
-    <header class="topbar">
-      <div class="brand">
-        <div class="brand-mark">A</div>
-        <div><strong>A-nauts OS</strong><span>Reserve / Admin</span></div>
-      </div>
-      <div class="topbar-right">
-        <div class="context-meta">
-          <span class="store-chip">YACHIYO</span>
-          <span id="todayLabel" class="today-label"></span>
-        </div>
-        <nav class="topnav" aria-label="主要メニュー">
-          <button class="nav-button is-active" data-view="staffSchedule"><span>👤</span>スタッフ予定</button>
-          <button class="nav-button" data-view="trainerSchedule"><span>🏋️</span>トレーナー予定</button>
-          <button class="nav-button" data-view="registration"><span>＋</span>登録</button>
-          <button class="nav-button" data-view="dailyReport"><span>📝</span>業務日報</button>
-        </nav>
-      </div>
-    </header>
-
-    <main class="main">
-      <section id="staffScheduleView" class="view is-active">
-        <div class="page-heading">
-          <div><p class="eyebrow">STAFF SCHEDULE</p><h1>スタッフ予定</h1><p>見学・カウンセリング・各種手続きなど、スタッフ担当業務。</p></div>
-          <div class="segmented"><button class="segment is-active" type="button">1週間</button><button class="segment" type="button">1か月</button></div>
-        </div>
-        <div class="schedule-toolbar card"><div class="toolbar-group"><button class="icon-button" type="button" aria-label="前へ">‹</button><button class="ghost-button" type="button">今日</button><button class="icon-button" type="button" aria-label="次へ">›</button></div><strong class="period-title">今週</strong><div class="schedule-summary"><span>表示期間</span><b>7日</b></div></div>
-        <div class="schedule-board card"><div class="schedule-board-head"><span>日時</span><span>予定</span><span>担当</span></div><div class="schedule-placeholder"><div class="placeholder-date"><b>8/4</b><span>火</span></div><div><strong>予定一覧APIの接続待ちです</strong><p>接続後、見学・カウンセリング・手続き予定がここに表示されます。</p></div><div class="assignee-pill">STAFF</div></div></div>
-      </section>
-
-      <section id="trainerScheduleView" class="view">
-        <div class="page-heading">
-          <div><p class="eyebrow">TRAINER SCHEDULE</p><h1>トレーナー予定</h1><p>パーソナルトレーニングと無料体験のみを表示する専用画面です。</p></div>
-          <div class="segmented"><button class="segment is-active" type="button">1週間</button><button class="segment" type="button">1か月</button></div>
-        </div>
-        <div class="schedule-toolbar card"><div class="toolbar-group"><button class="icon-button" type="button" aria-label="前へ">‹</button><button class="ghost-button" type="button">今日</button><button class="icon-button" type="button" aria-label="次へ">›</button></div><strong class="period-title">今週</strong><div class="schedule-summary"><span>表示期間</span><b>7日</b></div></div>
-        <div class="trainer-board card"><div class="trainer-placeholder-icon">🏋️</div><div><h2>トレーナー予定APIの接続待ちです</h2><p>パーソナルと無料体験のみを、トレーナー別に表示します。</p></div></div>
-      </section>
-
-      <section id="registrationView" class="view">
-        <div class="page-heading"><div><p class="eyebrow">REGISTRATION</p><h1>各種登録</h1><p>スタッフ、シフト、サービスなどのマスター情報を管理します。</p></div></div>
-        <div class="registration-grid">
-          <button class="registration-card is-primary" data-registration="staff"><span class="registration-icon">👥</span><strong>スタッフ登録</strong><small>登録・編集・担当サービス設定</small></button>
-          <button class="registration-card" data-registration="shift"><span class="registration-icon">🗓️</span><strong>シフト登録</strong><small>月次アップロード・個別入力</small></button>
-          <button class="registration-card" data-registration="service"><span class="registration-icon">🏷️</span><strong>サービス登録</strong><small>サービス内容と予約ルール</small></button>
-          <button class="registration-card" data-registration="hours"><span class="registration-icon">🕒</span><strong>サービス提供時間</strong><small>曜日・開始・終了時刻</small></button>
-          <button class="registration-card" data-registration="mailTemplate"><span class="registration-icon">✉️</span><strong>メールテンプレート</strong><small>件名・本文の編集</small></button>
-          <button class="registration-card" data-registration="calendar"><span class="registration-icon">📆</span><strong>カレンダー</strong><small>Googleカレンダー接続設定</small></button>
-          <button class="registration-card" data-registration="mailAccount"><span class="registration-icon">📧</span><strong>メールアカウント</strong><small>送信元・返信先・管理通知先</small></button>
-        </div>
-
-        <section id="staffManager" class="manager card is-hidden">
-          <div class="manager-header"><div><p class="eyebrow">STAFF</p><h2>スタッフ管理</h2></div><button id="newStaffButton" class="primary-button" type="button">＋ 新規登録</button></div>
-          <div class="staff-layout">
-            <aside class="staff-list-panel"><label class="search-box"><span>⌕</span><input id="staffSearch" type="search" placeholder="氏名・表示名・コードで検索"></label><div id="staffList" class="staff-list"></div></aside>
-            <div class="staff-form-panel">
-              <form id="staffForm">
-                <div class="form-header"><div><h3 id="staffFormTitle">新規スタッフ</h3><p id="staffCodeDisplay">スタッフコードは姓（ローマ字）から自動生成されます。</p></div><label class="switch-field"><input id="active" type="checkbox" checked><span>有効</span></label></div>
-                <div id="staffFormMessage" class="form-message is-hidden" role="status"></div>
-                <div class="form-section"><h4>基本情報</h4><div class="form-grid">
-                  <label><span>氏名</span><input id="staffName" required></label>
-                  <label><span>表示名</span><input id="displayName" required></label>
-                  <label><span>姓（ローマ字）</span><input id="romanSurname" placeholder="KAWAKAMI"></label>
-                  <label><span>ブランド</span><select id="brandCode" required><option value="TFG">The Forest Gym</option><option value="MPG">My Private Gym</option></select></label>
-                  <label><span>店舗</span><select id="storeCode" required><option value="YACHIYO">YACHIYO</option><option value="SOGA">SOGA</option></select></label>
-                  <label><span>役割</span><select id="role" required><option value="OWNER">👑 OWNER</option><option value="STAFF">👤 STAFF</option><option value="TRAINER">🏋️ TRAINER</option></select></label>
-                  <label><span>メール</span><input id="email" type="email"></label>
-                  <label><span>カレンダー</span><input id="calendarCode" placeholder="TFG_MAIN"></label>
-                  <label><span>メールアカウント</span><input id="mailAccountCode" placeholder="GMAIL01"></label>
-                  <label><span>カラー</span><div class="color-field"><input id="color" type="color" value="#2563eb"><input id="colorText" value="#2563EB" maxlength="7"></div></label>
-                </div></div>
-                <div class="form-section"><h4>担当可能サービス</h4><div class="check-grid">
-                  <label><input id="canPersonal" type="checkbox"> パーソナル</label>
-                  <label><input id="canTour" type="checkbox"> 店内見学</label>
-                  <label><input id="canCounsel" type="checkbox"> ダイエットカウンセリング</label>
-                  <label><input id="canMealPlanning" type="checkbox"> Meal Planning</label>
-                  <label><input id="canTrainingSupport" type="checkbox"> トレーニングサポート</label>
-                  <label><input id="canProcedure" type="checkbox"> 各種手続き</label>
-                  <label><input id="canUnsubscribe" type="checkbox"> 退会手続き</label>
-                  <label><input id="can9Round" type="checkbox"> 9ROUND</label>
-                </div></div>
-                <div class="form-actions"><button id="saveStaffButton" class="primary-button" type="submit">保存</button></div>
-              </form>
-            </div>
-          </div>
-        </section>
-
-        <section id="registrationPlaceholder" class="manager card is-hidden"><div class="empty-state compact"><div id="placeholderIcon" class="empty-icon">🛠️</div><h2 id="placeholderTitle">準備中</h2><p>スタッフ管理の次に実装します。</p></div></section>
-      </section>
-
-      <section id="dailyReportView" class="view"><div class="page-heading"><div><p class="eyebrow">DAILY REPORT</p><h1>業務日報</h1><p>見学結果、入会有無、清掃、マシン状況などをリリース後に実装します。</p></div></div><div class="empty-state card"><div class="empty-icon">📝</div><h2>現在準備中です</h2><p>Ver.1.1で実装予定です。</p></div></section>
-    </main>
-  </div>
-  <script src="./admin.js" defer></script>
-</body>
-</html>
+<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#f4f6f8"><title>A-nauts OS Reserve | Admin</title><link rel="stylesheet" href="./admin.css"></head><body>
+<div class="app-shell"><header class="topbar"><div class="brand"><div class="brand-mark">A</div><div><strong>A-nauts OS</strong><span>Reserve / Admin</span></div></div><div class="topbar-right"><div class="context-meta"><span class="store-chip">YACHIYO</span><span id="todayLabel" class="today-label"></span></div><nav class="topnav"><button class="nav-button is-active" data-view="staffSchedule"><span>👤</span>スタッフ予定</button><button class="nav-button" data-view="trainerSchedule"><span>🏋️</span>トレーナー予定</button><button class="nav-button" data-view="registration"><span>＋</span>登録</button><button class="nav-button" data-view="dailyReport"><span>📝</span>業務日報</button></nav></div></header>
+<main class="main">
+<section id="staffScheduleView" class="view is-active"><div class="page-heading"><div><p class="eyebrow">STAFF SCHEDULE</p><h1>スタッフ予定</h1><p>見学・カウンセリング・各種手続きなど、スタッフ担当業務。</p></div></div><div class="schedule-board card"><div class="schedule-placeholder"><div><strong>予定一覧APIの接続待ちです</strong><p>接続後、予定をここに表示します。</p></div></div></div></section>
+<section id="trainerScheduleView" class="view"><div class="page-heading"><div><p class="eyebrow">TRAINER SCHEDULE</p><h1>トレーナー予定</h1><p>パーソナルトレーニングと無料体験のみを表示します。</p></div></div><div class="trainer-board card"><div class="trainer-placeholder-icon">🏋️</div><div><h2>トレーナー予定APIの接続待ちです</h2></div></div></section>
+<section id="registrationView" class="view"><div class="page-heading"><div><p class="eyebrow">REGISTRATION</p><h1>各種登録</h1><p>スタッフ、シフト、サービスなどのマスター情報を管理します。</p></div></div>
+<div class="registration-grid"><button class="registration-card is-primary" data-registration="staff"><span class="registration-icon">👥</span><strong>スタッフ登録</strong><small>登録・編集・担当サービス設定</small></button><button class="registration-card" data-registration="shift"><span class="registration-icon">🗓️</span><strong>シフト登録</strong><small>月次アップロード・個別入力</small></button><button class="registration-card" data-registration="service"><span class="registration-icon">🏷️</span><strong>サービス登録</strong></button><button class="registration-card" data-registration="hours"><span class="registration-icon">🕒</span><strong>サービス提供時間</strong></button></div>
+<section id="staffManager" class="manager card is-hidden"><div class="manager-header"><div><p class="eyebrow">STAFF</p><h2>スタッフ管理</h2></div></div><div class="staff-layout"><aside class="staff-list-panel"><label class="search-box"><span>⌕</span><input id="staffSearch" type="search" placeholder="氏名・コードで検索"></label><div id="staffList" class="staff-list"></div></aside><div class="staff-form-panel"><div class="empty-state compact"><h2>既存スタッフ管理</h2><p>既存機能はそのまま利用します。</p></div></div></div></section>
+<section id="shiftManager" class="manager card is-hidden"><div class="manager-header"><div><p class="eyebrow">STAFF SHIFT</p><h2>シフト登録</h2></div></div><div class="shift-tabs"><button class="shift-tab is-active" data-shift-tab="bulk">月次一括登録</button><button class="shift-tab" data-shift-tab="single">個別登録</button></div><div id="shiftMessage" class="form-message is-hidden shift-message"></div>
+<div id="shiftBulkPanel" class="shift-panel"><div class="shift-form-grid"><label><span>店舗</span><select id="shiftBulkStore"></select></label><label><span>対象月</span><input id="shiftTargetMonth" type="month"></label><label><span>登録方式</span><select id="shiftImportMode"><option value="REPLACE_MONTH">対象月を全置換</option><option value="APPEND">追加登録</option></select></label><label><span>CSVファイル</span><input id="shiftCsvFile" type="file" accept=".csv,text/csv"></label></div><div class="csv-help">CSV列：staff_code,date,start_time,end_time</div><div class="shift-actions"><button id="shiftPreviewButton" class="ghost-button">プレビュー</button><button id="shiftImportButton" class="primary-button" disabled>登録する</button></div><div id="shiftPreviewArea" class="shift-preview is-hidden"><div id="shiftPreviewSummary" class="preview-summary"></div><div class="table-wrap"><table class="data-table"><thead><tr><th>行</th><th>スタッフ</th><th>日付</th><th>開始</th><th>終了</th><th>結果</th></tr></thead><tbody id="shiftPreviewBody"></tbody></table></div></div></div>
+<div id="shiftSinglePanel" class="shift-panel is-hidden"><form id="shiftSingleForm"><div class="shift-form-grid"><label><span>店舗</span><select id="shiftSingleStore" required></select></label><label><span>スタッフ</span><select id="shiftSingleStaff" required></select></label><label><span>日付</span><input id="shiftSingleDate" type="date" required></label><label><span>開始</span><input id="shiftSingleStart" type="time" required></label><label><span>終了</span><input id="shiftSingleEnd" type="time" required></label></div><div class="shift-actions"><button id="shiftSingleSaveButton" class="primary-button">保存</button></div></form></div></section>
+<section id="registrationPlaceholder" class="manager card is-hidden"><div class="empty-state compact"><div id="placeholderIcon" class="empty-icon">🛠️</div><h2 id="placeholderTitle">準備中</h2></div></section></section>
+<section id="dailyReportView" class="view"><div class="empty-state card"><div class="empty-icon">📝</div><h2>現在準備中です</h2></div></section></main></div><script src="./admin.js" defer></script></body></html>
