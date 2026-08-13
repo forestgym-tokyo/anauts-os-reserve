@@ -1,3 +1,4 @@
+// BUILD: 20260813-2235-service-manager-v2
 const API_URL="https://script.google.com/macros/s/AKfycbyvpQRxRpMRfpaQHtBar77dViCqPl-hdFW-2yMdozhN8RHtwcrFiNEM9cvEbny4x9q0/exec";
 const state={staff:[],stores:[],services:[],serviceHours:[],selectedServiceCode:"",selectedStaffCode:"",shiftRows:[],shiftPreview:null};
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
