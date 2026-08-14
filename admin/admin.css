@@ -563,3 +563,27 @@ input::placeholder,textarea::placeholder{color:#647067}
   .shift-time-grid{grid-template-columns:1fr}
   .shift-time-separator{min-height:auto}
 }
+
+
+/* ===== Shift import safety v4 ===== */
+.shift-replace-warning{
+  display:flex;
+  align-items:flex-start;
+  gap:12px;
+  margin-top:14px;
+  padding:14px 16px;
+  border:1px solid rgba(242,100,100,.30);
+  border-radius:13px;
+  background:rgba(242,100,100,.10);
+  color:#ffc2c2;
+}
+.shift-replace-warning strong{
+  flex:0 0 auto;
+  color:#ff9d9d;
+}
+.shift-replace-warning span{
+  line-height:1.55;
+}
+#shiftImportMode option[value="REPLACE_MONTH"]{
+  color:#ffaaaa;
+}

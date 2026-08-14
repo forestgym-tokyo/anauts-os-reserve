@@ -179,6 +179,7 @@ function setupShift(){
   $("#shiftSingleDate").onchange=loadRegisteredShifts;
   $("#shiftEditCancelButton").onclick=resetShiftEditor;
   resetShiftEditor();
+  updateReplaceWarning();
   if(!$("#shiftSinglePanel").classList.contains("is-hidden"))loadRegisteredShifts();
 }
 
@@ -256,9 +257,137 @@ async function deleteRegisteredShift(r){
 
 function csvLine(line){const a=[];let s="",q=false;for(let i=0;i<line.length;i++){const c=line[i];if(c==='"'){if(q&&line[i+1]==='"'){s+='"';i++}else q=!q}else if(c===","&&!q){a.push(s);s=""}else s+=c}a.push(s);return a}
 async function readCsv(f){const lines=(await f.text()).replace(/^\uFEFF/,"").split(/\r?\n/).filter(x=>x.trim());if(lines.length<2)throw new Error("CSVにデータがありません。");const h=csvLine(lines[0]).map(x=>x.trim()),req=["staff_code","date","start_time","end_time"];req.forEach(k=>{if(!h.includes(k))throw new Error(`CSVに ${k} 列がありません。`)});return lines.slice(1).map(l=>{const c=csvLine(l),o={};h.forEach((x,i)=>o[x]=String(c[i]??"").trim());return {staff_code:o.staff_code,date:o.date,start_time:o.start_time,end_time:o.end_time}})}
-$("#shiftPreviewButton").onclick=async()=>{hideMsg();const f=$("#shiftCsvFile").files[0];if(!f)return msg("CSVファイルを選択してください。",true);try{state.shiftRows=await readCsv(f);const j=await apiPost({action:"previewStaffShiftImport",mode:$("#shiftImportMode").value,store_code:$("#shiftBulkStore").value,target_month:$("#shiftTargetMonth").value,rows:state.shiftRows});state.shiftPreview=j.data;renderPreview(j.data);$("#shiftImportButton").disabled=+j.data.error_count>0||+j.data.valid_count===0;msg(+j.data.error_count?"エラーがあります。CSVを修正してください。":"プレビューOKです。",+j.data.error_count>0)}catch(e){msg(e.message,true)}};
+
+function monthRange(ym){
+  const m=/^(\d{4})-(\d{2})$/.exec(String(ym||""));
+  if(!m)return null;
+  const y=+m[1],mo=+m[2];
+  const last=new Date(y,mo,0).getDate();
+  return {
+    start:`${m[1]}-${m[2]}-01`,
+    end:`${m[1]}-${m[2]}-${String(last).padStart(2,"0")}`
+  };
+}
+
+async function getExistingShiftCountForImport(){
+  const ym=$("#shiftTargetMonth")?.value||"";
+  const store=$("#shiftBulkStore")?.value||"";
+  const range=monthRange(ym);
+  if(!range)return 0;
+  const j=await apiGet("getStaffShifts",{start_date:range.start,end_date:range.end});
+  const rows=Array.isArray(j.data)?j.data:Array.isArray(j.data?.shifts)?j.data.shifts:[];
+  return rows.filter(r=>(!store||String(r.store_code)===store)&&r.active!==false).length;
+}
+
+async function updateReplaceWarning(){
+  const box=$("#shiftReplaceWarning");
+  if(!box)return;
+  const replace=$("#shiftImportMode")?.value==="REPLACE_MONTH";
+  box.classList.toggle("is-hidden",!replace);
+  if(!replace)return;
+  $("#shiftReplaceWarningText").textContent="既存シフト件数を確認しています…";
+  try{
+    const count=await getExistingShiftCountForImport();
+    state.shiftExistingCount=count;
+    $("#shiftReplaceWarningText").textContent=
+      `対象月の既存シフト ${count}件を削除して、CSVの内容に置き換えます。`;
+  }catch(e){
+    state.shiftExistingCount=null;
+    $("#shiftReplaceWarningText").textContent=
+      "対象月の既存シフトを削除してCSV内容に置き換えます。件数取得に失敗したため、登録前に再確認してください。";
+  }
+}
+
+$("#shiftImportMode")?.addEventListener("change",updateReplaceWarning);
+$("#shiftTargetMonth")?.addEventListener("change",updateReplaceWarning);
+$("#shiftBulkStore")?.addEventListener("change",updateReplaceWarning);
+$("#shiftPreviewButton").onclick=async()=>{
+  hideMsg();
+  const f=$("#shiftCsvFile").files[0];
+  if(!f)return msg("CSVファイルを選択してください。",true);
+  try{
+    state.shiftRows=await readCsv(f);
+
+    if($("#shiftImportMode").value==="REPLACE_MONTH"){
+      state.shiftExistingCount=await getExistingShiftCountForImport();
+      await updateReplaceWarning();
+    }else{
+      state.shiftExistingCount=0;
+    }
+
+    const j=await apiPost({
+      action:"previewStaffShiftImport",
+      mode:$("#shiftImportMode").value,
+      store_code:$("#shiftBulkStore").value,
+      target_month:$("#shiftTargetMonth").value,
+      rows:state.shiftRows
+    });
+
+    state.shiftPreview=j.data;
+    renderPreview(j.data);
+    $("#shiftImportButton").disabled=+j.data.error_count>0||+j.data.valid_count===0;
+
+    if(+j.data.error_count){
+      msg("エラーがあります。CSVを修正してください。",true);
+    }else if($("#shiftImportMode").value==="REPLACE_MONTH"){
+      msg(`プレビューOKです。登録すると既存シフト ${state.shiftExistingCount||0}件を削除して置き換えます。`,true);
+    }else{
+      msg("プレビューOKです。既存シフトを残したまま追加登録します。");
+    }
+  }catch(e){
+    msg(e.message,true);
+  }
+};
 function renderPreview(d){$("#shiftPreviewArea").classList.remove("is-hidden");$("#shiftPreviewSummary").innerHTML=`<span>全 ${d.total_count}件</span><strong class="ok-count">有効 ${d.valid_count}件</strong><strong class="error-count">エラー ${d.error_count}件</strong>`;const em=new Map((d.errors||[]).map(x=>[+x.row,x]));$("#shiftPreviewBody").innerHTML=state.shiftRows.map((r,i)=>{const e=em.get(i+2),s=state.staff.find(x=>x.staff_code===r.staff_code);return `<tr class="${e?"row-error":""}"><td>${i+2}</td><td>${esc(s?.display_name||s?.staff_name||r.staff_code)}<small>${esc(r.staff_code)}</small></td><td>${esc(r.date)}</td><td>${esc(r.start_time)}</td><td>${esc(r.end_time)}</td><td>${e?`<span class="status-bad">${esc(e.message||e.code)}</span>`:'<span class="status-ok">OK</span>'}</td></tr>`}).join("")}
-$("#shiftImportButton").onclick=async()=>{if(!state.shiftPreview||+state.shiftPreview.error_count)return msg("エラーのないプレビューを先に実行してください。",true);if(!confirm(`${$("#shiftTargetMonth").value} のシフト ${state.shiftRows.length}件を登録します。よろしいですか？`))return;try{const j=await apiPost({action:"importStaffShifts",mode:$("#shiftImportMode").value,store_code:$("#shiftBulkStore").value,target_month:$("#shiftTargetMonth").value,rows:state.shiftRows});msg(`登録完了：${j.data.inserted_count}件 / 無効化：${j.data.disabled_count}件`);$("#shiftImportButton").disabled=true}catch(e){msg(e.message,true)}};
+$("#shiftImportButton").onclick=async()=>{
+  if(!state.shiftPreview||+state.shiftPreview.error_count){
+    return msg("エラーのないプレビューを先に実行してください。",true);
+  }
+
+  const mode=$("#shiftImportMode").value;
+  const month=$("#shiftTargetMonth").value;
+  const newCount=state.shiftRows.length;
+
+  let confirmText="";
+  if(mode==="REPLACE_MONTH"){
+    let existing=state.shiftExistingCount;
+    if(existing===undefined||existing===null){
+      try{existing=await getExistingShiftCountForImport()}catch(e){existing="不明"}
+    }
+    confirmText=
+      `【対象月を全置換】\n\n`+
+      `${month} の既存シフト ${existing}件を削除し、CSV ${newCount}件に置き換えます。\n\n`+
+      `この操作は既存シフトに影響します。実行しますか？`;
+  }else{
+    confirmText=
+      `【追加登録】\n\n`+
+      `${month} にCSV ${newCount}件を追加します。\n`+
+      `既存シフトは削除しません。\n\n実行しますか？`;
+  }
+
+  if(!confirm(confirmText))return;
+
+  try{
+    const j=await apiPost({
+      action:"importStaffShifts",
+      mode,
+      store_code:$("#shiftBulkStore").value,
+      target_month:month,
+      rows:state.shiftRows
+    });
+
+    if(mode==="REPLACE_MONTH"){
+      msg(`全置換完了：登録 ${j.data.inserted_count}件 / 既存無効化 ${j.data.disabled_count}件`);
+    }else{
+      msg(`追加登録完了：${j.data.inserted_count}件`);
+    }
+
+    $("#shiftImportButton").disabled=true;
+    await updateReplaceWarning();
+  }catch(e){
+    msg(e.message,true);
+  }
+};
 
 $("#shiftSingleForm").onsubmit=async e=>{
   e.preventDefault();
