@@ -6,11 +6,154 @@ async function apiGet(action,params={}){const u=new URL(API_URL);u.searchParams.
 async function apiPost(p){const r=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(p)}),j=await r.json();if(!j.ok)throw new Error(j.message||"処理失敗");return j}
 $$(".nav-button").forEach(b=>b.onclick=async()=>{$$(".nav-button").forEach(x=>x.classList.toggle("is-active",x===b));$$(".view").forEach(x=>x.classList.remove("is-active"));$("#"+b.dataset.view+"View").classList.add("is-active");if(b.dataset.view==="staffSchedule")await loadStaffSchedule();if(b.dataset.view==="trainerSchedule")await loadTrainerSchedule()});
 $$(".registration-card").forEach(b=>b.onclick=()=>showRegistration(b.dataset.registration));
-async function showRegistration(type){["#staffManager","#shiftManager","#serviceManager","#serviceHoursManager","#registrationPlaceholder"].forEach(x=>$(x)?.classList.add("is-hidden"));if(type==="staff"){$("#staffManager").classList.remove("is-hidden");await loadStaff();return}if(type==="shift"){$("#shiftManager").classList.remove("is-hidden");await Promise.all([loadStaff(),loadStores()]);setupShift();return}if(type==="service"){$("#serviceManager").classList.remove("is-hidden");await loadServices();setupServiceManager();return}if(type==="hours"){$("#serviceHoursManager").classList.remove("is-hidden");await loadServices();setupServiceHours();return}const map={},v=map[type]||["🛠️","準備中"];$("#placeholderIcon").textContent=v[0];$("#placeholderTitle").textContent=v[1];$("#registrationPlaceholder").classList.remove("is-hidden")}
+async function showRegistration(type){["#staffManager","#shiftManager","#serviceManager","#serviceHoursManager","#registrationPlaceholder"].forEach(x=>$(x)?.classList.add("is-hidden"));if(type==="staff"){$("#staffManager").classList.remove("is-hidden");await loadStaff();if(!state.selectedStaffCode)resetStaffForm();return}if(type==="shift"){$("#shiftManager").classList.remove("is-hidden");await Promise.all([loadStaff(),loadStores()]);setupShift();return}if(type==="service"){$("#serviceManager").classList.remove("is-hidden");await loadServices();setupServiceManager();return}if(type==="hours"){$("#serviceHoursManager").classList.remove("is-hidden");await loadServices();setupServiceHours();return}const map={},v=map[type]||["🛠️","準備中"];$("#placeholderIcon").textContent=v[0];$("#placeholderTitle").textContent=v[1];$("#registrationPlaceholder").classList.remove("is-hidden")}
 async function loadStaff(){try{const j=await apiGet("getStaff",{include_inactive:"true"});state.staff=Array.isArray(j.data?.staff)?j.data.staff:Array.isArray(j.data)?j.data:[];renderStaff()}catch(e){state.staff=[];$("#staffList").innerHTML=`<div class="no-staff">${esc(e.message)}</div>`}}
 async function loadStores(){try{const j=await apiGet("getStores");state.stores=Array.isArray(j.data)?j.data:[]}catch(e){msg(e.message,true)}}
-function renderStaff(){const box=$("#staffList");if(!box)return;const q=($("#staffSearch")?.value||"").toLowerCase();const a=state.staff.filter(s=>[s.staff_code,s.staff_name,s.display_name,s.role].join(" ").toLowerCase().includes(q));box.innerHTML=a.map(s=>`<div class="staff-card"><span class="role-icon">${String(s.role).toUpperCase()==="TRAINER"?"🏋️":"👤"}</span><span class="staff-meta"><strong>${esc(s.display_name||s.staff_name||s.staff_code)}</strong><small>${esc(s.role||"")} · ${esc(s.store_code||"")}</small></span></div>`).join("")||'<div class="no-staff">該当するスタッフがいません。</div>'}
+function renderStaff(){
+  const box=$("#staffList");
+  if(!box)return;
+  const q=($("#staffSearch")?.value||"").toLowerCase();
+  const rows=state.staff.filter(s=>
+    [s.staff_code,s.staff_name,s.display_name,s.role]
+      .join(" ").toLowerCase().includes(q)
+  );
+
+  box.innerHTML=rows.map(s=>`
+    <button type="button"
+      class="staff-card ${String(s.staff_code)===String(state.selectedStaffCode)?"is-selected":""}"
+      data-staff-code="${esc(s.staff_code)}">
+      <span class="role-icon">${String(s.role).toUpperCase()==="TRAINER"?"🏋️":"👤"}</span>
+      <span class="staff-meta">
+        <strong>${esc(s.display_name||s.staff_name||s.staff_code)}</strong>
+        <small>${esc(s.role||"")} · ${esc(s.store_code||"")}${s.active===false?" · 無効":""}</small>
+      </span>
+      <span class="staff-color" style="background:${esc(s.color||"#63d179")}"></span>
+    </button>
+  `).join("")||'<div class="no-staff">該当するスタッフがいません。</div>';
+
+  $$("[data-staff-code]").forEach(b=>{
+    b.onclick=()=>selectStaff(b.dataset.staffCode);
+  });
+}
+
 $("#staffSearch")?.addEventListener("input",renderStaff);
+
+function staffMsg(text,error=false){
+  const n=$("#staffMessage");
+  if(!n)return;
+  n.textContent=text||"";
+  n.classList.toggle("is-hidden",!text);
+  n.classList.toggle("is-error",!!error);
+}
+
+function resetStaffForm(){
+  state.selectedStaffCode="";
+  $("#staffForm")?.reset();
+  $("#staffFormTitle").textContent="新規スタッフ";
+  $("#staffCodeHelp").textContent="スタッフコードは新規登録後は変更しないでください。";
+  $("#staffCode").readOnly=false;
+  $("#staffBrand").value="TFG";
+  $("#staffStore").value="YACHIYO";
+  $("#staffRole").value="STAFF";
+  $("#staffActive").checked=true;
+  $("#staffColor").value="#63d179";
+  $("#staffColorPicker").value="#63d179";
+  staffMsg("");
+  renderStaff();
+}
+
+async function selectStaff(code){
+  if(!code)return;
+  staffMsg("");
+  try{
+    const j=await apiGet("getStaffByCode",{staff_code:code});
+    const s=j.data||{};
+    state.selectedStaffCode=s.staff_code||code;
+
+    $("#staffFormTitle").textContent=s.display_name||s.staff_name||s.staff_code||"スタッフ編集";
+    $("#staffCodeHelp").textContent=`スタッフコード：${s.staff_code||code}（編集時は変更しないでください）`;
+    $("#staffCode").value=s.staff_code||"";
+    $("#staffCode").readOnly=true;
+    $("#staffBrand").value=s.brand_code||"TFG";
+    $("#staffStore").value=s.store_code||"YACHIYO";
+    $("#staffName").value=s.staff_name||"";
+    $("#staffDisplayName").value=s.display_name||"";
+    $("#staffEmail").value=s.email||"";
+    $("#staffCalendarCode").value=s.calendar_code||"";
+    $("#staffMailAccountCode").value=s.mail_account_code||"";
+    $("#staffRole").value=s.role||"STAFF";
+    $("#staffActive").checked=s.active!==false;
+
+    const color=/^#[0-9A-Fa-f]{6}$/.test(s.color||"")?s.color:"#63d179";
+    $("#staffColor").value=color;
+    $("#staffColorPicker").value=color;
+
+    $("#staffCanPersonal").checked=!!s.can_personal;
+    $("#staffCanTour").checked=!!s.can_tour;
+    $("#staffCanCounsel").checked=!!s.can_counsel;
+    $("#staffCanMealPlanning").checked=!!s.can_meal_planning;
+    $("#staffCanProcedure").checked=!!s.can_procedure;
+    $("#staffCanUnsubscribe").checked=!!s.can_unsubscribe;
+    $("#staffCanTrainingSupport").checked=!!s.can_training_support;
+    $("#staffCan9Round").checked=!!s.can_9round;
+
+    renderStaff();
+  }catch(e){
+    staffMsg(e.message||"スタッフ情報を取得できませんでした。",true);
+  }
+}
+
+async function saveStaffFromUi(e){
+  e.preventDefault();
+  const code=String($("#staffCode").value||"").trim().toUpperCase();
+  if(!code)return staffMsg("スタッフコードを入力してください。",true);
+
+  const button=$("#saveStaffButton");
+  button.disabled=true;
+  button.textContent="保存中…";
+
+  try{
+    const j=await apiPost({
+      action:"saveStaff",
+      staff_code:code,
+      brand_code:$("#staffBrand").value.trim(),
+      store_code:$("#staffStore").value.trim(),
+      staff_name:$("#staffName").value.trim(),
+      display_name:$("#staffDisplayName").value.trim(),
+      email:$("#staffEmail").value.trim(),
+      calendar_code:$("#staffCalendarCode").value.trim(),
+      mail_account_code:$("#staffMailAccountCode").value.trim(),
+      color:$("#staffColor").value.trim(),
+      role:$("#staffRole").value,
+      active:$("#staffActive").checked,
+      can_personal:$("#staffCanPersonal").checked,
+      can_tour:$("#staffCanTour").checked,
+      can_counsel:$("#staffCanCounsel").checked,
+      can_meal_planning:$("#staffCanMealPlanning").checked,
+      can_procedure:$("#staffCanProcedure").checked,
+      can_unsubscribe:$("#staffCanUnsubscribe").checked,
+      can_training_support:$("#staffCanTrainingSupport").checked,
+      can_9round:$("#staffCan9Round").checked
+    });
+
+    await loadStaff();
+    await selectStaff(code);
+    staffMsg(j.data?.mode==="CREATE"?"スタッフを登録しました。":"スタッフ情報を更新しました。");
+  }catch(err){
+    staffMsg(err.message||"保存に失敗しました。",true);
+  }finally{
+    button.disabled=false;
+    button.textContent="保存";
+  }
+}
+
+$("#newStaffButton")?.addEventListener("click",resetStaffForm);
+$("#staffForm")?.addEventListener("submit",saveStaffFromUi);
+$("#staffColorPicker")?.addEventListener("input",e=>{$("#staffColor").value=e.target.value});
+$("#staffColor")?.addEventListener("input",e=>{
+  const v=e.target.value.trim();
+  if(/^#[0-9A-Fa-f]{6}$/.test(v))$("#staffColorPicker").value=v;
+});
 $$(".shift-tab").forEach(b=>b.onclick=()=>{$$(".shift-tab").forEach(x=>x.classList.toggle("is-active",x===b));$("#shiftBulkPanel").classList.toggle("is-hidden",b.dataset.shiftTab!=="bulk");$("#shiftSinglePanel").classList.toggle("is-hidden",b.dataset.shiftTab!=="single");hideMsg()});
 function setupShift(){const stores=state.stores.filter(s=>s.active!==false),o=stores.map(s=>`<option value="${esc(s.store_code)}">${esc(s.store_name||s.store_code)} (${esc(s.store_code)})</option>`).join("");$("#shiftBulkStore").innerHTML=o;$("#shiftSingleStore").innerHTML=o;["#shiftBulkStore","#shiftSingleStore"].forEach(x=>{if(stores.some(s=>s.store_code==="YACHIYO"))$(x).value="YACHIYO"});$("#shiftSingleStaff").innerHTML=state.staff.filter(s=>s.active!==false).map(s=>`<option value="${esc(s.staff_code)}">${esc(s.display_name||s.staff_name||s.staff_code)} (${esc(s.staff_code)})</option>`).join("");const d=new Date(),ym=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;$("#shiftTargetMonth").value=ym;$("#shiftSingleDate").value=`${ym}-${String(d.getDate()).padStart(2,"0")}`}
 function csvLine(line){const a=[];let s="",q=false;for(let i=0;i<line.length;i++){const c=line[i];if(c==='"'){if(q&&line[i+1]==='"'){s+='"';i++}else q=!q}else if(c===","&&!q){a.push(s);s=""}else s+=c}a.push(s);return a}
