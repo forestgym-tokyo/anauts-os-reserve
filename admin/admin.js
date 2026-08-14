@@ -1,10 +1,10 @@
-// BUILD: 20260814-staff-schedule-v1
+// BUILD: 20260814-trainer-schedule-v1
 const API_URL="https://script.google.com/macros/s/AKfycbyvpQRxRpMRfpaQHtBar77dViCqPl-hdFW-2yMdozhN8RHtwcrFiNEM9cvEbny4x9q0/exec";
-const state={staff:[],stores:[],services:[],serviceHours:[],selectedServiceCode:"",selectedStaffCode:"",shiftRows:[],shiftPreview:null,staffScheduleDate:"",staffSchedule:null};
+const state={staff:[],stores:[],services:[],serviceHours:[],selectedServiceCode:"",selectedStaffCode:"",shiftRows:[],shiftPreview:null,staffScheduleDate:"",staffSchedule:null,trainerScheduleDate:"",trainerSchedule:null};
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
 async function apiGet(action,params={}){const u=new URL(API_URL);u.searchParams.set("action",action);Object.entries(params).forEach(([k,v])=>u.searchParams.set(k,v));u.searchParams.set("_",Date.now());const r=await fetch(u,{cache:"no-store"}),j=await r.json();if(!j.ok)throw new Error(j.message||"取得失敗");return j}
 async function apiPost(p){const r=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(p)}),j=await r.json();if(!j.ok)throw new Error(j.message||"処理失敗");return j}
-$$(".nav-button").forEach(b=>b.onclick=async()=>{$$(".nav-button").forEach(x=>x.classList.toggle("is-active",x===b));$$(".view").forEach(x=>x.classList.remove("is-active"));$("#"+b.dataset.view+"View").classList.add("is-active");if(b.dataset.view==="staffSchedule")await loadStaffSchedule()});
+$$(".nav-button").forEach(b=>b.onclick=async()=>{$$(".nav-button").forEach(x=>x.classList.toggle("is-active",x===b));$$(".view").forEach(x=>x.classList.remove("is-active"));$("#"+b.dataset.view+"View").classList.add("is-active");if(b.dataset.view==="staffSchedule")await loadStaffSchedule();if(b.dataset.view==="trainerSchedule")await loadTrainerSchedule()});
 $$(".registration-card").forEach(b=>b.onclick=()=>showRegistration(b.dataset.registration));
 async function showRegistration(type){["#staffManager","#shiftManager","#serviceManager","#serviceHoursManager","#registrationPlaceholder"].forEach(x=>$(x)?.classList.add("is-hidden"));if(type==="staff"){$("#staffManager").classList.remove("is-hidden");await loadStaff();return}if(type==="shift"){$("#shiftManager").classList.remove("is-hidden");await Promise.all([loadStaff(),loadStores()]);setupShift();return}if(type==="service"){$("#serviceManager").classList.remove("is-hidden");await loadServices();setupServiceManager();return}if(type==="hours"){$("#serviceHoursManager").classList.remove("is-hidden");await loadServices();setupServiceHours();return}const map={},v=map[type]||["🛠️","準備中"];$("#placeholderIcon").textContent=v[0];$("#placeholderTitle").textContent=v[1];$("#registrationPlaceholder").classList.remove("is-hidden")}
 async function loadStaff(){try{const j=await apiGet("getStaff",{include_inactive:"true"});state.staff=Array.isArray(j.data?.staff)?j.data.staff:Array.isArray(j.data)?j.data:[];renderStaff()}catch(e){state.staff=[];$("#staffList").innerHTML=`<div class="no-staff">${esc(e.message)}</div>`}}
@@ -41,6 +41,57 @@ function formatStaffDate(v){const d=parseYmd(v),w=["日","月","火","水","木"
 async function loadStaffSchedule(){if(!$("#staffScheduleBoard"))return;if(!state.staffScheduleDate)state.staffScheduleDate=localYmd();$("#staffScheduleDateLabel").textContent=formatStaffDate(state.staffScheduleDate);$("#staffScheduleBoard").innerHTML='<div class="staff-schedule-loading">スタッフ予定を読み込んでいます…</div>';$("#staffScheduleMessage").classList.add("is-hidden");try{const j=await apiGet("getStaffSchedule",{date:state.staffScheduleDate,store_code:"YACHIYO"});state.staffSchedule=j.data||{};renderStaffSchedule(state.staffSchedule)}catch(e){$("#staffScheduleBoard").innerHTML='<div class="staff-schedule-empty"><strong>予定を取得できませんでした</strong><span>'+esc(e.message)+'</span></div>';const n=$("#staffScheduleMessage");n.textContent=e.message;n.classList.remove("is-hidden");n.classList.add("is-error")}}
 function renderStaffSchedule(d){const shifts=Array.isArray(d.shifts)?d.shifts:[],reservations=Array.isArray(d.reservations)?d.reservations:[];$("#staffScheduleSummary").innerHTML=`<span>勤務 <b>${shifts.length}</b>名</span><span>予約 <b>${reservations.length}</b>件</span>`;const staffCodes=[...new Set([...shifts.map(x=>x.staff_code),...reservations.map(x=>x.staff_code)].filter(Boolean))];if(!staffCodes.length){$("#staffScheduleBoard").innerHTML='<div class="staff-schedule-empty"><strong>この日のスタッフ予定はありません</strong><span>シフト・予約ともに登録されていません。</span></div>';return}const sections=staffCodes.map(code=>{const ss=shifts.filter(x=>x.staff_code===code),rr=reservations.filter(x=>x.staff_code===code).sort((a,b)=>String(a.start_time).localeCompare(String(b.start_time)));const name=ss[0]?.staff_name||rr[0]?.staff_name||code;const shiftText=ss.length?ss.map(x=>`${esc(x.start_time)}〜${esc(x.end_time)}`).join(" / "):"シフト登録なし";const rows=rr.length?rr.map(r=>`<div class="staff-reservation-row"><div class="staff-reservation-time">${esc(r.start_time)}〜${esc(r.end_time)}</div><div class="staff-reservation-service"><strong>${esc(r.service_name||r.service_code)}</strong><small>${esc(r.service_code||"")}</small></div><div class="staff-reservation-customer"><strong>${esc(r.customer_name||"氏名未登録")}</strong><small>${r.member_no?`会員番号 ${esc(r.member_no)}`:esc(r.customer_type||"")}</small></div><span class="reservation-status">${esc(r.status||"RESERVED")}</span></div>`).join(""):'<div class="staff-no-reservation">予約はありません。</div>';return `<section class="staff-day-section"><div class="staff-day-head"><div class="staff-day-person"><span class="staff-day-avatar">${esc(String(name).slice(0,1))}</span><span><strong>${esc(name)}</strong><small>${esc(code)}</small></span></div><span class="shift-pill">${shiftText}</span></div><div class="staff-reservation-list">${rows}</div></section>`}).join("");$("#staffScheduleBoard").innerHTML=`<div class="staff-day-grid">${sections}</div>`}
 $("#staffPrevDay")?.addEventListener("click",()=>moveStaffScheduleDate(-1));$("#staffNextDay")?.addEventListener("click",()=>moveStaffScheduleDate(1));$("#staffToday")?.addEventListener("click",()=>{state.staffScheduleDate=localYmd();loadStaffSchedule()});
+
+
+
+// ===== トレーナー予定 =====
+function moveTrainerScheduleDate(days){
+  const d=parseYmd(state.trainerScheduleDate||localYmd());
+  d.setDate(d.getDate()+days);
+  state.trainerScheduleDate=localYmd(d);
+  loadTrainerSchedule();
+}
+async function loadTrainerSchedule(){
+  if(!$("#trainerScheduleBoard"))return;
+  if(!state.trainerScheduleDate)state.trainerScheduleDate=localYmd();
+  $("#trainerScheduleDateLabel").textContent=formatStaffDate(state.trainerScheduleDate);
+  $("#trainerScheduleBoard").innerHTML='<div class="staff-schedule-loading">トレーナー予定を読み込んでいます…</div>';
+  const m=$("#trainerScheduleMessage");
+  m.classList.add("is-hidden");
+  m.classList.remove("is-error");
+  try{
+    const j=await apiGet("getTrainerSchedule",{date:state.trainerScheduleDate,store_code:"YACHIYO"});
+    state.trainerSchedule=j.data||{};
+    renderTrainerSchedule(state.trainerSchedule);
+  }catch(e){
+    $("#trainerScheduleBoard").innerHTML='<div class="staff-schedule-empty"><strong>予定を取得できませんでした</strong><span>'+esc(e.message)+'</span></div>';
+    m.textContent=e.message;
+    m.classList.remove("is-hidden");
+    m.classList.add("is-error");
+  }
+}
+function renderTrainerSchedule(d){
+  const shifts=Array.isArray(d.shifts)?d.shifts:[];
+  const reservations=Array.isArray(d.reservations)?d.reservations:[];
+  $("#trainerScheduleSummary").innerHTML=`<span>勤務 <b>${shifts.length}</b>名</span><span>予約 <b>${reservations.length}</b>件</span>`;
+  const codes=[...new Set([...shifts.map(x=>x.staff_code),...reservations.map(x=>x.staff_code)].filter(Boolean))];
+  if(!codes.length){
+    $("#trainerScheduleBoard").innerHTML='<div class="staff-schedule-empty"><strong>この日のトレーナー予定はありません</strong><span>シフト・予約ともに登録されていません。</span></div>';
+    return;
+  }
+  const sections=codes.map(code=>{
+    const ss=shifts.filter(x=>x.staff_code===code);
+    const rr=reservations.filter(x=>x.staff_code===code).sort((a,b)=>String(a.start_time).localeCompare(String(b.start_time)));
+    const name=ss[0]?.staff_name||rr[0]?.staff_name||code;
+    const shiftText=ss.length?ss.map(x=>`${esc(x.start_time)}〜${esc(x.end_time)}`).join(" / "):"シフト登録なし";
+    const rows=rr.length?rr.map(r=>`<div class="staff-reservation-row"><div class="staff-reservation-time">${esc(r.start_time)}〜${esc(r.end_time)}</div><div class="staff-reservation-service"><strong>${esc(r.service_name||r.service_code)}</strong><small>${esc(r.service_code||"")}</small></div><div class="staff-reservation-customer"><strong>${esc(r.customer_name||"氏名未登録")}</strong><small>${r.member_no?`会員番号 ${esc(r.member_no)}`:esc(r.customer_type||"")}</small></div><span class="reservation-status">${esc(r.status||"RESERVED")}</span></div>`).join(""):'<div class="staff-no-reservation">予約はありません。</div>';
+    return `<section class="staff-day-section"><div class="staff-day-head"><div class="staff-day-person"><span class="staff-day-avatar">${esc(String(name).slice(0,1))}</span><span><strong>${esc(name)}</strong><small>${esc(code)}</small></span></div><span class="shift-pill">${shiftText}</span></div><div class="staff-reservation-list">${rows}</div></section>`;
+  }).join("");
+  $("#trainerScheduleBoard").innerHTML=`<div class="staff-day-grid">${sections}</div>`;
+}
+$("#trainerPrevDay")?.addEventListener("click",()=>moveTrainerScheduleDate(-1));
+$("#trainerNextDay")?.addEventListener("click",()=>moveTrainerScheduleDate(1));
+$("#trainerToday")?.addEventListener("click",()=>{state.trainerScheduleDate=localYmd();loadTrainerSchedule()});
 
 // ===== サービス管理 =====
 function setupServiceManager(){renderServiceList();resetServiceForm();$("#serviceSearch").oninput=renderServiceList;$("#newServiceButton").onclick=resetServiceForm;$("#serviceForm").onsubmit=saveServiceFromUi}
