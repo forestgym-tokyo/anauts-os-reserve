@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#090d0a"><title>A-nauts OS Reserve | Admin</title><link rel="stylesheet" href="./admin.css?v=20260815-staff-edit-v2"></head><body data-build="20260815-staff-edit-v2">
+<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#090d0a"><title>A-nauts OS Reserve | Admin</title><link rel="stylesheet" href="./admin.css?v=20260815-shift-ui-v3"></head><body data-build="20260815-staff-edit-v2">
 <div class="app-shell"><header class="topbar"><div class="brand"><div class="brand-mark">A</div><div><strong>A-nauts OS</strong><span>Reserve / Admin</span></div></div><div class="topbar-right"><div class="context-meta"><span class="store-chip">YACHIYO</span><span id="todayLabel" class="today-label"></span></div><nav class="topnav"><button class="nav-button is-active" data-view="staffSchedule"><span>👤</span>スタッフ予定</button><button class="nav-button" data-view="trainerSchedule"><span>🏋️</span>トレーナー予定</button><button class="nav-button" data-view="registration"><span>＋</span>登録</button><button class="nav-button" data-view="dailyReport"><span>📝</span>業務日報</button></nav></div></header>
 <main class="main">
 <section id="staffScheduleView" class="view is-active"><div class="page-heading"><div><p class="eyebrow">STAFF SCHEDULE</p><h1>スタッフ予定</h1><p>見学・カウンセリング・各種手続きなど、スタッフ担当業務。</p></div></div><div class="schedule-toolbar card"><div class="toolbar-group"><button id="staffPrevDay" class="icon-button" type="button" aria-label="前日">‹</button><button id="staffToday" class="ghost-button" type="button">今日</button><button id="staffNextDay" class="icon-button" type="button" aria-label="翌日">›</button></div><strong id="staffScheduleDateLabel" class="period-title"></strong><div id="staffScheduleSummary" class="schedule-summary"></div></div><div id="staffScheduleMessage" class="form-message is-hidden staff-schedule-message"></div><div id="staffScheduleBoard" class="schedule-board card"><div class="staff-schedule-loading">スタッフ予定を読み込んでいます…</div></div></section>
@@ -111,9 +111,79 @@
     </div>
   </div>
 </section>
-<section id="shiftManager" class="manager card is-hidden"><div class="manager-header"><div><p class="eyebrow">STAFF SHIFT</p><h2>シフト登録</h2></div></div><div class="shift-tabs"><button class="shift-tab is-active" data-shift-tab="bulk">月次一括登録</button><button class="shift-tab" data-shift-tab="single">個別登録</button></div><div id="shiftMessage" class="form-message is-hidden shift-message"></div>
-<div id="shiftBulkPanel" class="shift-panel"><div class="shift-form-grid"><label><span>店舗</span><select id="shiftBulkStore"></select></label><label><span>対象月</span><input id="shiftTargetMonth" type="month"></label><label><span>登録方式</span><select id="shiftImportMode"><option value="REPLACE_MONTH">対象月を全置換</option><option value="APPEND">追加登録</option></select></label><label><span>CSVファイル</span><input id="shiftCsvFile" type="file" accept=".csv,text/csv"></label></div><div class="csv-help">CSV列：staff_code,date,start_time,end_time</div><div class="shift-actions"><button id="shiftPreviewButton" class="ghost-button">プレビュー</button><button id="shiftImportButton" class="primary-button" disabled>登録する</button></div><div id="shiftPreviewArea" class="shift-preview is-hidden"><div id="shiftPreviewSummary" class="preview-summary"></div><div class="table-wrap"><table class="data-table"><thead><tr><th>行</th><th>スタッフ</th><th>日付</th><th>開始</th><th>終了</th><th>結果</th></tr></thead><tbody id="shiftPreviewBody"></tbody></table></div></div></div>
-<div id="shiftSinglePanel" class="shift-panel is-hidden"><form id="shiftSingleForm"><div class="shift-form-grid"><label><span>店舗</span><select id="shiftSingleStore" required></select></label><label><span>スタッフ</span><select id="shiftSingleStaff" required></select></label><label><span>日付</span><input id="shiftSingleDate" type="date" required></label><label><span>開始</span><input id="shiftSingleStart" type="time" required></label><label><span>終了</span><input id="shiftSingleEnd" type="time" required></label></div><div class="shift-actions"><button id="shiftSingleSaveButton" class="primary-button">保存</button></div></form></div></section>
+<section id="shiftManager" class="manager card is-hidden">
+  <div class="manager-header">
+    <div><p class="eyebrow">STAFF SHIFT</p><h2>シフト登録</h2></div>
+  </div>
+
+  <div class="shift-tabs">
+    <button class="shift-tab is-active" data-shift-tab="bulk" type="button">月次一括登録</button>
+    <button class="shift-tab" data-shift-tab="single" type="button">個別登録</button>
+  </div>
+
+  <div id="shiftMessage" class="form-message is-hidden shift-message"></div>
+
+  <div id="shiftBulkPanel" class="shift-panel">
+    <div class="shift-section-title">
+      <div><span>MONTHLY IMPORT</span><h3>月次一括登録</h3></div>
+      <p>CSVで1か月分の勤務シフトをまとめて登録します。</p>
+    </div>
+    <div class="shift-form-grid">
+      <label><span>店舗</span><select id="shiftBulkStore"></select></label>
+      <label><span>対象月</span><input id="shiftTargetMonth" type="month"></label>
+      <label><span>登録方式</span><select id="shiftImportMode"><option value="REPLACE_MONTH">対象月を全置換</option><option value="APPEND">追加登録</option></select></label>
+      <label><span>CSVファイル</span><input id="shiftCsvFile" type="file" accept=".csv,text/csv"></label>
+    </div>
+    <div class="csv-help">CSV列：staff_code,date,start_time,end_time</div>
+    <div class="shift-actions">
+      <button id="shiftPreviewButton" class="ghost-button" type="button">プレビュー</button>
+      <button id="shiftImportButton" class="primary-button" type="button" disabled>登録する</button>
+    </div>
+    <div id="shiftPreviewArea" class="shift-preview is-hidden">
+      <div id="shiftPreviewSummary" class="preview-summary"></div>
+      <div class="table-wrap"><table class="data-table"><thead><tr><th>行</th><th>スタッフ</th><th>日付</th><th>開始</th><th>終了</th><th>結果</th></tr></thead><tbody id="shiftPreviewBody"></tbody></table></div>
+    </div>
+  </div>
+
+  <div id="shiftSinglePanel" class="shift-panel is-hidden">
+    <div class="shift-section-title">
+      <div><span>SINGLE SHIFT</span><h3>個別シフト登録</h3></div>
+      <p>スタッフと日付を選択すると、その日の登録済みシフトを確認できます。</p>
+    </div>
+
+    <div class="shift-context-grid">
+      <label><span>店舗</span><select id="shiftSingleStore" required></select></label>
+      <label><span>スタッフ</span><select id="shiftSingleStaff" required></select></label>
+      <label><span>日付</span><input id="shiftSingleDate" type="date" required></label>
+    </div>
+
+    <section class="registered-shifts-card">
+      <div class="registered-shifts-head">
+        <div><span>REGISTERED</span><h4>登録済みシフト</h4></div>
+        <small id="registeredShiftContext">スタッフ・日付を選択してください</small>
+      </div>
+      <div id="registeredShiftList" class="registered-shift-list">
+        <div class="registered-shift-empty">登録済みシフトを確認しています。</div>
+      </div>
+    </section>
+
+    <form id="shiftSingleForm" class="new-shift-card">
+      <div class="new-shift-head">
+        <div><span>NEW SHIFT</span><h4 id="shiftSingleFormTitle">新規シフト登録</h4></div>
+        <button id="shiftEditCancelButton" class="ghost-button is-hidden" type="button">編集をやめる</button>
+      </div>
+      <input id="shiftEditingId" type="hidden">
+      <div class="shift-time-grid">
+        <label><span>開始</span><input id="shiftSingleStart" type="time" required></label>
+        <div class="shift-time-separator">〜</div>
+        <label><span>終了</span><input id="shiftSingleEnd" type="time" required></label>
+      </div>
+      <div class="shift-actions">
+        <button id="shiftSingleSaveButton" class="primary-button" type="submit">保存</button>
+      </div>
+    </form>
+  </div>
+</section>
 <section id="serviceManager" class="manager card is-hidden"><div class="manager-header"><div><p class="eyebrow">SERVICE</p><h2>サービス管理</h2></div><button id="newServiceButton" class="primary-button" type="button">＋ 新規サービス</button></div><div id="serviceMessage" class="form-message is-hidden service-message"></div><div class="service-manager-layout"><aside class="service-list-panel"><label class="search-box"><span>⌕</span><input id="serviceSearch" type="search" placeholder="サービス名・コードで検索"></label><div id="serviceList" class="service-list"></div></aside><div class="service-form-panel"><form id="serviceForm"><div class="form-header"><div><h3 id="serviceFormTitle">新規サービス</h3><p id="serviceCodeHelp">サービスコードは新規登録後は変更しないでください。</p></div><div class="service-switches"><label class="switch-field"><input id="servicePublic" type="checkbox" checked><span>公開</span></label><label class="switch-field"><input id="serviceActive" type="checkbox" checked><span>有効</span></label></div></div><div class="form-section"><h4>基本情報</h4><div class="form-grid"><label><span>サービスコード</span><input id="serviceCode" required placeholder="TOUR"></label><label><span>サービス名</span><input id="serviceName" required></label><label><span>ブランド</span><input id="serviceBrand" value="TFG" required></label><label><span>店舗</span><input id="serviceStore" value="YACHIYO" required></label><label><span>カテゴリ</span><input id="serviceCategory" placeholder="PROCEDURE"></label><label><span>入力フォーム</span><select id="serviceFormType"><option value="MEMBER">MEMBER</option><option value="VISITOR">VISITOR</option><option value="BOTH">BOTH</option></select></label><label><span>所要時間（分）</span><input id="serviceDuration" type="number" min="1" required></label><label><span>予約間隔（分）</span><input id="serviceSlotInterval" type="number" min="1" required></label><label><span>担当ロール</span><input id="serviceProviderRole" placeholder="STAFF / TRAINER / TRAINER,STAFF"></label><label><span>カレンダーコード</span><input id="serviceCalendarCode" placeholder="TFG_MAIN"></label><label><span>メールアカウント</span><input id="serviceMailAccountCode" placeholder="GMAIL01"></label></div></div><div class="form-section"><h4>予約ルール</h4><div class="form-grid"><label><span>最短予約（時間前）</span><input id="serviceBookingMinHours" type="number" min="0" value="3"></label><label><span>変更期限（時間前）</span><input id="serviceChangeLimitHours" type="number" min="0" value="3"></label><label><span>キャンセル期限（時間前）</span><input id="serviceCancelLimitHours" type="number" min="0" value="3"></label><label><span>公開期間（日）</span><input id="servicePublicDays" type="number" min="0" value="30"></label></div></div><div class="form-actions"><button id="saveServiceButton" class="primary-button" type="submit">保存</button></div></form></div></div></section><section id="serviceHoursManager" class="manager card is-hidden">
 <div class="manager-header"><div><p class="eyebrow">SERVICE HOURS</p><h2>サービス提供時間</h2></div><button id="newServiceHourButton" class="primary-button" type="button">＋ 時間帯を追加</button></div>
 <div id="serviceHoursMessage" class="form-message is-hidden service-hours-message"></div>
@@ -124,4 +194,4 @@
 <label><span>曜日</span><select id="serviceHourDay"><option value="ALL">すべての曜日</option><option value="SUN">日曜日</option><option value="MON">月曜日</option><option value="TUE">火曜日</option><option value="WED">水曜日</option><option value="THU">木曜日</option><option value="FRI">金曜日</option><option value="SAT">土曜日</option></select></label>
 <label><span>開始</span><input id="serviceHourStart" type="time" required></label><label><span>終了</span><input id="serviceHourEnd" type="time" required></label></div>
 <div class="shift-actions"><button id="cancelServiceHourButton" class="ghost-button" type="button">キャンセル</button><button id="saveServiceHourButton" class="primary-button" type="submit">保存</button></div></form></div></div></section><section id="registrationPlaceholder" class="manager card is-hidden"><div class="empty-state compact"><div id="placeholderIcon" class="empty-icon">🛠️</div><h2 id="placeholderTitle">準備中</h2></div></section></section>
-<section id="dailyReportView" class="view daily-report-view"><div class="empty-state card"><div class="empty-icon">📝</div><h2>現在準備中です</h2></div></section></main></div><script src="./admin.js?v=20260815-staff-edit-v2" defer></script></body></html>
+<section id="dailyReportView" class="view daily-report-view"><div class="empty-state card"><div class="empty-icon">📝</div><h2>現在準備中です</h2></div></section></main></div><script src="./admin.js?v=20260815-shift-ui-v3" defer></script></body></html>

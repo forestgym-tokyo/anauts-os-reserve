@@ -154,15 +154,133 @@ $("#staffColor")?.addEventListener("input",e=>{
   const v=e.target.value.trim();
   if(/^#[0-9A-Fa-f]{6}$/.test(v))$("#staffColorPicker").value=v;
 });
-$$(".shift-tab").forEach(b=>b.onclick=()=>{$$(".shift-tab").forEach(x=>x.classList.toggle("is-active",x===b));$("#shiftBulkPanel").classList.toggle("is-hidden",b.dataset.shiftTab!=="bulk");$("#shiftSinglePanel").classList.toggle("is-hidden",b.dataset.shiftTab!=="single");hideMsg()});
-function setupShift(){const stores=state.stores.filter(s=>s.active!==false),o=stores.map(s=>`<option value="${esc(s.store_code)}">${esc(s.store_name||s.store_code)} (${esc(s.store_code)})</option>`).join("");$("#shiftBulkStore").innerHTML=o;$("#shiftSingleStore").innerHTML=o;["#shiftBulkStore","#shiftSingleStore"].forEach(x=>{if(stores.some(s=>s.store_code==="YACHIYO"))$(x).value="YACHIYO"});$("#shiftSingleStaff").innerHTML=state.staff.filter(s=>s.active!==false).map(s=>`<option value="${esc(s.staff_code)}">${esc(s.display_name||s.staff_name||s.staff_code)} (${esc(s.staff_code)})</option>`).join("");const d=new Date(),ym=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;$("#shiftTargetMonth").value=ym;$("#shiftSingleDate").value=`${ym}-${String(d.getDate()).padStart(2,"0")}`}
+$$(".shift-tab").forEach(b=>b.onclick=async()=>{
+  $$(".shift-tab").forEach(x=>x.classList.toggle("is-active",x===b));
+  $("#shiftBulkPanel").classList.toggle("is-hidden",b.dataset.shiftTab!=="bulk");
+  $("#shiftSinglePanel").classList.toggle("is-hidden",b.dataset.shiftTab!=="single");
+  hideMsg();
+  if(b.dataset.shiftTab==="single")await loadRegisteredShifts();
+});
+
+function setupShift(){
+  const stores=state.stores.filter(s=>s.active!==false);
+  const o=stores.map(s=>`<option value="${esc(s.store_code)}">${esc(s.store_name||s.store_code)} (${esc(s.store_code)})</option>`).join("");
+  $("#shiftBulkStore").innerHTML=o;
+  $("#shiftSingleStore").innerHTML=o;
+  ["#shiftBulkStore","#shiftSingleStore"].forEach(x=>{
+    if(stores.some(s=>s.store_code==="YACHIYO"))$(x).value="YACHIYO";
+  });
+  $("#shiftSingleStaff").innerHTML=state.staff.filter(s=>s.active!==false).map(s=>`<option value="${esc(s.staff_code)}">${esc(s.display_name||s.staff_name||s.staff_code)} (${esc(s.staff_code)})</option>`).join("");
+  const d=new Date(),ym=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+  $("#shiftTargetMonth").value=ym;
+  $("#shiftSingleDate").value=`${ym}-${String(d.getDate()).padStart(2,"0")}`;
+  $("#shiftSingleStore").onchange=loadRegisteredShifts;
+  $("#shiftSingleStaff").onchange=loadRegisteredShifts;
+  $("#shiftSingleDate").onchange=loadRegisteredShifts;
+  $("#shiftEditCancelButton").onclick=resetShiftEditor;
+  resetShiftEditor();
+  if(!$("#shiftSinglePanel").classList.contains("is-hidden"))loadRegisteredShifts();
+}
+
+async function loadRegisteredShifts(){
+  const store=$("#shiftSingleStore")?.value||"";
+  const staff=$("#shiftSingleStaff")?.value||"";
+  const date=$("#shiftSingleDate")?.value||"";
+  const box=$("#registeredShiftList");
+  if(!box)return;
+  if(!staff||!date){
+    box.innerHTML='<div class="registered-shift-empty">スタッフと日付を選択してください。</div>';
+    return;
+  }
+  const person=state.staff.find(s=>String(s.staff_code)===staff);
+  $("#registeredShiftContext").textContent=`${person?.display_name||person?.staff_name||staff} · ${date}`;
+  box.innerHTML='<div class="registered-shift-empty">読み込み中…</div>';
+  try{
+    const j=await apiGet("getStaffShifts",{staff_code:staff,start_date:date,end_date:date});
+    const rows=(Array.isArray(j.data)?j.data:Array.isArray(j.data?.shifts)?j.data.shifts:[])
+      .filter(r=>(!store||String(r.store_code)===store)&&r.active!==false);
+    state.currentRegisteredShifts=rows;
+    renderRegisteredShifts(rows);
+  }catch(e){
+    box.innerHTML=`<div class="registered-shift-empty is-error">${esc(e.message||"登録済みシフトを取得できませんでした。")}</div>`;
+  }
+}
+
+function renderRegisteredShifts(rows){
+  const box=$("#registeredShiftList");
+  if(!rows.length){
+    box.innerHTML='<div class="registered-shift-empty">この日の登録済みシフトはありません。</div>';
+    return;
+  }
+  box.innerHTML=rows.map((r,i)=>`
+    <div class="registered-shift-row">
+      <div class="registered-shift-time"><strong>${esc(r.start_time)}</strong><span>〜</span><strong>${esc(r.end_time)}</strong></div>
+      <div class="registered-shift-meta"><span>${esc(r.store_code||"")}</span><small>${esc(r.shift_id||"")}</small></div>
+      <div class="registered-shift-actions">
+        <button class="ghost-button" type="button" data-shift-edit="${i}">編集</button>
+        <button class="danger-ghost" type="button" data-shift-delete="${i}">削除</button>
+      </div>
+    </div>`).join("");
+  $$("[data-shift-edit]").forEach(b=>b.onclick=()=>editRegisteredShift(rows[+b.dataset.shiftEdit]));
+  $$("[data-shift-delete]").forEach(b=>b.onclick=()=>deleteRegisteredShift(rows[+b.dataset.shiftDelete]));
+}
+
+function editRegisteredShift(r){
+  $("#shiftEditingId").value=r.shift_id||"";
+  $("#shiftSingleStart").value=String(r.start_time||"").slice(0,5);
+  $("#shiftSingleEnd").value=String(r.end_time||"").slice(0,5);
+  $("#shiftSingleFormTitle").textContent="登録済みシフトを編集";
+  $("#shiftSingleSaveButton").textContent="変更を保存";
+  $("#shiftEditCancelButton").classList.remove("is-hidden");
+  $("#shiftSingleStart").focus();
+}
+
+function resetShiftEditor(){
+  if($("#shiftEditingId"))$("#shiftEditingId").value="";
+  if($("#shiftSingleStart"))$("#shiftSingleStart").value="";
+  if($("#shiftSingleEnd"))$("#shiftSingleEnd").value="";
+  if($("#shiftSingleFormTitle"))$("#shiftSingleFormTitle").textContent="新規シフト登録";
+  if($("#shiftSingleSaveButton"))$("#shiftSingleSaveButton").textContent="保存";
+  $("#shiftEditCancelButton")?.classList.add("is-hidden");
+}
+
+async function deleteRegisteredShift(r){
+  if(!confirm(`${r.start_time}〜${r.end_time} のシフトを削除しますか？`))return;
+  try{
+    await apiPost({action:"deleteStaffShift",shift_id:r.shift_id});
+    msg(`削除しました：${r.start_time}〜${r.end_time}`);
+    resetShiftEditor();
+    await loadRegisteredShifts();
+  }catch(e){msg(e.message,true)}
+}
+
 function csvLine(line){const a=[];let s="",q=false;for(let i=0;i<line.length;i++){const c=line[i];if(c==='"'){if(q&&line[i+1]==='"'){s+='"';i++}else q=!q}else if(c===","&&!q){a.push(s);s=""}else s+=c}a.push(s);return a}
 async function readCsv(f){const lines=(await f.text()).replace(/^\uFEFF/,"").split(/\r?\n/).filter(x=>x.trim());if(lines.length<2)throw new Error("CSVにデータがありません。");const h=csvLine(lines[0]).map(x=>x.trim()),req=["staff_code","date","start_time","end_time"];req.forEach(k=>{if(!h.includes(k))throw new Error(`CSVに ${k} 列がありません。`)});return lines.slice(1).map(l=>{const c=csvLine(l),o={};h.forEach((x,i)=>o[x]=String(c[i]??"").trim());return {staff_code:o.staff_code,date:o.date,start_time:o.start_time,end_time:o.end_time}})}
 $("#shiftPreviewButton").onclick=async()=>{hideMsg();const f=$("#shiftCsvFile").files[0];if(!f)return msg("CSVファイルを選択してください。",true);try{state.shiftRows=await readCsv(f);const j=await apiPost({action:"previewStaffShiftImport",mode:$("#shiftImportMode").value,store_code:$("#shiftBulkStore").value,target_month:$("#shiftTargetMonth").value,rows:state.shiftRows});state.shiftPreview=j.data;renderPreview(j.data);$("#shiftImportButton").disabled=+j.data.error_count>0||+j.data.valid_count===0;msg(+j.data.error_count?"エラーがあります。CSVを修正してください。":"プレビューOKです。",+j.data.error_count>0)}catch(e){msg(e.message,true)}};
 function renderPreview(d){$("#shiftPreviewArea").classList.remove("is-hidden");$("#shiftPreviewSummary").innerHTML=`<span>全 ${d.total_count}件</span><strong class="ok-count">有効 ${d.valid_count}件</strong><strong class="error-count">エラー ${d.error_count}件</strong>`;const em=new Map((d.errors||[]).map(x=>[+x.row,x]));$("#shiftPreviewBody").innerHTML=state.shiftRows.map((r,i)=>{const e=em.get(i+2),s=state.staff.find(x=>x.staff_code===r.staff_code);return `<tr class="${e?"row-error":""}"><td>${i+2}</td><td>${esc(s?.display_name||s?.staff_name||r.staff_code)}<small>${esc(r.staff_code)}</small></td><td>${esc(r.date)}</td><td>${esc(r.start_time)}</td><td>${esc(r.end_time)}</td><td>${e?`<span class="status-bad">${esc(e.message||e.code)}</span>`:'<span class="status-ok">OK</span>'}</td></tr>`}).join("")}
 $("#shiftImportButton").onclick=async()=>{if(!state.shiftPreview||+state.shiftPreview.error_count)return msg("エラーのないプレビューを先に実行してください。",true);if(!confirm(`${$("#shiftTargetMonth").value} のシフト ${state.shiftRows.length}件を登録します。よろしいですか？`))return;try{const j=await apiPost({action:"importStaffShifts",mode:$("#shiftImportMode").value,store_code:$("#shiftBulkStore").value,target_month:$("#shiftTargetMonth").value,rows:state.shiftRows});msg(`登録完了：${j.data.inserted_count}件 / 無効化：${j.data.disabled_count}件`);$("#shiftImportButton").disabled=true}catch(e){msg(e.message,true)}};
-$("#shiftSingleForm").onsubmit=async e=>{e.preventDefault();if($("#shiftSingleStart").value>=$("#shiftSingleEnd").value)return msg("終了時刻は開始時刻より後にしてください。",true);try{const j=await apiPost({action:"saveStaffShift",staff_code:$("#shiftSingleStaff").value,store_code:$("#shiftSingleStore").value,date:$("#shiftSingleDate").value,start_time:$("#shiftSingleStart").value,end_time:$("#shiftSingleEnd").value});msg(`保存しました：${j.data.date} ${j.data.start_time}〜${j.data.end_time}`)}catch(x){msg(x.message,true)}};
-function msg(s,e=false){const n=$("#shiftMessage");n.textContent=s;n.classList.remove("is-hidden");n.classList.toggle("is-error",e)}function hideMsg(){$("#shiftMessage").classList.add("is-hidden")}
+
+$("#shiftSingleForm").onsubmit=async e=>{
+  e.preventDefault();
+  const start=$("#shiftSingleStart").value,end=$("#shiftSingleEnd").value;
+  if(!start||!end)return msg("開始時刻と終了時刻を入力してください。",true);
+  if(start>=end)return msg("終了時刻は開始時刻より後にしてください。",true);
+  const button=$("#shiftSingleSaveButton");
+  button.disabled=true;
+  try{
+    const editingId=$("#shiftEditingId").value;
+    const payload={action:"saveStaffShift",staff_code:$("#shiftSingleStaff").value,store_code:$("#shiftSingleStore").value,date:$("#shiftSingleDate").value,start_time:start,end_time:end};
+    if(editingId)payload.shift_id=editingId;
+    const j=await apiPost(payload);
+    msg(`${editingId?"変更":"保存"}しました：${j.data.date} ${j.data.start_time}〜${j.data.end_time}`);
+    resetShiftEditor();
+    await loadRegisteredShifts();
+  }catch(x){msg(x.message,true)}
+  finally{button.disabled=false}
+};
+
+function msg(s,e=false){const n=$("#shiftMessage");n.textContent=s;n.classList.remove("is-hidden");n.classList.toggle("is-error",e)}
+function hideMsg(){$("#shiftMessage").classList.add("is-hidden")}
 async function loadServices(){try{const j=await apiGet("getServices");state.services=Array.isArray(j.data?.services)?j.data.services:Array.isArray(j.data)?j.data:[]}catch(e){state.services=[];if($("#serviceMessage")&&!$("#serviceManager")?.classList.contains("is-hidden"))serviceMsg(e.message,true);else hoursMsg(e.message,true)}}
 function setupServiceHours(){const a=state.services.filter(s=>s.active!==false),sel=$("#serviceHoursService");sel.innerHTML=a.map(s=>`<option value="${esc(s.service_code)}">${esc(s.service_name||s.name||s.service_code)} (${esc(s.service_code)})</option>`).join("");if(a.some(s=>String(s.service_code).toUpperCase()==="UNSUBSCRIBE"))sel.value="UNSUBSCRIBE";sel.onchange=loadSelectedHours;$("#newServiceHourButton").onclick=()=>{$("#serviceHourForm").classList.remove("is-hidden");$("#serviceHourDay").value="ALL";$("#serviceHourStart").value="";$("#serviceHourEnd").value="";hideHoursMsg()};$("#cancelServiceHourButton").onclick=()=>$("#serviceHourForm").classList.add("is-hidden");$("#serviceHourForm").onsubmit=saveHour;loadSelectedHours()}
 async function loadSelectedHours(){const code=$("#serviceHoursService").value;if(!code){$("#serviceHoursList").innerHTML='<div class="empty-service-hours">サービスがありません。</div>';return}const s=state.services.find(x=>String(x.service_code)===code)||{};$("#serviceHoursTitle").textContent=s.service_name||s.name||code;$("#serviceHoursCode").textContent=code;try{const j=await apiGet("getServiceHours",{service_code:code});state.serviceHours=Array.isArray(j.data)?j.data:[];renderHours()}catch(e){hoursMsg(e.message,true)}}
