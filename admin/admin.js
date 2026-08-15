@@ -1,4 +1,4 @@
-// BUILD: 20260814-trainer-schedule-v1
+// BUILD: 20260815-auth-startup-fixed-v6.1
 const API_URL="https://script.google.com/macros/s/AKfycbyvpQRxRpMRfpaQHtBar77dViCqPl-hdFW-2yMdozhN8RHtwcrFiNEM9cvEbny4x9q0/exec";
 const state={staff:[],stores:[],services:[],serviceHours:[],selectedServiceCode:"",selectedStaffCode:"",shiftRows:[],shiftPreview:null,staffScheduleDate:"",staffSchedule:null,trainerScheduleDate:"",trainerSchedule:null,authUser:null,idToken:""};
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
@@ -62,6 +62,24 @@ async function restoreAuthSession(){
     return false;
   }
 }
+
+async function initializeAppAfterAuth(){
+  if(!state.staffScheduleDate)state.staffScheduleDate=localYmd();
+
+  const activeButton=document.querySelector(".nav-button.is-active");
+  const activeView=activeButton?.dataset?.view||"staffSchedule";
+
+  if(activeView==="staffSchedule"){
+    await loadStaffSchedule();
+    return;
+  }
+
+  if(activeView==="trainerSchedule"){
+    await loadTrainerSchedule();
+    return;
+  }
+}
+
 async function doLogin(e){
   e.preventDefault();
   const button=$("#loginButton");
@@ -75,6 +93,7 @@ async function doLogin(e){
     if(!state.authUser)throw new Error("このアカウントにはA-nauts OS Reserveの利用権限がありません。");
     $("#loginGate").classList.add("is-hidden");
     applyPermissionUi();
+    await initializeAppAfterAuth();
   }catch(err){
     state.idToken="";
     sessionStorage.removeItem("anauts_id_token");
@@ -509,7 +528,7 @@ async function deleteHour(r){if(!confirm(`${r.day_of_week} ${r.start_time}〜${r
 function hoursMsg(s,e=false){const n=$("#serviceHoursMessage");n.textContent=s;n.classList.remove("is-hidden");n.classList.toggle("is-error",e)}function hideHoursMsg(){const n=$("#serviceHoursMessage");n.classList.add("is-hidden");n.classList.remove("is-error")}
 function esc(v){return String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;")}
 (()=>{const n=$("#todayLabel"),d=new Date(),w=["日","月","火","水","木","金","土"];if(n)n.textContent=`${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")}（${w[d.getDay()]}）`})();
-state.staffScheduleDate=localYmd();loadStaffSchedule();
+
 
 
 
@@ -583,8 +602,21 @@ function serviceMsg(text,error=false){const n=$("#serviceMessage");if(!n)return;
 function hideServiceMsg(){const n=$("#serviceMessage");if(!n)return;n.textContent="";n.classList.add("is-hidden");n.classList.remove("is-error")}
 
 window.addEventListener("DOMContentLoaded",async()=>{
-  if(!authEnabled())return;
+  if(!authEnabled()){
+    await initializeAppAfterAuth();
+    return;
+  }
+
+  $("#loginGate")?.classList.remove("is-hidden");
+
   const ok=await restoreAuthSession();
-  $("#loginGate")?.classList.toggle("is-hidden",ok);
-  if(ok)applyPermissionUi();
+
+  if(!ok){
+    $("#loginGate")?.classList.remove("is-hidden");
+    return;
+  }
+
+  $("#loginGate")?.classList.add("is-hidden");
+  applyPermissionUi();
+  await initializeAppAfterAuth();
 });
