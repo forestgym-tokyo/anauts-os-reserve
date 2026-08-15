@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#090d0a"><title>A-nauts OS Reserve | Admin</title><link rel="stylesheet" href="./admin.css?v=20260815-myshift-v8"></head><body data-build="20260815-myshift-v8">
+<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#090d0a"><title>A-nauts OS Reserve | Admin</title><link rel="stylesheet" href="./admin.css?v=20260816-staff-login-v9"></head><body data-build="20260816-staff-login-v9">
 <div id="loginGate" class="login-gate">
   <div class="login-card">
     <div class="login-brand">
@@ -33,7 +33,7 @@
     <strong id="authUserName">—</strong>
     <small id="authUserPermission">—</small>
   </div>
-  <button id="logoutButton" class="auth-logout" type="button">ログアウト</button>
+  <button id="accountSettingsButton" class="auth-logout" type="button">アカウント</button><button id="logoutButton" class="auth-logout" type="button">ログアウト</button>
 </div></div></header>
 <main class="main">
 <section id="staffScheduleView" class="view is-active"><div class="page-heading"><div><p class="eyebrow">STAFF SCHEDULE</p><h1>スタッフ予定</h1><p>見学・カウンセリング・各種手続きなど、スタッフ担当業務。</p></div></div><div class="schedule-toolbar card"><div class="toolbar-group"><button id="staffPrevDay" class="icon-button" type="button" aria-label="前日">‹</button><button id="staffToday" class="ghost-button" type="button">今日</button><button id="staffNextDay" class="icon-button" type="button" aria-label="翌日">›</button></div><strong id="staffScheduleDateLabel" class="period-title"></strong><div id="staffScheduleSummary" class="schedule-summary"></div></div><div id="staffScheduleMessage" class="form-message is-hidden staff-schedule-message"></div><div id="staffScheduleBoard" class="schedule-board card"><div class="staff-schedule-loading">スタッフ予定を読み込んでいます…</div></div></section>
@@ -140,7 +140,8 @@
           </div>
         </div>
 
-        <div class="form-actions">
+        <div class="form-actions" style="gap:10px;flex-wrap:wrap">
+          <button id="staffLoginSetupButton" class="ghost-button is-hidden" type="button">ログイン設定メールを送信</button>
           <button id="saveStaffButton" class="primary-button" type="submit">保存</button>
         </div>
       </form>
@@ -234,4 +235,43 @@
 <label><span>曜日</span><select id="serviceHourDay"><option value="ALL">すべての曜日</option><option value="SUN">日曜日</option><option value="MON">月曜日</option><option value="TUE">火曜日</option><option value="WED">水曜日</option><option value="THU">木曜日</option><option value="FRI">金曜日</option><option value="SAT">土曜日</option></select></label>
 <label><span>開始</span><input id="serviceHourStart" type="time" required></label><label><span>終了</span><input id="serviceHourEnd" type="time" required></label></div>
 <div class="shift-actions"><button id="cancelServiceHourButton" class="ghost-button" type="button">キャンセル</button><button id="saveServiceHourButton" class="primary-button" type="submit">保存</button></div></form></div></div></section><section id="registrationPlaceholder" class="manager card is-hidden"><div class="empty-state compact"><div id="placeholderIcon" class="empty-icon">🛠️</div><h2 id="placeholderTitle">準備中</h2></div></section></section>
-<section id="dailyReportView" class="view daily-report-view"><div class="empty-state card"><div class="empty-icon">📝</div><h2>現在準備中です</h2></div></section></main></div><script src="./firebase-config.js?v=20260815-myshift-v8"></script><script src="./admin.js?v=20260815-myshift-v8" defer></script></body></html>
+
+<section id="accountSettingsView" class="view">
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">ACCOUNT</p>
+      <h1>アカウント設定</h1>
+      <p>ログイン中のアカウントのパスワードを変更します。</p>
+    </div>
+  </div>
+
+  <section class="manager card" style="max-width:680px">
+    <div class="manager-header">
+      <div>
+        <p class="eyebrow">PASSWORD</p>
+        <h2>パスワード変更</h2>
+      </div>
+    </div>
+
+    <form id="changePasswordForm" style="padding:24px">
+      <div class="form-grid" style="grid-template-columns:1fr">
+        <label>
+          <span>新しいパスワード</span>
+          <input id="newPassword" type="password" autocomplete="new-password" required>
+        </label>
+        <label>
+          <span>新しいパスワード（確認）</span>
+          <input id="newPasswordConfirm" type="password" autocomplete="new-password" required>
+        </label>
+      </div>
+
+      <div id="passwordChangeMessage" class="form-message is-hidden"></div>
+
+      <div class="form-actions">
+        <button id="changePasswordButton" class="primary-button" type="submit">パスワードを変更</button>
+      </div>
+    </form>
+  </section>
+</section>
+
+<section id="dailyReportView" class="view daily-report-view"><div class="empty-state card"><div class="empty-icon">📝</div><h2>現在準備中です</h2></div></section></main></div><script src="./firebase-config.js?v=20260816-staff-login-v9"></script><script src="./admin.js?v=20260816-staff-login-v9" defer></script></body></html>

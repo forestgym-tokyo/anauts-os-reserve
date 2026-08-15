@@ -1,4 +1,4 @@
-// BUILD: 20260815-myshift-v8
+// BUILD: 20260816-staff-login-v9
 const API_URL="https://script.google.com/macros/s/AKfycbyvpQRxRpMRfpaQHtBar77dViCqPl-hdFW-2yMdozhN8RHtwcrFiNEM9cvEbny4x9q0/exec";
 const state={staff:[],stores:[],services:[],serviceHours:[],selectedServiceCode:"",selectedStaffCode:"",shiftRows:[],shiftPreview:null,staffScheduleDate:"",staffSchedule:null,trainerScheduleDate:"",trainerSchedule:null,myShiftDate:"",myShiftRows:[],myShiftRequests:[],authUser:null,idToken:""};
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
@@ -17,6 +17,11 @@ function hasPermission(...levels){
   const p=String(state.authUser?.permission||"STAFF").toUpperCase();
   return levels.includes(p);
 }
+
+function isManagementUser(){
+  return hasPermission("ADMIN","MANAGER");
+}
+
 function applyPermissionUi(){
   if(!authEnabled())return;
   const permission=String(state.authUser?.permission||"STAFF").toUpperCase();
@@ -104,6 +109,88 @@ function logout(){
 $("#loginForm")?.addEventListener("submit",doLogin);
 $("#logoutButton")?.addEventListener("click",logout);
 
+$("#accountSettingsButton")?.addEventListener("click",()=>{
+  
+async function firebaseChangeOwnPassword(newPassword){
+  const key=window.ANAUTS_AUTH?.firebaseApiKey;
+  if(!key)throw new Error("Firebase APIキーが設定されていません。");
+  if(!state.idToken)throw new Error("ログイン情報がありません。もう一度ログインしてください。");
+
+  const r=await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:update?key=${encodeURIComponent(key)}`,
+    {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        idToken:state.idToken,
+        password:newPassword,
+        returnSecureToken:true
+      })
+    }
+  );
+
+  const j=await r.json();
+
+  if(!r.ok){
+    const code=String(j?.error?.message||"");
+    if(code.includes("WEAK_PASSWORD"))throw new Error("パスワードが短すぎるか、設定条件を満たしていません。");
+    if(code.includes("INVALID_ID_TOKEN")||code.includes("TOKEN_EXPIRED")){
+      throw new Error("ログイン情報の有効期限が切れています。再ログインしてください。");
+    }
+    throw new Error("パスワードを変更できませんでした。");
+  }
+
+  if(j.idToken){
+    state.idToken=j.idToken;
+    sessionStorage.setItem("anauts_id_token",j.idToken);
+  }
+
+  return j;
+}
+
+function passwordChangeMsg(text,error=false){
+  const n=$("#passwordChangeMessage");
+  if(!n)return;
+  n.textContent=text||"";
+  n.classList.toggle("is-hidden",!text);
+  n.classList.toggle("is-error",!!error);
+}
+
+$("#changePasswordForm")?.addEventListener("submit",async e=>{
+  e.preventDefault();
+
+  const password=$("#newPassword")?.value||"";
+  const confirmPassword=$("#newPasswordConfirm")?.value||"";
+
+  if(!password)return passwordChangeMsg("新しいパスワードを入力してください。",true);
+  if(password!==confirmPassword)return passwordChangeMsg("確認用パスワードが一致しません。",true);
+
+  const button=$("#changePasswordButton");
+  button.disabled=true;
+  button.textContent="変更中…";
+  passwordChangeMsg("");
+
+  try{
+    await firebaseChangeOwnPassword(password);
+    $("#changePasswordForm")?.reset();
+    passwordChangeMsg("パスワードを変更しました。",false);
+  }catch(err){
+    passwordChangeMsg(err.message||"パスワード変更に失敗しました。",true);
+  }finally{
+    button.disabled=false;
+    button.textContent="パスワードを変更";
+  }
+});
+
+$$(".nav-button").forEach(x=>x.classList.remove("is-active"));
+  $$(".view").forEach(x=>x.classList.remove("is-active"));
+  $("#accountSettingsView")?.classList.add("is-active");
+  const msg=$("#passwordChangeMessage");
+  if(msg){msg.textContent="";msg.classList.add("is-hidden");msg.classList.remove("is-error");}
+  $("#changePasswordForm")?.reset();
+});
+
+
 $$(".nav-button").forEach(b=>b.onclick=async()=>{$$(".nav-button").forEach(x=>x.classList.toggle("is-active",x===b));$$(".view").forEach(x=>x.classList.remove("is-active"));$("#"+b.dataset.view+"View").classList.add("is-active");if(b.dataset.view==="staffSchedule")await loadStaffSchedule();if(b.dataset.view==="trainerSchedule")await loadTrainerSchedule();if(b.dataset.view==="myShift")await loadMyShiftView()});
 $$(".registration-card").forEach(b=>b.onclick=()=>showRegistration(b.dataset.registration));
 async function showRegistration(type){if(authEnabled()&&!hasPermission("ADMIN","MANAGER"))return;["#staffManager","#shiftManager","#serviceManager","#serviceHoursManager","#registrationPlaceholder"].forEach(x=>$(x)?.classList.add("is-hidden"));if(type==="staff"){$("#staffManager").classList.remove("is-hidden");await loadStaff();if(!state.selectedStaffCode)resetStaffForm();return}if(type==="shift"){$("#shiftManager").classList.remove("is-hidden");await Promise.all([loadStaff(),loadStores()]);setupShift();return}if(type==="service"){$("#serviceManager").classList.remove("is-hidden");await loadServices();setupServiceManager();return}if(type==="hours"){$("#serviceHoursManager").classList.remove("is-hidden");await loadServices();setupServiceHours();return}const map={},v=map[type]||["🛠️","準備中"];$("#placeholderIcon").textContent=v[0];$("#placeholderTitle").textContent=v[1];$("#registrationPlaceholder").classList.remove("is-hidden")}
@@ -159,6 +246,7 @@ function resetStaffForm(){
   $("#staffColor").value="#63d179";
   $("#staffColorPicker").value="#63d179";
   staffMsg("");
+  $("#staffLoginSetupButton")?.classList.add("is-hidden");
   renderStaff();
 }
 
@@ -197,6 +285,7 @@ async function selectStaff(code){
     $("#staffCanTrainingSupport").checked=!!s.can_training_support;
     $("#staffCan9Round").checked=!!s.can_9round;
 
+    $("#staffLoginSetupButton")?.classList.toggle("is-hidden",!isManagementUser());
     renderStaff();
   }catch(e){
     staffMsg(e.message||"スタッフ情報を取得できませんでした。",true);
@@ -205,9 +294,11 @@ async function selectStaff(code){
 
 async function saveStaffFromUi(e){
   e.preventDefault();
+
   const code=String($("#staffCode").value||"").trim().toUpperCase();
   if(!code)return staffMsg("スタッフコードを入力してください。",true);
 
+  const email=String($("#staffEmail").value||"").trim().toLowerCase();
   const button=$("#saveStaffButton");
   button.disabled=true;
   button.textContent="保存中…";
@@ -220,7 +311,7 @@ async function saveStaffFromUi(e){
       store_code:$("#staffStore").value.trim(),
       staff_name:$("#staffName").value.trim(),
       display_name:$("#staffDisplayName").value.trim(),
-      email:$("#staffEmail").value.trim(),
+      email:email,
       calendar_code:$("#staffCalendarCode").value.trim(),
       mail_account_code:$("#staffMailAccountCode").value.trim(),
       color:$("#staffColor").value.trim(),
@@ -236,9 +327,47 @@ async function saveStaffFromUi(e){
       can_9round:$("#staffCan9Round").checked
     });
 
+    const created=j.data?.mode==="CREATE";
+    let loginSetupResult=null;
+
+    /*
+     * 新規スタッフ + メールありの場合は、
+     * Firebaseログインアカウントとauth_usersを自動作成し、
+     * 本人へパスワード設定メールを送る。
+     */
+    if(created && email){
+      try{
+        loginSetupResult=await apiPost({
+          action:"provisionStaffLogin",
+          staff_code:code,
+          email:email
+        });
+      }catch(loginError){
+        await loadStaff();
+        await selectStaff(code);
+        staffMsg(
+          `スタッフは登録しましたが、ログイン設定メールの送信に失敗しました：${loginError.message}`,
+          true
+        );
+        return;
+      }
+    }
+
     await loadStaff();
     await selectStaff(code);
-    staffMsg(j.data?.mode==="CREATE"?"スタッフを登録しました。":"スタッフ情報を更新しました。");
+
+    if(created){
+      if(email && loginSetupResult){
+        staffMsg("スタッフを登録し、本人へパスワード設定メールを送信しました。");
+      }else if(!email){
+        staffMsg("スタッフを登録しました。メール未登録のためログインアカウントは作成していません。",true);
+      }else{
+        staffMsg("スタッフを登録しました。");
+      }
+    }else{
+      staffMsg("スタッフ情報を更新しました。");
+    }
+
   }catch(err){
     staffMsg(err.message||"保存に失敗しました。",true);
   }finally{
@@ -247,7 +376,36 @@ async function saveStaffFromUi(e){
   }
 }
 
+async function sendStaffLoginSetupFromUi(){
+  if(!isManagementUser())return staffMsg("この操作を行う権限がありません。",true);
+
+  const code=String($("#staffCode")?.value||"").trim().toUpperCase();
+  const email=String($("#staffEmail")?.value||"").trim().toLowerCase();
+
+  if(!code)return staffMsg("スタッフを選択してください。",true);
+  if(!email)return staffMsg("ログイン用メールアドレスを登録してください。",true);
+
+  const button=$("#staffLoginSetupButton");
+  button.disabled=true;
+  button.textContent="送信中…";
+
+  try{
+    await apiPost({
+      action:"provisionStaffLogin",
+      staff_code:code,
+      email:email
+    });
+    staffMsg("本人へパスワード設定メールを送信しました。");
+  }catch(e){
+    staffMsg(e.message||"ログイン設定メールの送信に失敗しました。",true);
+  }finally{
+    button.disabled=false;
+    button.textContent="ログイン設定メールを送信";
+  }
+}
+
 $("#newStaffButton")?.addEventListener("click",resetStaffForm);
+$("#staffLoginSetupButton")?.addEventListener("click",sendStaffLoginSetupFromUi);
 $("#staffForm")?.addEventListener("submit",saveStaffFromUi);
 $("#staffColorPicker")?.addEventListener("input",e=>{$("#staffColor").value=e.target.value});
 $("#staffColor")?.addEventListener("input",e=>{
