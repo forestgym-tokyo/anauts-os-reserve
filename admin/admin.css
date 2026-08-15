@@ -587,3 +587,97 @@ input::placeholder,textarea::placeholder{color:#647067}
 #shiftImportMode option[value="REPLACE_MONTH"]{
   color:#ffaaaa;
 }
+
+
+/* =========================================================
+   A-nauts OS Reserve / Fine polish v5
+   Fixes found during real-device review.
+   ========================================================= */
+
+/* Staff / trainer schedule:
+   prevent white header + white text collision. */
+.staff-day-head{
+  background:#111813!important;
+  border-color:var(--border)!important;
+}
+.staff-day-person strong{
+  color:#f4f7f5!important;
+}
+.staff-day-person small{
+  color:#89968d!important;
+}
+.shift-pill{
+  border-color:rgba(255,255,255,.10)!important;
+  background:#0c120e!important;
+  color:#dce5de!important;
+}
+.staff-day-avatar{
+  border:1px solid rgba(255,255,255,.08);
+  background:#111827!important;
+  color:#fff!important;
+}
+
+/* Service list:
+   actual production selector is .service-list-item. */
+.service-list-item{
+  border-color:rgba(255,255,255,.08)!important;
+  background:#121914!important;
+  color:#edf3ee!important;
+  box-shadow:none!important;
+}
+.service-list-item:hover{
+  border-color:rgba(99,209,121,.22)!important;
+  background:#162019!important;
+}
+.service-list-item.is-selected{
+  border-color:rgba(99,209,121,.42)!important;
+  background:rgba(99,209,121,.11)!important;
+  box-shadow:0 0 0 2px rgba(99,209,121,.07)!important;
+}
+.service-list-item strong{
+  color:#f4f7f5!important;
+}
+.service-list-item small{
+  color:#8e9b92!important;
+}
+.service-badge{
+  border:1px solid rgba(99,209,121,.13)!important;
+  background:rgba(99,209,121,.10)!important;
+  color:#bdeec7!important;
+}
+.service-badge.off{
+  border-color:rgba(255,255,255,.08)!important;
+  background:rgba(255,255,255,.045)!important;
+  color:#859087!important;
+}
+
+/* Search field consistency on service/staff lists. */
+.service-list-panel .search-box,
+.staff-list-panel .search-box{
+  background:#0b110d!important;
+  border-color:rgba(255,255,255,.10)!important;
+}
+.service-list-panel .search-box input,
+.staff-list-panel .search-box input{
+  color:#f5f8f5!important;
+}
+.service-list-panel .search-box input::placeholder,
+.staff-list-panel .search-box input::placeholder{
+  color:#647067!important;
+}
+
+/* Schedule reservation rows: keep all text legible in dark mode. */
+.staff-reservation-row,
+.staff-no-reservation{
+  border-color:var(--border)!important;
+}
+.staff-reservation-service strong,
+.staff-reservation-customer strong,
+.staff-reservation-time{
+  color:#f4f7f5!important;
+}
+.staff-reservation-service small,
+.staff-reservation-customer small,
+.staff-no-reservation{
+  color:#87938b!important;
+}
