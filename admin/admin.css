@@ -804,3 +804,191 @@ input::placeholder,textarea::placeholder{color:#647067}
   .auth-logout{padding:0 9px}
   .login-card{padding:26px 20px}
 }
+
+
+/* =========================================================
+   Login layout fix v7.1
+   Matches current #loginGate HTML structure.
+   ========================================================= */
+
+.login-gate{
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  display:grid;
+  place-items:center;
+  min-height:100dvh;
+  padding:24px;
+  overflow:auto;
+  background:
+    radial-gradient(circle at 80% 0,rgba(84,190,105,.18),transparent 32rem),
+    radial-gradient(circle at 15% 100%,rgba(48,91,60,.12),transparent 28rem),
+    #080c09;
+}
+
+.login-card{
+  width:min(100%,440px);
+  margin:auto;
+  padding:32px;
+  border:1px solid rgba(255,255,255,.09);
+  border-radius:24px;
+  background:linear-gradient(180deg,#151d17 0%,#101612 100%);
+  box-shadow:0 34px 100px rgba(0,0,0,.48);
+}
+
+.login-brand{
+  display:flex;
+  align-items:center;
+  gap:13px;
+  margin-bottom:26px;
+}
+
+.login-brand .brand-mark{
+  flex:0 0 auto;
+  width:48px;
+  height:48px;
+  border-radius:15px;
+}
+
+.login-brand strong,
+.login-brand span{
+  display:block;
+}
+
+.login-brand strong{
+  color:#fff;
+  font-size:17px;
+  letter-spacing:-.01em;
+}
+
+.login-brand span{
+  margin-top:3px;
+  color:#7e8b82;
+  font-size:11px;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+}
+
+.login-heading{
+  margin-bottom:24px;
+}
+
+.login-heading .eyebrow{
+  margin:0 0 7px;
+  color:var(--accent)!important;
+  font-size:10px!important;
+  font-weight:900;
+  letter-spacing:.17em;
+}
+
+.login-heading h1{
+  margin:0;
+  color:#fff;
+  font-size:30px;
+  line-height:1.15;
+  letter-spacing:-.035em;
+}
+
+.login-heading p:not(.eyebrow){
+  margin:10px 0 0;
+  color:#8e9b92;
+  font-size:13px;
+  line-height:1.7;
+}
+
+.login-form{
+  display:grid;
+  gap:16px;
+}
+
+.login-form label{
+  display:grid;
+  gap:8px;
+}
+
+.login-form label > span{
+  color:#b5c0b8;
+  font-size:12px;
+  font-weight:800;
+}
+
+.login-form input{
+  width:100%;
+  min-height:50px;
+  border:1px solid rgba(255,255,255,.11);
+  border-radius:13px;
+  background:#0a100c;
+  color:#fff;
+  padding:0 14px;
+  outline:0;
+  box-shadow:none;
+}
+
+.login-form input::placeholder{
+  color:#59655d;
+}
+
+.login-form input:focus{
+  border-color:rgba(99,209,121,.62);
+  box-shadow:0 0 0 4px rgba(99,209,121,.09);
+}
+
+#loginMessage{
+  margin:0;
+  padding:11px 13px;
+  border-radius:11px;
+  background:rgba(99,209,121,.10);
+  color:#b9edc3;
+  font-size:12px;
+  font-weight:700;
+}
+
+#loginMessage.is-error{
+  background:rgba(239,93,93,.11);
+  color:#ffb7b7;
+}
+
+#loginButton{
+  width:100%;
+  min-height:52px;
+  margin-top:2px;
+  border:0;
+  border-radius:13px;
+  background:linear-gradient(180deg,#70dc85,#50c268);
+  color:#061008;
+  font-weight:900;
+  box-shadow:0 12px 28px rgba(76,191,99,.17);
+}
+
+#loginButton:hover{
+  background:linear-gradient(180deg,#79e28d,#59ca70);
+  transform:translateY(-1px);
+}
+
+#loginButton:disabled{
+  opacity:.65;
+  cursor:wait;
+  transform:none;
+}
+
+@media(max-width:560px){
+  .login-gate{
+    place-items:start center;
+    padding:18px 14px;
+  }
+
+  .login-card{
+    width:100%;
+    margin-top:max(5vh,24px);
+    padding:24px 18px;
+    border-radius:20px;
+  }
+
+  .login-heading h1{
+    font-size:27px;
+  }
+
+  .login-brand{
+    margin-bottom:22px;
+  }
+}
