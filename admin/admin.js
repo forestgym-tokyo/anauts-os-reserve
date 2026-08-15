@@ -1,6 +1,6 @@
-// BUILD: 20260816-staff-login-v9
+// BUILD: 20260816-login-provision-v9
 const API_URL="https://script.google.com/macros/s/AKfycbyvpQRxRpMRfpaQHtBar77dViCqPl-hdFW-2yMdozhN8RHtwcrFiNEM9cvEbny4x9q0/exec";
-const state={staff:[],stores:[],services:[],serviceHours:[],selectedServiceCode:"",selectedStaffCode:"",shiftRows:[],shiftPreview:null,staffScheduleDate:"",staffSchedule:null,trainerScheduleDate:"",trainerSchedule:null,myShiftDate:"",myShiftRows:[],myShiftRequests:[],authUser:null,idToken:""};
+const state={staff:[],stores:[],services:[],serviceHours:[],selectedServiceCode:"",selectedStaffCode:"",shiftRows:[],shiftPreview:null,staffScheduleDate:"",staffSchedule:null,trainerScheduleDate:"",trainerSchedule:null,authUser:null,idToken:""};
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
 function authEnabled(){return !!window.ANAUTS_AUTH?.enabled}
 function withAuth(params={}){const o={...params};if(authEnabled()&&state.idToken)o.id_token=state.idToken;return o}
@@ -17,17 +17,14 @@ function hasPermission(...levels){
   const p=String(state.authUser?.permission||"STAFF").toUpperCase();
   return levels.includes(p);
 }
-
-function isManagementUser(){
-  return hasPermission("ADMIN","MANAGER");
-}
-
 function applyPermissionUi(){
   if(!authEnabled())return;
   const permission=String(state.authUser?.permission||"STAFF").toUpperCase();
-  const management=permission==="ADMIN"||permission==="MANAGER";
-  document.querySelectorAll('[data-view="registration"]').forEach(el=>el.classList.toggle("is-hidden",!management));
-  $("#myShiftNav")?.classList.toggle("is-hidden",management);
+  document.querySelectorAll('[data-view="registration"]').forEach(el=>{
+    el.classList.toggle("is-hidden",!(permission==="ADMIN"||permission==="MANAGER"));
+  });
+  // STAFFは現時点では登録画面へ直接入れない。
+  // 自分のシフト変更申請UIは次工程で専用導線として追加する。
   $("#authUserArea")?.classList.remove("is-hidden");
   if($("#authUserName"))$("#authUserName").textContent=roleHonorific(state.authUser);
   if($("#authUserPermission"))$("#authUserPermission").textContent=permission;
@@ -68,12 +65,19 @@ async function restoreAuthSession(){
 
 async function initializeAppAfterAuth(){
   if(!state.staffScheduleDate)state.staffScheduleDate=localYmd();
-  if(!state.myShiftDate)state.myShiftDate=localYmd();
+
   const activeButton=document.querySelector(".nav-button.is-active");
   const activeView=activeButton?.dataset?.view||"staffSchedule";
-  if(activeView==="staffSchedule"){await loadStaffSchedule();return;}
-  if(activeView==="trainerSchedule"){await loadTrainerSchedule();return;}
-  if(activeView==="myShift"){await loadMyShiftView();return;}
+
+  if(activeView==="staffSchedule"){
+    await loadStaffSchedule();
+    return;
+  }
+
+  if(activeView==="trainerSchedule"){
+    await loadTrainerSchedule();
+    return;
+  }
 }
 
 async function doLogin(e){
@@ -109,89 +113,7 @@ function logout(){
 $("#loginForm")?.addEventListener("submit",doLogin);
 $("#logoutButton")?.addEventListener("click",logout);
 
-$("#accountSettingsButton")?.addEventListener("click",()=>{
-  
-async function firebaseChangeOwnPassword(newPassword){
-  const key=window.ANAUTS_AUTH?.firebaseApiKey;
-  if(!key)throw new Error("Firebase APIキーが設定されていません。");
-  if(!state.idToken)throw new Error("ログイン情報がありません。もう一度ログインしてください。");
-
-  const r=await fetch(
-    `https://identitytoolkit.googleapis.com/v1/accounts:update?key=${encodeURIComponent(key)}`,
-    {
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({
-        idToken:state.idToken,
-        password:newPassword,
-        returnSecureToken:true
-      })
-    }
-  );
-
-  const j=await r.json();
-
-  if(!r.ok){
-    const code=String(j?.error?.message||"");
-    if(code.includes("WEAK_PASSWORD"))throw new Error("パスワードが短すぎるか、設定条件を満たしていません。");
-    if(code.includes("INVALID_ID_TOKEN")||code.includes("TOKEN_EXPIRED")){
-      throw new Error("ログイン情報の有効期限が切れています。再ログインしてください。");
-    }
-    throw new Error("パスワードを変更できませんでした。");
-  }
-
-  if(j.idToken){
-    state.idToken=j.idToken;
-    sessionStorage.setItem("anauts_id_token",j.idToken);
-  }
-
-  return j;
-}
-
-function passwordChangeMsg(text,error=false){
-  const n=$("#passwordChangeMessage");
-  if(!n)return;
-  n.textContent=text||"";
-  n.classList.toggle("is-hidden",!text);
-  n.classList.toggle("is-error",!!error);
-}
-
-$("#changePasswordForm")?.addEventListener("submit",async e=>{
-  e.preventDefault();
-
-  const password=$("#newPassword")?.value||"";
-  const confirmPassword=$("#newPasswordConfirm")?.value||"";
-
-  if(!password)return passwordChangeMsg("新しいパスワードを入力してください。",true);
-  if(password!==confirmPassword)return passwordChangeMsg("確認用パスワードが一致しません。",true);
-
-  const button=$("#changePasswordButton");
-  button.disabled=true;
-  button.textContent="変更中…";
-  passwordChangeMsg("");
-
-  try{
-    await firebaseChangeOwnPassword(password);
-    $("#changePasswordForm")?.reset();
-    passwordChangeMsg("パスワードを変更しました。",false);
-  }catch(err){
-    passwordChangeMsg(err.message||"パスワード変更に失敗しました。",true);
-  }finally{
-    button.disabled=false;
-    button.textContent="パスワードを変更";
-  }
-});
-
-$$(".nav-button").forEach(x=>x.classList.remove("is-active"));
-  $$(".view").forEach(x=>x.classList.remove("is-active"));
-  $("#accountSettingsView")?.classList.add("is-active");
-  const msg=$("#passwordChangeMessage");
-  if(msg){msg.textContent="";msg.classList.add("is-hidden");msg.classList.remove("is-error");}
-  $("#changePasswordForm")?.reset();
-});
-
-
-$$(".nav-button").forEach(b=>b.onclick=async()=>{$$(".nav-button").forEach(x=>x.classList.toggle("is-active",x===b));$$(".view").forEach(x=>x.classList.remove("is-active"));$("#"+b.dataset.view+"View").classList.add("is-active");if(b.dataset.view==="staffSchedule")await loadStaffSchedule();if(b.dataset.view==="trainerSchedule")await loadTrainerSchedule();if(b.dataset.view==="myShift")await loadMyShiftView()});
+$$(".nav-button").forEach(b=>b.onclick=async()=>{$$(".nav-button").forEach(x=>x.classList.toggle("is-active",x===b));$$(".view").forEach(x=>x.classList.remove("is-active"));$("#"+b.dataset.view+"View").classList.add("is-active");if(b.dataset.view==="staffSchedule")await loadStaffSchedule();if(b.dataset.view==="trainerSchedule")await loadTrainerSchedule()});
 $$(".registration-card").forEach(b=>b.onclick=()=>showRegistration(b.dataset.registration));
 async function showRegistration(type){if(authEnabled()&&!hasPermission("ADMIN","MANAGER"))return;["#staffManager","#shiftManager","#serviceManager","#serviceHoursManager","#registrationPlaceholder"].forEach(x=>$(x)?.classList.add("is-hidden"));if(type==="staff"){$("#staffManager").classList.remove("is-hidden");await loadStaff();if(!state.selectedStaffCode)resetStaffForm();return}if(type==="shift"){$("#shiftManager").classList.remove("is-hidden");await Promise.all([loadStaff(),loadStores()]);setupShift();return}if(type==="service"){$("#serviceManager").classList.remove("is-hidden");await loadServices();setupServiceManager();return}if(type==="hours"){$("#serviceHoursManager").classList.remove("is-hidden");await loadServices();setupServiceHours();return}const map={},v=map[type]||["🛠️","準備中"];$("#placeholderIcon").textContent=v[0];$("#placeholderTitle").textContent=v[1];$("#registrationPlaceholder").classList.remove("is-hidden")}
 async function loadStaff(){try{const j=await apiGet("getStaff",{include_inactive:"true"});state.staff=Array.isArray(j.data?.staff)?j.data.staff:Array.isArray(j.data)?j.data:[];renderStaff()}catch(e){state.staff=[];$("#staffList").innerHTML=`<div class="no-staff">${esc(e.message)}</div>`}}
@@ -246,7 +168,6 @@ function resetStaffForm(){
   $("#staffColor").value="#63d179";
   $("#staffColorPicker").value="#63d179";
   staffMsg("");
-  $("#staffLoginSetupButton")?.classList.add("is-hidden");
   renderStaff();
 }
 
@@ -285,7 +206,6 @@ async function selectStaff(code){
     $("#staffCanTrainingSupport").checked=!!s.can_training_support;
     $("#staffCan9Round").checked=!!s.can_9round;
 
-    $("#staffLoginSetupButton")?.classList.toggle("is-hidden",!isManagementUser());
     renderStaff();
   }catch(e){
     staffMsg(e.message||"スタッフ情報を取得できませんでした。",true);
@@ -294,11 +214,9 @@ async function selectStaff(code){
 
 async function saveStaffFromUi(e){
   e.preventDefault();
-
   const code=String($("#staffCode").value||"").trim().toUpperCase();
   if(!code)return staffMsg("スタッフコードを入力してください。",true);
 
-  const email=String($("#staffEmail").value||"").trim().toLowerCase();
   const button=$("#saveStaffButton");
   button.disabled=true;
   button.textContent="保存中…";
@@ -311,7 +229,7 @@ async function saveStaffFromUi(e){
       store_code:$("#staffStore").value.trim(),
       staff_name:$("#staffName").value.trim(),
       display_name:$("#staffDisplayName").value.trim(),
-      email:email,
+      email:$("#staffEmail").value.trim(),
       calendar_code:$("#staffCalendarCode").value.trim(),
       mail_account_code:$("#staffMailAccountCode").value.trim(),
       color:$("#staffColor").value.trim(),
@@ -327,47 +245,9 @@ async function saveStaffFromUi(e){
       can_9round:$("#staffCan9Round").checked
     });
 
-    const created=j.data?.mode==="CREATE";
-    let loginSetupResult=null;
-
-    /*
-     * 新規スタッフ + メールありの場合は、
-     * Firebaseログインアカウントとauth_usersを自動作成し、
-     * 本人へパスワード設定メールを送る。
-     */
-    if(created && email){
-      try{
-        loginSetupResult=await apiPost({
-          action:"provisionStaffLogin",
-          staff_code:code,
-          email:email
-        });
-      }catch(loginError){
-        await loadStaff();
-        await selectStaff(code);
-        staffMsg(
-          `スタッフは登録しましたが、ログイン設定メールの送信に失敗しました：${loginError.message}`,
-          true
-        );
-        return;
-      }
-    }
-
     await loadStaff();
     await selectStaff(code);
-
-    if(created){
-      if(email && loginSetupResult){
-        staffMsg("スタッフを登録し、本人へパスワード設定メールを送信しました。");
-      }else if(!email){
-        staffMsg("スタッフを登録しました。メール未登録のためログインアカウントは作成していません。",true);
-      }else{
-        staffMsg("スタッフを登録しました。");
-      }
-    }else{
-      staffMsg("スタッフ情報を更新しました。");
-    }
-
+    staffMsg(j.data?.mode==="CREATE"?"スタッフを登録しました。":"スタッフ情報を更新しました。");
   }catch(err){
     staffMsg(err.message||"保存に失敗しました。",true);
   }finally{
@@ -376,36 +256,32 @@ async function saveStaffFromUi(e){
   }
 }
 
-async function sendStaffLoginSetupFromUi(){
-  if(!isManagementUser())return staffMsg("この操作を行う権限がありません。",true);
 
-  const code=String($("#staffCode")?.value||"").trim().toUpperCase();
-  const email=String($("#staffEmail")?.value||"").trim().toLowerCase();
-
-  if(!code)return staffMsg("スタッフを選択してください。",true);
-  if(!email)return staffMsg("ログイン用メールアドレスを登録してください。",true);
-
-  const button=$("#staffLoginSetupButton");
-  button.disabled=true;
-  button.textContent="送信中…";
-
-  try{
-    await apiPost({
-      action:"provisionStaffLogin",
-      staff_code:code,
-      email:email
-    });
-    staffMsg("本人へパスワード設定メールを送信しました。");
-  }catch(e){
-    staffMsg(e.message||"ログイン設定メールの送信に失敗しました。",true);
-  }finally{
-    button.disabled=false;
-    button.textContent="ログイン設定メールを送信";
-  }
+function staffLoginSetupMsg(text,error=false){
+  const n=$("#staffLoginSetupMessage"); if(!n)return;
+  n.textContent=text||""; n.classList.toggle("is-hidden",!text); n.classList.toggle("is-error",!!error);
 }
+async function sendStaffLoginSetup(){
+  if(!hasPermission("ADMIN","MANAGER"))return staffLoginSetupMsg("この操作を行う権限がありません。",true);
+  const staffCode=String($("#staffCode")?.value||"").trim().toUpperCase();
+  const email=String($("#staffEmail")?.value||"").trim().toLowerCase();
+  const password=String($("#staffInitialPassword")?.value||"");
+  const permission=String($("#staffLoginPermission")?.value||"STAFF").trim().toUpperCase();
+  if(!staffCode)return staffLoginSetupMsg("先にスタッフを選択または登録してください。",true);
+  if(!email)return staffLoginSetupMsg("スタッフのメールアドレスを入力してください。",true);
+  if(password.length<6)return staffLoginSetupMsg("初期パスワードは6文字以上で入力してください。",true);
+  const name=String($("#staffDisplayName")?.value||$("#staffName")?.value||staffCode).trim();
+  if(!confirm(`${name} のログイン設定を作成し、${email} に案内メールを送信します。\n\n権限：${permission}\n初期パスワード：${password}\n\n実行しますか？`))return;
+  const b=$("#sendLoginSetupButton"); b.disabled=true; b.textContent="送信中…"; staffLoginSetupMsg("");
+  try{
+    await apiPost({action:"provisionStaffLogin",staff_code:staffCode,email,initial_password:password,permission,admin_url:location.origin+location.pathname});
+    staffLoginSetupMsg("ログイン設定を保存し、案内メールを送信しました。");
+  }catch(e){staffLoginSetupMsg(e.message||"ログイン設定メールを送信できませんでした。",true)}
+  finally{b.disabled=false;b.textContent="ログイン設定メールを送信"}
+}
+$("#sendLoginSetupButton")?.addEventListener("click",sendStaffLoginSetup);
 
 $("#newStaffButton")?.addEventListener("click",resetStaffForm);
-$("#staffLoginSetupButton")?.addEventListener("click",sendStaffLoginSetupFromUi);
 $("#staffForm")?.addEventListener("submit",saveStaffFromUi);
 $("#staffColorPicker")?.addEventListener("input",e=>{$("#staffColor").value=e.target.value});
 $("#staffColor")?.addEventListener("input",e=>{
@@ -740,21 +616,6 @@ function renderTrainerSchedule(d){
 $("#trainerPrevDay")?.addEventListener("click",()=>moveTrainerScheduleDate(-1));
 $("#trainerNextDay")?.addEventListener("click",()=>moveTrainerScheduleDate(1));
 $("#trainerToday")?.addEventListener("click",()=>{state.trainerScheduleDate=localYmd();loadTrainerSchedule()});
-
-
-// ===== 自分のシフト変更申請 =====
-function isManagementUser(){return hasPermission("ADMIN","MANAGER")}
-function canUseMyShift(){return authEnabled()&&!isManagementUser()&&!!state.authUser?.staff_code}
-function moveMyShiftDate(days){const d=parseYmd(state.myShiftDate||localYmd());d.setDate(d.getDate()+days);state.myShiftDate=localYmd(d);loadMyShiftView()}
-function myShiftMsg(text,error=false){const n=$("#myShiftMessage");if(!n)return;n.textContent=text||"";n.classList.toggle("is-hidden",!text);n.classList.toggle("is-error",!!error)}
-function resetMyShiftForm(){if($("#myShiftEditingId"))$("#myShiftEditingId").value="";if($("#myShiftStart"))$("#myShiftStart").value="";if($("#myShiftEnd"))$("#myShiftEnd").value="";if($("#myShiftReason"))$("#myShiftReason").value="";if($("#myShiftFormTitle"))$("#myShiftFormTitle").textContent="シフト追加申請";if($("#myShiftSubmitButton"))$("#myShiftSubmitButton").textContent="追加申請を送る";$("#myShiftCancelEdit")?.classList.add("is-hidden")}
-async function loadMyShiftView(){if(!canUseMyShift())return;if(!state.myShiftDate)state.myShiftDate=localYmd();$("#myShiftDateLabel").textContent=formatStaffDate(state.myShiftDate);const box=$("#myShiftList"),hist=$("#myShiftRequestHistory");if(box)box.innerHTML='<div class="registered-shift-empty">シフトを読み込んでいます…</div>';if(hist)hist.innerHTML='<div class="registered-shift-empty">申請履歴を読み込んでいます…</div>';try{const [a,b]=await Promise.all([apiGet("getStaffShifts",{staff_code:state.authUser.staff_code,start_date:state.myShiftDate,end_date:state.myShiftDate}),apiGet("getMyShiftChangeRequests")]);state.myShiftRows=(Array.isArray(a.data)?a.data:Array.isArray(a.data?.shifts)?a.data.shifts:[]).filter(r=>r.active!==false);state.myShiftRequests=Array.isArray(b.data)?b.data:[];renderMyShiftRows();renderMyShiftRequestHistory();const p=state.myShiftRequests.filter(r=>String(r.status||"").toUpperCase()==="PENDING"&&String(r.date||"")===state.myShiftDate).length;$("#myShiftStatusSummary").textContent=`登録 ${state.myShiftRows.length}件 / 承認待ち ${p}件`}catch(e){if(box)box.innerHTML=`<div class="registered-shift-empty is-error">${esc(e.message||"シフトを取得できませんでした。")}</div>`;myShiftMsg(e.message||"取得に失敗しました。",true)}}
-function renderMyShiftRows(){const box=$("#myShiftList"),rows=state.myShiftRows||[];if(!box)return;if(!rows.length){box.innerHTML='<div class="registered-shift-empty">この日の登録済みシフトはありません。</div>';return}box.innerHTML=rows.map((r,i)=>`<div class="registered-shift-row"><div class="registered-shift-time"><strong>${esc(r.start_time)}</strong><span>〜</span><strong>${esc(r.end_time)}</strong></div><div class="registered-shift-meta"><span>${esc(r.store_code||state.authUser?.store_code||"")}</span><small>${esc(r.shift_id||"")}</small></div><div class="registered-shift-actions"><button class="ghost-button" type="button" data-my-shift-edit="${i}">変更申請</button><button class="danger-ghost" type="button" data-my-shift-delete="${i}">削除申請</button></div></div>`).join("");$$('[data-my-shift-edit]').forEach(b=>b.onclick=()=>editMyShiftRequest(rows[+b.dataset.myShiftEdit]));$$('[data-my-shift-delete]').forEach(b=>b.onclick=()=>requestDeleteMyShift(rows[+b.dataset.myShiftDelete]))}
-function editMyShiftRequest(r){$("#myShiftEditingId").value=r.shift_id||"";$("#myShiftStart").value=String(r.start_time||"").slice(0,5);$("#myShiftEnd").value=String(r.end_time||"").slice(0,5);$("#myShiftReason").value="";$("#myShiftFormTitle").textContent="シフト変更申請";$("#myShiftSubmitButton").textContent="変更申請を送る";$("#myShiftCancelEdit").classList.remove("is-hidden");$("#myShiftStart").focus()}
-async function requestDeleteMyShift(r){const reason=prompt(`${r.start_time}〜${r.end_time} の削除申請を送ります。\n申請理由があれば入力してください。`,"");if(reason===null)return;try{await apiPost({action:"createShiftChangeRequest",request_type:"DELETE",staff_code:state.authUser.staff_code,shift_id:r.shift_id,reason:String(reason||"").trim()});myShiftMsg("削除申請を送信しました。管理者の承認待ちです。");await loadMyShiftView()}catch(e){myShiftMsg(e.message||"削除申請に失敗しました。",true)}}
-$("#myShiftRequestForm")?.addEventListener("submit",async e=>{e.preventDefault();if(!canUseMyShift())return myShiftMsg("この操作を行う権限がありません。",true);const start=$("#myShiftStart").value,end=$("#myShiftEnd").value;if(!start||!end)return myShiftMsg("開始時刻と終了時刻を入力してください。",true);if(start>=end)return myShiftMsg("終了時刻は開始時刻より後にしてください。",true);const editingId=$("#myShiftEditingId").value,b=$("#myShiftSubmitButton");b.disabled=true;try{await apiPost({action:"createShiftChangeRequest",request_type:editingId?"UPDATE":"ADD",staff_code:state.authUser.staff_code,shift_id:editingId||"",store_code:state.authUser.store_code||"YACHIYO",date:state.myShiftDate,start_time:start,end_time:end,reason:$("#myShiftReason").value.trim()});myShiftMsg(editingId?"変更申請を送信しました。管理者の承認待ちです。":"追加申請を送信しました。管理者の承認待ちです。");resetMyShiftForm();await loadMyShiftView()}catch(x){myShiftMsg(x.message||"シフト変更申請に失敗しました。",true)}finally{b.disabled=false}})
-$("#myShiftCancelEdit")?.addEventListener("click",resetMyShiftForm);$("#myShiftPrevDay")?.addEventListener("click",()=>moveMyShiftDate(-1));$("#myShiftNextDay")?.addEventListener("click",()=>moveMyShiftDate(1));$("#myShiftToday")?.addEventListener("click",()=>{state.myShiftDate=localYmd();loadMyShiftView()});
-function renderMyShiftRequestHistory(){const box=$("#myShiftRequestHistory"),rows=(state.myShiftRequests||[]).slice(0,30);if(!box)return;if(!rows.length){box.innerHTML='<div class="registered-shift-empty">申請履歴はありません。</div>';return}const tl={ADD:"追加",UPDATE:"変更",DELETE:"削除"},sl={PENDING:"承認待ち",APPROVED:"承認済み",REJECTED:"却下"};box.innerHTML=rows.map(r=>{const t=String(r.request_type||"").toUpperCase(),s=String(r.status||"").toUpperCase(),time=t==="DELETE"?`${esc(r.old_start_time||"")}〜${esc(r.old_end_time||"")}`:`${esc(r.new_start_time||"")}〜${esc(r.new_end_time||"")}`;return `<div class="registered-shift-row"><div class="registered-shift-time"><strong>${esc(r.date||"")}</strong></div><div class="registered-shift-meta"><span>${esc(tl[t]||t)} · ${time}</span><small>${esc(r.reason||"理由なし")}</small></div><div class="registered-shift-actions"><span class="shift-pill">${esc(sl[s]||s)}</span></div></div>`}).join("")}
 
 // ===== サービス管理 =====
 function setupServiceManager(){renderServiceList();resetServiceForm();$("#serviceSearch").oninput=renderServiceList;$("#newServiceButton").onclick=resetServiceForm;$("#serviceForm").onsubmit=saveServiceFromUi}
