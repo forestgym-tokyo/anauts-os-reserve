@@ -1,4 +1,4 @@
 window.ANAUTS_AUTH = {
-  enabled: false,
+  enabled: true,
   firebaseApiKey: "AIzaSyAtxFCPt1mGZWYP6hMYcqeVzLAVmrvvyIc"
 };
