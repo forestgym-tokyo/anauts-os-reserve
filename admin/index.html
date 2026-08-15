@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#090d0a"><title>A-nauts OS Reserve | Admin</title><link rel="stylesheet" href="./admin.css?v=20260816-staff-selfservice-v10"></head><body data-build="20260816-staff-selfservice-v10">
+<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#090d0a"><title>A-nauts OS Reserve | Admin</title><link rel="stylesheet" href="./admin.css?v=20260816-shift-approval-fix-v11"></head><body data-build="20260816-shift-approval-fix-v11">
 <div id="loginGate" class="login-gate">
   <div class="login-card">
     <div class="login-brand">
@@ -50,7 +50,7 @@
   <form id="myShiftRequestForm" class="new-shift-card">
     <div class="new-shift-head"><div><span>SHIFT REQUEST</span><h4 id="myShiftFormTitle">シフト追加申請</h4></div><button id="myShiftCancelEdit" class="ghost-button is-hidden" type="button">編集をやめる</button></div>
     <input id="myShiftEditingId" type="hidden">
-    <div class="shift-time-grid"><label><span>開始</span><input id="myShiftStart" type="time" required></label><div class="shift-time-separator">〜</div><label><span>終了</span><input id="myShiftEnd" type="time" required></label></div>
+    <div class="shift-time-grid"><label><span>開始</span><select id="myShiftStart" required></select></label><div class="shift-time-separator">〜</div><label><span>終了</span><select id="myShiftEnd" required></select></label></div>
     <div style="padding:0 18px 4px"><label style="display:grid;gap:8px"><span style="color:#aab6ad;font-size:12px;font-weight:800">申請理由（任意）</span><textarea id="myShiftReason" rows="3" placeholder="例：学校行事のため、開始時刻を変更したい"></textarea></label></div>
     <div class="shift-actions"><button id="myShiftSubmitButton" class="primary-button" type="submit">追加申請を送る</button></div>
   </form>
@@ -277,4 +277,4 @@
 <label><span>曜日</span><select id="serviceHourDay"><option value="ALL">すべての曜日</option><option value="SUN">日曜日</option><option value="MON">月曜日</option><option value="TUE">火曜日</option><option value="WED">水曜日</option><option value="THU">木曜日</option><option value="FRI">金曜日</option><option value="SAT">土曜日</option></select></label>
 <label><span>開始</span><input id="serviceHourStart" type="time" required></label><label><span>終了</span><input id="serviceHourEnd" type="time" required></label></div>
 <div class="shift-actions"><button id="cancelServiceHourButton" class="ghost-button" type="button">キャンセル</button><button id="saveServiceHourButton" class="primary-button" type="submit">保存</button></div></form></div></div></section><section id="registrationPlaceholder" class="manager card is-hidden"><div class="empty-state compact"><div id="placeholderIcon" class="empty-icon">🛠️</div><h2 id="placeholderTitle">準備中</h2></div></section></section>
-<section id="dailyReportView" class="view daily-report-view"><div class="empty-state card"><div class="empty-icon">📝</div><h2>現在準備中です</h2></div></section></main></div><script src="./firebase-config.js?v=20260816-staff-selfservice-v10"></script><script src="./admin.js?v=20260816-staff-selfservice-v10" defer></script></body></html>
+<section id="dailyReportView" class="view daily-report-view"><div class="empty-state card"><div class="empty-icon">📝</div><h2>現在準備中です</h2></div></section></main></div><script src="./firebase-config.js?v=20260816-shift-approval-fix-v11"></script><script src="./admin.js?v=20260816-shift-approval-fix-v11" defer></script></body></html>

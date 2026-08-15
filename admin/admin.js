@@ -1,4 +1,4 @@
-// BUILD: 20260816-staff-selfservice-v10
+// BUILD: 20260816-shift-approval-fix-v11
 const API_URL="https://script.google.com/macros/s/AKfycbyvpQRxRpMRfpaQHtBar77dViCqPl-hdFW-2yMdozhN8RHtwcrFiNEM9cvEbny4x9q0/exec";
 const state={staff:[],stores:[],services:[],serviceHours:[],selectedServiceCode:"",selectedStaffCode:"",shiftRows:[],shiftPreview:null,staffScheduleDate:"",staffSchedule:null,trainerScheduleDate:"",trainerSchedule:null,myShiftDate:"",myShiftRows:[],myShiftRequests:[],authUser:null,idToken:""};
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
@@ -611,8 +611,39 @@ $("#trainerToday")?.addEventListener("click",()=>{state.trainerScheduleDate=loca
 
 
 // ===== 自分のシフト変更申請 =====
+
+function buildShiftTimeOptions_(includeBlank=true){
+  const rows=[];
+  if(includeBlank)rows.push('<option value="">選択してください</option>');
+  for(let h=8;h<=23;h++){
+    for(const m of [0,15,30,45]){
+      const hh=String(h).padStart(2,"0");
+      const mm=String(m).padStart(2,"0");
+      rows.push(`<option value="${hh}:${mm}">${hh}:${mm}</option>`);
+    }
+  }
+  rows.push('<option value="24:00">24:00</option>');
+  return rows.join("");
+}
+
+function setupMyShiftTimeSelectors_(){
+  const options=buildShiftTimeOptions_(true);
+  if($("#myShiftStart"))$("#myShiftStart").innerHTML=options;
+  if($("#myShiftEnd"))$("#myShiftEnd").innerHTML=options;
+}
+
 function isManagementUser(){return hasPermission("ADMIN","MANAGER")}
 function canUseMyShift(){return authEnabled()&&!isManagementUser()&&!!state.authUser?.staff_code}
+
+function isAllowedShiftTime_(value){
+  const m=/^(\d{2}):(\d{2})$/.exec(String(value||""));
+  if(!m)return false;
+  const h=Number(m[1]),min=Number(m[2]);
+  if(![0,15,30,45].includes(min))return false;
+  if(h===24)return min===0;
+  return h>=8&&h<=23;
+}
+
 function moveMyShiftDate(days){const d=parseYmd(state.myShiftDate||localYmd());d.setDate(d.getDate()+days);state.myShiftDate=localYmd(d);loadMyShiftView()}
 function myShiftMsg(text,error=false){const n=$("#myShiftMessage");if(!n)return;n.textContent=text||"";n.classList.toggle("is-hidden",!text);n.classList.toggle("is-error",!!error)}
 function resetMyShiftForm(){if($("#myShiftEditingId"))$("#myShiftEditingId").value="";if($("#myShiftStart"))$("#myShiftStart").value="";if($("#myShiftEnd"))$("#myShiftEnd").value="";if($("#myShiftReason"))$("#myShiftReason").value="";if($("#myShiftFormTitle"))$("#myShiftFormTitle").textContent="シフト追加申請";if($("#myShiftSubmitButton"))$("#myShiftSubmitButton").textContent="追加申請を送る";$("#myShiftCancelEdit")?.classList.add("is-hidden")}
@@ -651,7 +682,7 @@ async function requestDeleteMyShift(r){
 }
 $("#myShiftRequestForm")?.addEventListener("submit",async e=>{
   e.preventDefault();if(!canUseMyShift())return myShiftMsg("この操作を行う権限がありません。",true);
-  const start=$("#myShiftStart").value,end=$("#myShiftEnd").value;if(!start||!end)return myShiftMsg("開始時刻と終了時刻を入力してください。",true);if(start>=end)return myShiftMsg("終了時刻は開始時刻より後にしてください。",true);
+  const start=$("#myShiftStart").value,end=$("#myShiftEnd").value;if(!start||!end)return myShiftMsg("開始時刻と終了時刻を選択してください。",true);if(!isAllowedShiftTime_(start)||!isAllowedShiftTime_(end))return myShiftMsg("時刻は08:00〜24:00、分は00・15・30・45のみ選択できます。",true);if(start>=end)return myShiftMsg("終了時刻は開始時刻より後にしてください。",true);
   const editingId=$("#myShiftEditingId").value,b=$("#myShiftSubmitButton");b.disabled=true;
   try{
     await apiPost({action:"createShiftChangeRequest",request_type:editingId?"UPDATE":"ADD",staff_code:state.authUser.staff_code,shift_id:editingId||"",store_code:state.authUser.store_code||"YACHIYO",date:state.myShiftDate,start_time:start,end_time:end,reason:$("#myShiftReason").value.trim()});
@@ -693,6 +724,7 @@ function serviceMsg(text,error=false){const n=$("#serviceMessage");if(!n)return;
 function hideServiceMsg(){const n=$("#serviceMessage");if(!n)return;n.textContent="";n.classList.add("is-hidden");n.classList.remove("is-error")}
 
 window.addEventListener("DOMContentLoaded",async()=>{
+  setupMyShiftTimeSelectors_();
   if(!authEnabled()){
     await initializeAppAfterAuth();
     return;
