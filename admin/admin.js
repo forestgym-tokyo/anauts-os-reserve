@@ -1,12 +1,102 @@
 // BUILD: 20260814-trainer-schedule-v1
 const API_URL="https://script.google.com/macros/s/AKfycbyvpQRxRpMRfpaQHtBar77dViCqPl-hdFW-2yMdozhN8RHtwcrFiNEM9cvEbny4x9q0/exec";
-const state={staff:[],stores:[],services:[],serviceHours:[],selectedServiceCode:"",selectedStaffCode:"",shiftRows:[],shiftPreview:null,staffScheduleDate:"",staffSchedule:null,trainerScheduleDate:"",trainerSchedule:null};
+const state={staff:[],stores:[],services:[],serviceHours:[],selectedServiceCode:"",selectedStaffCode:"",shiftRows:[],shiftPreview:null,staffScheduleDate:"",staffSchedule:null,trainerScheduleDate:"",trainerSchedule:null,authUser:null,idToken:""};
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
-async function apiGet(action,params={}){const u=new URL(API_URL);u.searchParams.set("action",action);Object.entries(params).forEach(([k,v])=>u.searchParams.set(k,v));u.searchParams.set("_",Date.now());const r=await fetch(u,{cache:"no-store"}),j=await r.json();if(!j.ok)throw new Error(j.message||"取得失敗");return j}
-async function apiPost(p){const r=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(p)}),j=await r.json();if(!j.ok)throw new Error(j.message||"処理失敗");return j}
+function authEnabled(){return !!window.ANAUTS_AUTH?.enabled}
+function withAuth(params={}){const o={...params};if(authEnabled()&&state.idToken)o.id_token=state.idToken;return o}
+async function apiGet(action,params={}){const u=new URL(API_URL);u.searchParams.set("action",action);Object.entries(withAuth(params)).forEach(([k,v])=>u.searchParams.set(k,v));u.searchParams.set("_",Date.now());const r=await fetch(u,{cache:"no-store"}),j=await r.json();if(!j.ok)throw new Error(j.message||"取得失敗");return j}
+async function apiPost(p){const r=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(withAuth(p))}),j=await r.json();if(!j.ok)throw new Error(j.message||"処理失敗");return j}
+
+function roleHonorific(user){
+  if(!user)return "";
+  const base=user.display_name||user.staff_name||user.staff_code||user.email||"";
+  return String(user.role||"").toUpperCase()==="TRAINER" ? `${base}トレーナー` : `${base}さん`;
+}
+function hasPermission(...levels){
+  if(!authEnabled())return true;
+  const p=String(state.authUser?.permission||"STAFF").toUpperCase();
+  return levels.includes(p);
+}
+function applyPermissionUi(){
+  if(!authEnabled())return;
+  const permission=String(state.authUser?.permission||"STAFF").toUpperCase();
+  document.querySelectorAll('[data-view="registration"]').forEach(el=>{
+    el.classList.toggle("is-hidden",!(permission==="ADMIN"||permission==="MANAGER"));
+  });
+  // STAFFは現時点では登録画面へ直接入れない。
+  // 自分のシフト変更申請UIは次工程で専用導線として追加する。
+  $("#authUserArea")?.classList.remove("is-hidden");
+  if($("#authUserName"))$("#authUserName").textContent=roleHonorific(state.authUser);
+  if($("#authUserPermission"))$("#authUserPermission").textContent=permission;
+}
+function showLoginMessage(text,error=true){
+  const n=$("#loginMessage"); if(!n)return;
+  n.textContent=text||"";
+  n.classList.toggle("is-hidden",!text);
+  n.classList.toggle("is-error",!!error);
+}
+async function firebaseSignIn(email,password){
+  const key=window.ANAUTS_AUTH?.firebaseApiKey;
+  if(!key)throw new Error("Firebase APIキーが設定されていません。");
+  const r=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${encodeURIComponent(key)}`,{
+    method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({email,password,returnSecureToken:true})
+  });
+  const j=await r.json();
+  if(!r.ok)throw new Error("メールアドレスまたはパスワードを確認してください。");
+  return j;
+}
+async function restoreAuthSession(){
+  if(!authEnabled())return true;
+  const token=sessionStorage.getItem("anauts_id_token")||"";
+  if(!token)return false;
+  state.idToken=token;
+  try{
+    const j=await apiGet("getCurrentUser");
+    state.authUser=j.data||null;
+    applyPermissionUi();
+    return !!state.authUser;
+  }catch(e){
+    sessionStorage.removeItem("anauts_id_token");
+    state.idToken="";
+    return false;
+  }
+}
+async function doLogin(e){
+  e.preventDefault();
+  const button=$("#loginButton");
+  button.disabled=true; button.textContent="ログイン中…"; showLoginMessage("");
+  try{
+    const auth=await firebaseSignIn($("#loginEmail").value.trim(),$("#loginPassword").value);
+    state.idToken=auth.idToken;
+    sessionStorage.setItem("anauts_id_token",auth.idToken);
+    const j=await apiGet("getCurrentUser");
+    state.authUser=j.data||null;
+    if(!state.authUser)throw new Error("このアカウントにはA-nauts OS Reserveの利用権限がありません。");
+    $("#loginGate").classList.add("is-hidden");
+    applyPermissionUi();
+  }catch(err){
+    state.idToken="";
+    sessionStorage.removeItem("anauts_id_token");
+    showLoginMessage(err.message||"ログインに失敗しました。",true);
+  }finally{
+    button.disabled=false; button.textContent="ログイン";
+  }
+}
+function logout(){
+  state.idToken=""; state.authUser=null;
+  sessionStorage.removeItem("anauts_id_token");
+  if(authEnabled()){
+    $("#authUserArea")?.classList.add("is-hidden");
+    $("#loginGate")?.classList.remove("is-hidden");
+  }
+}
+$("#loginForm")?.addEventListener("submit",doLogin);
+$("#logoutButton")?.addEventListener("click",logout);
+
 $$(".nav-button").forEach(b=>b.onclick=async()=>{$$(".nav-button").forEach(x=>x.classList.toggle("is-active",x===b));$$(".view").forEach(x=>x.classList.remove("is-active"));$("#"+b.dataset.view+"View").classList.add("is-active");if(b.dataset.view==="staffSchedule")await loadStaffSchedule();if(b.dataset.view==="trainerSchedule")await loadTrainerSchedule()});
 $$(".registration-card").forEach(b=>b.onclick=()=>showRegistration(b.dataset.registration));
-async function showRegistration(type){["#staffManager","#shiftManager","#serviceManager","#serviceHoursManager","#registrationPlaceholder"].forEach(x=>$(x)?.classList.add("is-hidden"));if(type==="staff"){$("#staffManager").classList.remove("is-hidden");await loadStaff();if(!state.selectedStaffCode)resetStaffForm();return}if(type==="shift"){$("#shiftManager").classList.remove("is-hidden");await Promise.all([loadStaff(),loadStores()]);setupShift();return}if(type==="service"){$("#serviceManager").classList.remove("is-hidden");await loadServices();setupServiceManager();return}if(type==="hours"){$("#serviceHoursManager").classList.remove("is-hidden");await loadServices();setupServiceHours();return}const map={},v=map[type]||["🛠️","準備中"];$("#placeholderIcon").textContent=v[0];$("#placeholderTitle").textContent=v[1];$("#registrationPlaceholder").classList.remove("is-hidden")}
+async function showRegistration(type){if(authEnabled()&&!hasPermission("ADMIN","MANAGER"))return;["#staffManager","#shiftManager","#serviceManager","#serviceHoursManager","#registrationPlaceholder"].forEach(x=>$(x)?.classList.add("is-hidden"));if(type==="staff"){$("#staffManager").classList.remove("is-hidden");await loadStaff();if(!state.selectedStaffCode)resetStaffForm();return}if(type==="shift"){$("#shiftManager").classList.remove("is-hidden");await Promise.all([loadStaff(),loadStores()]);setupShift();return}if(type==="service"){$("#serviceManager").classList.remove("is-hidden");await loadServices();setupServiceManager();return}if(type==="hours"){$("#serviceHoursManager").classList.remove("is-hidden");await loadServices();setupServiceHours();return}const map={},v=map[type]||["🛠️","準備中"];$("#placeholderIcon").textContent=v[0];$("#placeholderTitle").textContent=v[1];$("#registrationPlaceholder").classList.remove("is-hidden")}
 async function loadStaff(){try{const j=await apiGet("getStaff",{include_inactive:"true"});state.staff=Array.isArray(j.data?.staff)?j.data.staff:Array.isArray(j.data)?j.data:[];renderStaff()}catch(e){state.staff=[];$("#staffList").innerHTML=`<div class="no-staff">${esc(e.message)}</div>`}}
 async function loadStores(){try{const j=await apiGet("getStores");state.stores=Array.isArray(j.data)?j.data:[]}catch(e){msg(e.message,true)}}
 function renderStaff(){
@@ -491,3 +581,10 @@ function resetServiceForm(){state.selectedServiceCode="";$("#serviceForm")?.rese
 async function saveServiceFromUi(e){e.preventDefault();const code=String($("#serviceCode").value||"").trim().toUpperCase();if(!code)return serviceMsg("サービスコードを入力してください。",true);if(!$("#serviceName").value.trim())return serviceMsg("サービス名を入力してください。",true);if(+$("#serviceDuration").value<=0||+$("#serviceSlotInterval").value<=0)return serviceMsg("所要時間と予約間隔は1分以上にしてください。",true);const b=$("#saveServiceButton");b.disabled=true;b.textContent="保存中…";try{const j=await apiPost({action:"saveService",service_code:code,brand_code:$("#serviceBrand").value.trim(),store_code:$("#serviceStore").value.trim(),service_name:$("#serviceName").value.trim(),category:$("#serviceCategory").value.trim(),form_type:$("#serviceFormType").value,duration:+$("#serviceDuration").value,calendar_code:$("#serviceCalendarCode").value.trim(),provider_role:$("#serviceProviderRole").value.trim(),booking_min_hours:+$("#serviceBookingMinHours").value,change_limit_hours:+$("#serviceChangeLimitHours").value,cancel_limit_hours:+$("#serviceCancelLimitHours").value,public_days:+$("#servicePublicDays").value,slot_interval_minutes:+$("#serviceSlotInterval").value,mail_account_code:$("#serviceMailAccountCode").value.trim(),public:$("#servicePublic").checked,active:$("#serviceActive").checked});await loadServices();state.selectedServiceCode=code;const saved=state.services.find(x=>x.service_code===code);if(saved)selectService(code);else resetServiceForm();serviceMsg(j.data?.active===false?"保存しました。無効化したサービスは現在の一覧APIには表示されません。":"保存しました。")}catch(err){serviceMsg(err.message||"保存に失敗しました。",true)}finally{b.disabled=false;b.textContent="保存"}}
 function serviceMsg(text,error=false){const n=$("#serviceMessage");if(!n)return;n.textContent=text;n.classList.remove("is-hidden");n.classList.toggle("is-error",error)}
 function hideServiceMsg(){const n=$("#serviceMessage");if(!n)return;n.textContent="";n.classList.add("is-hidden");n.classList.remove("is-error")}
+
+window.addEventListener("DOMContentLoaded",async()=>{
+  if(!authEnabled())return;
+  const ok=await restoreAuthSession();
+  $("#loginGate")?.classList.toggle("is-hidden",ok);
+  if(ok)applyPermissionUi();
+});
