@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#090d0a"><title>A-nauts OS Reserve | Admin</title><link rel="stylesheet" href="./admin.css?v=20260816-shift-approval-fix-v11"></head><body data-build="20260816-shift-approval-fix-v11">
+<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#090d0a"><title>A-nauts OS Reserve | Admin</title><link rel="stylesheet" href="./admin.css?v=20260816-shift-request-rules-v13"></head><body data-build="20260816-shift-request-rules-v13">
 <div id="loginGate" class="login-gate">
   <div class="login-card">
     <div class="login-brand">
@@ -41,14 +41,27 @@
 
 <section id="myShiftView" class="view">
   <div class="page-heading"><div><p class="eyebrow">MY SHIFT</p><h1>自分のシフト</h1><p>シフトの追加・変更・削除は管理者への申請となります。承認後に勤務シフトへ反映されます。</p></div></div>
+  <div class="card" style="margin-bottom:16px;padding:16px 18px;line-height:1.75">
+    <strong style="color:#ffcf7d">当日のシフト変更について</strong>
+    <div style="margin-top:5px;color:#d7ddd8">
+      当日の追加・変更・削除申請はこの画面からはできません。必ず直接
+      <a href="tel:08035534259" style="color:#79dc8c;font-weight:900;text-decoration:none">080-3553-4259</a>
+      までご連絡ください。
+    </div>
+  </div>
   <div class="schedule-toolbar card">
     <div class="toolbar-group"><button id="myShiftPrevDay" class="icon-button" type="button">‹</button><button id="myShiftToday" class="ghost-button" type="button">今日</button><button id="myShiftNextDay" class="icon-button" type="button">›</button></div>
     <strong id="myShiftDateLabel" class="period-title"></strong><div class="schedule-summary"><span id="myShiftStatusSummary"></span></div>
   </div>
   <div id="myShiftMessage" class="form-message is-hidden staff-schedule-message"></div>
+  <div class="card" style="margin-bottom:16px;padding:14px 18px;line-height:1.7;color:#cbd4cd">
+    <strong>既存シフトの申請方法</strong><br>
+    時間を変える場合は「変更申請」、既存シフトを丸ごと取り消す場合は「シフト削除申請」を使用してください。
+    どちらも承認されるまでは現在のシフトは変更されません。
+  </div>
   <section class="manager card"><div class="manager-header"><div><p class="eyebrow">REGISTERED SHIFT</p><h2>登録済みシフト</h2></div></div><div id="myShiftList" class="registered-shift-list"><div class="registered-shift-empty">シフトを読み込んでいます…</div></div></section>
   <form id="myShiftRequestForm" class="new-shift-card">
-    <div class="new-shift-head"><div><span>SHIFT REQUEST</span><h4 id="myShiftFormTitle">シフト追加申請</h4></div><button id="myShiftCancelEdit" class="ghost-button is-hidden" type="button">編集をやめる</button></div>
+    <div class="new-shift-head"><div><span>SHIFT REQUEST</span><h4 id="myShiftFormTitle">追加勤務の申請</h4><small id="myShiftFormHelp" style="display:block;margin-top:6px;color:#9ba79f;line-height:1.6">既存シフトを変更する場合は「変更申請」、そのシフト自体を丸ごと取り消す場合は「削除申請」を押してください。このフォームは追加勤務の申請専用です。</small></div><button id="myShiftCancelEdit" class="ghost-button is-hidden" type="button">編集をやめる</button></div>
     <input id="myShiftEditingId" type="hidden">
     <div class="shift-time-grid"><label><span>開始</span><select id="myShiftStart" required></select></label><div class="shift-time-separator">〜</div><label><span>終了</span><select id="myShiftEnd" required></select></label></div>
     <div style="padding:0 18px 4px"><label style="display:grid;gap:8px"><span style="color:#aab6ad;font-size:12px;font-weight:800">申請理由（任意）</span><textarea id="myShiftReason" rows="3" placeholder="例：学校行事のため、開始時刻を変更したい"></textarea></label></div>
@@ -277,4 +290,4 @@
 <label><span>曜日</span><select id="serviceHourDay"><option value="ALL">すべての曜日</option><option value="SUN">日曜日</option><option value="MON">月曜日</option><option value="TUE">火曜日</option><option value="WED">水曜日</option><option value="THU">木曜日</option><option value="FRI">金曜日</option><option value="SAT">土曜日</option></select></label>
 <label><span>開始</span><input id="serviceHourStart" type="time" required></label><label><span>終了</span><input id="serviceHourEnd" type="time" required></label></div>
 <div class="shift-actions"><button id="cancelServiceHourButton" class="ghost-button" type="button">キャンセル</button><button id="saveServiceHourButton" class="primary-button" type="submit">保存</button></div></form></div></div></section><section id="registrationPlaceholder" class="manager card is-hidden"><div class="empty-state compact"><div id="placeholderIcon" class="empty-icon">🛠️</div><h2 id="placeholderTitle">準備中</h2></div></section></section>
-<section id="dailyReportView" class="view daily-report-view"><div class="empty-state card"><div class="empty-icon">📝</div><h2>現在準備中です</h2></div></section></main></div><script src="./firebase-config.js?v=20260816-shift-approval-fix-v11"></script><script src="./admin.js?v=20260816-shift-approval-fix-v11" defer></script></body></html>
+<section id="dailyReportView" class="view daily-report-view"><div class="empty-state card"><div class="empty-icon">📝</div><h2>現在準備中です</h2></div></section></main></div><script src="./firebase-config.js?v=20260816-shift-request-rules-v13"></script><script src="./admin.js?v=20260816-shift-request-rules-v13" defer></script></body></html>

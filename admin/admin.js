@@ -1,4 +1,4 @@
-// BUILD: 20260816-shift-approval-fix-v11
+// BUILD: 20260816-shift-request-rules-v13
 const API_URL="https://script.google.com/macros/s/AKfycbyvpQRxRpMRfpaQHtBar77dViCqPl-hdFW-2yMdozhN8RHtwcrFiNEM9cvEbny4x9q0/exec";
 const state={staff:[],stores:[],services:[],serviceHours:[],selectedServiceCode:"",selectedStaffCode:"",shiftRows:[],shiftPreview:null,staffScheduleDate:"",staffSchedule:null,trainerScheduleDate:"",trainerSchedule:null,myShiftDate:"",myShiftRows:[],myShiftRequests:[],authUser:null,idToken:""};
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
@@ -644,9 +644,37 @@ function isAllowedShiftTime_(value){
   return h>=8&&h<=23;
 }
 
+
+function isTodayOrPastShiftDate_(dateValue){
+  const target=String(dateValue||"");
+  return !!target && target<=localYmd();
+}
+
+function sameDayShiftRuleMessage_(){
+  return "当日のシフト追加・変更・削除はWeb申請できません。080-3553-4259まで直接ご連絡ください。";
+}
+
+function applyMyShiftDateRules_(){
+  const blocked=isTodayOrPastShiftDate_(state.myShiftDate);
+  const start=$("#myShiftStart"),end=$("#myShiftEnd"),reason=$("#myShiftReason"),submit=$("#myShiftSubmitButton");
+
+  if(start)start.disabled=blocked;
+  if(end)end.disabled=blocked;
+  if(reason)reason.disabled=blocked;
+  if(submit)submit.disabled=blocked;
+
+  if(blocked){
+    resetMyShiftForm();
+    myShiftMsg(sameDayShiftRuleMessage_(),true);
+  }else{
+    const current=$("#myShiftMessage");
+    if(current && current.textContent===sameDayShiftRuleMessage_())myShiftMsg("");
+  }
+}
+
 function moveMyShiftDate(days){const d=parseYmd(state.myShiftDate||localYmd());d.setDate(d.getDate()+days);state.myShiftDate=localYmd(d);loadMyShiftView()}
 function myShiftMsg(text,error=false){const n=$("#myShiftMessage");if(!n)return;n.textContent=text||"";n.classList.toggle("is-hidden",!text);n.classList.toggle("is-error",!!error)}
-function resetMyShiftForm(){if($("#myShiftEditingId"))$("#myShiftEditingId").value="";if($("#myShiftStart"))$("#myShiftStart").value="";if($("#myShiftEnd"))$("#myShiftEnd").value="";if($("#myShiftReason"))$("#myShiftReason").value="";if($("#myShiftFormTitle"))$("#myShiftFormTitle").textContent="シフト追加申請";if($("#myShiftSubmitButton"))$("#myShiftSubmitButton").textContent="追加申請を送る";$("#myShiftCancelEdit")?.classList.add("is-hidden")}
+function resetMyShiftForm(){if($("#myShiftEditingId"))$("#myShiftEditingId").value="";if($("#myShiftStart"))$("#myShiftStart").value="";if($("#myShiftEnd"))$("#myShiftEnd").value="";if($("#myShiftReason"))$("#myShiftReason").value="";if($("#myShiftFormTitle"))$("#myShiftFormTitle").textContent="追加勤務の申請";if($("#myShiftFormHelp"))$("#myShiftFormHelp").textContent="既存シフトを変更する場合は「変更申請」、そのシフト自体を丸ごと取り消す場合は「削除申請」を押してください。このフォームは追加勤務の申請専用です。";if($("#myShiftSubmitButton"))$("#myShiftSubmitButton").textContent="追加申請を送る";$("#myShiftCancelEdit")?.classList.add("is-hidden")}
 async function loadMyShiftView(){
   if(!canUseMyShift())return;
   if(!state.myShiftDate)state.myShiftDate=localYmd();
@@ -660,7 +688,7 @@ async function loadMyShiftView(){
     ]);
     state.myShiftRows=(Array.isArray(shiftRes.data)?shiftRes.data:Array.isArray(shiftRes.data?.shifts)?shiftRes.data.shifts:[]).filter(r=>r.active!==false);
     state.myShiftRequests=Array.isArray(requestRes.data)?requestRes.data:[];
-    renderMyShiftRows();renderMyShiftRequestHistory();
+    renderMyShiftRows();renderMyShiftRequestHistory();applyMyShiftDateRules_();
     const pending=state.myShiftRequests.filter(r=>String(r.status||"").toUpperCase()==="PENDING"&&String(r.date||"")===String(state.myShiftDate)).length;
     $("#myShiftStatusSummary").textContent=`登録 ${state.myShiftRows.length}件 / 承認待ち ${pending}件`;
   }catch(e){
@@ -671,17 +699,29 @@ async function loadMyShiftView(){
 function renderMyShiftRows(){
   const box=$("#myShiftList"),rows=state.myShiftRows||[];
   if(!rows.length){box.innerHTML='<div class="registered-shift-empty">この日の登録済みシフトはありません。</div>';return}
-  box.innerHTML=rows.map((r,i)=>`<div class="registered-shift-row"><div class="registered-shift-time"><strong>${esc(r.start_time)}</strong><span>〜</span><strong>${esc(r.end_time)}</strong></div><div class="registered-shift-meta"><span>${esc(r.store_code||state.authUser?.store_code||"")}</span><small>${esc(r.shift_id||"")}</small></div><div class="registered-shift-actions"><button class="ghost-button" type="button" data-my-shift-edit="${i}">変更申請</button><button class="danger-ghost" type="button" data-my-shift-delete="${i}">削除申請</button></div></div>`).join("");
+  box.innerHTML=rows.map((r,i)=>`<div class="registered-shift-row"><div class="registered-shift-time"><strong>${esc(r.start_time)}</strong><span>〜</span><strong>${esc(r.end_time)}</strong></div><div class="registered-shift-meta"><span>${esc(r.store_code||state.authUser?.store_code||"")}</span><small>${esc(r.shift_id||"")}</small></div><div class="registered-shift-actions"><button class="ghost-button" type="button" data-my-shift-edit="${i}" ${isTodayOrPastShiftDate_(state.myShiftDate)?"disabled":""}>変更申請</button><button class="danger-ghost" type="button" data-my-shift-delete="${i}" ${isTodayOrPastShiftDate_(state.myShiftDate)?"disabled":""}>シフト削除申請</button></div></div>`).join("");
   $$("[data-my-shift-edit]").forEach(b=>b.onclick=()=>editMyShiftRequest(rows[+b.dataset.myShiftEdit]));
   $$("[data-my-shift-delete]").forEach(b=>b.onclick=()=>requestDeleteMyShift(rows[+b.dataset.myShiftDelete]));
 }
-function editMyShiftRequest(r){$("#myShiftEditingId").value=r.shift_id||"";$("#myShiftStart").value=String(r.start_time||"").slice(0,5);$("#myShiftEnd").value=String(r.end_time||"").slice(0,5);$("#myShiftReason").value="";$("#myShiftFormTitle").textContent="シフト変更申請";$("#myShiftSubmitButton").textContent="変更申請を送る";$("#myShiftCancelEdit").classList.remove("is-hidden");$("#myShiftStart").focus()}
+function editMyShiftRequest(r){
+  if(isTodayOrPastShiftDate_(state.myShiftDate))return myShiftMsg(sameDayShiftRuleMessage_(),true);
+  $("#myShiftEditingId").value=r.shift_id||"";
+  $("#myShiftStart").value=String(r.start_time||"").slice(0,5);
+  $("#myShiftEnd").value=String(r.end_time||"").slice(0,5);
+  $("#myShiftReason").value="";
+  $("#myShiftFormTitle").textContent="シフト変更申請";
+  if($("#myShiftFormHelp"))$("#myShiftFormHelp").textContent="この既存シフトを変更する申請です。承認後に元のシフトが変更されます。";
+  $("#myShiftSubmitButton").textContent="変更申請を送る";
+  $("#myShiftCancelEdit").classList.remove("is-hidden");
+  $("#myShiftStart").focus();
+}
 async function requestDeleteMyShift(r){
-  const reason=prompt(`${r.start_time}〜${r.end_time} の削除申請を送ります。\n申請理由があれば入力してください。`,"");if(reason===null)return;
-  try{await apiPost({action:"createShiftChangeRequest",request_type:"DELETE",staff_code:state.authUser.staff_code,shift_id:r.shift_id,reason:String(reason||"").trim()});myShiftMsg("削除申請を送信しました。管理者の承認待ちです。");await loadMyShiftView()}catch(e){myShiftMsg(e.message||"削除申請に失敗しました。",true)}
+  if(isTodayOrPastShiftDate_(state.myShiftDate))return myShiftMsg(sameDayShiftRuleMessage_(),true);
+  const reason=prompt(`${r.start_time}〜${r.end_time} の既存シフトを丸ごと削除する申請を送ります。\n承認されるまで元のシフトは残ります。\n\n申請理由があれば入力してください。`,"");if(reason===null)return;
+  try{await apiPost({action:"createShiftChangeRequest",request_type:"DELETE",staff_code:state.authUser.staff_code,shift_id:r.shift_id,reason:String(reason||"").trim()});myShiftMsg("シフト削除申請を送信しました。承認されるまで現在のシフトはそのまま残ります。");await loadMyShiftView()}catch(e){myShiftMsg(e.message||"削除申請に失敗しました。",true)}
 }
 $("#myShiftRequestForm")?.addEventListener("submit",async e=>{
-  e.preventDefault();if(!canUseMyShift())return myShiftMsg("この操作を行う権限がありません。",true);
+  e.preventDefault();if(!canUseMyShift())return myShiftMsg("この操作を行う権限がありません。",true);if(isTodayOrPastShiftDate_(state.myShiftDate))return myShiftMsg(sameDayShiftRuleMessage_(),true);
   const start=$("#myShiftStart").value,end=$("#myShiftEnd").value;if(!start||!end)return myShiftMsg("開始時刻と終了時刻を選択してください。",true);if(!isAllowedShiftTime_(start)||!isAllowedShiftTime_(end))return myShiftMsg("時刻は08:00〜24:00、分は00・15・30・45のみ選択できます。",true);if(start>=end)return myShiftMsg("終了時刻は開始時刻より後にしてください。",true);
   const editingId=$("#myShiftEditingId").value,b=$("#myShiftSubmitButton");b.disabled=true;
   try{
