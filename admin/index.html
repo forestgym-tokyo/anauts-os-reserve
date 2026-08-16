@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#090d0a"><title>A-nauts OS Reserve | Admin</title><link rel="stylesheet" href="./admin.css?v=20260816-myshift-today-call-v17"><style>
+<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#090d0a"><title>A-nauts OS Reserve | Admin</title><link rel="stylesheet" href="./admin.css?v=20260816-myshift-month-tabs-v19"><style>
 @media(max-width:700px){
   #myShiftView .registered-shift-row{
     grid-template-columns:1fr!important;
@@ -24,23 +24,12 @@
 </style>
 <style>
 #myShiftView .today-shift-row{
-  cursor:pointer;
+  
   border-color:rgba(99,209,121,.28)!important;
   background:rgba(99,209,121,.055);
 }
-#myShiftView .today-shift-row:hover{
-  background:rgba(99,209,121,.09);
-}
-#myShiftView .today-shift-row .registered-shift-time strong::after{
-  content:"  タップで当日変更";
-  display:block;
-  margin-top:5px;
-  color:#79dc8c;
-  font-size:11px;
-  font-weight:800;
-}
 </style>
-</head><body data-build="20260816-myshift-today-call-v17">
+</head><body data-build="20260816-myshift-month-tabs-v19">
 <div id="loginGate" class="login-gate">
   <div class="login-card">
     <div class="login-brand">
@@ -92,10 +81,9 @@
     </div>
   </div>
   <div class="schedule-toolbar card">
-    <div class="toolbar-group">
-      <button id="myShiftPrevMonth" class="icon-button" type="button" aria-label="前月">‹</button>
-      <button id="myShiftThisMonth" class="ghost-button" type="button">今月</button>
-      <button id="myShiftNextMonth" class="icon-button" type="button" aria-label="翌月">›</button>
+    <div class="toolbar-group" id="myShiftMonthTabs">
+      <button id="myShiftCurrentMonthTab" class="ghost-button is-active" type="button"></button>
+      <button id="myShiftNextMonthTab" class="ghost-button" type="button"></button>
     </div>
     <strong id="myShiftMonthLabel" class="period-title"></strong>
     <div class="schedule-summary"><span id="myShiftStatusSummary"></span></div>
@@ -107,13 +95,13 @@
         <p class="eyebrow">TODAY'S SHIFT CHANGE</p>
         <h2>本日のシフト変更</h2>
         <p style="margin:6px 0 0;color:#91a198;font-size:12px">
-          当日のシフト変更・削除はWebから申請できません。必ず直接ご連絡ください。
+          当日のシフト変更・削除はWebから申請できません。選択した内容について直接ご連絡ください。
         </p>
       </div>
       <button id="closeTodayShiftContactCard" class="ghost-button" type="button">閉じる</button>
     </div>
     <div style="padding:20px 22px">
-      <div id="todayShiftContactDetail" style="margin-bottom:16px;line-height:1.8"></div>
+      <div id="todayShiftContactAction" style="margin-bottom:10px;color:#79dc8c;font-size:14px;font-weight:900"></div><div id="todayShiftContactDetail" style="margin-bottom:16px;line-height:1.8"></div>
       <a href="tel:08035534259" class="primary-button" style="display:flex;align-items:center;justify-content:center;min-height:52px;text-decoration:none">
         電話する 080-3553-4259
       </a>
@@ -128,12 +116,12 @@
     <div class="manager-header">
       <div>
         <p class="eyebrow">MONTHLY SHIFT</p>
-        <h2>1か月のシフト</h2>
+        <h2>月別シフト</h2>
         <p style="margin:6px 0 0;color:#91a198;font-size:12px">確定している勤務シフトのみ表示します。各行から変更・削除申請ができます。</p>
       </div>
     </div>
     <div id="myShiftList" class="registered-shift-list">
-      <div class="registered-shift-empty">1か月分のシフトを読み込んでいます…</div>
+      <div class="registered-shift-empty">シフトを読み込んでいます…</div>
     </div>
   </section>
   <form id="myShiftRequestForm" class="new-shift-card is-hidden">
@@ -478,4 +466,4 @@
 </section>
 
 <section id="registrationPlaceholder" class="manager card is-hidden"><div class="empty-state compact"><div id="placeholderIcon" class="empty-icon">🛠️</div><h2 id="placeholderTitle">準備中</h2></div></section></section>
-<section id="dailyReportView" class="view daily-report-view"><div class="empty-state card"><div class="empty-icon">📝</div><h2>現在準備中です</h2></div></section></main></div><script src="./firebase-config.js?v=20260816-myshift-today-call-v17"></script><script src="./admin.js?v=20260816-myshift-today-call-v17" defer></script></body></html>
+<section id="dailyReportView" class="view daily-report-view"><div class="empty-state card"><div class="empty-icon">📝</div><h2>現在準備中です</h2></div></section></main></div><script src="./firebase-config.js?v=20260816-myshift-month-tabs-v19"></script><script src="./admin.js?v=20260816-myshift-month-tabs-v19" defer></script></body></html>
