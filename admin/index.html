@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#090d0a"><title>A-nauts OS Reserve | Admin</title><link rel="stylesheet" href="./admin.css?v=20260816-shift-mail-fix-v16"><style>
+<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#090d0a"><title>A-nauts OS Reserve | Admin</title><link rel="stylesheet" href="./admin.css?v=20260816-myshift-today-call-v17"><style>
 @media(max-width:700px){
   #myShiftView .registered-shift-row{
     grid-template-columns:1fr!important;
@@ -21,7 +21,26 @@
     gap:10px!important;
   }
 }
-</style></head><body data-build="20260816-shift-mail-fix-v16">
+</style>
+<style>
+#myShiftView .today-shift-row{
+  cursor:pointer;
+  border-color:rgba(99,209,121,.28)!important;
+  background:rgba(99,209,121,.055);
+}
+#myShiftView .today-shift-row:hover{
+  background:rgba(99,209,121,.09);
+}
+#myShiftView .today-shift-row .registered-shift-time strong::after{
+  content:"  タップで当日変更";
+  display:block;
+  margin-top:5px;
+  color:#79dc8c;
+  font-size:11px;
+  font-weight:800;
+}
+</style>
+</head><body data-build="20260816-myshift-today-call-v17">
 <div id="loginGate" class="login-gate">
   <div class="login-card">
     <div class="login-brand">
@@ -63,7 +82,7 @@
 <section id="trainerScheduleView" class="view"><div class="page-heading"><div><p class="eyebrow">TRAINER SCHEDULE</p><h1>トレーナー予定</h1><p>パーソナルトレーニングと無料体験など、トレーナー担当業務。</p></div></div><div class="schedule-toolbar card"><div class="toolbar-group"><button id="trainerPrevDay" class="icon-button" type="button" aria-label="前日">‹</button><button id="trainerToday" class="ghost-button" type="button">今日</button><button id="trainerNextDay" class="icon-button" type="button" aria-label="翌日">›</button></div><strong id="trainerScheduleDateLabel" class="period-title"></strong><div id="trainerScheduleSummary" class="schedule-summary"></div></div><div id="trainerScheduleMessage" class="form-message is-hidden staff-schedule-message"></div><div id="trainerScheduleBoard" class="schedule-board card"><div class="staff-schedule-loading">トレーナー予定を読み込んでいます…</div></div></section>
 
 <section id="myShiftView" class="view">
-  <div class="page-heading"><div><p class="eyebrow">MY SHIFT</p><h1>自分のシフト</h1><p>シフトの追加・変更・削除は管理者への申請となります。承認後に勤務シフトへ反映されます。</p></div></div>
+  <div class="page-heading"><div><p class="eyebrow">MY SHIFT</p><h1 id="myShiftPageTitle">シフト</h1><p>シフトの追加・変更・削除は管理者への申請となります。承認後に勤務シフトへ反映されます。</p></div></div>
   <div class="card" style="margin-bottom:16px;padding:16px 18px;line-height:1.75">
     <strong style="color:#ffcf7d">当日のシフト変更について</strong>
     <div style="margin-top:5px;color:#d7ddd8">
@@ -82,6 +101,24 @@
     <div class="schedule-summary"><span id="myShiftStatusSummary"></span></div>
   </div>
   <div id="myShiftMessage" class="form-message is-hidden staff-schedule-message"></div>
+  <section id="todayShiftContactCard" class="manager card is-hidden" style="margin-bottom:16px">
+    <div class="manager-header">
+      <div>
+        <p class="eyebrow">TODAY'S SHIFT CHANGE</p>
+        <h2>本日のシフト変更</h2>
+        <p style="margin:6px 0 0;color:#91a198;font-size:12px">
+          当日のシフト変更・削除はWebから申請できません。必ず直接ご連絡ください。
+        </p>
+      </div>
+      <button id="closeTodayShiftContactCard" class="ghost-button" type="button">閉じる</button>
+    </div>
+    <div style="padding:20px 22px">
+      <div id="todayShiftContactDetail" style="margin-bottom:16px;line-height:1.8"></div>
+      <a href="tel:08035534259" class="primary-button" style="display:flex;align-items:center;justify-content:center;min-height:52px;text-decoration:none">
+        電話する 080-3553-4259
+      </a>
+    </div>
+  </section>
   <div class="card" style="margin-bottom:16px;padding:14px 18px;line-height:1.7;color:#cbd4cd">
     <strong>既存シフトの申請方法</strong><br>
     時間を変える場合は「変更申請」、既存シフトを丸ごと取り消す場合は「シフト削除申請」を使用してください。
@@ -441,4 +478,4 @@
 </section>
 
 <section id="registrationPlaceholder" class="manager card is-hidden"><div class="empty-state compact"><div id="placeholderIcon" class="empty-icon">🛠️</div><h2 id="placeholderTitle">準備中</h2></div></section></section>
-<section id="dailyReportView" class="view daily-report-view"><div class="empty-state card"><div class="empty-icon">📝</div><h2>現在準備中です</h2></div></section></main></div><script src="./firebase-config.js?v=20260816-shift-mail-fix-v16"></script><script src="./admin.js?v=20260816-shift-mail-fix-v16" defer></script></body></html>
+<section id="dailyReportView" class="view daily-report-view"><div class="empty-state card"><div class="empty-icon">📝</div><h2>現在準備中です</h2></div></section></main></div><script src="./firebase-config.js?v=20260816-myshift-today-call-v17"></script><script src="./admin.js?v=20260816-myshift-today-call-v17" defer></script></body></html>

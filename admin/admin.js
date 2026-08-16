@@ -1,4 +1,4 @@
-// BUILD: 20260816-shift-mail-fix-v16
+// BUILD: 20260816-myshift-today-call-v17
 const API_URL="https://script.google.com/macros/s/AKfycbyvpQRxRpMRfpaQHtBar77dViCqPl-hdFW-2yMdozhN8RHtwcrFiNEM9cvEbny4x9q0/exec";
 const state={staff:[],stores:[],services:[],serviceHours:[],presenceWeekdays:[],presenceSpecials:[],selectedServiceCode:"",selectedStaffCode:"",shiftRows:[],shiftPreview:null,staffScheduleDate:"",staffSchedule:null,trainerScheduleDate:"",trainerSchedule:null,myShiftMonth:"",myShiftDate:"",myShiftRows:[],myShiftRequests:[],authUser:null,idToken:""};
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
@@ -723,6 +723,20 @@ function resetMyShiftForm(){
 
 async function loadMyShiftView(){
   if(!canUseMyShift())return;
+
+  const role=String(state.authUser?.role||"STAFF").toUpperCase();
+  const rawName=String(
+    state.authUser?.display_name ||
+    state.authUser?.staff_name ||
+    state.authUser?.staff_code ||
+    ""
+  ).trim();
+
+  const titleName=role==="TRAINER"
+    ? `${rawName}トレーナー`
+    : `${rawName}さん`;
+
+  if($("#myShiftPageTitle"))$("#myShiftPageTitle").textContent=`${titleName}のシフト`;
   if(!state.myShiftMonth)state.myShiftMonth=localYmd().slice(0,7);
 
   const range=monthRangeFromYm_(state.myShiftMonth);
@@ -772,15 +786,20 @@ function renderMyShiftRows(){
     return;
   }
 
+  const today=localYmd();
+
   box.innerHTML=rows.map(r=>{
     const date=String(r.date||"");
     const d=parseYmd(date);
     const day=d.getDate();
-    const blocked=isTodayOrPastShiftDate_(date);
+    const isToday=date===today;
+    const blocked=date<today;
 
-    return `<div class="registered-shift-row" style="grid-template-columns:minmax(125px,170px) minmax(0,1fr) auto">
+    return `<div class="registered-shift-row ${isToday?"today-shift-row":""}"
+      style="grid-template-columns:minmax(125px,170px) minmax(0,1fr) auto"
+      ${isToday?`data-today-shift="${esc(r.shift_id||"")}"`:""}>
       <div class="registered-shift-time">
-        <strong>${day}日（${weekdayJa_(date)}）</strong>
+        <strong>${day}日（${weekdayJa_(date)}）${isToday?" 今日":""}</strong>
         <small style="display:block;margin-top:4px;color:#91a198">${esc(date)}</small>
       </div>
       <div class="registered-shift-meta">
@@ -788,8 +807,14 @@ function renderMyShiftRows(){
         <small>${esc(r.store_code||state.authUser?.store_code||"")}</small>
       </div>
       <div class="registered-shift-actions">
-        <button class="ghost-button" type="button" data-my-shift-edit="${esc(r.shift_id||"")}" ${blocked?"disabled":""}>変更申請</button>
-        <button class="danger-ghost" type="button" data-my-shift-delete="${esc(r.shift_id||"")}" ${blocked?"disabled":""}>シフト削除申請</button>
+        ${
+          isToday
+            ? '<span class="shift-pill">直接連絡</span>'
+            : `
+              <button class="ghost-button" type="button" data-my-shift-edit="${esc(r.shift_id||"")}" ${blocked?"disabled":""}>変更申請</button>
+              <button class="danger-ghost" type="button" data-my-shift-delete="${esc(r.shift_id||"")}" ${blocked?"disabled":""}>シフト削除申請</button>
+            `
+        }
       </div>
     </div>`;
   }).join("");
@@ -803,7 +828,33 @@ function renderMyShiftRows(){
     const r=rows.find(x=>String(x.shift_id)===String(b.dataset.myShiftDelete));
     if(r)requestDeleteMyShift(r);
   });
+
+  $$("[data-today-shift]").forEach(row=>{
+    row.onclick=()=>{
+      const r=rows.find(x=>String(x.shift_id)===String(row.dataset.todayShift));
+      if(r)showTodayShiftContactCard_(r);
+    };
+  });
 }
+
+function showTodayShiftContactCard_(r){
+  const name=roleHonorific(state.authUser||{});
+  if($("#todayShiftContactDetail")){
+    $("#todayShiftContactDetail").innerHTML=
+      `<strong>${esc(name)}</strong><br>`+
+      `${esc(formatStaffDate(r.date))}<br>`+
+      `${esc(r.start_time)}〜${esc(r.end_time)}<br><br>`+
+      `当日のシフト変更・削除はWeb申請できません。<br>`+
+      `下のボタンから直接ご連絡ください。`;
+  }
+
+  $("#todayShiftContactCard")?.classList.remove("is-hidden");
+  $("#todayShiftContactCard")?.scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+$("#closeTodayShiftContactCard")?.addEventListener("click",()=>{
+  $("#todayShiftContactCard")?.classList.add("is-hidden");
+});
 
 function editMyShiftRequest(r){
   const date=String(r.date||"");
