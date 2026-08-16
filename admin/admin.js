@@ -1,4 +1,4 @@
-// BUILD: 20260816-pending-shift-card-v21
+// BUILD: 20260816-reservation-guard-v22
 const API_URL="https://script.google.com/macros/s/AKfycbyvpQRxRpMRfpaQHtBar77dViCqPl-hdFW-2yMdozhN8RHtwcrFiNEM9cvEbny4x9q0/exec";
 const state={staff:[],stores:[],services:[],serviceHours:[],presenceWeekdays:[],presenceSpecials:[],selectedServiceCode:"",selectedStaffCode:"",shiftRows:[],shiftPreview:null,staffScheduleDate:"",staffSchedule:null,trainerScheduleDate:"",trainerSchedule:null,myShiftMonth:"",myShiftDate:"",myShiftRows:[],myShiftRequests:[],authUser:null,idToken:""};
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
@@ -940,8 +940,40 @@ async function requestDeleteMyShift(r){
     myShiftMsg("シフト削除申請を送信しました。承認されるまで現在のシフトはそのまま残ります。");
     await loadMyShiftView();
   }catch(e){
-    myShiftMsg(e.message||"削除申請に失敗しました。",true);
+    const message=e.message||"削除申請に失敗しました。";
+
+    if(isShiftReservationConflictMessage_(message)){
+      myShiftMsg(message,true);
+      showShiftReservationConflictCard_(message);
+      return;
+    }
+
+    myShiftMsg(message,true);
   }
+}
+
+
+function isShiftReservationConflictMessage_(message){
+  const s=String(message||"");
+  return s.includes("対応予定") ||
+         s.includes("予約があります") ||
+         s.includes("予約があるため") ||
+         s.includes("080-3553-4259");
+}
+
+function showShiftReservationConflictCard_(message){
+  if($("#todayShiftContactAction")){
+    $("#todayShiftContactAction").textContent="予約対応の確認が必要です";
+  }
+
+  if($("#todayShiftContactDetail")){
+    $("#todayShiftContactDetail").innerHTML=
+      `${esc(message||"このシフト変更には予約対応の確認が必要です。")}<br><br>`+
+      `下のボタンから080-3553-4259へ直接ご連絡ください。`;
+  }
+
+  $("#todayShiftContactCard")?.classList.remove("is-hidden");
+  $("#todayShiftContactCard")?.scrollIntoView({behavior:"smooth",block:"start"});
 }
 
 $("#myShiftRequestForm")?.addEventListener("submit",async e=>{
@@ -1015,7 +1047,16 @@ $("#myShiftRequestForm")?.addEventListener("submit",async e=>{
   }catch(err){
     b.textContent="変更申請を送る";
     b.disabled=false;
-    myShiftMsg(err.message||"シフト変更申請に失敗しました。",true);
+
+    const message=err.message||"シフト変更申請に失敗しました。";
+
+    if(isShiftReservationConflictMessage_(message)){
+      myShiftMsg(message,true);
+      showShiftReservationConflictCard_(message);
+      return;
+    }
+
+    myShiftMsg(message,true);
   }
 });
 
