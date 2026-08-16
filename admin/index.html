@@ -1,4 +1,27 @@
-<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#090d0a"><title>A-nauts OS Reserve | Admin</title><link rel="stylesheet" href="./admin.css?v=20260816-shift-request-rules-v13"></head><body data-build="20260816-shift-request-rules-v13">
+<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#090d0a"><title>A-nauts OS Reserve | Admin</title><link rel="stylesheet" href="./admin.css?v=20260816-presence-hours-v15"><style>
+@media(max-width:700px){
+  #myShiftView .registered-shift-row{
+    grid-template-columns:1fr!important;
+    gap:10px!important;
+    align-items:stretch!important;
+    padding:16px!important;
+  }
+  #myShiftView .registered-shift-actions{
+    display:grid!important;
+    grid-template-columns:1fr!important;
+    gap:8px!important;
+    width:100%!important;
+  }
+  #myShiftView .registered-shift-actions button{
+    width:100%!important;
+    min-height:46px!important;
+  }
+  #myShiftView .schedule-toolbar{
+    align-items:flex-start!important;
+    gap:10px!important;
+  }
+}
+</style></head><body data-build="20260816-presence-hours-v15">
 <div id="loginGate" class="login-gate">
   <div class="login-card">
     <div class="login-brand">
@@ -50,8 +73,13 @@
     </div>
   </div>
   <div class="schedule-toolbar card">
-    <div class="toolbar-group"><button id="myShiftPrevDay" class="icon-button" type="button">‹</button><button id="myShiftToday" class="ghost-button" type="button">今日</button><button id="myShiftNextDay" class="icon-button" type="button">›</button></div>
-    <strong id="myShiftDateLabel" class="period-title"></strong><div class="schedule-summary"><span id="myShiftStatusSummary"></span></div>
+    <div class="toolbar-group">
+      <button id="myShiftPrevMonth" class="icon-button" type="button" aria-label="前月">‹</button>
+      <button id="myShiftThisMonth" class="ghost-button" type="button">今月</button>
+      <button id="myShiftNextMonth" class="icon-button" type="button" aria-label="翌月">›</button>
+    </div>
+    <strong id="myShiftMonthLabel" class="period-title"></strong>
+    <div class="schedule-summary"><span id="myShiftStatusSummary"></span></div>
   </div>
   <div id="myShiftMessage" class="form-message is-hidden staff-schedule-message"></div>
   <div class="card" style="margin-bottom:16px;padding:14px 18px;line-height:1.7;color:#cbd4cd">
@@ -59,13 +87,24 @@
     時間を変える場合は「変更申請」、既存シフトを丸ごと取り消す場合は「シフト削除申請」を使用してください。
     どちらも承認されるまでは現在のシフトは変更されません。
   </div>
-  <section class="manager card"><div class="manager-header"><div><p class="eyebrow">REGISTERED SHIFT</p><h2>登録済みシフト</h2></div></div><div id="myShiftList" class="registered-shift-list"><div class="registered-shift-empty">シフトを読み込んでいます…</div></div></section>
+  <section class="manager card">
+    <div class="manager-header">
+      <div>
+        <p class="eyebrow">MONTHLY SHIFT</p>
+        <h2>1か月のシフト</h2>
+        <p style="margin:6px 0 0;color:#91a198;font-size:12px">確定している勤務シフトのみ表示します。各行から変更・削除申請ができます。</p>
+      </div>
+    </div>
+    <div id="myShiftList" class="registered-shift-list">
+      <div class="registered-shift-empty">1か月分のシフトを読み込んでいます…</div>
+    </div>
+  </section>
   <form id="myShiftRequestForm" class="new-shift-card">
-    <div class="new-shift-head"><div><span>SHIFT REQUEST</span><h4 id="myShiftFormTitle">追加勤務の申請</h4><small id="myShiftFormHelp" style="display:block;margin-top:6px;color:#9ba79f;line-height:1.6">既存シフトを変更する場合は「変更申請」、そのシフト自体を丸ごと取り消す場合は「削除申請」を押してください。このフォームは追加勤務の申請専用です。</small></div><button id="myShiftCancelEdit" class="ghost-button is-hidden" type="button">編集をやめる</button></div>
+    <div class="new-shift-head"><div><span>SHIFT REQUEST</span><h4 id="myShiftFormTitle">シフト変更申請</h4><div id="myShiftSelectedDate" style="margin-top:5px;color:#79dc8c;font-size:13px;font-weight:800"></div><small id="myShiftFormHelp" style="display:block;margin-top:6px;color:#9ba79f;line-height:1.6">既存シフトを変更する場合は「変更申請」、そのシフト自体を丸ごと取り消す場合は「削除申請」を押してください。このフォームはシフト変更申請専用です。</small></div><button id="myShiftCancelEdit" class="ghost-button is-hidden" type="button">編集をやめる</button></div>
     <input id="myShiftEditingId" type="hidden">
     <div class="shift-time-grid"><label><span>開始</span><select id="myShiftStart" required></select></label><div class="shift-time-separator">〜</div><label><span>終了</span><select id="myShiftEnd" required></select></label></div>
     <div style="padding:0 18px 4px"><label style="display:grid;gap:8px"><span style="color:#aab6ad;font-size:12px;font-weight:800">申請理由（任意）</span><textarea id="myShiftReason" rows="3" placeholder="例：学校行事のため、開始時刻を変更したい"></textarea></label></div>
-    <div class="shift-actions"><button id="myShiftSubmitButton" class="primary-button" type="submit">追加申請を送る</button></div>
+    <div class="shift-actions"><button id="myShiftSubmitButton" class="primary-button" type="submit">変更申請を送る</button></div>
   </form>
   <section class="manager card" style="margin-top:18px"><div class="manager-header"><div><p class="eyebrow">REQUEST HISTORY</p><h2>申請履歴</h2></div></div><div id="myShiftRequestHistory" class="registered-shift-list"><div class="registered-shift-empty">申請履歴を読み込んでいます…</div></div></section>
 </section>
@@ -85,7 +124,12 @@
 </section>
 
 <section id="registrationView" class="view"><div class="page-heading"><div><p class="eyebrow">REGISTRATION</p><h1>各種登録</h1><p>スタッフ、シフト、サービスなどのマスター情報を管理します。</p></div></div>
-<div class="registration-grid"><button class="registration-card" data-registration="staff"><span class="registration-icon">👥</span><strong>スタッフ登録</strong><small>登録・編集・担当サービス設定</small></button><button class="registration-card" data-registration="shift"><span class="registration-icon">🗓️</span><strong>シフト登録</strong><small>月次アップロード・個別入力</small></button><button class="registration-card" data-registration="service"><span class="registration-icon">🏷️</span><strong>サービス登録</strong></button><button class="registration-card" data-registration="hours"><span class="registration-icon">🕒</span><strong>サービス提供時間</strong></button></div>
+<div class="registration-grid"><button class="registration-card" data-registration="staff"><span class="registration-icon">👥</span><strong>スタッフ登録</strong><small>登録・編集・担当サービス設定</small></button><button class="registration-card" data-registration="shift"><span class="registration-icon">🗓️</span><strong>シフト登録</strong><small>月次アップロード・個別入力</small></button><button class="registration-card" data-registration="service"><span class="registration-icon">🏷️</span><strong>サービス登録</strong></button><button class="registration-card" data-registration="hours"><span class="registration-icon">🕒</span><strong>サービス提供時間</strong></button>
+<button class="registration-card" type="button" data-registration="presence">
+  <span class="registration-icon">🕒</span>
+  <strong>スタッフ在駐時間</strong>
+  <small>通常曜日と特殊日の在駐時間を設定</small>
+</button></div>
 <section id="staffManager" class="manager card is-hidden">
   <div class="manager-header">
     <div>
@@ -289,5 +333,112 @@
 <form id="serviceHourForm" class="service-hour-editor is-hidden"><h3>時間帯を追加</h3><div class="service-hour-form-grid">
 <label><span>曜日</span><select id="serviceHourDay"><option value="ALL">すべての曜日</option><option value="SUN">日曜日</option><option value="MON">月曜日</option><option value="TUE">火曜日</option><option value="WED">水曜日</option><option value="THU">木曜日</option><option value="FRI">金曜日</option><option value="SAT">土曜日</option></select></label>
 <label><span>開始</span><input id="serviceHourStart" type="time" required></label><label><span>終了</span><input id="serviceHourEnd" type="time" required></label></div>
-<div class="shift-actions"><button id="cancelServiceHourButton" class="ghost-button" type="button">キャンセル</button><button id="saveServiceHourButton" class="primary-button" type="submit">保存</button></div></form></div></div></section><section id="registrationPlaceholder" class="manager card is-hidden"><div class="empty-state compact"><div id="placeholderIcon" class="empty-icon">🛠️</div><h2 id="placeholderTitle">準備中</h2></div></section></section>
-<section id="dailyReportView" class="view daily-report-view"><div class="empty-state card"><div class="empty-icon">📝</div><h2>現在準備中です</h2></div></section></main></div><script src="./firebase-config.js?v=20260816-shift-request-rules-v13"></script><script src="./admin.js?v=20260816-shift-request-rules-v13" defer></script></body></html>
+<div class="shift-actions"><button id="cancelServiceHourButton" class="ghost-button" type="button">キャンセル</button><button id="saveServiceHourButton" class="primary-button" type="submit">保存</button></div></form></div></div></section>
+<section id="presenceManager" class="manager card is-hidden">
+  <div class="manager-header">
+    <div>
+      <p class="eyebrow">STAFF PRESENCE HOURS</p>
+      <h2>スタッフ在駐時間</h2>
+      <p style="margin:6px 0 0;color:#91a198;font-size:12px">
+        STAFFの勤務可能時間の基準です。TRAINERにはこの制限を適用しません。
+      </p>
+    </div>
+  </div>
+
+  <div style="padding:20px 22px">
+    <div class="form-grid" style="margin-bottom:18px">
+      <label>
+        <span>店舗</span>
+        <select id="presenceStore"></select>
+      </label>
+    </div>
+
+    <div class="segmented" style="margin-bottom:18px">
+      <button id="presenceWeekdayTab" class="segment is-active" type="button">曜日設定</button>
+      <button id="presenceSpecialTab" class="segment" type="button">追加設定</button>
+    </div>
+
+    <div id="presenceMessage" class="form-message is-hidden"></div>
+
+    <section id="presenceWeekdayPanel">
+      <div class="form-header" style="padding-left:0;padding-right:0">
+        <div>
+          <h3>曜日設定</h3>
+          <p>通常のスタッフ在駐時間です。在駐しない曜日は「在駐なし」にしてください。</p>
+        </div>
+      </div>
+
+      <div id="presenceWeekdayList" style="display:grid;gap:10px;margin-top:14px"></div>
+
+      <div class="form-actions" style="padding-left:0;padding-right:0">
+        <button id="savePresenceWeekdays" class="primary-button" type="button">曜日設定を保存</button>
+      </div>
+    </section>
+
+    <section id="presenceSpecialPanel" class="is-hidden">
+      <div class="form-header" style="padding-left:0;padding-right:0">
+        <div>
+          <h3>追加設定</h3>
+          <p>特定日または毎月○日の在駐時間を曜日設定より優先します。</p>
+        </div>
+        <button id="newPresenceSpecial" class="ghost-button" type="button">＋ 追加</button>
+      </div>
+
+      <form id="presenceSpecialForm" class="form-section is-hidden" style="padding-left:0;padding-right:0">
+        <input id="presenceSpecialId" type="hidden">
+        <div class="form-grid">
+          <label>
+            <span>設定種別</span>
+            <select id="presenceSpecialType">
+              <option value="MONTH_DAY">毎月○日</option>
+              <option value="DATE">特定日</option>
+            </select>
+          </label>
+
+          <label id="presenceMonthDayField">
+            <span>毎月の日</span>
+            <select id="presenceMonthDay"></select>
+          </label>
+
+          <label id="presenceDateField" class="is-hidden">
+            <span>特定日</span>
+            <input id="presenceSpecialDate" type="date">
+          </label>
+
+          <label>
+            <span>名称</span>
+            <input id="presenceSpecialLabel" placeholder="例：退会手続き最終日">
+          </label>
+
+          <label>
+            <span>開始</span>
+            <select id="presenceSpecialStart"></select>
+          </label>
+
+          <label>
+            <span>終了</span>
+            <select id="presenceSpecialEnd"></select>
+          </label>
+
+          <label style="align-self:end">
+            <span>在駐設定</span>
+            <span style="display:flex;align-items:center;gap:8px;min-height:44px">
+              <input id="presenceSpecialClosed" type="checkbox">
+              <span>在駐なし</span>
+            </span>
+          </label>
+        </div>
+
+        <div class="form-actions" style="padding-left:0;padding-right:0">
+          <button class="primary-button" type="submit">保存</button>
+          <button id="cancelPresenceSpecial" class="ghost-button" type="button">キャンセル</button>
+        </div>
+      </form>
+
+      <div id="presenceSpecialList" style="display:grid;gap:10px;margin-top:14px"></div>
+    </section>
+  </div>
+</section>
+
+<section id="registrationPlaceholder" class="manager card is-hidden"><div class="empty-state compact"><div id="placeholderIcon" class="empty-icon">🛠️</div><h2 id="placeholderTitle">準備中</h2></div></section></section>
+<section id="dailyReportView" class="view daily-report-view"><div class="empty-state card"><div class="empty-icon">📝</div><h2>現在準備中です</h2></div></section></main></div><script src="./firebase-config.js?v=20260816-presence-hours-v15"></script><script src="./admin.js?v=20260816-presence-hours-v15" defer></script></body></html>

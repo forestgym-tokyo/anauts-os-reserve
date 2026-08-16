@@ -1,6 +1,6 @@
-// BUILD: 20260816-shift-request-rules-v13
+// BUILD: 20260816-presence-hours-v15
 const API_URL="https://script.google.com/macros/s/AKfycbyvpQRxRpMRfpaQHtBar77dViCqPl-hdFW-2yMdozhN8RHtwcrFiNEM9cvEbny4x9q0/exec";
-const state={staff:[],stores:[],services:[],serviceHours:[],selectedServiceCode:"",selectedStaffCode:"",shiftRows:[],shiftPreview:null,staffScheduleDate:"",staffSchedule:null,trainerScheduleDate:"",trainerSchedule:null,myShiftDate:"",myShiftRows:[],myShiftRequests:[],authUser:null,idToken:""};
+const state={staff:[],stores:[],services:[],serviceHours:[],presenceWeekdays:[],presenceSpecials:[],selectedServiceCode:"",selectedStaffCode:"",shiftRows:[],shiftPreview:null,staffScheduleDate:"",staffSchedule:null,trainerScheduleDate:"",trainerSchedule:null,myShiftMonth:"",myShiftDate:"",myShiftRows:[],myShiftRequests:[],authUser:null,idToken:""};
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
 function authEnabled(){return !!window.ANAUTS_AUTH?.enabled}
 function withAuth(params={}){const o={...params};if(authEnabled()&&state.idToken)o.id_token=state.idToken;return o}
@@ -64,7 +64,7 @@ async function restoreAuthSession(){
 
 async function initializeAppAfterAuth(){
   if(!state.staffScheduleDate)state.staffScheduleDate=localYmd();
-  if(!state.myShiftDate)state.myShiftDate=localYmd();
+  if(!state.myShiftMonth)state.myShiftMonth=localYmd().slice(0,7);
   const activeButton=document.querySelector(".nav-button.is-active");
   const activeView=activeButton?.dataset?.view||"staffSchedule";
   if(activeView==="staffSchedule"){await loadStaffSchedule();return;}
@@ -107,7 +107,7 @@ $("#logoutButton")?.addEventListener("click",logout);
 
 $$(".nav-button").forEach(b=>b.onclick=async()=>{$$(".nav-button").forEach(x=>x.classList.toggle("is-active",x===b));$$(".view").forEach(x=>x.classList.remove("is-active"));$("#"+b.dataset.view+"View").classList.add("is-active");if(b.dataset.view==="staffSchedule")await loadStaffSchedule();if(b.dataset.view==="trainerSchedule")await loadTrainerSchedule();if(b.dataset.view==="myShift")await loadMyShiftView()});
 $$(".registration-card").forEach(b=>b.onclick=()=>showRegistration(b.dataset.registration));
-async function showRegistration(type){if(authEnabled()&&!hasPermission("ADMIN","MANAGER"))return;["#staffManager","#shiftManager","#serviceManager","#serviceHoursManager","#registrationPlaceholder"].forEach(x=>$(x)?.classList.add("is-hidden"));if(type==="staff"){$("#staffManager").classList.remove("is-hidden");await loadStaff();if(!state.selectedStaffCode)resetStaffForm();return}if(type==="shift"){$("#shiftManager").classList.remove("is-hidden");await Promise.all([loadStaff(),loadStores()]);setupShift();return}if(type==="service"){$("#serviceManager").classList.remove("is-hidden");await loadServices();setupServiceManager();return}if(type==="hours"){$("#serviceHoursManager").classList.remove("is-hidden");await loadServices();setupServiceHours();return}const map={},v=map[type]||["🛠️","準備中"];$("#placeholderIcon").textContent=v[0];$("#placeholderTitle").textContent=v[1];$("#registrationPlaceholder").classList.remove("is-hidden")}
+async function showRegistration(type){if(authEnabled()&&!hasPermission("ADMIN","MANAGER"))return;["#staffManager","#shiftManager","#serviceManager","#serviceHoursManager","#presenceManager","#registrationPlaceholder"].forEach(x=>$(x)?.classList.add("is-hidden"));if(type==="staff"){$("#staffManager").classList.remove("is-hidden");await loadStaff();if(!state.selectedStaffCode)resetStaffForm();return}if(type==="shift"){$("#shiftManager").classList.remove("is-hidden");await Promise.all([loadStaff(),loadStores()]);setupShift();return}if(type==="service"){$("#serviceManager").classList.remove("is-hidden");await loadServices();setupServiceManager();return}if(type==="hours"){$("#serviceHoursManager").classList.remove("is-hidden");await loadServices();setupServiceHours();return}if(type==="presence"){$("#presenceManager").classList.remove("is-hidden");await loadStores();setupPresenceManager();return}const map={},v=map[type]||["🛠️","準備中"];$("#placeholderIcon").textContent=v[0];$("#placeholderTitle").textContent=v[1];$("#registrationPlaceholder").classList.remove("is-hidden")}
 async function loadStaff(){try{const j=await apiGet("getStaff",{include_inactive:"true"});state.staff=Array.isArray(j.data?.staff)?j.data.staff:Array.isArray(j.data)?j.data:[];renderStaff()}catch(e){state.staff=[];$("#staffList").innerHTML=`<div class="no-staff">${esc(e.message)}</div>`}}
 async function loadStores(){try{const j=await apiGet("getStores");state.stores=Array.isArray(j.data)?j.data:[]}catch(e){msg(e.message,true)}}
 function renderStaff(){
@@ -523,6 +523,20 @@ $("#shiftSingleForm").onsubmit=async e=>{
   const button=$("#shiftSingleSaveButton");
   button.disabled=true;
   try{
+    const selectedStaffCode=$("#shiftSingleStaff")?.value||"";
+    const selectedPerson=(state.staff||[]).find(x=>String(x.staff_code)===String(selectedStaffCode));
+    const selectedRole=String(selectedPerson?.role||"STAFF").toUpperCase();
+
+    if(selectedRole==="STAFF"){
+      const presence=await getResolvedPresence_($("#shiftSingleDate").value,$("#shiftSingleStore").value);
+      const s=$("#shiftSingleStart").value,e=$("#shiftSingleEnd").value;
+
+      if(!isWithinPresence_(s,e,presence)){
+        const rule=presence.closed?"在駐なし":`${presence.start_time||"--:--"}〜${presence.end_time||"--:--"}`;
+        if(!confirm(`スタッフ在駐時間外のシフトです。\nこの日の在駐時間：${rule}\n\n例外として登録しますか？`))return;
+      }
+    }
+
     const editingId=$("#shiftEditingId").value;
     const payload={action:"saveStaffShift",staff_code:$("#shiftSingleStaff").value,store_code:$("#shiftSingleStore").value,date:$("#shiftSingleDate").value,start_time:start,end_time:end};
     if(editingId)payload.shift_id=editingId;
@@ -611,7 +625,6 @@ $("#trainerToday")?.addEventListener("click",()=>{state.trainerScheduleDate=loca
 
 
 // ===== 自分のシフト変更申請 =====
-
 function buildShiftTimeOptions_(includeBlank=true){
   const rows=[];
   if(includeBlank)rows.push('<option value="">選択してください</option>');
@@ -644,7 +657,6 @@ function isAllowedShiftTime_(value){
   return h>=8&&h<=23;
 }
 
-
 function isTodayOrPastShiftDate_(dateValue){
   const target=String(dateValue||"");
   return !!target && target<=localYmd();
@@ -654,90 +666,302 @@ function sameDayShiftRuleMessage_(){
   return "当日のシフト追加・変更・削除はWeb申請できません。080-3553-4259まで直接ご連絡ください。";
 }
 
-function applyMyShiftDateRules_(){
-  const blocked=isTodayOrPastShiftDate_(state.myShiftDate);
-  const start=$("#myShiftStart"),end=$("#myShiftEnd"),reason=$("#myShiftReason"),submit=$("#myShiftSubmitButton");
-
-  if(start)start.disabled=blocked;
-  if(end)end.disabled=blocked;
-  if(reason)reason.disabled=blocked;
-  if(submit)submit.disabled=blocked;
-
-  if(blocked){
-    resetMyShiftForm();
-    myShiftMsg(sameDayShiftRuleMessage_(),true);
-  }else{
-    const current=$("#myShiftMessage");
-    if(current && current.textContent===sameDayShiftRuleMessage_())myShiftMsg("");
-  }
+function monthRangeFromYm_(ym){
+  const m=/^(\d{4})-(\d{2})$/.exec(String(ym||""));
+  if(!m)return null;
+  const year=Number(m[1]),month=Number(m[2]);
+  const last=new Date(year,month,0).getDate();
+  return {
+    start:`${m[1]}-${m[2]}-01`,
+    end:`${m[1]}-${m[2]}-${String(last).padStart(2,"0")}`,
+    year,month,last
+  };
 }
 
-function moveMyShiftDate(days){const d=parseYmd(state.myShiftDate||localYmd());d.setDate(d.getDate()+days);state.myShiftDate=localYmd(d);loadMyShiftView()}
-function myShiftMsg(text,error=false){const n=$("#myShiftMessage");if(!n)return;n.textContent=text||"";n.classList.toggle("is-hidden",!text);n.classList.toggle("is-error",!!error)}
-function resetMyShiftForm(){if($("#myShiftEditingId"))$("#myShiftEditingId").value="";if($("#myShiftStart"))$("#myShiftStart").value="";if($("#myShiftEnd"))$("#myShiftEnd").value="";if($("#myShiftReason"))$("#myShiftReason").value="";if($("#myShiftFormTitle"))$("#myShiftFormTitle").textContent="追加勤務の申請";if($("#myShiftFormHelp"))$("#myShiftFormHelp").textContent="既存シフトを変更する場合は「変更申請」、そのシフト自体を丸ごと取り消す場合は「削除申請」を押してください。このフォームは追加勤務の申請専用です。";if($("#myShiftSubmitButton"))$("#myShiftSubmitButton").textContent="追加申請を送る";$("#myShiftCancelEdit")?.classList.add("is-hidden")}
+function formatMonthLabel_(ym){
+  const r=monthRangeFromYm_(ym);
+  if(!r)return ym||"";
+  return `${r.year}年${r.month}月`;
+}
+
+function weekdayJa_(date){
+  const d=parseYmd(date);
+  return ["日","月","火","水","木","金","土"][d.getDay()];
+}
+
+function moveMyShiftMonth_(delta){
+  const r=monthRangeFromYm_(state.myShiftMonth||localYmd().slice(0,7));
+  const d=new Date(r.year,r.month-1+delta,1);
+  state.myShiftMonth=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+  resetMyShiftForm();
+  loadMyShiftView();
+}
+
+function myShiftMsg(text,error=false){
+  const n=$("#myShiftMessage");
+  if(!n)return;
+  n.textContent=text||"";
+  n.classList.toggle("is-hidden",!text);
+  n.classList.toggle("is-error",!!error);
+}
+
+function resetMyShiftForm(){
+  if($("#myShiftEditingId"))$("#myShiftEditingId").value="";
+  if($("#myShiftStart"))$("#myShiftStart").value="";
+  if($("#myShiftEnd"))$("#myShiftEnd").value="";
+  if($("#myShiftReason"))$("#myShiftReason").value="";
+  if($("#myShiftFormTitle"))$("#myShiftFormTitle").textContent="追加勤務の申請";
+  if($("#myShiftSelectedDate"))$("#myShiftSelectedDate").textContent=state.myShiftDate?formatStaffDate(state.myShiftDate):"日付の「追加勤務申請」を押してください";
+  if($("#myShiftFormHelp"))$("#myShiftFormHelp").textContent="既存シフトを変更する場合は「変更申請」、そのシフト自体を丸ごと取り消す場合は「シフト削除申請」を押してください。このフォームは追加勤務の申請専用です。";
+  if($("#myShiftSubmitButton"))$("#myShiftSubmitButton").textContent="追加申請を送る";
+  $("#myShiftCancelEdit")?.classList.add("is-hidden");
+}
+
 async function loadMyShiftView(){
   if(!canUseMyShift())return;
-  if(!state.myShiftDate)state.myShiftDate=localYmd();
-  $("#myShiftDateLabel").textContent=formatStaffDate(state.myShiftDate);
-  $("#myShiftList").innerHTML='<div class="registered-shift-empty">シフトを読み込んでいます…</div>';
+  if(!state.myShiftMonth)state.myShiftMonth=localYmd().slice(0,7);
+
+  const range=monthRangeFromYm_(state.myShiftMonth);
+  if(!range)return;
+
+  $("#myShiftMonthLabel").textContent=formatMonthLabel_(state.myShiftMonth);
+  $("#myShiftList").innerHTML='<div class="registered-shift-empty">1か月分のシフトを読み込んでいます…</div>';
   $("#myShiftRequestHistory").innerHTML='<div class="registered-shift-empty">申請履歴を読み込んでいます…</div>';
+
   try{
     const [shiftRes,requestRes]=await Promise.all([
-      apiGet("getStaffShifts",{staff_code:state.authUser.staff_code,start_date:state.myShiftDate,end_date:state.myShiftDate}),
+      apiGet("getStaffShifts",{
+        staff_code:state.authUser.staff_code,
+        start_date:range.start,
+        end_date:range.end
+      }),
       apiGet("getMyShiftChangeRequests")
     ]);
-    state.myShiftRows=(Array.isArray(shiftRes.data)?shiftRes.data:Array.isArray(shiftRes.data?.shifts)?shiftRes.data.shifts:[]).filter(r=>r.active!==false);
-    state.myShiftRequests=Array.isArray(requestRes.data)?requestRes.data:[];
-    renderMyShiftRows();renderMyShiftRequestHistory();applyMyShiftDateRules_();
-    const pending=state.myShiftRequests.filter(r=>String(r.status||"").toUpperCase()==="PENDING"&&String(r.date||"")===String(state.myShiftDate)).length;
-    $("#myShiftStatusSummary").textContent=`登録 ${state.myShiftRows.length}件 / 承認待ち ${pending}件`;
+
+    state.myShiftRows=(Array.isArray(shiftRes.data)?shiftRes.data:Array.isArray(shiftRes.data?.shifts)?shiftRes.data.shifts:[])
+      .filter(r=>r.active!==false)
+      .sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.start_time).localeCompare(String(b.start_time)));
+
+    state.myShiftRequests=(Array.isArray(requestRes.data)?requestRes.data:[])
+      .filter(r=>String(r.date||"").slice(0,7)===state.myShiftMonth);
+
+    renderMyShiftRows();
+    renderMyShiftRequestHistory();
+
+    const pending=state.myShiftRequests.filter(r=>String(r.status||"").toUpperCase()==="PENDING").length;
+    $("#myShiftStatusSummary").textContent=`勤務 ${state.myShiftRows.length}件 / 承認待ち ${pending}件`;
+
+    resetMyShiftForm();
+
   }catch(e){
     $("#myShiftList").innerHTML=`<div class="registered-shift-empty is-error">${esc(e.message||"シフトを取得できませんでした。")}</div>`;
     myShiftMsg(e.message||"取得に失敗しました。",true);
   }
 }
+
 function renderMyShiftRows(){
-  const box=$("#myShiftList"),rows=state.myShiftRows||[];
-  if(!rows.length){box.innerHTML='<div class="registered-shift-empty">この日の登録済みシフトはありません。</div>';return}
-  box.innerHTML=rows.map((r,i)=>`<div class="registered-shift-row"><div class="registered-shift-time"><strong>${esc(r.start_time)}</strong><span>〜</span><strong>${esc(r.end_time)}</strong></div><div class="registered-shift-meta"><span>${esc(r.store_code||state.authUser?.store_code||"")}</span><small>${esc(r.shift_id||"")}</small></div><div class="registered-shift-actions"><button class="ghost-button" type="button" data-my-shift-edit="${i}" ${isTodayOrPastShiftDate_(state.myShiftDate)?"disabled":""}>変更申請</button><button class="danger-ghost" type="button" data-my-shift-delete="${i}" ${isTodayOrPastShiftDate_(state.myShiftDate)?"disabled":""}>シフト削除申請</button></div></div>`).join("");
-  $$("[data-my-shift-edit]").forEach(b=>b.onclick=()=>editMyShiftRequest(rows[+b.dataset.myShiftEdit]));
-  $$("[data-my-shift-delete]").forEach(b=>b.onclick=()=>requestDeleteMyShift(rows[+b.dataset.myShiftDelete]));
+  const box=$("#myShiftList");
+  const rows=state.myShiftRows||[];
+
+  if(!rows.length){
+    box.innerHTML='<div class="registered-shift-empty">この月の確定シフトはありません。</div>';
+    return;
+  }
+
+  box.innerHTML=rows.map(r=>{
+    const date=String(r.date||"");
+    const d=parseYmd(date);
+    const day=d.getDate();
+    const blocked=isTodayOrPastShiftDate_(date);
+
+    return `<div class="registered-shift-row" style="grid-template-columns:minmax(125px,170px) minmax(0,1fr) auto">
+      <div class="registered-shift-time">
+        <strong>${day}日（${weekdayJa_(date)}）</strong>
+        <small style="display:block;margin-top:4px;color:#91a198">${esc(date)}</small>
+      </div>
+      <div class="registered-shift-meta">
+        <span style="font-size:16px;font-weight:900;color:#fff">${esc(r.start_time)}〜${esc(r.end_time)}</span>
+        <small>${esc(r.store_code||state.authUser?.store_code||"")}</small>
+      </div>
+      <div class="registered-shift-actions">
+        <button class="ghost-button" type="button" data-my-shift-edit="${esc(r.shift_id||"")}" ${blocked?"disabled":""}>変更申請</button>
+        <button class="danger-ghost" type="button" data-my-shift-delete="${esc(r.shift_id||"")}" ${blocked?"disabled":""}>シフト削除申請</button>
+      </div>
+    </div>`;
+  }).join("");
+
+  $$("[data-my-shift-edit]").forEach(b=>b.onclick=()=>{
+    const r=rows.find(x=>String(x.shift_id)===String(b.dataset.myShiftEdit));
+    if(r)editMyShiftRequest(r);
+  });
+
+  $$("[data-my-shift-delete]").forEach(b=>b.onclick=()=>{
+    const r=rows.find(x=>String(x.shift_id)===String(b.dataset.myShiftDelete));
+    if(r)requestDeleteMyShift(r);
+  });
 }
+
+function startAddMyShiftRequest_(date){
+  if(isTodayOrPastShiftDate_(date))return myShiftMsg(sameDayShiftRuleMessage_(),true);
+
+  state.myShiftDate=date;
+  resetMyShiftForm();
+  $("#myShiftFormTitle").textContent="追加勤務の申請";
+  $("#myShiftSelectedDate").textContent=formatStaffDate(date);
+  $("#myShiftStart").focus();
+  $("#myShiftRequestForm")?.scrollIntoView({behavior:"smooth",block:"start"});
+}
+
 function editMyShiftRequest(r){
-  if(isTodayOrPastShiftDate_(state.myShiftDate))return myShiftMsg(sameDayShiftRuleMessage_(),true);
+  const date=String(r.date||"");
+  if(isTodayOrPastShiftDate_(date))return myShiftMsg(sameDayShiftRuleMessage_(),true);
+
+  state.myShiftDate=date;
   $("#myShiftEditingId").value=r.shift_id||"";
   $("#myShiftStart").value=String(r.start_time||"").slice(0,5);
   $("#myShiftEnd").value=String(r.end_time||"").slice(0,5);
   $("#myShiftReason").value="";
   $("#myShiftFormTitle").textContent="シフト変更申請";
+  $("#myShiftSelectedDate").textContent=formatStaffDate(date);
   if($("#myShiftFormHelp"))$("#myShiftFormHelp").textContent="この既存シフトを変更する申請です。承認後に元のシフトが変更されます。";
   $("#myShiftSubmitButton").textContent="変更申請を送る";
   $("#myShiftCancelEdit").classList.remove("is-hidden");
+  $("#myShiftRequestForm")?.scrollIntoView({behavior:"smooth",block:"start"});
   $("#myShiftStart").focus();
 }
+
 async function requestDeleteMyShift(r){
-  if(isTodayOrPastShiftDate_(state.myShiftDate))return myShiftMsg(sameDayShiftRuleMessage_(),true);
-  const reason=prompt(`${r.start_time}〜${r.end_time} の既存シフトを丸ごと削除する申請を送ります。\n承認されるまで元のシフトは残ります。\n\n申請理由があれば入力してください。`,"");if(reason===null)return;
-  try{await apiPost({action:"createShiftChangeRequest",request_type:"DELETE",staff_code:state.authUser.staff_code,shift_id:r.shift_id,reason:String(reason||"").trim()});myShiftMsg("シフト削除申請を送信しました。承認されるまで現在のシフトはそのまま残ります。");await loadMyShiftView()}catch(e){myShiftMsg(e.message||"削除申請に失敗しました。",true)}
-}
-$("#myShiftRequestForm")?.addEventListener("submit",async e=>{
-  e.preventDefault();if(!canUseMyShift())return myShiftMsg("この操作を行う権限がありません。",true);if(isTodayOrPastShiftDate_(state.myShiftDate))return myShiftMsg(sameDayShiftRuleMessage_(),true);
-  const start=$("#myShiftStart").value,end=$("#myShiftEnd").value;if(!start||!end)return myShiftMsg("開始時刻と終了時刻を選択してください。",true);if(!isAllowedShiftTime_(start)||!isAllowedShiftTime_(end))return myShiftMsg("時刻は08:00〜24:00、分は00・15・30・45のみ選択できます。",true);if(start>=end)return myShiftMsg("終了時刻は開始時刻より後にしてください。",true);
-  const editingId=$("#myShiftEditingId").value,b=$("#myShiftSubmitButton");b.disabled=true;
+  const date=String(r.date||"");
+  if(isTodayOrPastShiftDate_(date))return myShiftMsg(sameDayShiftRuleMessage_(),true);
+
+  const reason=prompt(
+    `${formatStaffDate(date)} ${r.start_time}〜${r.end_time} の既存シフトを丸ごと削除する申請を送ります。\n承認されるまで元のシフトは残ります。\n\n申請理由があれば入力してください。`,
+    ""
+  );
+  if(reason===null)return;
+
   try{
-    await apiPost({action:"createShiftChangeRequest",request_type:editingId?"UPDATE":"ADD",staff_code:state.authUser.staff_code,shift_id:editingId||"",store_code:state.authUser.store_code||"YACHIYO",date:state.myShiftDate,start_time:start,end_time:end,reason:$("#myShiftReason").value.trim()});
-    myShiftMsg(editingId?"変更申請を送信しました。管理者の承認待ちです。":"追加申請を送信しました。管理者の承認待ちです。");resetMyShiftForm();await loadMyShiftView()
-  }catch(e2){myShiftMsg(e2.message||"シフト変更申請に失敗しました。",true)}finally{b.disabled=false}
+    await apiPost({
+      action:"createShiftChangeRequest",
+      request_type:"DELETE",
+      staff_code:state.authUser.staff_code,
+      shift_id:r.shift_id,
+      reason:String(reason||"").trim()
+    });
+    myShiftMsg("シフト削除申請を送信しました。承認されるまで現在のシフトはそのまま残ります。");
+    await loadMyShiftView();
+  }catch(e){
+    myShiftMsg(e.message||"削除申請に失敗しました。",true);
+  }
+}
+
+$("#myShiftRequestForm")?.addEventListener("submit",async e=>{
+  e.preventDefault();
+
+  if(!canUseMyShift())return myShiftMsg("この操作を行う権限がありません。",true);
+  if(!state.myShiftDate)return myShiftMsg("一覧から申請する日付を選択してください。",true);
+  if(isTodayOrPastShiftDate_(state.myShiftDate))return myShiftMsg(sameDayShiftRuleMessage_(),true);
+
+  const start=$("#myShiftStart").value;
+  const end=$("#myShiftEnd").value;
+
+  if(!start||!end)return myShiftMsg("開始時刻と終了時刻を選択してください。",true);
+  if(!isAllowedShiftTime_(start)||!isAllowedShiftTime_(end))return myShiftMsg("時刻は08:00〜24:00、分は00・15・30・45のみ選択できます。",true);
+  if(start>=end)return myShiftMsg("終了時刻は開始時刻より後にしてください。",true);
+
+  const editingId=$("#myShiftEditingId").value;
+  if(!editingId)return myShiftMsg("一覧の既存シフトから「変更申請」を選択してください。",true);
+  const b=$("#myShiftSubmitButton");
+  b.disabled=true;
+
+  try{
+    const role=String(state.authUser?.role||"STAFF").toUpperCase();
+    if(role==="STAFF"){
+      const store=state.authUser.store_code||"YACHIYO";
+      const presence=await getResolvedPresence_(state.myShiftDate,store);
+
+      if(!isWithinPresence_(start,end,presence)){
+        const rule=presence.closed
+          ?"在駐なし"
+          :`${presence.start_time||"--:--"}〜${presence.end_time||"--:--"}`;
+
+        return myShiftMsg(
+          `変更後の勤務時間はスタッフ在駐時間内で指定してください。この日の在駐時間：${rule}`,
+          true
+        );
+      }
+    }
+
+    await apiPost({
+      action:"createShiftChangeRequest",
+      request_type:"UPDATE",
+      staff_code:state.authUser.staff_code,
+      shift_id:editingId||"",
+      store_code:state.authUser.store_code||"YACHIYO",
+      date:state.myShiftDate,
+      start_time:start,
+      end_time:end,
+      reason:$("#myShiftReason").value.trim()
+    });
+
+    myShiftMsg(editingId
+      ?"変更申請を送信しました。管理者の承認待ちです。"
+      :"追加申請を送信しました。管理者の承認待ちです。");
+
+    state.myShiftDate="";
+    resetMyShiftForm();
+    await loadMyShiftView();
+
+  }catch(e2){
+    myShiftMsg(e2.message||"シフト変更申請に失敗しました。",true);
+  }finally{
+    b.disabled=false;
+  }
 });
-$("#myShiftCancelEdit")?.addEventListener("click",resetMyShiftForm);
-$("#myShiftPrevDay")?.addEventListener("click",()=>moveMyShiftDate(-1));
-$("#myShiftNextDay")?.addEventListener("click",()=>moveMyShiftDate(1));
-$("#myShiftToday")?.addEventListener("click",()=>{state.myShiftDate=localYmd();loadMyShiftView()});
+
+$("#myShiftCancelEdit")?.addEventListener("click",()=>{
+  state.myShiftDate="";
+  resetMyShiftForm();
+});
+
+$("#myShiftPrevMonth")?.addEventListener("click",()=>moveMyShiftMonth_(-1));
+$("#myShiftNextMonth")?.addEventListener("click",()=>moveMyShiftMonth_(1));
+$("#myShiftThisMonth")?.addEventListener("click",()=>{
+  state.myShiftMonth=localYmd().slice(0,7);
+  state.myShiftDate="";
+  resetMyShiftForm();
+  loadMyShiftView();
+});
+
 function renderMyShiftRequestHistory(){
-  const box=$("#myShiftRequestHistory"),rows=(state.myShiftRequests||[]).slice(0,30);
-  if(!rows.length){box.innerHTML='<div class="registered-shift-empty">申請履歴はありません。</div>';return}
-  const typeLabel={ADD:"追加",UPDATE:"変更",DELETE:"削除"},statusLabel={PENDING:"承認待ち",APPROVED:"承認済み",REJECTED:"却下"};
-  box.innerHTML=rows.map(r=>{const t=String(r.request_type||"").toUpperCase(),s=String(r.status||"").toUpperCase(),time=t==="DELETE"?`${esc(r.old_start_time||"")}〜${esc(r.old_end_time||"")}`:`${esc(r.new_start_time||"")}〜${esc(r.new_end_time||"")}`;return `<div class="registered-shift-row"><div class="registered-shift-time"><strong>${esc(r.date||"")}</strong></div><div class="registered-shift-meta"><span>${esc(typeLabel[t]||t)} · ${time}</span><small>${esc(r.reason||"理由なし")}</small></div><div class="registered-shift-actions"><span class="shift-pill">${esc(statusLabel[s]||s)}</span></div></div>`}).join("")
+  const box=$("#myShiftRequestHistory");
+  const rows=(state.myShiftRequests||[]).slice()
+    .sort((a,b)=>String(a.date||"").localeCompare(String(b.date||""))||String(a.requested_at||"").localeCompare(String(b.requested_at||"")));
+
+  if(!rows.length){
+    box.innerHTML='<div class="registered-shift-empty">この月の申請履歴はありません。</div>';
+    return;
+  }
+
+  const typeLabel={ADD:"追加",UPDATE:"変更",DELETE:"削除"};
+  const statusLabel={PENDING:"承認待ち",APPROVED:"承認済み",REJECTED:"却下"};
+
+  box.innerHTML=rows.map(r=>{
+    const t=String(r.request_type||"").toUpperCase();
+    const s=String(r.status||"").toUpperCase();
+    const time=t==="DELETE"
+      ? `${esc(r.old_start_time||"")}〜${esc(r.old_end_time||"")}`
+      : `${esc(r.new_start_time||"")}〜${esc(r.new_end_time||"")}`;
+
+    return `<div class="registered-shift-row">
+      <div class="registered-shift-time"><strong>${esc(r.date||"")}</strong></div>
+      <div class="registered-shift-meta">
+        <span>${esc(typeLabel[t]||t)} · ${time}</span>
+        <small>${esc(r.reason||"理由なし")}</small>
+      </div>
+      <div class="registered-shift-actions"><span class="shift-pill">${esc(statusLabel[s]||s)}</span></div>
+    </div>`;
+  }).join("");
 }
 
 // ===== パスワード変更 =====
@@ -753,6 +977,258 @@ $("#passwordChangeForm")?.addEventListener("submit",async e=>{
   try{const result=await firebaseChangePassword(p1);if(result.idToken){state.idToken=result.idToken;sessionStorage.setItem("anauts_id_token",result.idToken)}$("#passwordChangeForm").reset();passwordMsg("パスワードを変更しました。")}catch(e2){passwordMsg(e2.message||"パスワードを変更できませんでした。",true)}finally{b.disabled=false;b.textContent="パスワードを変更"}
 });
 
+
+
+// ===== スタッフ在駐時間 =====
+const PRESENCE_DAY_LABEL={MON:"月曜日",TUE:"火曜日",WED:"水曜日",THU:"木曜日",FRI:"金曜日",SAT:"土曜日",SUN:"日曜日"};
+const PRESENCE_DAY_ORDER=["MON","TUE","WED","THU","FRI","SAT","SUN"];
+
+function presenceMsg(text,error=false){
+  const n=$("#presenceMessage");
+  if(!n)return;
+  n.textContent=text||"";
+  n.classList.toggle("is-hidden",!text);
+  n.classList.toggle("is-error",!!error);
+}
+
+function presenceTimeOptions_(blank=true){
+  const a=[];
+  if(blank)a.push('<option value="">選択</option>');
+  for(let h=0;h<=23;h++){
+    for(const m of [0,15,30,45]){
+      const v=`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
+      a.push(`<option value="${v}">${v}</option>`);
+    }
+  }
+  a.push('<option value="24:00">24:00</option>');
+  return a.join("");
+}
+
+function setupPresenceManager(){
+  const stores=state.stores.filter(s=>s.active!==false);
+  $("#presenceStore").innerHTML=stores.map(s=>`<option value="${esc(s.store_code)}">${esc(s.store_name||s.store_code)}</option>`).join("");
+  if(stores.some(s=>String(s.store_code)==="YACHIYO"))$("#presenceStore").value="YACHIYO";
+
+  $("#presenceMonthDay").innerHTML=Array.from({length:31},(_,i)=>`<option value="${i+1}">${i+1}日</option>`).join("");
+  $("#presenceSpecialStart").innerHTML=presenceTimeOptions_(true);
+  $("#presenceSpecialEnd").innerHTML=presenceTimeOptions_(true);
+
+  $("#presenceStore").onchange=loadPresenceSettings_;
+  $("#presenceWeekdayTab").onclick=()=>showPresenceTab_("weekday");
+  $("#presenceSpecialTab").onclick=()=>showPresenceTab_("special");
+  $("#savePresenceWeekdays").onclick=savePresenceWeekdays_;
+  $("#newPresenceSpecial").onclick=()=>openPresenceSpecialForm_();
+  $("#cancelPresenceSpecial").onclick=closePresenceSpecialForm_;
+  $("#presenceSpecialType").onchange=updatePresenceSpecialTypeUi_;
+  $("#presenceSpecialClosed").onchange=updatePresenceSpecialClosedUi_;
+  $("#presenceSpecialForm").onsubmit=savePresenceSpecial_;
+
+  loadPresenceSettings_();
+}
+
+function showPresenceTab_(tab){
+  const weekday=tab==="weekday";
+  $("#presenceWeekdayTab").classList.toggle("is-active",weekday);
+  $("#presenceSpecialTab").classList.toggle("is-active",!weekday);
+  $("#presenceWeekdayPanel").classList.toggle("is-hidden",!weekday);
+  $("#presenceSpecialPanel").classList.toggle("is-hidden",weekday);
+  presenceMsg("");
+}
+
+async function loadPresenceSettings_(){
+  const store=$("#presenceStore")?.value||"";
+  if(!store)return;
+  try{
+    const j=await apiGet("getStaffPresenceHours",{store_code:store});
+    state.presenceWeekdays=Array.isArray(j.data?.weekdays)?j.data.weekdays:[];
+    state.presenceSpecials=Array.isArray(j.data?.specials)?j.data.specials:[];
+    renderPresenceWeekdays_();
+    renderPresenceSpecials_();
+    presenceMsg("");
+  }catch(e){
+    presenceMsg(e.message||"スタッフ在駐時間を取得できませんでした。",true);
+  }
+}
+
+function renderPresenceWeekdays_(){
+  const byDay=new Map((state.presenceWeekdays||[]).map(r=>[String(r.day_of_week),r]));
+  const options=presenceTimeOptions_(true);
+
+  $("#presenceWeekdayList").innerHTML=PRESENCE_DAY_ORDER.map(day=>{
+    const r=byDay.get(day)||{};
+    const closed=r.closed===true || String(r.closed).toUpperCase()==="TRUE" || !r.start_time || !r.end_time;
+
+    return `<div class="service-hour-row" data-presence-day="${day}" style="grid-template-columns:minmax(110px,150px) 1fr 1fr auto">
+      <div class="service-day"><strong>${PRESENCE_DAY_LABEL[day]}</strong><small>${day}</small></div>
+      <label><span style="display:block;color:#91a198;font-size:11px;margin-bottom:5px">開始</span><select class="presence-week-start">${options}</select></label>
+      <label><span style="display:block;color:#91a198;font-size:11px;margin-bottom:5px">終了</span><select class="presence-week-end">${options}</select></label>
+      <label style="display:flex;align-items:center;gap:7px"><input class="presence-week-closed" type="checkbox" ${closed?"checked":""}><span>在駐なし</span></label>
+    </div>`;
+  }).join("");
+
+  $$("[data-presence-day]").forEach(row=>{
+    const day=row.dataset.presenceDay;
+    const r=byDay.get(day)||{};
+    const start=row.querySelector(".presence-week-start");
+    const end=row.querySelector(".presence-week-end");
+    const closed=row.querySelector(".presence-week-closed");
+
+    start.value=r.start_time||"";
+    end.value=r.end_time||"";
+
+    const sync=()=>{
+      start.disabled=closed.checked;
+      end.disabled=closed.checked;
+    };
+    closed.onchange=sync;
+    sync();
+  });
+}
+
+async function savePresenceWeekdays_(){
+  const store=$("#presenceStore").value;
+  const rows=$$("[data-presence-day]").map(row=>({
+    day_of_week:row.dataset.presenceDay,
+    start_time:row.querySelector(".presence-week-start").value,
+    end_time:row.querySelector(".presence-week-end").value,
+    closed:row.querySelector(".presence-week-closed").checked
+  }));
+
+  for(const r of rows){
+    if(!r.closed && (!r.start_time||!r.end_time))
+      return presenceMsg(`${PRESENCE_DAY_LABEL[r.day_of_week]}の開始・終了時刻を指定してください。`,true);
+    if(!r.closed && r.start_time>=r.end_time)
+      return presenceMsg(`${PRESENCE_DAY_LABEL[r.day_of_week]}の終了時刻は開始時刻より後にしてください。`,true);
+  }
+
+  try{
+    await apiPost({action:"saveStaffPresenceWeekdays",store_code:store,rows});
+    await loadPresenceSettings_();
+    presenceMsg("曜日設定を保存しました。");
+  }catch(e){
+    presenceMsg(e.message||"保存できませんでした。",true);
+  }
+}
+
+function openPresenceSpecialForm_(r=null){
+  $("#presenceSpecialForm").classList.remove("is-hidden");
+  $("#presenceSpecialId").value=r?.presence_id||"";
+  $("#presenceSpecialType").value=r?.rule_type||"MONTH_DAY";
+  $("#presenceMonthDay").value=String(r?.month_day||9);
+  $("#presenceSpecialDate").value=r?.specific_date||"";
+  $("#presenceSpecialLabel").value=r?.label||"";
+  $("#presenceSpecialStart").value=r?.start_time||"";
+  $("#presenceSpecialEnd").value=r?.end_time||"";
+  $("#presenceSpecialClosed").checked=r?.closed===true||String(r?.closed).toUpperCase()==="TRUE";
+  updatePresenceSpecialTypeUi_();
+  updatePresenceSpecialClosedUi_();
+}
+
+function closePresenceSpecialForm_(){
+  $("#presenceSpecialForm").classList.add("is-hidden");
+  $("#presenceSpecialForm").reset();
+  $("#presenceSpecialId").value="";
+}
+
+function updatePresenceSpecialTypeUi_(){
+  const isDate=$("#presenceSpecialType").value==="DATE";
+  $("#presenceMonthDayField").classList.toggle("is-hidden",isDate);
+  $("#presenceDateField").classList.toggle("is-hidden",!isDate);
+}
+
+function updatePresenceSpecialClosedUi_(){
+  const closed=$("#presenceSpecialClosed").checked;
+  $("#presenceSpecialStart").disabled=closed;
+  $("#presenceSpecialEnd").disabled=closed;
+}
+
+async function savePresenceSpecial_(e){
+  e.preventDefault();
+
+  const type=$("#presenceSpecialType").value;
+  const closed=$("#presenceSpecialClosed").checked;
+
+  const payload={
+    action:"saveStaffPresenceSpecial",
+    presence_id:$("#presenceSpecialId").value,
+    store_code:$("#presenceStore").value,
+    rule_type:type,
+    month_day:type==="MONTH_DAY"?Number($("#presenceMonthDay").value):"",
+    specific_date:type==="DATE"?$("#presenceSpecialDate").value:"",
+    label:$("#presenceSpecialLabel").value.trim(),
+    start_time:closed?"":$("#presenceSpecialStart").value,
+    end_time:closed?"":$("#presenceSpecialEnd").value,
+    closed
+  };
+
+  if(type==="DATE"&&!payload.specific_date)return presenceMsg("特定日を指定してください。",true);
+  if(!closed&&(!payload.start_time||!payload.end_time))return presenceMsg("開始・終了時刻を指定してください。",true);
+  if(!closed&&payload.start_time>=payload.end_time)return presenceMsg("終了時刻は開始時刻より後にしてください。",true);
+
+  try{
+    await apiPost(payload);
+    closePresenceSpecialForm_();
+    await loadPresenceSettings_();
+    presenceMsg("追加設定を保存しました。");
+  }catch(err){
+    presenceMsg(err.message||"保存できませんでした。",true);
+  }
+}
+
+function renderPresenceSpecials_(){
+  const rows=state.presenceSpecials||[];
+
+  if(!rows.length){
+    $("#presenceSpecialList").innerHTML='<div class="empty-service-hours">追加設定はありません。</div>';
+    return;
+  }
+
+  $("#presenceSpecialList").innerHTML=rows.map((r,i)=>{
+    const key=r.rule_type==="DATE" ? esc(r.specific_date||"") : `毎月${esc(r.month_day)}日`;
+    const time=(r.closed===true||String(r.closed).toUpperCase()==="TRUE")
+      ?"在駐なし"
+      :`${esc(r.start_time)} 〜 ${esc(r.end_time)}`;
+
+    return `<div class="service-hour-row" style="grid-template-columns:minmax(130px,180px) 1fr auto auto">
+      <div class="service-day"><strong>${key}</strong><small>${esc(r.label||r.rule_type||"")}</small></div>
+      <div class="service-time">${time}</div>
+      <button type="button" class="ghost-button" data-presence-edit="${i}">編集</button>
+      <button type="button" class="danger-ghost" data-presence-delete="${i}">削除</button>
+    </div>`;
+  }).join("");
+
+  $$("[data-presence-edit]").forEach(b=>b.onclick=()=>openPresenceSpecialForm_(rows[+b.dataset.presenceEdit]));
+  $$("[data-presence-delete]").forEach(b=>b.onclick=()=>deletePresenceSpecial_(rows[+b.dataset.presenceDelete]));
+}
+
+async function deletePresenceSpecial_(r){
+  const label=r.rule_type==="DATE"?r.specific_date:`毎月${r.month_day}日`;
+  if(!confirm(`${label} の追加設定を削除しますか？`))return;
+
+  try{
+    await apiPost({action:"deleteStaffPresenceSpecial",presence_id:r.presence_id});
+    await loadPresenceSettings_();
+    presenceMsg("追加設定を削除しました。");
+  }catch(e){
+    presenceMsg(e.message||"削除できませんでした。",true);
+  }
+}
+
+async function getResolvedPresence_(date,store){
+  const j=await apiGet("getResolvedStaffPresenceHours",{date,store_code:store});
+  return j.data||{};
+}
+
+function timeMinutes_(v){
+  const m=/^(\d{2}):(\d{2})$/.exec(String(v||""));
+  return m?Number(m[1])*60+Number(m[2]):NaN;
+}
+
+function isWithinPresence_(start,end,p){
+  if(!p||p.closed===true||String(p.closed).toUpperCase()==="TRUE")return false;
+  if(!p.start_time||!p.end_time)return false;
+  return timeMinutes_(start)>=timeMinutes_(p.start_time)&&timeMinutes_(end)<=timeMinutes_(p.end_time);
+}
 
 // ===== サービス管理 =====
 function setupServiceManager(){renderServiceList();resetServiceForm();$("#serviceSearch").oninput=renderServiceList;$("#newServiceButton").onclick=resetServiceForm;$("#serviceForm").onsubmit=saveServiceFromUi}
