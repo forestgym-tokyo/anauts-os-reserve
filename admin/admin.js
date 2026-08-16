@@ -1,4 +1,4 @@
-// BUILD: 20260816-presence-hours-v15
+// BUILD: 20260816-shift-mail-fix-v16
 const API_URL="https://script.google.com/macros/s/AKfycbyvpQRxRpMRfpaQHtBar77dViCqPl-hdFW-2yMdozhN8RHtwcrFiNEM9cvEbny4x9q0/exec";
 const state={staff:[],stores:[],services:[],serviceHours:[],presenceWeekdays:[],presenceSpecials:[],selectedServiceCode:"",selectedStaffCode:"",shiftRows:[],shiftPreview:null,staffScheduleDate:"",staffSchedule:null,trainerScheduleDate:"",trainerSchedule:null,myShiftMonth:"",myShiftDate:"",myShiftRows:[],myShiftRequests:[],authUser:null,idToken:""};
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
@@ -710,11 +710,15 @@ function resetMyShiftForm(){
   if($("#myShiftStart"))$("#myShiftStart").value="";
   if($("#myShiftEnd"))$("#myShiftEnd").value="";
   if($("#myShiftReason"))$("#myShiftReason").value="";
-  if($("#myShiftFormTitle"))$("#myShiftFormTitle").textContent="追加勤務の申請";
-  if($("#myShiftSelectedDate"))$("#myShiftSelectedDate").textContent=state.myShiftDate?formatStaffDate(state.myShiftDate):"日付の「追加勤務申請」を押してください";
-  if($("#myShiftFormHelp"))$("#myShiftFormHelp").textContent="既存シフトを変更する場合は「変更申請」、そのシフト自体を丸ごと取り消す場合は「シフト削除申請」を押してください。このフォームは追加勤務の申請専用です。";
-  if($("#myShiftSubmitButton"))$("#myShiftSubmitButton").textContent="追加申請を送る";
+  if($("#myShiftFormTitle"))$("#myShiftFormTitle").textContent="シフト変更申請";
+  if($("#myShiftSelectedDate"))$("#myShiftSelectedDate").textContent="";
+  if($("#myShiftFormHelp"))$("#myShiftFormHelp").textContent="一覧の「変更申請」を押すと、変更後の勤務時間を指定できます。";
+  if($("#myShiftSubmitButton")){
+    $("#myShiftSubmitButton").textContent="変更申請を送る";
+    $("#myShiftSubmitButton").disabled=false;
+  }
   $("#myShiftCancelEdit")?.classList.add("is-hidden");
+  $("#myShiftRequestForm")?.classList.add("is-hidden");
 }
 
 async function loadMyShiftView(){
@@ -801,22 +805,12 @@ function renderMyShiftRows(){
   });
 }
 
-function startAddMyShiftRequest_(date){
-  if(isTodayOrPastShiftDate_(date))return myShiftMsg(sameDayShiftRuleMessage_(),true);
-
-  state.myShiftDate=date;
-  resetMyShiftForm();
-  $("#myShiftFormTitle").textContent="追加勤務の申請";
-  $("#myShiftSelectedDate").textContent=formatStaffDate(date);
-  $("#myShiftStart").focus();
-  $("#myShiftRequestForm")?.scrollIntoView({behavior:"smooth",block:"start"});
-}
-
 function editMyShiftRequest(r){
   const date=String(r.date||"");
   if(isTodayOrPastShiftDate_(date))return myShiftMsg(sameDayShiftRuleMessage_(),true);
 
   state.myShiftDate=date;
+  $("#myShiftRequestForm")?.classList.remove("is-hidden");
   $("#myShiftEditingId").value=r.shift_id||"";
   $("#myShiftStart").value=String(r.start_time||"").slice(0,5);
   $("#myShiftEnd").value=String(r.end_time||"").slice(0,5);
@@ -859,8 +853,11 @@ $("#myShiftRequestForm")?.addEventListener("submit",async e=>{
   e.preventDefault();
 
   if(!canUseMyShift())return myShiftMsg("この操作を行う権限がありません。",true);
-  if(!state.myShiftDate)return myShiftMsg("一覧から申請する日付を選択してください。",true);
+  if(!state.myShiftDate)return myShiftMsg("一覧の既存シフトから「変更申請」を選択してください。",true);
   if(isTodayOrPastShiftDate_(state.myShiftDate))return myShiftMsg(sameDayShiftRuleMessage_(),true);
+
+  const editingId=String($("#myShiftEditingId").value||"").trim();
+  if(!editingId)return myShiftMsg("一覧の既存シフトから「変更申請」を選択してください。",true);
 
   const start=$("#myShiftStart").value;
   const end=$("#myShiftEnd").value;
@@ -869,13 +866,14 @@ $("#myShiftRequestForm")?.addEventListener("submit",async e=>{
   if(!isAllowedShiftTime_(start)||!isAllowedShiftTime_(end))return myShiftMsg("時刻は08:00〜24:00、分は00・15・30・45のみ選択できます。",true);
   if(start>=end)return myShiftMsg("終了時刻は開始時刻より後にしてください。",true);
 
-  const editingId=$("#myShiftEditingId").value;
-  if(!editingId)return myShiftMsg("一覧の既存シフトから「変更申請」を選択してください。",true);
   const b=$("#myShiftSubmitButton");
   b.disabled=true;
+  b.textContent="送信中…";
+  myShiftMsg("");
 
   try{
     const role=String(state.authUser?.role||"STAFF").toUpperCase();
+
     if(role==="STAFF"){
       const store=state.authUser.store_code||"YACHIYO";
       const presence=await getResolvedPresence_(state.myShiftDate,store);
@@ -885,18 +883,17 @@ $("#myShiftRequestForm")?.addEventListener("submit",async e=>{
           ?"在駐なし"
           :`${presence.start_time||"--:--"}〜${presence.end_time||"--:--"}`;
 
-        return myShiftMsg(
-          `変更後の勤務時間はスタッフ在駐時間内で指定してください。この日の在駐時間：${rule}`,
-          true
+        throw new Error(
+          `変更後の勤務時間はスタッフ在駐時間内で指定してください。この日の在駐時間：${rule}`
         );
       }
     }
 
-    await apiPost({
+    const result=await apiPost({
       action:"createShiftChangeRequest",
       request_type:"UPDATE",
       staff_code:state.authUser.staff_code,
-      shift_id:editingId||"",
+      shift_id:editingId,
       store_code:state.authUser.store_code||"YACHIYO",
       date:state.myShiftDate,
       start_time:start,
@@ -904,18 +901,26 @@ $("#myShiftRequestForm")?.addEventListener("submit",async e=>{
       reason:$("#myShiftReason").value.trim()
     });
 
-    myShiftMsg(editingId
-      ?"変更申請を送信しました。管理者の承認待ちです。"
-      :"追加申請を送信しました。管理者の承認待ちです。");
+    b.textContent="送信完了しました";
+    myShiftMsg("変更申請を送信しました。ADMIN / MANAGERへ承認メールを送信しました。");
 
     state.myShiftDate="";
-    resetMyShiftForm();
-    await loadMyShiftView();
 
-  }catch(e2){
-    myShiftMsg(e2.message||"シフト変更申請に失敗しました。",true);
-  }finally{
+    // 完了表示を確認できるようにしてから一覧を更新
+    setTimeout(()=>{ loadMyShiftView(); },1200);
+
+    // 完了表示は少し残す
+    setTimeout(()=>{
+      if($("#myShiftSubmitButton")){
+        $("#myShiftSubmitButton").textContent="変更申請を送る";
+        $("#myShiftSubmitButton").disabled=false;
+      }
+    },1500);
+
+  }catch(err){
+    b.textContent="変更申請を送る";
     b.disabled=false;
+    myShiftMsg(err.message||"シフト変更申請に失敗しました。",true);
   }
 });
 
