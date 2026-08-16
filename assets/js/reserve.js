@@ -39,12 +39,12 @@ const ROUTES = {
     mode: "FIXED",
     serviceCode: "MEAL_PLANNING"
   },
-"training-support": {
-  title: "トレーニングサポート",
-  lead: "会員向けトレーニングサポート（45分）のご予約です。",
-  mode: "FIXED",
-  serviceCode: "TRAINING_SUPPORT45"
-},
+  "training-support": {
+    title: "トレーニングサポート",
+    lead: "会員向けトレーニングサポート（45分）のご予約です。",
+    mode: "FIXED",
+    serviceCode: "TRAINING_SUPPORT45"
+  },
   unsubscribe: {
     title: "退会手続き",
     lead: "退会手続きのご来店予約です。",
@@ -76,12 +76,18 @@ const el = {
   phoneField: document.querySelector("#phoneField"),
   postalField: document.querySelector("#postalField"),
   addressField: document.querySelector("#addressField"),
+  prefectureField: document.querySelector("#prefectureField"),
+  cityField: document.querySelector("#cityField"),
+  addressDetailField: document.querySelector("#addressDetailField"),
   memberNo: document.querySelector("#memberNo"),
   customerName: document.querySelector("#customerName"),
   customerEmail: document.querySelector("#customerEmail"),
   customerPhone: document.querySelector("#customerPhone"),
   postalCode: document.querySelector("#postalCode"),
   address: document.querySelector("#address"),
+  prefecture: document.querySelector("#prefecture"),
+  city: document.querySelector("#city"),
+  addressDetail: document.querySelector("#addressDetail"),
   note: document.querySelector("#note"),
   formError: document.querySelector("#formError"),
   submitButton: document.querySelector("#submitButton"),
@@ -217,23 +223,198 @@ function renderServiceCards(list) {
 
 function configureCustomerForm() {
   const formType = String(selectedService?.form_type || "").toUpperCase();
-  const code = String(selectedService?.service_code || "");
+  const code = String(selectedService?.service_code || "").toUpperCase();
 
-  el.customerTypeField.classList.toggle("is-hidden", formType !== "BOTH");
-  el.memberNoField.classList.toggle("is-hidden", formType === "VISITOR");
-  el.nameField.classList.toggle("is-hidden", formType === "MEMBER");
+  const isTour = code === "TOUR";
+  const isCounsel = code === "COUNSEL";
+  const isTrainingSupport = code === "TRAINING_SUPPORT45";
 
-  const needsAddress = ["TOUR", "COUNSEL"].includes(code);
-  el.postalField.classList.toggle("is-hidden", !needsAddress);
-  el.addressField.classList.toggle("is-hidden", !needsAddress);
+  // トレーニングサポートは会員専用。住所は不要。
+  if (isTrainingSupport) {
+    el.customerTypeField?.classList.add("is-hidden");
+    el.memberNoField?.classList.remove("is-hidden");
+    el.nameField?.classList.add("is-hidden");
+    el.phoneField?.classList.add("is-hidden");
+    setAddressFieldsVisible_(false);
+    configureMemberNumberInput_();
+    return;
+  }
+
+  el.customerTypeField?.classList.toggle("is-hidden", formType !== "BOTH");
+  el.memberNoField?.classList.toggle("is-hidden", formType === "VISITOR");
+  el.nameField?.classList.toggle("is-hidden", formType === "MEMBER");
+
+  // 店内見学は常に住所必須。
+  if (isTour) {
+    setAddressFieldsVisible_(true);
+  } else if (isCounsel) {
+    // カウンセリングは会員番号が入ったら住所欄を消す。
+    setAddressFieldsVisible_(!hasCounselMemberNo_());
+  } else {
+    setAddressFieldsVisible_(false);
+  }
+
+  configureMemberNumberInput_();
 
   document.querySelectorAll('input[name="customer_type"]').forEach((radio) => {
     radio.onchange = () => {
-      el.memberNoField.classList.toggle("is-hidden", radio.value !== "MEMBER");
-      el.nameField.classList.toggle("is-hidden", radio.value !== "VISITOR");
+      el.memberNoField?.classList.toggle("is-hidden", radio.value !== "MEMBER");
+      el.nameField?.classList.toggle("is-hidden", radio.value !== "VISITOR");
+
+      if (isCounsel) {
+        setAddressFieldsVisible_(radio.value !== "MEMBER" && !hasCounselMemberNo_());
+      }
     };
   });
+
+  if (el.memberNo) {
+    el.memberNo.oninput = () => {
+      el.memberNo.value = el.memberNo.value.replace(/\D/g, "");
+
+      if (isCounsel) {
+        setAddressFieldsVisible_(!hasCounselMemberNo_());
+      }
+    };
+  }
+
+  if (el.postalCode) {
+    el.postalCode.oninput = handlePostalCodeInput_;
+    el.postalCode.onblur = handlePostalCodeInput_;
+  }
 }
+
+function configureMemberNumberInput_() {
+  if (!el.memberNo) return;
+
+  el.memberNo.setAttribute("inputmode", "numeric");
+  el.memberNo.setAttribute("pattern", "[0-9]*");
+  el.memberNo.setAttribute("autocomplete", "off");
+}
+
+function hasCounselMemberNo_() {
+  return /^\d+$/.test(String(el.memberNo?.value || "").trim());
+}
+
+function setAddressFieldsVisible_(visible) {
+  [el.postalField, el.addressField, el.prefectureField, el.cityField, el.addressDetailField]
+    .filter(Boolean)
+    .forEach(node => node.classList.toggle("is-hidden", !visible));
+
+  // 旧HTMLのaddressFieldしかない場合でも、新3項目を自動生成する。
+  ensureSplitAddressFields_();
+
+  [el.postalField, el.prefectureField, el.cityField, el.addressDetailField]
+    .filter(Boolean)
+    .forEach(node => node.classList.toggle("is-hidden", !visible));
+
+  if (el.addressField) {
+    el.addressField.classList.add("is-hidden");
+  }
+}
+
+function ensureSplitAddressFields_() {
+  if (!el.reservationForm || !el.postalField) return;
+
+  if (!document.querySelector("#prefecture")) {
+    const prefectureField = document.createElement("label");
+    prefectureField.id = "prefectureField";
+    prefectureField.className = "field";
+    prefectureField.innerHTML =
+      '<span>都道府県</span>' +
+      '<input id="prefecture" type="text" autocomplete="address-level1" placeholder="例：千葉県">';
+    el.postalField.insertAdjacentElement("afterend", prefectureField);
+    el.prefectureField = prefectureField;
+    el.prefecture = prefectureField.querySelector("#prefecture");
+  }
+
+  if (!document.querySelector("#city")) {
+    const cityField = document.createElement("label");
+    cityField.id = "cityField";
+    cityField.className = "field";
+    cityField.innerHTML =
+      '<span>市区町村</span>' +
+      '<input id="city" type="text" autocomplete="address-level2" placeholder="例：浦安市">';
+    el.prefectureField.insertAdjacentElement("afterend", cityField);
+    el.cityField = cityField;
+    el.city = cityField.querySelector("#city");
+  }
+
+  if (!document.querySelector("#addressDetail")) {
+    const detailField = document.createElement("label");
+    detailField.id = "addressDetailField";
+    detailField.className = "field";
+    detailField.innerHTML =
+      '<span>続きの住所</span>' +
+      '<input id="addressDetail" type="text" autocomplete="street-address" placeholder="町名・番地・建物名・部屋番号">';
+    el.cityField.insertAdjacentElement("afterend", detailField);
+    el.addressDetailField = detailField;
+    el.addressDetail = detailField.querySelector("#addressDetail");
+  }
+
+  if (el.postalCode) {
+    el.postalCode.setAttribute("inputmode", "numeric");
+    el.postalCode.setAttribute("maxlength", "8");
+    el.postalCode.setAttribute("placeholder", "例：2790012");
+  }
+}
+
+let postalLookupTimer_ = null;
+
+function handlePostalCodeInput_() {
+  if (!el.postalCode) return;
+
+  const digits = el.postalCode.value.replace(/\D/g, "").slice(0, 7);
+  el.postalCode.value = digits;
+
+  clearTimeout(postalLookupTimer_);
+
+  if (digits.length !== 7) return;
+
+  postalLookupTimer_ = setTimeout(() => lookupPostalAddress_(digits), 180);
+}
+
+async function lookupPostalAddress_(postalCode) {
+  try {
+    const response = await fetch(
+      `https://zipcloud.ibsnet.co.jp/api/search?zipcode=${encodeURIComponent(postalCode)}`,
+      { cache: "no-store" }
+    );
+
+    if (!response.ok) return;
+
+    const data = await response.json();
+    const row = Array.isArray(data.results) ? data.results[0] : null;
+
+    if (!row) return;
+
+    ensureSplitAddressFields_();
+
+    if (el.prefecture) el.prefecture.value = row.address1 || "";
+    if (el.city) el.city.value = `${row.address2 || ""}${row.address3 || ""}`;
+    if (el.addressDetail) el.addressDetail.focus();
+
+  } catch (error) {
+    // 郵便番号検索失敗時も手入力は可能。
+  }
+}
+
+function getAddressParts_() {
+  ensureSplitAddressFields_();
+
+  const postalCode = String(el.postalCode?.value || "").trim();
+  const prefecture = String(el.prefecture?.value || "").trim();
+  const city = String(el.city?.value || "").trim();
+  const addressDetail = String(el.addressDetail?.value || "").trim();
+
+  return {
+    postalCode,
+    prefecture,
+    city,
+    addressDetail,
+    fullAddress: `${prefecture}${city}${addressDetail}`
+  };
+}
+
 
 el.prevWeekButton.addEventListener("click", () => changeWeek(-7));
 el.nextWeekButton.addEventListener("click", () => changeWeek(7));
@@ -411,9 +592,19 @@ async function submitReservation(event) {
   const name = el.customerName.value.trim();
   const email = el.customerEmail.value.trim();
   const phone = el.customerPhone.value.trim();
+  const serviceCode = String(selectedService.service_code || "").toUpperCase();
+  const isTour = serviceCode === "TOUR";
+  const isCounsel = serviceCode === "COUNSEL";
+  const isTrainingSupport = serviceCode === "TRAINING_SUPPORT45";
+  const addressParts = getAddressParts_();
 
-  if (customerType === "MEMBER" && !memberNo) {
+  if ((customerType === "MEMBER" || isTrainingSupport) && !memberNo) {
     showError("会員番号を入力してください。");
+    return;
+  }
+
+  if ((customerType === "MEMBER" || isTrainingSupport) && !/^\d+$/.test(memberNo)) {
+    showError("会員番号は数字のみで入力してください。");
     return;
   }
 
@@ -432,6 +623,29 @@ async function submitReservation(event) {
     return;
   }
 
+  const needsAddress =
+    isTour ||
+    (isCounsel && !/^\d+$/.test(memberNo));
+
+  if (needsAddress) {
+    if (!/^\d{7}$/.test(addressParts.postalCode)) {
+      showError("郵便番号を7桁の数字で入力してください。");
+      return;
+    }
+    if (!addressParts.prefecture) {
+      showError("都道府県を入力してください。");
+      return;
+    }
+    if (!addressParts.city) {
+      showError("市区町村を入力してください。");
+      return;
+    }
+    if (!addressParts.addressDetail) {
+      showError("続きの住所を入力してください。");
+      return;
+    }
+  }
+
   el.submitButton.disabled = true;
   el.submitButton.textContent = "予約処理中…";
 
@@ -446,8 +660,11 @@ async function submitReservation(event) {
       customer_name: customerType === "MEMBER" ? "会員照合中" : name,
       customer_email: email,
       customer_phone: phone,
-      postal_code: el.postalCode.value.trim(),
-      address: el.address.value.trim(),
+      postal_code: needsAddress ? addressParts.postalCode : "",
+      prefecture: needsAddress ? addressParts.prefecture : "",
+      city: needsAddress ? addressParts.city : "",
+      address_detail: needsAddress ? addressParts.addressDetail : "",
+      address: needsAddress ? addressParts.fullAddress : "",
       note: el.note.value.trim()
     };
 
