@@ -81,6 +81,8 @@ const el = {
   addressDetailField: document.querySelector("#addressDetailField"),
   memberNo: document.querySelector("#memberNo"),
   customerName: document.querySelector("#customerName"),
+  customerLastName: document.querySelector("#customerLastName"),
+  customerFirstName: document.querySelector("#customerFirstName"),
   customerEmail: document.querySelector("#customerEmail"),
   customerPhone: document.querySelector("#customerPhone"),
   postalCode: document.querySelector("#postalCode"),
@@ -221,7 +223,67 @@ function renderServiceCards(list) {
   });
 }
 
+
+function ensureSplitNameFields_() {
+  if (!el.reservationForm) return;
+
+  // すでに新しい姓・名欄がある場合
+  let last = document.querySelector("#customerLastName");
+  let first = document.querySelector("#customerFirstName");
+
+  if (last && first) {
+    el.customerLastName = last;
+    el.customerFirstName = first;
+    if (el.customerName) el.customerName.closest("label, .field")?.classList.add("is-hidden");
+    return;
+  }
+
+  // 旧 customerName 欄の位置を利用して姓・名に置換
+  const legacy = el.customerName;
+  const legacyField = legacy?.closest("label, .field") || el.nameField;
+
+  if (!legacyField) return;
+
+  const wrapper = document.createElement("div");
+  wrapper.id = "splitNameField";
+  wrapper.className = "field";
+  wrapper.innerHTML = `
+    <span>氏名</span>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <input id="customerLastName"
+             type="text"
+             autocomplete="family-name"
+             placeholder="姓">
+      <input id="customerFirstName"
+             type="text"
+             autocomplete="given-name"
+             placeholder="名">
+    </div>
+  `;
+
+  legacyField.insertAdjacentElement("afterend", wrapper);
+  legacyField.classList.add("is-hidden");
+
+  el.customerLastName = wrapper.querySelector("#customerLastName");
+  el.customerFirstName = wrapper.querySelector("#customerFirstName");
+}
+
+function getCustomerNameParts_() {
+  ensureSplitNameFields_();
+
+  const lastName = String(el.customerLastName?.value || "").trim();
+  const firstName = String(el.customerFirstName?.value || "").trim();
+
+  return {
+    lastName,
+    firstName,
+    fullName: `${lastName} ${firstName}`.trim()
+  };
+}
+
 function configureCustomerForm() {
+  ensureSplitNameFields_();
+
   const formType = String(selectedService?.form_type || "").toUpperCase();
   const code = String(selectedService?.service_code || "").toUpperCase();
 
@@ -234,6 +296,7 @@ function configureCustomerForm() {
     el.customerTypeField?.classList.add("is-hidden");
     el.memberNoField?.classList.remove("is-hidden");
     el.nameField?.classList.add("is-hidden");
+    document.querySelector("#splitNameField")?.classList.remove("is-hidden");
     el.phoneField?.classList.add("is-hidden");
     setAddressFieldsVisible_(false);
     configureMemberNumberInput_();
@@ -242,7 +305,8 @@ function configureCustomerForm() {
 
   el.customerTypeField?.classList.toggle("is-hidden", formType !== "BOTH");
   el.memberNoField?.classList.toggle("is-hidden", formType === "VISITOR");
-  el.nameField?.classList.toggle("is-hidden", formType === "MEMBER");
+  el.nameField?.classList.add("is-hidden");
+  document.querySelector("#splitNameField")?.classList.remove("is-hidden");
 
   // 店内見学は常に住所必須。
   if (isTour) {
@@ -259,7 +323,8 @@ function configureCustomerForm() {
   document.querySelectorAll('input[name="customer_type"]').forEach((radio) => {
     radio.onchange = () => {
       el.memberNoField?.classList.toggle("is-hidden", radio.value !== "MEMBER");
-      el.nameField?.classList.toggle("is-hidden", radio.value !== "VISITOR");
+      el.nameField?.classList.add("is-hidden");
+      document.querySelector("#splitNameField")?.classList.remove("is-hidden");
 
       if (isCounsel) {
         setAddressFieldsVisible_(radio.value !== "MEMBER" && !hasCounselMemberNo_());
@@ -589,7 +654,8 @@ async function submitReservation(event) {
   }
 
   const memberNo = el.memberNo.value.trim();
-  const name = el.customerName.value.trim();
+  const nameParts = getCustomerNameParts_();
+  const name = nameParts.fullName;
   const email = el.customerEmail.value.trim();
   const phone = el.customerPhone.value.trim();
   const serviceCode = String(selectedService.service_code || "").toUpperCase();
@@ -608,8 +674,13 @@ async function submitReservation(event) {
     return;
   }
 
-  if (customerType === "VISITOR" && !name) {
-    showError("氏名を入力してください。");
+  if (!nameParts.lastName) {
+    showError("姓を入力してください。");
+    return;
+  }
+
+  if (!nameParts.firstName) {
+    showError("名を入力してください。");
     return;
   }
 
@@ -657,7 +728,9 @@ async function submitReservation(event) {
       start_time: selectedSlot.start_time,
       customer_type: customerType,
       member_no: memberNo,
-      customer_name: customerType === "MEMBER" ? "会員照合中" : name,
+      customer_name: name,
+      customer_last_name: nameParts.lastName,
+      customer_first_name: nameParts.firstName,
       customer_email: email,
       customer_phone: phone,
       postal_code: needsAddress ? addressParts.postalCode : "",
