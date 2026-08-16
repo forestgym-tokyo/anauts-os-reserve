@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#090d0a"><title>A-nauts OS Reserve | Admin</title><link rel="stylesheet" href="./admin.css?v=20260816-myshift-month-tabs-v19"><style>
+<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#090d0a"><title>A-nauts OS Reserve | Admin</title><link rel="stylesheet" href="./admin.css?v=20260816-pending-shift-card-v21"><style>
 @media(max-width:700px){
   #myShiftView .registered-shift-row{
     grid-template-columns:1fr!important;
@@ -22,14 +22,27 @@
   }
 }
 </style>
+
 <style>
-#myShiftView .today-shift-row{
-  
-  border-color:rgba(99,209,121,.28)!important;
-  background:rgba(99,209,121,.055);
+#myShiftView .registered-shift-row.is-pending-request{
+  border:2px solid #63d179;
+  box-shadow:0 0 0 1px rgba(99,209,121,.12);
+}
+#myShiftView .shift-request-pending-badge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:28px;
+  padding:4px 10px;
+  border:1px solid #63d179;
+  border-radius:999px;
+  color:#79dc8c;
+  font-size:12px;
+  font-weight:900;
+  white-space:nowrap;
 }
 </style>
-</head><body data-build="20260816-myshift-month-tabs-v19">
+</head><body data-build="20260816-pending-shift-card-v21">
 <div id="loginGate" class="login-gate">
   <div class="login-card">
     <div class="login-brand">
@@ -466,4 +479,4 @@
 </section>
 
 <section id="registrationPlaceholder" class="manager card is-hidden"><div class="empty-state compact"><div id="placeholderIcon" class="empty-icon">🛠️</div><h2 id="placeholderTitle">準備中</h2></div></section></section>
-<section id="dailyReportView" class="view daily-report-view"><div class="empty-state card"><div class="empty-icon">📝</div><h2>現在準備中です</h2></div></section></main></div><script src="./firebase-config.js?v=20260816-myshift-month-tabs-v19"></script><script src="./admin.js?v=20260816-myshift-month-tabs-v19" defer></script></body></html>
+<section id="dailyReportView" class="view daily-report-view"><div class="empty-state card"><div class="empty-icon">📝</div><h2>現在準備中です</h2></div></section></main></div><script src="./firebase-config.js?v=20260816-pending-shift-card-v21"></script><script src="./admin.js?v=20260816-pending-shift-card-v21" defer></script></body></html>

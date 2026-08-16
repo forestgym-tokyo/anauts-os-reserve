@@ -1,4 +1,4 @@
-// BUILD: 20260816-myshift-month-tabs-v19
+// BUILD: 20260816-pending-shift-card-v21
 const API_URL="https://script.google.com/macros/s/AKfycbyvpQRxRpMRfpaQHtBar77dViCqPl-hdFW-2yMdozhN8RHtwcrFiNEM9cvEbny4x9q0/exec";
 const state={staff:[],stores:[],services:[],serviceHours:[],presenceWeekdays:[],presenceSpecials:[],selectedServiceCode:"",selectedStaffCode:"",shiftRows:[],shiftPreview:null,staffScheduleDate:"",staffSchedule:null,trainerScheduleDate:"",trainerSchedule:null,myShiftMonth:"",myShiftDate:"",myShiftRows:[],myShiftRequests:[],authUser:null,idToken:""};
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
@@ -810,6 +810,16 @@ function renderMyShiftRows(){
   }
 
   const today=localYmd();
+  const requests=state.myShiftRequests||[];
+
+  const pendingForShift=(r)=>{
+    const shiftId=String(r.shift_id||"");
+    return requests.find(q=>{
+      const status=String(q.status||"").trim().toUpperCase();
+      const requestShiftId=String(q.shift_id||q.original_shift_id||"");
+      return status==="PENDING" && requestShiftId===shiftId;
+    })||null;
+  };
 
   box.innerHTML=rows.map(r=>{
     const date=String(r.date||"");
@@ -817,24 +827,30 @@ function renderMyShiftRows(){
     const day=d.getDate();
     const isToday=date===today;
     const blocked=date<today;
+    const pending=pendingForShift(r);
+    const pendingType=String(pending?.request_type||"").toUpperCase();
+    const pendingLabel=pending
+      ? (pendingType==="DELETE" ? "削除申請中" : "変更申請中")
+      : "";
 
-    return `<div class="registered-shift-row ${isToday?"today-shift-row":""}"
+    return `<div class="registered-shift-row ${pending?"is-pending-request":""}"
       style="grid-template-columns:minmax(125px,170px) minmax(0,1fr) auto">
       <div class="registered-shift-time">
-        <strong>${d.getMonth()+1}月${day}日（${weekdayJa_(date)}）${isToday?" 今日":""}</strong>
+        <strong>${d.getMonth()+1}月${day}日（${weekdayJa_(date)}）</strong>
         <small style="display:block;margin-top:4px;color:#91a198">${esc(date)}</small>
       </div>
       <div class="registered-shift-meta">
         <span style="font-size:16px;font-weight:900;color:#fff">${esc(r.start_time)}〜${esc(r.end_time)}</span>
         <small>${esc(r.store_code||state.authUser?.store_code||"")}</small>
+        ${pending?`<span class="shift-request-pending-badge">${esc(pendingLabel)}</span>`:""}
       </div>
       <div class="registered-shift-actions">
         <button class="ghost-button" type="button"
           data-my-shift-edit="${esc(r.shift_id||"")}"
-          ${blocked?"disabled":""}>変更申請</button>
+          ${(blocked||pending)?"disabled":""}>変更申請</button>
         <button class="danger-ghost" type="button"
           data-my-shift-delete="${esc(r.shift_id||"")}"
-          ${blocked?"disabled":""}>シフト削除申請</button>
+          ${(blocked||pending)?"disabled":""}>シフト削除申請</button>
       </div>
     </div>`;
   }).join("");
