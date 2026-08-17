@@ -1,195 +1,219 @@
 /**
  * A-nauts OS Reserve
- * 店内見学アンケート 表示・印刷アドオン v28
+ * 店内見学アンケート UI v29
  *
- * admin.js の後に読み込む。
- * スタッフ予定の TOUR 行へ「アンケート表示・印刷」を追加する。
+ * TOUR予約行に「アンケート閲覧・印刷」を追加。
+ * ラジオボタン:
+ * - 全部
+ * - 住所のみ
+ * - すべて空欄
  */
 (function(){
   "use strict";
 
-  function e(v){
+  const PRINT_ACTION = "generateTourQuestionnairePdf";
+
+  function escapeHtml(v){
     return String(v ?? "")
       .replaceAll("&","&amp;")
       .replaceAll("<","&lt;")
       .replaceAll(">","&gt;")
-      .replaceAll('"',"&quot;");
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
   }
 
-  function postal(v){
-    const d=String(v||"").replace(/\D/g,"");
-    if(d.length===7)return "〒"+d.slice(0,3)+"-"+d.slice(3);
-    return d ? "〒"+d : "";
+  function injectStyles(){
+    if(document.getElementById("tourPrintStyles"))return;
+    const style=document.createElement("style");
+    style.id="tourPrintStyles";
+    style.textContent=`
+      .tour-print-button{margin-left:10px;white-space:nowrap}
+      .tour-print-overlay{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.62);display:flex;align-items:center;justify-content:center;padding:18px}
+      .tour-print-modal{width:min(520px,100%);background:#fff;color:#111;border-radius:18px;box-shadow:0 24px 80px rgba(0,0,0,.35);overflow:hidden}
+      .tour-print-head{padding:20px 22px 14px;border-bottom:1px solid #e5e7eb}
+      .tour-print-head h2{margin:0 0 6px;font-size:20px}
+      .tour-print-head p{margin:0;color:#667085;font-size:13px;line-height:1.5}
+      .tour-print-body{padding:18px 22px}
+      .tour-print-reservation{background:#f6f7f8;border-radius:12px;padding:12px 14px;margin-bottom:16px;font-size:13px;line-height:1.7}
+      .tour-print-options{display:grid;gap:10px}
+      .tour-print-option{display:flex;align-items:flex-start;gap:11px;padding:13px;border:1px solid #d9dde3;border-radius:12px;cursor:pointer}
+      .tour-print-option:has(input:checked){border-color:#111;background:#f4f7f5;box-shadow:0 0 0 1px #111 inset}
+      .tour-print-option input{margin-top:3px;transform:scale(1.18)}
+      .tour-print-option strong{display:block;font-size:14px;margin-bottom:3px}
+      .tour-print-option small{display:block;color:#667085;line-height:1.45}
+      .tour-print-duplex{margin-top:16px;padding:12px 14px;border-radius:10px;background:#fff7e6;border:1px solid #f2d28b;font-size:13px;line-height:1.55;font-weight:700}
+      .tour-print-message{min-height:20px;margin-top:10px;color:#b42318;font-size:13px}
+      .tour-print-actions{display:flex;justify-content:flex-end;gap:10px;padding:14px 22px 20px}
+      .tour-print-actions button{min-height:42px}
+      @media(max-width:680px){
+        .tour-print-button{margin-left:0;margin-top:8px;width:100%}
+        .tour-print-modal{border-radius:14px}
+        .tour-print-actions{flex-direction:column-reverse}
+        .tour-print-actions button{width:100%}
+      }
+    `;
+    document.head.appendChild(style);
   }
 
-  function jpDate(dateText){
-    const p=String(dateText||"").split("-").map(Number);
-    if(p.length!==3||!p[0])return String(dateText||"");
-    const d=new Date(p[0],p[1]-1,p[2]);
-    const w=["日","月","火","水","木","金","土"];
-    return `${p[0]}年${p[1]}月${p[2]}日(${w[d.getDay()]})`;
-  }
-
-  function pageHtml(imageUrl, overlays){
-    return `
-      <section class="sheet">
-        <img class="base" src="${e(imageUrl)}">
-        ${overlays.join("")}
-      </section>`;
-  }
-
-  function textAt(cls, value){
-    return `<div class="fill ${cls}">${e(value)}</div>`;
-  }
-
-  function openQuestionnaire(r, mode="FULL"){
-    const w=window.open("","_blank");
-    if(!w){
-      alert("印刷画面を開けませんでした。ブラウザのポップアップを許可してください。");
-      return;
-    }
-
-    const base=new URL("./assets/", location.href);
-    const front=new URL("tour-questionnaire-front.png",base).href;
-    const back=new URL("tour-questionnaire-back.png",base).href;
-
-    const fullAddress =
-      String(r.address||"").trim() ||
-      `${String(r.prefecture||"").trim()}${String(r.city||"").trim()}${String(r.address_detail||"").trim()}`;
-
-    const dateText=jpDate(r.date||r.reservation_date);
-    const timeText=`${String(r.start_time||"")} - ${String(r.end_time||"")}`;
-
-    const addressOnly =
-      String(mode||"").toUpperCase()==="ADDRESS_ONLY";
-
-    const frontOverlays=[
-      textAt("front-name", addressOnly ? "" : (r.customer_name||"")),
-      textAt("front-postal", postal(r.postal_code)),
-      textAt("front-address", fullAddress),
-      textAt("front-phone", addressOnly ? "" : (r.customer_phone||"")),
-      textAt("front-email", addressOnly ? "" : (r.customer_email||"")),
-      textAt("front-booking", `${dateText} ${timeText}`)
-    ];
-
-    const backOverlays=[
-      textAt("back-date", dateText.replace(/\(.+?\)$/,"")),
-      textAt("back-name", addressOnly ? "" : (r.customer_name||""))
-    ];
-
-    w.document.open();
-    w.document.write(`<!doctype html>
-<html lang="ja">
-<head>
-<meta charset="utf-8">
-<title>${String(mode||"").toUpperCase()==="ADDRESS_ONLY" ? "同伴者用アンケート（住所のみ）" : "店内見学アンケート"} - ${e(r.customer_name||"")}</title>
-<style>
-  *{box-sizing:border-box}
-  html,body{margin:0;background:#d8d8d8;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Yu Gothic","Meiryo",sans-serif}
-  .toolbar{position:sticky;top:0;z-index:20;background:#111;color:#fff;padding:12px;text-align:center}
-  .toolbar button{border:0;border-radius:8px;padding:11px 22px;font-size:16px;font-weight:800;cursor:pointer}
-  .sheet{position:relative;width:210mm;height:297mm;margin:10mm auto;background:#fff;overflow:hidden;page-break-after:always}
-  .sheet:last-child{page-break-after:auto}
-  .base{position:absolute;inset:0;width:100%;height:100%;object-fit:fill}
-  .fill{position:absolute;z-index:3;color:#111;white-space:nowrap;font-size:10.5pt;line-height:1.2}
-  .front-name{left:21.2%;top:13.8%;font-size:11pt}
-  .front-postal{left:16.1%;top:17.05%;font-size:10.5pt}
-  .front-address{left:16.1%;top:19.15%;font-size:10.5pt;max-width:58%;white-space:normal}
-  .front-phone{left:22.8%;top:22.42%;font-size:10.5pt}
-  .front-email{left:22.0%;top:25.55%;font-size:10.2pt}
-  .front-booking{left:8.3%;top:87.55%;font-size:10.3pt}
-  .back-date{left:35.0%;top:82.2%;font-size:10.5pt}
-  .back-name{left:56.0%;top:82.2%;font-size:10.5pt}
-  @media print{
-    html,body{background:#fff}
-    .toolbar{display:none!important}
-    .sheet{margin:0;width:210mm;height:297mm}
-    @page{size:A4 portrait;margin:0}
-  }
-</style>
-</head>
-<body>
-<div class="toolbar"><button onclick="window.print()">印刷する</button></div>
-${pageHtml(front,frontOverlays)}
-${pageHtml(back,backOverlays)}
-</body></html>`);
-    w.document.close();
-  }
-
-  function enhance(d){
+  function orderedReservations(d){
     const reservations=Array.isArray(d?.reservations)?d.reservations:[];
     const shifts=Array.isArray(d?.shifts)?d.shifts:[];
     const staffCodes=[...new Set([
       ...shifts.map(x=>x.staff_code),
       ...reservations.map(x=>x.staff_code)
     ].filter(Boolean))];
-
     const ordered=[];
     staffCodes.forEach(code=>{
       reservations
         .filter(x=>x.staff_code===code)
-        .sort((a,b)=>String(a.start_time).localeCompare(String(b.start_time)))
+        .sort((a,b)=>String(a.start_time||"").localeCompare(String(b.start_time||"")))
         .forEach(r=>ordered.push(r));
     });
+    return ordered;
+  }
 
+  function decodeBase64Pdf(base64){
+    const binary=atob(base64);
+    const bytes=new Uint8Array(binary.length);
+    for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+    return new Blob([bytes],{type:"application/pdf"});
+  }
+
+  function closeModal(){
+    document.querySelector(".tour-print-overlay")?.remove();
+  }
+
+  function openPrintModal(r){
+    closeModal();
+    injectStyles();
+
+    const overlay=document.createElement("div");
+    overlay.className="tour-print-overlay";
+    overlay.innerHTML=`
+      <div class="tour-print-modal" role="dialog" aria-modal="true" aria-label="アンケート閲覧・印刷">
+        <div class="tour-print-head">
+          <h2>店内見学アンケート</h2>
+          <p>転記内容を選択してPDFを作成します。</p>
+        </div>
+        <div class="tour-print-body">
+          <div class="tour-print-reservation">
+            <strong>${escapeHtml(r.customer_name||"見学者")}</strong><br>
+            ${escapeHtml(r.date||r.reservation_date||"")} ${escapeHtml(r.start_time||"")}〜${escapeHtml(r.end_time||"")}
+          </div>
+          <div class="tour-print-options">
+            <label class="tour-print-option">
+              <input type="radio" name="tourPrintMode" value="FULL" checked>
+              <span><strong>全部</strong><small>氏名・郵便番号・住所・電話番号・メールアドレス・見学日時を転記</small></span>
+            </label>
+            <label class="tour-print-option">
+              <input type="radio" name="tourPrintMode" value="ADDRESS_ONLY">
+              <span><strong>住所のみ</strong><small>郵便番号・住所・見学日時のみ転記。氏名・電話番号・メールは空欄</small></span>
+            </label>
+            <label class="tour-print-option">
+              <input type="radio" name="tourPrintMode" value="BLANK">
+              <span><strong>すべて空欄</strong><small>予約情報を一切転記せず、原本のまま出力</small></span>
+            </label>
+          </div>
+          <div class="tour-print-duplex">印刷設定：A4／両面印刷／長辺とじ<br>PDFは表面・裏面の2ページで生成されます。</div>
+          <div class="tour-print-message" id="tourPrintMessage"></div>
+        </div>
+        <div class="tour-print-actions">
+          <button type="button" class="ghost-button" id="tourPrintCancel">閉じる</button>
+          <button type="button" class="primary-button" id="tourPrintGenerate">PDFを作成して閲覧・印刷</button>
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+    overlay.addEventListener("click",e=>{if(e.target===overlay)closeModal()});
+    overlay.querySelector("#tourPrintCancel").onclick=closeModal;
+
+    overlay.querySelector("#tourPrintGenerate").onclick=async()=>{
+      const btn=overlay.querySelector("#tourPrintGenerate");
+      const msg=overlay.querySelector("#tourPrintMessage");
+      const mode=overlay.querySelector('input[name="tourPrintMode"]:checked')?.value||"FULL";
+
+      // 先に空タブを開き、非同期処理後もポップアップブロックされないようにする。
+      const preview=window.open("about:blank","_blank");
+      if(preview){
+        preview.document.write('<p style="font-family:sans-serif;padding:24px">PDFを作成しています…</p>');
+      }
+
+      btn.disabled=true;
+      btn.textContent="PDF作成中…";
+      msg.textContent="";
+
+      try{
+        if(typeof apiGet!=="function")throw new Error("管理画面APIを利用できません。");
+        const j=await apiGet(PRINT_ACTION,{
+          reservation_id:r.reservation_id,
+          print_mode:mode
+        });
+        const data=j.data||{};
+        if(!data.base64)throw new Error("PDFデータを取得できませんでした。");
+
+        const blob=decodeBase64Pdf(data.base64);
+        const url=URL.createObjectURL(blob);
+
+        if(preview){
+          preview.location.href=url;
+        }else{
+          window.open(url,"_blank");
+        }
+
+        // PDF Viewerが読み込む時間を確保してから解放。
+        setTimeout(()=>URL.revokeObjectURL(url),5*60*1000);
+        msg.style.color="#067647";
+        msg.textContent="PDFを生成しました。印刷時は「両面・長辺とじ」を選択してください。";
+      }catch(err){
+        if(preview)preview.close();
+        msg.style.color="#b42318";
+        msg.textContent=err.message||"PDFの生成に失敗しました。";
+      }finally{
+        btn.disabled=false;
+        btn.textContent="PDFを作成して閲覧・印刷";
+      }
+    };
+  }
+
+  function enhanceStaffSchedule(d){
+    injectStyles();
+    const ordered=orderedReservations(d);
     const rows=[...document.querySelectorAll("#staffScheduleBoard .staff-reservation-row")];
+
     rows.forEach((row,i)=>{
       const r=ordered[i];
-      if(!r || String(r.service_code||"").toUpperCase()!=="TOUR")return;
-      if(row.querySelector(".tour-questionnaire-button"))return;
+      if(!r||String(r.service_code||"").toUpperCase()!=="TOUR")return;
+      if(row.querySelector(".tour-print-button"))return;
 
-      const actions=document.createElement("span");
-      actions.className="tour-questionnaire-actions";
-      actions.style.display="inline-flex";
-      actions.style.gap="8px";
-      actions.style.marginLeft="10px";
-      actions.style.flexWrap="wrap";
-
-      const b=document.createElement("button");
-      b.type="button";
-      b.className="ghost-button tour-questionnaire-button";
-      b.textContent="本人用アンケート";
-      b.onclick=(ev)=>{
-        ev.preventDefault();
-        ev.stopPropagation();
-        openQuestionnaire(r, "FULL");
+      const button=document.createElement("button");
+      button.type="button";
+      button.className="ghost-button tour-print-button";
+      button.textContent="アンケート閲覧・印刷";
+      button.onclick=e=>{
+        e.preventDefault();
+        e.stopPropagation();
+        openPrintModal(r);
       };
-
-      const family=document.createElement("button");
-      family.type="button";
-      family.className="ghost-button tour-questionnaire-button";
-      family.textContent="同伴者用（住所のみ）";
-      family.onclick=(ev)=>{
-        ev.preventDefault();
-        ev.stopPropagation();
-        openQuestionnaire(r, "ADDRESS_ONLY");
-      };
-
-      actions.appendChild(b);
-      actions.appendChild(family);
-      row.appendChild(actions);
+      row.appendChild(button);
     });
   }
 
-  const boot=()=>{
+  function boot(){
+    injectStyles();
     if(typeof window.renderStaffSchedule!=="function"){
       setTimeout(boot,200);
       return;
     }
-    if(window.__tourQuestionnaireWrapped)return;
-    window.__tourQuestionnaireWrapped=true;
+    if(window.__tourPrintV29Installed)return;
+    window.__tourPrintV29Installed=true;
 
     const original=window.renderStaffSchedule;
     window.renderStaffSchedule=function(d){
       const result=original.apply(this,arguments);
-      setTimeout(()=>enhance(d),0);
+      setTimeout(()=>enhanceStaffSchedule(d),0);
       return result;
     };
-
-    if(window.state?.staffSchedule){
-      setTimeout(()=>enhance(window.state.staffSchedule),0);
-    }
-  };
+  }
 
   boot();
 })();
