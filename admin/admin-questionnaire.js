@@ -156,7 +156,7 @@
         </div>
         <div class="tour-print-actions">
           <button type="button" class="ghost-button" id="tourPrintCancel">閉じる</button>
-          <button type="button" class="primary-button" id="tourPrintGenerate">PDFを作成して閲覧・印刷</button>
+          <button type="button" class="primary-button" id="tourPrintGenerate">アンケートを表示</button>
         </div>
       </div>`;
 
@@ -204,7 +204,7 @@
           !completed
         ){
           btn.disabled=false;
-          btn.textContent="PDFを作成して閲覧・印刷";
+          btn.textContent="アンケートを表示";
         }
       }
     };
