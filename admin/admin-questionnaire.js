@@ -1,6 +1,6 @@
 /**
  * A-nauts OS Reserve
- * 店内見学 UI v32.1
+ * 店内見学 UI v34.1
  *
  * TOUR予約行に「アンケート閲覧・印刷」を追加。
  * ラジオボタン:
@@ -99,6 +99,24 @@
     document.querySelector(".tour-print-overlay")?.remove();
   }
 
+  function finishPrintModal_(overlay){
+    const msg=overlay?.querySelector("#tourPrintMessage");
+    if(msg){
+      msg.style.color="#067647";
+      msg.textContent="PDF作成完了しました。";
+    }
+
+    const btn=overlay?.querySelector("#tourPrintGenerate");
+    if(btn){
+      btn.disabled=true;
+      btn.textContent="作成完了";
+    }
+
+    setTimeout(()=>{
+      closeModal();
+    },1200);
+  }
+
   function openPrintModal(r){
     closeModal();
     injectStyles();
@@ -174,27 +192,16 @@
           window.open(fileUrl,"_blank","noopener");
         }
 
-        const folderUrl=String(data.folder_url||"").trim();
-        const driveFolder=String(data.drive_folder||"A-nauts OS Reserve / TourQuestionnaireTemp").trim();
-
-        msg.style.color="#067647";
-        msg.innerHTML=
-          `<div class="tour-save-result">`+
-          `<strong>PDFをGoogle Driveへ保存しました。</strong>`+
-          `保存先：${escapeHtml(driveFolder)}<br>`+
-          `<a href="${escapeHtml(fileUrl)}" target="_blank" rel="noopener">PDFを開く</a>`+
-          (folderUrl
-            ? `<a href="${escapeHtml(folderUrl)}" target="_blank" rel="noopener">保存フォルダを開く</a>`
-            : ``)+
-          `<br>印刷時は「両面・長辺とじ」を選択してください。`+
-          `</div>`;
+        finishPrintModal_(overlay);
       }catch(err){
         if(preview)preview.close();
         msg.style.color="#b42318";
         msg.textContent=err.message||"PDFの生成に失敗しました。";
       }finally{
-        btn.disabled=false;
-        btn.textContent="PDFを作成して閲覧・印刷";
+        if(document.body.contains(overlay) && btn.textContent!=="作成完了"){
+          btn.disabled=false;
+          btn.textContent="PDFを作成して閲覧・印刷";
+        }
       }
     };
   }
