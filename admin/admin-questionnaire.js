@@ -1,6 +1,6 @@
 /**
  * A-nauts OS Reserve
- * 店内見学アンケート UI v29
+ * 店内見学 UI v31
  *
  * TOUR予約行に「アンケート閲覧・印刷」を追加。
  * ラジオボタン:
@@ -12,6 +12,7 @@
   "use strict";
 
   const PRINT_ACTION = "generateTourQuestionnairePdf";
+  const REPLY_ACTION = "sendTourCustomerReply";
 
   function escapeHtml(v){
     return String(v ?? "")
@@ -45,8 +46,20 @@
       .tour-print-message{min-height:20px;margin-top:10px;color:#b42318;font-size:13px}
       .tour-print-actions{display:flex;justify-content:flex-end;gap:10px;padding:14px 22px 20px}
       .tour-print-actions button{min-height:42px}
+      .tour-info-box{margin-top:10px;padding:10px 12px;border-radius:10px;background:#f8fafc;border:1px solid #e3e8ef;font-size:13px;line-height:1.6}
+      .tour-info-box strong{display:block;margin-bottom:3px;font-size:12px;color:#475467}
+      .tour-row-actions{display:inline-flex;gap:7px;align-items:center;margin-left:10px;flex-wrap:wrap}
+      .tour-mail-button{width:38px;height:38px;min-width:38px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;font-size:18px;line-height:1;padding:0}
+      .tour-question-inline{width:100%;margin-top:8px;padding:9px 11px;border-left:3px solid #98a2b3;background:#f8fafc;border-radius:0 8px 8px 0;font-size:12px;line-height:1.55;color:#344054}
+      .tour-question-inline strong{color:#101828}
+      .tour-reply-textarea{width:100%;min-height:170px;resize:vertical;padding:12px;border:1px solid #d0d5dd;border-radius:10px;font:inherit;line-height:1.65}
+      .tour-reply-subject{width:100%;padding:11px 12px;border:1px solid #d0d5dd;border-radius:10px;font:inherit}
+      .tour-reply-label{display:block;margin:14px 0 6px;font-size:13px;font-weight:700}
       @media(max-width:680px){
-        .tour-print-button{margin-left:0;margin-top:8px;width:100%}
+        .tour-print-button{margin-left:0}
+        .tour-row-actions{margin-left:0;margin-top:8px;width:100%}
+        .tour-row-actions .tour-print-button{flex:1}
+        .tour-question-inline{margin-top:8px}
         .tour-print-modal{border-radius:14px}
         .tour-print-actions{flex-direction:column-reverse}
         .tour-print-actions button{width:100%}
@@ -72,12 +85,6 @@
     return ordered;
   }
 
-  function decodeBase64Pdf(base64){
-    const binary=atob(base64);
-    const bytes=new Uint8Array(binary.length);
-    for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
-    return new Blob([bytes],{type:"application/pdf"});
-  }
 
   function closeModal(){
     document.querySelector(".tour-print-overlay")?.remove();
@@ -149,21 +156,18 @@
           print_mode:mode
         });
         const data=j.data||{};
-        if(!data.base64)throw new Error("PDFデータを取得できませんでした。");
-
-        const blob=decodeBase64Pdf(data.base64);
-        const url=URL.createObjectURL(blob);
+        const fileUrl=String(data.file_url||"").trim();
+        if(!fileUrl)throw new Error("保存済みPDFのURLを取得できませんでした。");
 
         if(preview){
-          preview.location.href=url;
+          preview.location.replace(fileUrl);
         }else{
-          window.open(url,"_blank");
+          window.open(fileUrl,"_blank","noopener");
         }
 
-        // PDF Viewerが読み込む時間を確保してから解放。
-        setTimeout(()=>URL.revokeObjectURL(url),5*60*1000);
         msg.style.color="#067647";
-        msg.textContent="PDFを生成しました。印刷時は「両面・長辺とじ」を選択してください。";
+        msg.textContent=
+          "PDFをGoogle Driveへ保存しました。印刷時は「両面・長辺とじ」を選択してください。";
       }catch(err){
         if(preview)preview.close();
         msg.style.color="#b42318";
@@ -171,6 +175,98 @@
       }finally{
         btn.disabled=false;
         btn.textContent="PDFを作成して閲覧・印刷";
+      }
+    };
+  }
+
+
+  function defaultReplySubject(){
+    return "【The Forest Gym 八千代緑が丘店】店内見学について";
+  }
+
+  function defaultReplyBody(r){
+    const name=String(r?.customer_name||"").trim();
+    return `${name ? name+" 様" : "お客様"}\n\nお問い合わせありがとうございます。\n\n\nThe Forest Gym 八千代緑が丘店`;
+  }
+
+  function openReplyModal(r){
+    closeModal();
+    injectStyles();
+
+    const overlay=document.createElement("div");
+    overlay.className="tour-print-overlay";
+    overlay.innerHTML=`
+      <div class="tour-print-modal" role="dialog" aria-modal="true" aria-label="見学者へメール返信">
+        <div class="tour-print-head">
+          <h2>見学者へメール返信</h2>
+          <p>info@theforestgym.com から送信します。</p>
+        </div>
+        <div class="tour-print-body">
+          <div class="tour-print-reservation">
+            <strong>${escapeHtml(r.customer_name||"見学者")}</strong><br>
+            ${escapeHtml(r.customer_email||"メールアドレス未登録")}
+          </div>
+          <div class="tour-info-box">
+            <strong>見学フォームの質問・ご要望</strong>
+            ${escapeHtml(r.note||"なし").replace(/\n/g,"<br>")}
+          </div>
+          <label class="tour-reply-label" for="tourReplySubject">件名</label>
+          <input id="tourReplySubject" class="tour-reply-subject" type="text" value="${escapeHtml(defaultReplySubject())}">
+          <label class="tour-reply-label" for="tourReplyBody">本文</label>
+          <textarea id="tourReplyBody" class="tour-reply-textarea">${escapeHtml(defaultReplyBody(r))}</textarea>
+          <div class="tour-print-message" id="tourReplyMessage"></div>
+        </div>
+        <div class="tour-print-actions">
+          <button type="button" class="ghost-button" id="tourReplyCancel">閉じる</button>
+          <button type="button" class="primary-button" id="tourReplySend">送信する</button>
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+    overlay.addEventListener("click",e=>{if(e.target===overlay)closeModal()});
+    overlay.querySelector("#tourReplyCancel").onclick=closeModal;
+
+    overlay.querySelector("#tourReplySend").onclick=async()=>{
+      const btn=overlay.querySelector("#tourReplySend");
+      const msg=overlay.querySelector("#tourReplyMessage");
+      const subject=overlay.querySelector("#tourReplySubject").value.trim();
+      const body=overlay.querySelector("#tourReplyBody").value.trim();
+
+      if(!r.customer_email){
+        msg.textContent="見学者のメールアドレスがありません。";
+        return;
+      }
+      if(!subject){
+        msg.textContent="件名を入力してください。";
+        return;
+      }
+      if(!body){
+        msg.textContent="本文を入力してください。";
+        return;
+      }
+
+      btn.disabled=true;
+      btn.textContent="送信中…";
+      msg.style.color="#475467";
+      msg.textContent="メールを送信しています…";
+
+      try{
+        if(typeof apiPost!=="function")throw new Error("管理画面APIを利用できません。");
+        await apiPost({
+          action:REPLY_ACTION,
+          reservation_id:r.reservation_id,
+          subject,
+          body
+        });
+        msg.style.color="#067647";
+        msg.textContent="送信完了しました。";
+        btn.textContent="送信完了";
+        setTimeout(closeModal,900);
+      }catch(err){
+        msg.style.color="#b42318";
+        msg.textContent=err.message||"メール送信に失敗しました。";
+        btn.disabled=false;
+        btn.textContent="送信する";
       }
     };
   }
@@ -185,16 +281,40 @@
       if(!r||String(r.service_code||"").toUpperCase()!=="TOUR")return;
       if(row.querySelector(".tour-print-button"))return;
 
+      const actions=document.createElement("span");
+      actions.className="tour-row-actions";
+
       const button=document.createElement("button");
       button.type="button";
       button.className="ghost-button tour-print-button";
-      button.textContent="アンケート閲覧・印刷";
+      button.textContent="アンケート";
       button.onclick=e=>{
         e.preventDefault();
         e.stopPropagation();
         openPrintModal(r);
       };
-      row.appendChild(button);
+
+      const mail=document.createElement("button");
+      mail.type="button";
+      mail.className="ghost-button tour-mail-button";
+      mail.textContent="✉";
+      mail.title="見学者へメール返信";
+      mail.setAttribute("aria-label","見学者へメール返信");
+      mail.onclick=e=>{
+        e.preventDefault();
+        e.stopPropagation();
+        openReplyModal(r);
+      };
+
+      actions.appendChild(button);
+      actions.appendChild(mail);
+      row.appendChild(actions);
+
+      const question=document.createElement("div");
+      question.className="tour-question-inline";
+      question.innerHTML=
+        `<strong>質問・ご要望：</strong> ${escapeHtml(r.note||"なし").replace(/\n/g,"<br>")}`;
+      row.appendChild(question);
     });
   }
 
@@ -204,8 +324,8 @@
       setTimeout(boot,200);
       return;
     }
-    if(window.__tourPrintV29Installed)return;
-    window.__tourPrintV29Installed=true;
+    if(window.__tourUiV31Installed)return;
+    window.__tourUiV31Installed=true;
 
     const original=window.renderStaffSchedule;
     window.renderStaffSchedule=function(d){
