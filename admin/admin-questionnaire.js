@@ -1,6 +1,6 @@
 /**
  * A-nauts OS Reserve
- * 店内見学 UI v31.1
+ * 店内見学 UI v32.1
  *
  * TOUR予約行に「アンケート閲覧・印刷」を追加。
  * ラジオボタン:
@@ -52,6 +52,12 @@
       .tour-mail-button{width:38px;height:38px;min-width:38px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;font-size:18px;line-height:1;padding:0}
       .tour-question-inline{width:100%;margin-top:8px;padding:9px 11px;border-left:3px solid #98a2b3;background:#f8fafc;border-radius:0 8px 8px 0;font-size:12px;line-height:1.55;color:#344054}
       .tour-question-inline strong{color:#101828}
+      .tour-inquiry-status{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;font-size:12px}
+      .tour-status-badge{display:inline-flex;align-items:center;border-radius:999px;padding:4px 9px;font-weight:800}
+      .tour-status-pending{background:#fff1f2;color:#b42318;border:1px solid #fecdd3}
+      .tour-status-done{background:#ecfdf3;color:#067647;border:1px solid #abefc6}
+      .tour-status-handler{color:#475467}
+      .tour-status-button{min-height:32px;padding:5px 10px;font-size:12px}
       .tour-reply-textarea{width:100%;min-height:170px;resize:vertical;padding:12px;border:1px solid #d0d5dd;border-radius:10px;font:inherit;line-height:1.65}
       .tour-reply-subject{width:100%;padding:11px 12px;border:1px solid #d0d5dd;border-radius:10px;font:inherit}
       .tour-reply-label{display:block;margin:14px 0 6px;font-size:13px;font-weight:700}
@@ -270,7 +276,10 @@
           action:REPLY_ACTION,
           reservation_id:r.reservation_id,
           subject,
-          body
+          body,
+          handler_code:currentHandler().code,
+          handler_name:currentHandler().name,
+          handler_email:currentHandler().email
         });
         msg.style.color="#067647";
         msg.textContent="送信完了しました。";
@@ -282,6 +291,51 @@
         btn.disabled=false;
         btn.textContent="送信する";
       }
+    };
+  }
+
+
+  function currentHandler(){
+    const u=window.state?.authUser || (typeof state!=="undefined" ? state.authUser : null) || {};
+    return {
+      code:String(u.staff_code||u.staffCode||u.email||"").trim(),
+      name:String(u.display_name||u.staff_name||u.name||u.email||"").trim(),
+      email:String(u.email||"").trim()
+    };
+  }
+
+  async function changeInquiryStatus(r, nextStatus, container){
+    const h=currentHandler();
+    const btn=container.querySelector(".tour-status-button");
+    if(btn){btn.disabled=true;btn.textContent="更新中…";}
+    try{
+      const j=await apiPost({
+        action:"setTourInquiryStatus",
+        reservation_id:r.reservation_id,
+        inquiry_status:nextStatus,
+        handler_code:h.code,
+        handler_name:h.name,
+        handler_email:h.email
+      });
+      Object.assign(r,j.data||{});
+      renderInquiryStatus(r,container);
+    }catch(err){
+      alert(err.message||"対応状況の更新に失敗しました。");
+      if(btn)btn.disabled=false;
+    }
+  }
+
+  function renderInquiryStatus(r, container){
+    const done=String(r.inquiry_status||"PENDING").toUpperCase()==="DONE";
+    const name=String(r.inquiry_handled_by_name||r.inquiry_handled_by||"").trim();
+    container.innerHTML=`
+      <span class="tour-status-badge ${done?"tour-status-done":"tour-status-pending"}">${done?"対応済":"未済"}</span>
+      ${done && name ? `<span class="tour-status-handler">対応者：${escapeHtml(name)}</span>` : ``}
+      <button type="button" class="ghost-button tour-status-button">${done?"未済に戻す":"対応済みにする"}</button>
+    `;
+    container.querySelector(".tour-status-button").onclick=e=>{
+      e.preventDefault();e.stopPropagation();
+      changeInquiryStatus(r,done?"PENDING":"DONE",container);
     };
   }
 
@@ -329,6 +383,11 @@
       question.innerHTML=
         `<strong>質問・ご要望：</strong> ${escapeHtml(r.note||"なし").replace(/\n/g,"<br>")}`;
       row.appendChild(question);
+
+      const inquiry=document.createElement("div");
+      inquiry.className="tour-inquiry-status";
+      renderInquiryStatus(r,inquiry);
+      row.appendChild(inquiry);
     });
   }
 
