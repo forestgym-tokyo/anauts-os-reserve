@@ -1,6 +1,6 @@
 /**
  * A-nauts OS Reserve
- * 店内見学 UI v31
+ * 店内見学 UI v31.1
  *
  * TOUR予約行に「アンケート閲覧・印刷」を追加。
  * ラジオボタン:
@@ -55,6 +55,9 @@
       .tour-reply-textarea{width:100%;min-height:170px;resize:vertical;padding:12px;border:1px solid #d0d5dd;border-radius:10px;font:inherit;line-height:1.65}
       .tour-reply-subject{width:100%;padding:11px 12px;border:1px solid #d0d5dd;border-radius:10px;font:inherit}
       .tour-reply-label{display:block;margin:14px 0 6px;font-size:13px;font-weight:700}
+      .tour-save-result{margin-top:12px;padding:12px 14px;border-radius:10px;background:#f0fdf4;border:1px solid #bbf7d0;font-size:13px;line-height:1.65}
+      .tour-save-result strong{display:block;margin-bottom:4px}
+      .tour-save-result a{display:inline-block;margin-right:12px;font-weight:700;text-decoration:underline}
       @media(max-width:680px){
         .tour-print-button{margin-left:0}
         .tour-row-actions{margin-left:0;margin-top:8px;width:100%}
@@ -165,9 +168,20 @@
           window.open(fileUrl,"_blank","noopener");
         }
 
+        const folderUrl=String(data.folder_url||"").trim();
+        const driveFolder=String(data.drive_folder||"A-nauts OS Reserve / TourQuestionnaireTemp").trim();
+
         msg.style.color="#067647";
-        msg.textContent=
-          "PDFをGoogle Driveへ保存しました。印刷時は「両面・長辺とじ」を選択してください。";
+        msg.innerHTML=
+          `<div class="tour-save-result">`+
+          `<strong>PDFをGoogle Driveへ保存しました。</strong>`+
+          `保存先：${escapeHtml(driveFolder)}<br>`+
+          `<a href="${escapeHtml(fileUrl)}" target="_blank" rel="noopener">PDFを開く</a>`+
+          (folderUrl
+            ? `<a href="${escapeHtml(folderUrl)}" target="_blank" rel="noopener">保存フォルダを開く</a>`
+            : ``)+
+          `<br>印刷時は「両面・長辺とじ」を選択してください。`+
+          `</div>`;
       }catch(err){
         if(preview)preview.close();
         msg.style.color="#b42318";
@@ -324,8 +338,8 @@
       setTimeout(boot,200);
       return;
     }
-    if(window.__tourUiV31Installed)return;
-    window.__tourUiV31Installed=true;
+    if(window.__tourUiV311Installed)return;
+    window.__tourUiV311Installed=true;
 
     const original=window.renderStaffSchedule;
     window.renderStaffSchedule=function(d){
