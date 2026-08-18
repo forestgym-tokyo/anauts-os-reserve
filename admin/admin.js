@@ -1,4 +1,4 @@
-// BUILD: 20260818-hide-cancelled-reservations-v41
+// BUILD: 20260818-logout-message-v49
 const API_URL="https://script.google.com/macros/s/AKfycbyvpQRxRpMRfpaQHtBar77dViCqPl-hdFW-2yMdozhN8RHtwcrFiNEM9cvEbny4x9q0/exec";
 const state={staff:[],stores:[],services:[],serviceHours:[],presenceWeekdays:[],presenceSpecials:[],selectedServiceCode:"",selectedStaffCode:"",shiftRows:[],shiftPreview:null,staffScheduleDate:"",staffSchedule:null,trainerScheduleDate:"",trainerSchedule:null,myShiftMonth:"",myShiftDate:"",myShiftRows:[],myShiftRequests:[],authUser:null,idToken:""};
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
@@ -95,11 +95,24 @@ async function doLogin(e){
   }
 }
 function logout(){
-  state.idToken=""; state.authUser=null;
+  state.idToken="";
+  state.authUser=null;
   sessionStorage.removeItem("anauts_id_token");
+
   if(authEnabled()){
     $("#authUserArea")?.classList.add("is-hidden");
     $("#loginGate")?.classList.remove("is-hidden");
+
+    const emailInput=$("#loginEmail");
+    const passwordInput=$("#loginPassword");
+
+    if(emailInput)emailInput.value="";
+    if(passwordInput)passwordInput.value="";
+
+    showLoginMessage(
+      "ログアウトしました。",
+      false
+    );
   }
 }
 $("#loginForm")?.addEventListener("submit",doLogin);
