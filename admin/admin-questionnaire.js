@@ -166,15 +166,10 @@
       const msg=overlay.querySelector("#tourPrintMessage");
       const mode=overlay.querySelector('input[name="tourPrintMode"]:checked')?.value||"FULL";
 
-      // 先に空タブを開き、非同期処理後もポップアップブロックされないようにする。
-      const preview=window.open("about:blank","_blank");
-      if(preview){
-        preview.document.write('<p style="font-family:sans-serif;padding:24px">PDFを作成しています…</p>');
-      }
-
       btn.disabled=true;
       btn.textContent="PDF作成中…";
-      msg.textContent="";
+      msg.style.color="#475467";
+      msg.textContent="PDFを作成しています…";
 
       try{
         if(typeof apiGet!=="function")throw new Error("管理画面APIを利用できません。");
@@ -186,27 +181,21 @@
         const fileUrl=String(data.file_url||"").trim();
         if(!fileUrl)throw new Error("保存済みPDFのURLを取得できませんでした。");
 
-        // PDF生成が成功した時点で、先に管理UIを完了状態へ戻す。
-        // Drive画面への遷移成否にUI状態を依存させない。
+        // 成功したら管理UIを必ず完了状態へ戻す。
         finishPrintModal_(overlay);
 
-        if(preview){
-          try{
-            preview.document.body.innerHTML=
-              '<p style="font-family:sans-serif;padding:24px">PDF作成完了しました。PDFを開いています…</p>';
-          }catch(e){}
-          preview.location.href=fileUrl;
-        }else{
-          const link=document.createElement("a");
-          link.href=fileUrl;
-          link.target="_blank";
-          link.rel="noopener";
-          document.body.appendChild(link);
-          link.click();
-          link.remove();
-        }
+        // 空の待機タブは作らない。
+        // PDFは生成完了後に直接開くため、
+        // 「PDFを作成しています…」だけのタブが残り続けることはない。
+        const link=document.createElement("a");
+        link.href=fileUrl;
+        link.target="_blank";
+        link.rel="noopener";
+        link.style.display="none";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
       }catch(err){
-        if(preview)preview.close();
         msg.style.color="#b42318";
         msg.textContent=err.message||"PDFの生成に失敗しました。";
       }finally{
