@@ -174,6 +174,8 @@
       msg.style.color="#475467";
       msg.textContent="PDFを作成しています…";
 
+      let completed=false;
+
       try{
         if(typeof apiGet!=="function")throw new Error("管理画面APIを利用できません。");
         const j=await apiGet(PRINT_ACTION,{
@@ -191,15 +193,18 @@
           overlay,
           fileUrl
         );
+
+        completed=true;
       }catch(err){
         msg.style.color="#b42318";
         msg.textContent=err.message||"PDFの生成に失敗しました。";
       }finally{
-        if(document.body.contains(overlay)){
-          if(btn.textContent!=="作成完了"){
-            btn.disabled=false;
-            btn.textContent="PDFを作成して閲覧・印刷";
-          }
+        if(
+          document.body.contains(overlay) &&
+          !completed
+        ){
+          btn.disabled=false;
+          btn.textContent="PDFを作成して閲覧・印刷";
         }
       }
     };
