@@ -99,7 +99,7 @@
     document.querySelector(".tour-print-overlay")?.remove();
   }
 
-  function finishPrintModal_(overlay){
+  function finishPrintModal_(overlay,fileUrl){
     const msg=overlay?.querySelector("#tourPrintMessage");
     if(msg){
       msg.style.color="#067647";
@@ -108,13 +108,16 @@
 
     const btn=overlay?.querySelector("#tourPrintGenerate");
     if(btn){
-      btn.disabled=true;
-      btn.textContent="作成完了";
+      btn.disabled=false;
+      btn.textContent="アンケートを開く";
+      btn.onclick=()=>{
+        window.open(
+          fileUrl,
+          "_blank",
+          "noopener"
+        );
+      };
     }
-
-    setTimeout(()=>{
-      closeModal();
-    },1200);
   }
 
   function openPrintModal(r){
@@ -181,20 +184,13 @@
         const fileUrl=String(data.file_url||"").trim();
         if(!fileUrl)throw new Error("保存済みPDFのURLを取得できませんでした。");
 
-        // 成功したら管理UIを必ず完了状態へ戻す。
-        finishPrintModal_(overlay);
-
-        // 空の待機タブは作らない。
-        // PDFは生成完了後に直接開くため、
-        // 「PDFを作成しています…」だけのタブが残り続けることはない。
-        const link=document.createElement("a");
-        link.href=fileUrl;
-        link.target="_blank";
-        link.rel="noopener";
-        link.style.display="none";
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
+        // 成功後も同じUIを残し、
+        // 「アンケートを開く」ボタンからPDFを開く。
+        // 自動で別タブは開かない。
+        finishPrintModal_(
+          overlay,
+          fileUrl
+        );
       }catch(err){
         msg.style.color="#b42318";
         msg.textContent=err.message||"PDFの生成に失敗しました。";
