@@ -186,21 +186,35 @@
         const fileUrl=String(data.file_url||"").trim();
         if(!fileUrl)throw new Error("保存済みPDFのURLを取得できませんでした。");
 
-        if(preview){
-          preview.location.replace(fileUrl);
-        }else{
-          window.open(fileUrl,"_blank","noopener");
-        }
-
+        // PDF生成が成功した時点で、先に管理UIを完了状態へ戻す。
+        // Drive画面への遷移成否にUI状態を依存させない。
         finishPrintModal_(overlay);
+
+        if(preview){
+          try{
+            preview.document.body.innerHTML=
+              '<p style="font-family:sans-serif;padding:24px">PDF作成完了しました。PDFを開いています…</p>';
+          }catch(e){}
+          preview.location.href=fileUrl;
+        }else{
+          const link=document.createElement("a");
+          link.href=fileUrl;
+          link.target="_blank";
+          link.rel="noopener";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+        }
       }catch(err){
         if(preview)preview.close();
         msg.style.color="#b42318";
         msg.textContent=err.message||"PDFの生成に失敗しました。";
       }finally{
-        if(document.body.contains(overlay) && btn.textContent!=="作成完了"){
-          btn.disabled=false;
-          btn.textContent="PDFを作成して閲覧・印刷";
+        if(document.body.contains(overlay)){
+          if(btn.textContent!=="作成完了"){
+            btn.disabled=false;
+            btn.textContent="PDFを作成して閲覧・印刷";
+          }
         }
       }
     };
