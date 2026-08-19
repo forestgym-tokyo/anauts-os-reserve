@@ -41,7 +41,7 @@ const ROUTES = {
   },
   "training-support": {
     title: "トレーニングサポート",
-    lead: "会員向けトレーニングサポート（45分）のご予約です。",
+    lead: "会員様向けトレーニングサポート（45分）のご予約です。",
     mode: "FIXED",
     serviceCode: "TRAINING_SUPPORT45"
   },
@@ -281,70 +281,192 @@ function getCustomerNameParts_() {
   };
 }
 
+
+function isCustomerNameRequired_(serviceCode, customerType) {
+  const code = String(serviceCode || "").toUpperCase();
+  const type = String(customerType || "").toUpperCase();
+
+  // 会員向けで氏名入力を不要にするサービス
+  if ([
+    "TRAINING_SUPPORT45",
+    "PROCEDURE",
+    "UNSUBSCRIBE",
+    "MEAL_PLANNING"
+  ].includes(code)) {
+    return false;
+  }
+
+  // ダイエット無料カウンセリング
+  // 会員：氏名入力不要 / 非会員：氏名入力必須
+  if (code === "COUNSEL") {
+    return type !== "MEMBER";
+  }
+
+  // 店内見学・パーソナル等は従来どおり
+  return true;
+}
+
+function setCustomerNameVisible_(visible) {
+  el.nameField?.classList.add("is-hidden");
+
+  const splitNameField =
+    document.querySelector("#splitNameField");
+
+  splitNameField?.classList.toggle(
+    "is-hidden",
+    !visible
+  );
+
+  if (el.customerLastName) {
+    el.customerLastName.required = !!visible;
+  }
+
+  if (el.customerFirstName) {
+    el.customerFirstName.required = !!visible;
+  }
+}
+
+function getCurrentCustomerType_(formType) {
+  const normalized =
+    String(formType || "").toUpperCase();
+
+  if (normalized === "BOTH") {
+    return document.querySelector(
+      'input[name="customer_type"]:checked'
+    )?.value || "";
+  }
+
+  return normalized;
+}
+
+
 function configureCustomerForm() {
   ensureSplitNameFields_();
 
-  const formType = String(selectedService?.form_type || "").toUpperCase();
-  const code = String(selectedService?.service_code || "").toUpperCase();
+  const formType =
+    String(
+      selectedService?.form_type || ""
+    ).toUpperCase();
 
-  const isTour = code === "TOUR";
-  const isCounsel = code === "COUNSEL";
-  const isTrainingSupport = code === "TRAINING_SUPPORT45";
+  const code =
+    String(
+      selectedService?.service_code || ""
+    ).toUpperCase();
 
-  // トレーニングサポートは会員専用。住所は不要。
+  const isTour =
+    code === "TOUR";
+
+  const isCounsel =
+    code === "COUNSEL";
+
+  const isTrainingSupport =
+    code === "TRAINING_SUPPORT45";
+
+  // トレーニングサポートは会員専用
   if (isTrainingSupport) {
-    el.customerTypeField?.classList.add("is-hidden");
-    el.memberNoField?.classList.remove("is-hidden");
-    el.nameField?.classList.add("is-hidden");
-    document.querySelector("#splitNameField")?.classList.remove("is-hidden");
-    el.phoneField?.classList.add("is-hidden");
+    el.customerTypeField?.classList.add(
+      "is-hidden"
+    );
+
+    el.memberNoField?.classList.remove(
+      "is-hidden"
+    );
+
+    setCustomerNameVisible_(false);
+
+    el.phoneField?.classList.add(
+      "is-hidden"
+    );
+
     setAddressFieldsVisible_(false);
+
     configureMemberNumberInput_();
+
     return;
   }
 
-  el.customerTypeField?.classList.toggle("is-hidden", formType !== "BOTH");
-  el.memberNoField?.classList.toggle("is-hidden", formType === "VISITOR");
-  el.nameField?.classList.add("is-hidden");
-  document.querySelector("#splitNameField")?.classList.remove("is-hidden");
+  el.customerTypeField?.classList.toggle(
+    "is-hidden",
+    formType !== "BOTH"
+  );
 
-  // 店内見学は常に住所必須。
+  el.memberNoField?.classList.toggle(
+    "is-hidden",
+    formType === "VISITOR"
+  );
+
+  const initialCustomerType =
+    getCurrentCustomerType_(formType);
+
+  setCustomerNameVisible_(
+    isCustomerNameRequired_(
+      code,
+      initialCustomerType
+    )
+  );
+
+  // 店内見学は従来どおり住所必須
   if (isTour) {
     setAddressFieldsVisible_(true);
+
   } else if (isCounsel) {
-    // カウンセリングは会員番号が入ったら住所欄を消す。
-    setAddressFieldsVisible_(!hasCounselMemberNo_());
+    // カウンセリングは会員なら住所不要、非会員なら住所必須
+    setAddressFieldsVisible_(
+      initialCustomerType !== "MEMBER"
+    );
+
   } else {
     setAddressFieldsVisible_(false);
   }
 
   configureMemberNumberInput_();
 
-  document.querySelectorAll('input[name="customer_type"]').forEach((radio) => {
-    radio.onchange = () => {
-      el.memberNoField?.classList.toggle("is-hidden", radio.value !== "MEMBER");
-      el.nameField?.classList.add("is-hidden");
-      document.querySelector("#splitNameField")?.classList.remove("is-hidden");
+  document
+    .querySelectorAll(
+      'input[name="customer_type"]'
+    )
+    .forEach((radio) => {
 
-      if (isCounsel) {
-        setAddressFieldsVisible_(radio.value !== "MEMBER" && !hasCounselMemberNo_());
-      }
-    };
-  });
+      radio.onchange = () => {
+        const customerType =
+          radio.value;
+
+        el.memberNoField?.classList.toggle(
+          "is-hidden",
+          customerType !== "MEMBER"
+        );
+
+        setCustomerNameVisible_(
+          isCustomerNameRequired_(
+            code,
+            customerType
+          )
+        );
+
+        if (isCounsel) {
+          setAddressFieldsVisible_(
+            customerType !== "MEMBER"
+          );
+        }
+      };
+    });
 
   if (el.memberNo) {
     el.memberNo.oninput = () => {
-      el.memberNo.value = el.memberNo.value.replace(/\D/g, "");
-
-      if (isCounsel) {
-        setAddressFieldsVisible_(!hasCounselMemberNo_());
-      }
+      el.memberNo.value =
+        el.memberNo.value.replace(
+          /\D/g,
+          ""
+        );
     };
   }
 
   if (el.postalCode) {
-    el.postalCode.oninput = handlePostalCodeInput_;
-    el.postalCode.onblur = handlePostalCodeInput_;
+    el.postalCode.oninput =
+      handlePostalCodeInput_;
+
+    el.postalCode.onblur =
+      handlePostalCodeInput_;
   }
 }
 
@@ -655,10 +777,16 @@ async function submitReservation(event) {
 
   const memberNo = el.memberNo.value.trim();
   const nameParts = getCustomerNameParts_();
-  const name = nameParts.fullName;
   const email = el.customerEmail.value.trim();
   const phone = el.customerPhone.value.trim();
   const serviceCode = String(selectedService.service_code || "").toUpperCase();
+  const nameRequired = isCustomerNameRequired_(
+    serviceCode,
+    customerType
+  );
+  const name = nameRequired
+    ? nameParts.fullName
+    : "";
   const isTour = serviceCode === "TOUR";
   const isCounsel = serviceCode === "COUNSEL";
   const isTrainingSupport = serviceCode === "TRAINING_SUPPORT45";
@@ -674,12 +802,18 @@ async function submitReservation(event) {
     return;
   }
 
-  if (!nameParts.lastName) {
+  if (
+    nameRequired &&
+    !nameParts.lastName
+  ) {
     showError("姓を入力してください。");
     return;
   }
 
-  if (!nameParts.firstName) {
+  if (
+    nameRequired &&
+    !nameParts.firstName
+  ) {
     showError("名を入力してください。");
     return;
   }
@@ -729,8 +863,14 @@ async function submitReservation(event) {
       customer_type: customerType,
       member_no: memberNo,
       customer_name: name,
-      customer_last_name: nameParts.lastName,
-      customer_first_name: nameParts.firstName,
+      customer_last_name:
+        nameRequired
+          ? nameParts.lastName
+          : "",
+      customer_first_name:
+        nameRequired
+          ? nameParts.firstName
+          : "",
       customer_email: email,
       customer_phone: phone,
       postal_code: needsAddress ? addressParts.postalCode : "",
