@@ -23,13 +23,13 @@ const ROUTES = {
   },
   counsel: {
     title: "ダイエットカウンセリング",
-    lead: "会員・非会員どちらもご予約いただけます。",
+    lead: "会員様・非会員様どちらもご予約いただけます。",
     mode: "FIXED",
     serviceCode: "COUNSEL"
   },
   procedure: {
     title: "各種手続き",
-    lead: "会員向け手続きのご来店予約です。",
+    lead: "会員様向け手続きのご来店予約です。",
     mode: "FIXED",
     serviceCode: "PROCEDURE"
   },
@@ -474,12 +474,13 @@ function configureMemberNumberInput_() {
   if (!el.memberNo) return;
 
   el.memberNo.setAttribute("inputmode", "numeric");
-  el.memberNo.setAttribute("pattern", "[0-9]*");
+  el.memberNo.setAttribute("pattern", "[0-9]{6}");
+  el.memberNo.setAttribute("maxlength", "6");
   el.memberNo.setAttribute("autocomplete", "off");
 }
 
 function hasCounselMemberNo_() {
-  return /^\d+$/.test(String(el.memberNo?.value || "").trim());
+  return /^\d{6}$/.test(String(el.memberNo?.value || "").trim());
 }
 
 function setAddressFieldsVisible_(visible) {
@@ -797,8 +798,8 @@ async function submitReservation(event) {
     return;
   }
 
-  if ((customerType === "MEMBER" || isTrainingSupport) && !/^\d+$/.test(memberNo)) {
-    showError("会員番号は数字のみで入力してください。");
+  if ((customerType === "MEMBER" || isTrainingSupport) && !/^\d{6}$/.test(memberNo)) {
+    showError("会員番号は6桁の数字で入力してください。");
     return;
   }
 
@@ -830,7 +831,7 @@ async function submitReservation(event) {
 
   const needsAddress =
     isTour ||
-    (isCounsel && !/^\d+$/.test(memberNo));
+    (isCounsel && !/^\d{6}$/.test(memberNo));
 
   if (needsAddress) {
     if (!/^\d{7}$/.test(addressParts.postalCode)) {

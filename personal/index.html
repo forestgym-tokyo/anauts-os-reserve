@@ -55,15 +55,40 @@
       <fieldset id="customerTypeField" class="field is-hidden">
         <legend>会員区分</legend>
         <div class="choice-row">
-          <label><input type="radio" name="customer_type" value="MEMBER"> 会員</label>
-          <label><input type="radio" name="customer_type" value="VISITOR"> 非会員</label>
+          <label><input type="radio" name="customer_type" value="MEMBER"> 会員様</label>
+          <label><input type="radio" name="customer_type" value="VISITOR"> 非会員様</label>
         </div>
       </fieldset>
 
-      <label id="memberNoField" class="field is-hidden">
-        <span>会員番号</span>
-        <input id="memberNo" type="text" placeholder="例：108035">
-      </label>
+      <div id="memberNoField" class="field is-hidden">
+        <label for="memberNo">
+          <span>会員番号</span>
+        </label>
+        <input
+          id="memberNo"
+          type="text"
+          inputmode="numeric"
+          maxlength="6"
+          placeholder="6桁の数字のみ"
+        >
+        <a
+          href="https://forestgym-tokyo.github.io/tfg-member-id-lookup/"
+          target="_blank"
+          rel="noopener noreferrer"
+          style="
+            display:inline-block;
+            margin-top:10px;
+            padding:9px 14px;
+            border:1px solid #178447;
+            border-radius:8px;
+            color:#178447;
+            background:#ffffff;
+            text-decoration:none;
+            font-size:13px;
+            font-weight:700;
+          "
+        >会員番号が不明の場合</a>
+      </div>
 
       <label id="nameField" class="field is-hidden">
         <span>氏名</span>
