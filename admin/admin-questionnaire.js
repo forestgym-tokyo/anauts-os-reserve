@@ -1,6 +1,6 @@
 /**
  * A-nauts OS Reserve
- * 店内見学 / ダイエット無料カウンセリング非会員 UI v35
+ * 店内見学 / ダイエット無料カウンセリング非会員 UI v36
  *
  * 対象:
  * - TOUR
@@ -31,10 +31,20 @@
   }
 
   function isCounselVisitorReservation_(r){
-    return (
-      serviceCodeOf_(r)==="COUNSEL" &&
-      customerTypeOf_(r)==="VISITOR"
-    );
+    if(serviceCodeOf_(r)!=="COUNSEL")return false;
+
+    const type=customerTypeOf_(r);
+    const memberNo=String(r?.member_no||"").trim();
+
+    /*
+     * COUNSEL非会員判定を堅牢化。
+     * getStaffScheduleでcustomer_typeがVISITORなら確定。
+     * 旧データ等でcustomer_typeが空でも、会員番号が空なら非会員として扱う。
+     * MEMBERは必ず除外する。
+     */
+    if(type==="MEMBER")return false;
+    if(type==="VISITOR")return true;
+    return !memberNo;
   }
 
   function isQuestionnaireTarget_(r){
@@ -469,8 +479,8 @@
       setTimeout(boot,200);
       return;
     }
-    if(window.__questionnaireUiV35Installed)return;
-    window.__questionnaireUiV35Installed=true;
+    if(window.__questionnaireUiV36Installed)return;
+    window.__questionnaireUiV36Installed=true;
 
     const original=window.renderStaffSchedule;
     window.renderStaffSchedule=function(d){
