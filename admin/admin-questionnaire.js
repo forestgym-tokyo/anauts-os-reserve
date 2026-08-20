@@ -1,12 +1,8 @@
 /**
  * A-nauts OS Reserve
- * 店内見学 / ダイエット無料カウンセリング非会員 UI v38
+ * 店内見学 UI v32.1
  *
- * 対象:
- * - TOUR
- * - COUNSEL かつ customer_type=VISITOR
- *
- * 対象予約行に「アンケート」を追加。
+ * TOUR予約行に「アンケート閲覧・印刷」を追加。
  * ラジオボタン:
  * - 全部
  * - 住所のみ
@@ -26,186 +22,25 @@
     return String(r?.customer_type||"").toUpperCase();
   }
 
-  function isTourReservation_(r){
+  function isTour_(r){
     return serviceCodeOf_(r)==="TOUR";
   }
 
-  function isCounselVisitorReservation_(r){
+  function isCounselVisitor_(r){
     if(serviceCodeOf_(r)!=="COUNSEL")return false;
 
     const type=customerTypeOf_(r);
     const memberNo=String(r?.member_no||"").trim();
 
-    /*
-     * COUNSEL非会員判定を堅牢化。
-     * getStaffScheduleでcustomer_typeがVISITORなら確定。
-     * 旧データ等でcustomer_typeが空でも、会員番号が空なら非会員として扱う。
-     * MEMBERは必ず除外する。
-     */
     if(type==="MEMBER")return false;
     if(type==="VISITOR")return true;
+
+    // 既存予約でcustomer_typeが空の場合の互換
     return !memberNo;
   }
 
   function isQuestionnaireTarget_(r){
-    return (
-      isTourReservation_(r) ||
-      isCounselVisitorReservation_(r)
-    );
-  }
-
-  function questionnaireTitle_(r){
-    return isCounselVisitorReservation_(r)
-      ? "ダイエット無料カウンセリング／非会員様アンケート"
-      : "店内見学アンケート";
-  }
-
-  function questionnairePersonLabel_(r){
-    return isCounselVisitorReservation_(r)
-      ? "カウンセリング予約者"
-      : "見学者";
-  }
-
-  function questionnaireDateLabel_(r){
-    return isCounselVisitorReservation_(r)
-      ? "カウンセリング日時"
-      : "見学日時";
-  }
-
-
-  function buildCounselVisitorQuestionnaireHtml_(r){
-    const esc=escapeHtml;
-    const name=esc(r?.customer_name||"");
-    const postal=esc(r?.postal_code||"");
-    const prefecture=esc(r?.prefecture||"");
-    const city=esc(r?.city||"");
-    const detail=esc(r?.address_detail||"");
-    const phone=esc(r?.customer_phone||"");
-    const email=esc(r?.customer_email||"");
-    const date=esc(r?.date||r?.reservation_date||"");
-    const start=esc(r?.start_time||"");
-    const end=esc(r?.end_time||"");
-    const address=`${prefecture}${city}${detail}`;
-
-    return `<!doctype html>
-<html lang="ja">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ダイエット無料カウンセリング／非会員様アンケート</title>
-<style>
-@page{size:A4;margin:9mm}
-*{box-sizing:border-box}
-body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;color:#111;background:#eef1f4}
-.toolbar{position:sticky;top:0;z-index:20;padding:10px;background:#111827;text-align:center}
-.toolbar button{border:0;border-radius:8px;background:#178447;color:#fff;font-weight:800;font-size:15px;padding:11px 24px;cursor:pointer}
-.sheet{width:210mm;min-height:297mm;margin:12px auto;background:#fff;padding:9mm;box-shadow:0 4px 20px rgba(0,0,0,.15)}
-h1{font-size:18px;text-align:center;margin:0 0 8px}
-h2{font-size:15px;margin:10px 0 5px}
-.sub{text-align:center;font-size:11px;margin-bottom:8px}
-table{width:100%;border-collapse:collapse;font-size:11px}
-th,td{border:1px solid #555;padding:5px 6px;vertical-align:top}
-th{width:24%;background:#f2f4f7;text-align:left}
-.q{border:1px solid #555;border-top:0;padding:7px 8px;font-size:11px;line-height:1.55}
-.q:first-of-type{border-top:1px solid #555}
-.line{display:inline-block;min-width:110px;border-bottom:1px solid #555;height:15px}
-.check{white-space:nowrap;margin-right:12px}
-.office{margin-top:8px;border:1px solid #555;padding:6px;font-size:10px}
-.medical td:first-child{width:78%}
-.medical td:last-child{width:22%;white-space:nowrap}
-.page2{page-break-before:always}
-.note{font-size:10px;line-height:1.5}
-@media print{
-  body{background:#fff}
-  .toolbar{display:none!important}
-  .sheet{margin:0;box-shadow:none;width:auto;min-height:0;padding:0}
-  .page2{page-break-before:always}
-}
-</style>
-</head>
-<body>
-<div class="toolbar"><button onclick="window.print()">印刷する</button></div>
-
-<section class="sheet">
-<h1>WEBご入会者アンケート＆登録用紙</h1>
-<div class="sub">ダイエット無料カウンセリング（非会員様）</div>
-
-<table>
-<tr><th>お名前</th><td>${name ? name+" 様" : ""}</td><th>性別</th><td>男・女</td></tr>
-<tr><th>ふりがな</th><td></td><th>生年月日（西暦）</th><td>　　　　年　　月　　日　　年齢　　歳</td></tr>
-<tr><th>ご住所</th><td colspan="3">〒 ${postal}<br>${address}</td></tr>
-<tr><th>お電話番号</th><td>${phone}</td><th>ご紹介者</th><td></td></tr>
-<tr><th>メールアドレス</th><td colspan="3">${email}</td></tr>
-</table>
-
-<h2>以下のアンケートにお答えください。</h2>
-<div class="q"><strong>① 当ジムを何でお知りになりましたか？</strong><br>
-1．新聞折込　2．ちらし　3．通りがかり　4．ホットペッパービューティー　5．マイプレ<br>
-6．ホームページ　7．インスタグラム　8．駅看板　9．その他<br>
-9を選択の方、ご記載お願いします。 <span class="line"></span></div>
-
-<div class="q"><strong>② 現在、ジムに通っていますか？</strong><br>
-1．はい　2．以前通っていた　3．通ったことがない<br>
-1の方、どのような形態のジムですか<br>
-1．総合型（プール、スタジオ有）　2．24時間型　3．パーソナル　4．その他</div>
-
-<div class="q"><strong>③ ジムを検討されている目的は何ですか？</strong><br>
-1．健康維持　2．体力強化　3．スタイル改善　4．その他（　　　　　　　　　　　）</div>
-
-<div class="q"><strong>④ ジムを選ぶ際に重要視している点は何ですか？</strong><br>
-1．口コミ　2．価格　3．営業時間・アクセスの良さ　4．設備　5．ご質問・その他<br>
-4の方、どのような設備ですか？ <span class="line"></span><br>
-5の方、具体的に教えてください。その他ご要望等<br><br><br></div>
-
-<div class="office"><strong>弊社使用欄</strong>　ダイエット無料カウンセリング　
-${date} ${start}${end ? " - "+end : ""}　受付 □　確認 □</div>
-</section>
-
-<section class="sheet page2">
-<h1>会員登録書</h1>
-<h2>●メディカルチェック（該当する方へ✓を入れて下さい）</h2>
-<table class="medical">
-<tr><td>医師から、脳卒中（脳出血、脳梗塞等）にかかっているといわれたり、治療を受けたことがありますか？</td><td>□はい　□いいえ</td></tr>
-<tr><td>医師から、心臓病（狭心症、心筋梗塞等）にかかっているといわれたり、治療を受けたことがありますか？</td><td>□はい　□いいえ</td></tr>
-<tr><td>医師から、慢性の腎不全にかかっているといわれたり、治療（人工透析）を受けたことがありますか？</td><td>□はい　□いいえ</td></tr>
-<tr><td>医師から貧血と言われたことがありますか？</td><td>□はい　□いいえ</td></tr>
-<tr><td>これまで長く通院していたとか、入院手術をした病気はありませんか？<br>「はい」の場合、病名を記載してください。<br>（病名：　　　　　　　　　　　　　　　　　　　　　　　　　）</td><td>□はい　□いいえ</td></tr>
-<tr><td>＜女性の方のみ＞現在、妊娠中ですか？</td><td>□はい　□いいえ</td></tr>
-<tr><td>最近お身体で気になることはありますか？<br>「はい」の場合、内容を記載してください。<br>（内容：　　　　　　　　　　　　　　　　　　　　　　　　　）</td><td>□はい　□いいえ</td></tr>
-</table>
-<p class="note">※「はい」がある方は、必要に応じて医師への確認をおすすめします。</p>
-
-<h2>●緊急連絡先</h2>
-<table>
-<tr><th>お名前</th><td></td><th>ご関係</th><td></td></tr>
-<tr><th>お電話番号</th><td colspan="3"></td></tr>
-</table>
-
-<h2>公式LINE登録（任意）</h2>
-<p class="note">The Forest Gym公式LINEアカウントでは、健康に関する情報、マシントレーニングに関する情報などを不定期でお届けします。　□ご登録済</p>
-
-<h2>入会申込み</h2>
-<p class="note">The Forest Gymにおける入会規則について同意し、会員になることを申し込みます。</p>
-<table>
-<tr><th>会員№</th><td></td><th>日付</th><td>2026／　　／　　</td></tr>
-<tr><th>お名前</th><td colspan="3"></td></tr>
-<tr><th>プラン</th><td colspan="3"></td></tr>
-</table>
-<div class="office"><strong>弊社使用欄</strong>　受付 □　確認 □</div>
-</section>
-</body>
-</html>`;
-  }
-
-  function openCounselVisitorQuestionnaire_(r){
-    const win=window.open("","_blank");
-    if(!win){
-      throw new Error("ブラウザのポップアップがブロックされています。");
-    }
-    win.document.open();
-    win.document.write(buildCounselVisitorQuestionnaireHtml_(r));
-    win.document.close();
-    try{win.focus();}catch(e){}
+    return isTour_(r)||isCounselVisitor_(r);
   }
 
   function escapeHtml(v){
@@ -293,87 +128,7 @@ ${date} ${start}${end ? " - "+end : ""}　受付 □　確認 □</div>
     document.querySelector(".tour-print-overlay")?.remove();
   }
 
-  function finishPrintModal_(overlay,fileUrl){
-    const msg=overlay?.querySelector("#tourPrintMessage");
-    if(msg){
-      msg.style.color="#067647";
-      msg.textContent="PDF作成完了しました。";
-    }
-
-    const btn=overlay?.querySelector("#tourPrintGenerate");
-    if(btn){
-      btn.disabled=false;
-      btn.textContent="アンケートを開く";
-      btn.onclick=()=>{
-        window.open(
-          fileUrl,
-          "_blank",
-          "noopener"
-        );
-      };
-    }
-  }
-
-  function openCounselQuestionnaireModal_(r){
-    closeModal();
-    injectStyles();
-
-    const overlay=document.createElement("div");
-    overlay.className="tour-print-overlay";
-
-    const html=buildCounselVisitorQuestionnaireHtml_(r);
-
-    overlay.innerHTML=`
-      <div class="tour-print-modal" style="width:min(1100px,98vw);height:94vh;display:flex;flex-direction:column;" role="dialog" aria-modal="true">
-        <div class="tour-print-head" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
-          <div>
-            <h2 style="margin:0;">ダイエット無料カウンセリング／非会員様アンケート</h2>
-            <p style="margin:4px 0 0;">A4・2ページで表示します。</p>
-          </div>
-          <div style="display:flex;gap:8px;">
-            <button type="button" class="ghost-button" id="counselQuestionnaireClose">閉じる</button>
-            <button type="button" class="primary-button" id="counselQuestionnairePrint">印刷する</button>
-          </div>
-        </div>
-        <iframe
-          id="counselQuestionnaireFrame"
-          title="ダイエット無料カウンセリング非会員様アンケート"
-          style="flex:1;width:100%;border:0;background:#eef1f4;"
-        ></iframe>
-      </div>`;
-
-    document.body.appendChild(overlay);
-
-    const frame=overlay.querySelector("#counselQuestionnaireFrame");
-    frame.srcdoc=html;
-
-    overlay.querySelector("#counselQuestionnaireClose").onclick=closeModal;
-    overlay.querySelector("#counselQuestionnairePrint").onclick=()=>{
-      try{
-        frame.contentWindow.focus();
-        frame.contentWindow.print();
-      }catch(err){
-        alert("印刷画面を開けませんでした。");
-      }
-    };
-
-    overlay.addEventListener("click",e=>{
-      if(e.target===overlay)closeModal();
-    });
-  }
-
-
   function openPrintModal(r){
-    /*
-     * COUNSELでアンケートボタンが表示されている予約は
-     * PDF生成APIを一切呼ばない。
-     * 同一画面のモーダル内へ直接アンケートを表示する。
-     */
-    if(serviceCodeOf_(r)==="COUNSEL"){
-      openCounselQuestionnaireModal_(r);
-      return;
-    }
-
     closeModal();
     injectStyles();
 
@@ -382,22 +137,22 @@ ${date} ${start}${end ? " - "+end : ""}　受付 □　確認 □</div>
     overlay.innerHTML=`
       <div class="tour-print-modal" role="dialog" aria-modal="true" aria-label="アンケート閲覧・印刷">
         <div class="tour-print-head">
-          <h2>${escapeHtml(questionnaireTitle_(r))}</h2>
+          <h2>${isCounselVisitor_(r) ? "ダイエット無料カウンセリング アンケート" : "店内見学アンケート"}</h2>
           <p>転記内容を選択してPDFを作成します。</p>
         </div>
         <div class="tour-print-body">
           <div class="tour-print-reservation">
-            <strong>${escapeHtml(r.customer_name||questionnairePersonLabel_(r))}</strong><br>
+            <strong>${escapeHtml(r.customer_name||(isCounselVisitor_(r) ? "カウンセリング予約者" : "見学者"))}</strong><br>
             ${escapeHtml(r.date||r.reservation_date||"")} ${escapeHtml(r.start_time||"")}〜${escapeHtml(r.end_time||"")}
           </div>
           <div class="tour-print-options">
             <label class="tour-print-option">
               <input type="radio" name="tourPrintMode" value="FULL" checked>
-              <span><strong>全部</strong><small>氏名・郵便番号・住所・電話番号・メールアドレス・${escapeHtml(questionnaireDateLabel_(r))}を転記</small></span>
+              <span><strong>全部</strong><small>氏名・郵便番号・住所・電話番号・メールアドレス・予約日時を転記</small></span>
             </label>
             <label class="tour-print-option">
               <input type="radio" name="tourPrintMode" value="ADDRESS_ONLY">
-              <span><strong>住所のみ</strong><small>郵便番号・住所・${escapeHtml(questionnaireDateLabel_(r))}のみ転記。氏名・電話番号・メールは空欄</small></span>
+              <span><strong>住所のみ</strong><small>郵便番号・住所・予約日時のみ転記。氏名・電話番号・メールは空欄</small></span>
             </label>
             <label class="tour-print-option">
               <input type="radio" name="tourPrintMode" value="BLANK">
@@ -409,7 +164,7 @@ ${date} ${start}${end ? " - "+end : ""}　受付 □　確認 □</div>
         </div>
         <div class="tour-print-actions">
           <button type="button" class="ghost-button" id="tourPrintCancel">閉じる</button>
-          <button type="button" class="primary-button" id="tourPrintGenerate">アンケートを表示</button>
+          <button type="button" class="primary-button" id="tourPrintGenerate">PDFを作成して閲覧・印刷</button>
         </div>
       </div>`;
 
@@ -422,47 +177,53 @@ ${date} ${start}${end ? " - "+end : ""}　受付 □　確認 □</div>
       const msg=overlay.querySelector("#tourPrintMessage");
       const mode=overlay.querySelector('input[name="tourPrintMode"]:checked')?.value||"FULL";
 
+      // 先に空タブを開き、非同期処理後もポップアップブロックされないようにする。
+      const preview=window.open("about:blank","_blank");
+      if(preview){
+        preview.document.write('<p style="font-family:sans-serif;padding:24px">PDFを作成しています…</p>');
+      }
+
       btn.disabled=true;
       btn.textContent="PDF作成中…";
-      msg.style.color="#475467";
-      msg.textContent="PDFを作成しています…";
-
-      let completed=false;
+      msg.textContent="";
 
       try{
         if(typeof apiGet!=="function")throw new Error("管理画面APIを利用できません。");
         const j=await apiGet(PRINT_ACTION,{
           reservation_id:r.reservation_id,
-          print_mode:mode,
-          questionnaire_source:
-            isCounselVisitorReservation_(r)
-              ? "COUNSEL_VISITOR"
-              : "TOUR"
+          print_mode:mode
         });
         const data=j.data||{};
         const fileUrl=String(data.file_url||"").trim();
         if(!fileUrl)throw new Error("保存済みPDFのURLを取得できませんでした。");
 
-        // 成功後も同じUIを残し、
-        // 「アンケートを開く」ボタンからPDFを開く。
-        // 自動で別タブは開かない。
-        finishPrintModal_(
-          overlay,
-          fileUrl
-        );
+        if(preview){
+          preview.location.replace(fileUrl);
+        }else{
+          window.open(fileUrl,"_blank","noopener");
+        }
 
-        completed=true;
+        const folderUrl=String(data.folder_url||"").trim();
+        const driveFolder=String(data.drive_folder||"A-nauts OS Reserve / TourQuestionnaireTemp").trim();
+
+        msg.style.color="#067647";
+        msg.innerHTML=
+          `<div class="tour-save-result">`+
+          `<strong>PDFをGoogle Driveへ保存しました。</strong>`+
+          `保存先：${escapeHtml(driveFolder)}<br>`+
+          `<a href="${escapeHtml(fileUrl)}" target="_blank" rel="noopener">PDFを開く</a>`+
+          (folderUrl
+            ? `<a href="${escapeHtml(folderUrl)}" target="_blank" rel="noopener">保存フォルダを開く</a>`
+            : ``)+
+          `<br>印刷時は「両面・長辺とじ」を選択してください。`+
+          `</div>`;
       }catch(err){
+        if(preview)preview.close();
         msg.style.color="#b42318";
         msg.textContent=err.message||"PDFの生成に失敗しました。";
       }finally{
-        if(
-          document.body.contains(overlay) &&
-          !completed
-        ){
-          btn.disabled=false;
-          btn.textContent="アンケートを表示";
-        }
+        btn.disabled=false;
+        btn.textContent="PDFを作成して閲覧・印刷";
       }
     };
   }
@@ -623,44 +384,34 @@ ${date} ${start}${end ? " - "+end : ""}　受付 □　確認 □</div>
       const button=document.createElement("button");
       button.type="button";
       button.className="ghost-button tour-print-button";
-      button.textContent=serviceCodeOf_(r)==="COUNSEL" ? "アンケートを表示" : "アンケート";
-      button.title=serviceCodeOf_(r)==="COUNSEL" ? "COUNSELアンケート v38" : "店内見学アンケート";
+      button.textContent="アンケート";
       button.onclick=e=>{
         e.preventDefault();
         e.stopPropagation();
-
-        if(serviceCodeOf_(r)==="COUNSEL"){
-          openCounselQuestionnaireModal_(r);
-          return;
-        }
-
         openPrintModal(r);
+      };
+
+      const mail=document.createElement("button");
+      mail.type="button";
+      mail.className="ghost-button tour-mail-button";
+      mail.textContent="✉";
+      mail.title="見学者へメール返信";
+      mail.setAttribute("aria-label","見学者へメール返信");
+      mail.onclick=e=>{
+        e.preventDefault();
+        e.stopPropagation();
+        openReplyModal(r);
       };
 
       actions.appendChild(button);
 
-      if(isTourReservation_(r)){
-        const mail=document.createElement("button");
-        mail.type="button";
-        mail.className="ghost-button tour-mail-button";
-        mail.textContent="✉";
-        mail.title="見学者へメール返信";
-        mail.setAttribute("aria-label","見学者へメール返信");
-        mail.onclick=e=>{
-          e.preventDefault();
-          e.stopPropagation();
-          openReplyModal(r);
-        };
+      if(isTour_(r)){
         actions.appendChild(mail);
       }
 
       row.appendChild(actions);
 
-      /*
-       * 見学専用の「質問・ご要望」「対応済み」は
-       * COUNSELには追加しない。
-       */
-      if(isTourReservation_(r)){
+      if(isTour_(r)){
         const question=document.createElement("div");
         question.className="tour-question-inline";
         question.innerHTML=
@@ -681,8 +432,8 @@ ${date} ${start}${end ? " - "+end : ""}　受付 □　確認 □</div>
       setTimeout(boot,200);
       return;
     }
-    if(window.__questionnaireUiV38Installed)return;
-    window.__questionnaireUiV38Installed=true;
+    if(window.__questionnaireUiV39Installed)return;
+    window.__questionnaireUiV39Installed=true;
 
     const original=window.renderStaffSchedule;
     window.renderStaffSchedule=function(d){
