@@ -521,7 +521,7 @@ function ensureSplitAddressFields_() {
     cityField.className = "field";
     cityField.innerHTML =
       '<span>市区町村</span>' +
-      '<input id="city" type="text" autocomplete="address-level2" placeholder="例：浦安市">';
+      '<input id="city" type="text" autocomplete="address-level2" placeholder="例：八千代市">';
     el.prefectureField.insertAdjacentElement("afterend", cityField);
     el.cityField = cityField;
     el.city = cityField.querySelector("#city");
