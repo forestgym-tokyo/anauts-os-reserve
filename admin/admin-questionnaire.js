@@ -1,8 +1,12 @@
 /**
  * A-nauts OS Reserve
- * 店内見学 UI v34.1
+ * 店内見学 / ダイエット無料カウンセリング非会員 UI v35
  *
- * TOUR予約行に「アンケート閲覧・印刷」を追加。
+ * 対象:
+ * - TOUR
+ * - COUNSEL かつ customer_type=VISITOR
+ *
+ * 対象予約行に「アンケート」を追加。
  * ラジオボタン:
  * - 全部
  * - 住所のみ
@@ -13,6 +17,50 @@
 
   const PRINT_ACTION = "generateTourQuestionnairePdf";
   const REPLY_ACTION = "sendTourCustomerReply";
+
+  function serviceCodeOf_(r){
+    return String(r?.service_code||"").toUpperCase();
+  }
+
+  function customerTypeOf_(r){
+    return String(r?.customer_type||"").toUpperCase();
+  }
+
+  function isTourReservation_(r){
+    return serviceCodeOf_(r)==="TOUR";
+  }
+
+  function isCounselVisitorReservation_(r){
+    return (
+      serviceCodeOf_(r)==="COUNSEL" &&
+      customerTypeOf_(r)==="VISITOR"
+    );
+  }
+
+  function isQuestionnaireTarget_(r){
+    return (
+      isTourReservation_(r) ||
+      isCounselVisitorReservation_(r)
+    );
+  }
+
+  function questionnaireTitle_(r){
+    return isCounselVisitorReservation_(r)
+      ? "ダイエット無料カウンセリング／非会員様アンケート"
+      : "店内見学アンケート";
+  }
+
+  function questionnairePersonLabel_(r){
+    return isCounselVisitorReservation_(r)
+      ? "カウンセリング予約者"
+      : "見学者";
+  }
+
+  function questionnaireDateLabel_(r){
+    return isCounselVisitorReservation_(r)
+      ? "カウンセリング日時"
+      : "見学日時";
+  }
 
   function escapeHtml(v){
     return String(v ?? "")
@@ -129,22 +177,22 @@
     overlay.innerHTML=`
       <div class="tour-print-modal" role="dialog" aria-modal="true" aria-label="アンケート閲覧・印刷">
         <div class="tour-print-head">
-          <h2>店内見学アンケート</h2>
+          <h2>${escapeHtml(questionnaireTitle_(r))}</h2>
           <p>転記内容を選択してPDFを作成します。</p>
         </div>
         <div class="tour-print-body">
           <div class="tour-print-reservation">
-            <strong>${escapeHtml(r.customer_name||"見学者")}</strong><br>
+            <strong>${escapeHtml(r.customer_name||questionnairePersonLabel_(r))}</strong><br>
             ${escapeHtml(r.date||r.reservation_date||"")} ${escapeHtml(r.start_time||"")}〜${escapeHtml(r.end_time||"")}
           </div>
           <div class="tour-print-options">
             <label class="tour-print-option">
               <input type="radio" name="tourPrintMode" value="FULL" checked>
-              <span><strong>全部</strong><small>氏名・郵便番号・住所・電話番号・メールアドレス・見学日時を転記</small></span>
+              <span><strong>全部</strong><small>氏名・郵便番号・住所・電話番号・メールアドレス・${escapeHtml(questionnaireDateLabel_(r))}を転記</small></span>
             </label>
             <label class="tour-print-option">
               <input type="radio" name="tourPrintMode" value="ADDRESS_ONLY">
-              <span><strong>住所のみ</strong><small>郵便番号・住所・見学日時のみ転記。氏名・電話番号・メールは空欄</small></span>
+              <span><strong>住所のみ</strong><small>郵便番号・住所・${escapeHtml(questionnaireDateLabel_(r))}のみ転記。氏名・電話番号・メールは空欄</small></span>
             </label>
             <label class="tour-print-option">
               <input type="radio" name="tourPrintMode" value="BLANK">
@@ -180,7 +228,11 @@
         if(typeof apiGet!=="function")throw new Error("管理画面APIを利用できません。");
         const j=await apiGet(PRINT_ACTION,{
           reservation_id:r.reservation_id,
-          print_mode:mode
+          print_mode:mode,
+          questionnaire_source:
+            isCounselVisitorReservation_(r)
+              ? "COUNSEL_VISITOR"
+              : "TOUR"
         });
         const data=j.data||{};
         const fileUrl=String(data.file_url||"").trim();
@@ -357,7 +409,7 @@
 
     rows.forEach((row,i)=>{
       const r=ordered[i];
-      if(!r||String(r.service_code||"").toUpperCase()!=="TOUR")return;
+      if(!r||!isQuestionnaireTarget_(r))return;
       if(row.querySelector(".tour-print-button"))return;
 
       const actions=document.createElement("span");
@@ -373,32 +425,41 @@
         openPrintModal(r);
       };
 
-      const mail=document.createElement("button");
-      mail.type="button";
-      mail.className="ghost-button tour-mail-button";
-      mail.textContent="✉";
-      mail.title="見学者へメール返信";
-      mail.setAttribute("aria-label","見学者へメール返信");
-      mail.onclick=e=>{
-        e.preventDefault();
-        e.stopPropagation();
-        openReplyModal(r);
-      };
-
       actions.appendChild(button);
-      actions.appendChild(mail);
+
+      if(isTourReservation_(r)){
+        const mail=document.createElement("button");
+        mail.type="button";
+        mail.className="ghost-button tour-mail-button";
+        mail.textContent="✉";
+        mail.title="見学者へメール返信";
+        mail.setAttribute("aria-label","見学者へメール返信");
+        mail.onclick=e=>{
+          e.preventDefault();
+          e.stopPropagation();
+          openReplyModal(r);
+        };
+        actions.appendChild(mail);
+      }
+
       row.appendChild(actions);
 
-      const question=document.createElement("div");
-      question.className="tour-question-inline";
-      question.innerHTML=
-        `<strong>質問・ご要望：</strong> ${escapeHtml(r.note||"なし").replace(/\n/g,"<br>")}`;
-      row.appendChild(question);
+      /*
+       * 見学専用の「質問・ご要望」「対応済み」は
+       * COUNSELには追加しない。
+       */
+      if(isTourReservation_(r)){
+        const question=document.createElement("div");
+        question.className="tour-question-inline";
+        question.innerHTML=
+          `<strong>質問・ご要望：</strong> ${escapeHtml(r.note||"なし").replace(/\n/g,"<br>")}`;
+        row.appendChild(question);
 
-      const inquiry=document.createElement("div");
-      inquiry.className="tour-inquiry-status";
-      renderInquiryStatus(r,inquiry);
-      row.appendChild(inquiry);
+        const inquiry=document.createElement("div");
+        inquiry.className="tour-inquiry-status";
+        renderInquiryStatus(r,inquiry);
+        row.appendChild(inquiry);
+      }
     });
   }
 
@@ -408,8 +469,8 @@
       setTimeout(boot,200);
       return;
     }
-    if(window.__tourUiV311Installed)return;
-    window.__tourUiV311Installed=true;
+    if(window.__questionnaireUiV35Installed)return;
+    window.__questionnaireUiV35Installed=true;
 
     const original=window.renderStaffSchedule;
     window.renderStaffSchedule=function(d){
