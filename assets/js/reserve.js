@@ -542,7 +542,7 @@ function ensureSplitAddressFields_() {
   if (el.postalCode) {
     el.postalCode.setAttribute("inputmode", "numeric");
     el.postalCode.setAttribute("maxlength", "8");
-    el.postalCode.setAttribute("placeholder", "例：2790012");
+    el.postalCode.setAttribute("placeholder", "2760040");
   }
 }
 
