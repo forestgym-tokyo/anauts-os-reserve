@@ -1,6 +1,6 @@
 /**
  * A-nauts OS Reserve
- * 店内見学 / ダイエット無料カウンセリング非会員 UI v37
+ * 店内見学 / ダイエット無料カウンセリング非会員 UI v38
  *
  * 対象:
  * - TOUR
@@ -314,14 +314,63 @@ ${date} ${start}${end ? " - "+end : ""}　受付 □　確認 □</div>
     }
   }
 
+  function openCounselQuestionnaireModal_(r){
+    closeModal();
+    injectStyles();
+
+    const overlay=document.createElement("div");
+    overlay.className="tour-print-overlay";
+
+    const html=buildCounselVisitorQuestionnaireHtml_(r);
+
+    overlay.innerHTML=`
+      <div class="tour-print-modal" style="width:min(1100px,98vw);height:94vh;display:flex;flex-direction:column;" role="dialog" aria-modal="true">
+        <div class="tour-print-head" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+          <div>
+            <h2 style="margin:0;">ダイエット無料カウンセリング／非会員様アンケート</h2>
+            <p style="margin:4px 0 0;">A4・2ページで表示します。</p>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button type="button" class="ghost-button" id="counselQuestionnaireClose">閉じる</button>
+            <button type="button" class="primary-button" id="counselQuestionnairePrint">印刷する</button>
+          </div>
+        </div>
+        <iframe
+          id="counselQuestionnaireFrame"
+          title="ダイエット無料カウンセリング非会員様アンケート"
+          style="flex:1;width:100%;border:0;background:#eef1f4;"
+        ></iframe>
+      </div>`;
+
+    document.body.appendChild(overlay);
+
+    const frame=overlay.querySelector("#counselQuestionnaireFrame");
+    frame.srcdoc=html;
+
+    overlay.querySelector("#counselQuestionnaireClose").onclick=closeModal;
+    overlay.querySelector("#counselQuestionnairePrint").onclick=()=>{
+      try{
+        frame.contentWindow.focus();
+        frame.contentWindow.print();
+      }catch(err){
+        alert("印刷画面を開けませんでした。");
+      }
+    };
+
+    overlay.addEventListener("click",e=>{
+      if(e.target===overlay)closeModal();
+    });
+  }
+
+
   function openPrintModal(r){
     /*
-     * COUNSEL非会員はGASのTOUR専用PDF生成を通さず、
-     * ブラウザ上で即時2ページ表示→印刷する。
-     * 「作成中のまま」「表示されない」を回避。
+     * COUNSELでアンケートボタンが表示されている予約は
+     * PDF生成APIを一切呼ばない。
+     * 同一画面のモーダル内へ直接アンケートを表示する。
      */
-    if(isCounselVisitorReservation_(r)){
-      openCounselVisitorQuestionnaire_(r);
+    if(serviceCodeOf_(r)==="COUNSEL"){
+      openCounselQuestionnaireModal_(r);
       return;
     }
 
@@ -574,10 +623,17 @@ ${date} ${start}${end ? " - "+end : ""}　受付 □　確認 □</div>
       const button=document.createElement("button");
       button.type="button";
       button.className="ghost-button tour-print-button";
-      button.textContent="アンケート";
+      button.textContent=serviceCodeOf_(r)==="COUNSEL" ? "アンケートを表示" : "アンケート";
+      button.title=serviceCodeOf_(r)==="COUNSEL" ? "COUNSELアンケート v38" : "店内見学アンケート";
       button.onclick=e=>{
         e.preventDefault();
         e.stopPropagation();
+
+        if(serviceCodeOf_(r)==="COUNSEL"){
+          openCounselQuestionnaireModal_(r);
+          return;
+        }
+
         openPrintModal(r);
       };
 
@@ -625,8 +681,8 @@ ${date} ${start}${end ? " - "+end : ""}　受付 □　確認 □</div>
       setTimeout(boot,200);
       return;
     }
-    if(window.__questionnaireUiV37Installed)return;
-    window.__questionnaireUiV37Installed=true;
+    if(window.__questionnaireUiV38Installed)return;
+    window.__questionnaireUiV38Installed=true;
 
     const original=window.renderStaffSchedule;
     window.renderStaffSchedule=function(d){
