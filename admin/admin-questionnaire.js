@@ -1,6 +1,6 @@
 /**
  * A-nauts OS Reserve
- * 店内見学 / ダイエット無料カウンセリング非会員 UI v36
+ * 店内見学 / ダイエット無料カウンセリング非会員 UI v37
  *
  * 対象:
  * - TOUR
@@ -70,6 +70,142 @@
     return isCounselVisitorReservation_(r)
       ? "カウンセリング日時"
       : "見学日時";
+  }
+
+
+  function buildCounselVisitorQuestionnaireHtml_(r){
+    const esc=escapeHtml;
+    const name=esc(r?.customer_name||"");
+    const postal=esc(r?.postal_code||"");
+    const prefecture=esc(r?.prefecture||"");
+    const city=esc(r?.city||"");
+    const detail=esc(r?.address_detail||"");
+    const phone=esc(r?.customer_phone||"");
+    const email=esc(r?.customer_email||"");
+    const date=esc(r?.date||r?.reservation_date||"");
+    const start=esc(r?.start_time||"");
+    const end=esc(r?.end_time||"");
+    const address=`${prefecture}${city}${detail}`;
+
+    return `<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ダイエット無料カウンセリング／非会員様アンケート</title>
+<style>
+@page{size:A4;margin:9mm}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;color:#111;background:#eef1f4}
+.toolbar{position:sticky;top:0;z-index:20;padding:10px;background:#111827;text-align:center}
+.toolbar button{border:0;border-radius:8px;background:#178447;color:#fff;font-weight:800;font-size:15px;padding:11px 24px;cursor:pointer}
+.sheet{width:210mm;min-height:297mm;margin:12px auto;background:#fff;padding:9mm;box-shadow:0 4px 20px rgba(0,0,0,.15)}
+h1{font-size:18px;text-align:center;margin:0 0 8px}
+h2{font-size:15px;margin:10px 0 5px}
+.sub{text-align:center;font-size:11px;margin-bottom:8px}
+table{width:100%;border-collapse:collapse;font-size:11px}
+th,td{border:1px solid #555;padding:5px 6px;vertical-align:top}
+th{width:24%;background:#f2f4f7;text-align:left}
+.q{border:1px solid #555;border-top:0;padding:7px 8px;font-size:11px;line-height:1.55}
+.q:first-of-type{border-top:1px solid #555}
+.line{display:inline-block;min-width:110px;border-bottom:1px solid #555;height:15px}
+.check{white-space:nowrap;margin-right:12px}
+.office{margin-top:8px;border:1px solid #555;padding:6px;font-size:10px}
+.medical td:first-child{width:78%}
+.medical td:last-child{width:22%;white-space:nowrap}
+.page2{page-break-before:always}
+.note{font-size:10px;line-height:1.5}
+@media print{
+  body{background:#fff}
+  .toolbar{display:none!important}
+  .sheet{margin:0;box-shadow:none;width:auto;min-height:0;padding:0}
+  .page2{page-break-before:always}
+}
+</style>
+</head>
+<body>
+<div class="toolbar"><button onclick="window.print()">印刷する</button></div>
+
+<section class="sheet">
+<h1>WEBご入会者アンケート＆登録用紙</h1>
+<div class="sub">ダイエット無料カウンセリング（非会員様）</div>
+
+<table>
+<tr><th>お名前</th><td>${name ? name+" 様" : ""}</td><th>性別</th><td>男・女</td></tr>
+<tr><th>ふりがな</th><td></td><th>生年月日（西暦）</th><td>　　　　年　　月　　日　　年齢　　歳</td></tr>
+<tr><th>ご住所</th><td colspan="3">〒 ${postal}<br>${address}</td></tr>
+<tr><th>お電話番号</th><td>${phone}</td><th>ご紹介者</th><td></td></tr>
+<tr><th>メールアドレス</th><td colspan="3">${email}</td></tr>
+</table>
+
+<h2>以下のアンケートにお答えください。</h2>
+<div class="q"><strong>① 当ジムを何でお知りになりましたか？</strong><br>
+1．新聞折込　2．ちらし　3．通りがかり　4．ホットペッパービューティー　5．マイプレ<br>
+6．ホームページ　7．インスタグラム　8．駅看板　9．その他<br>
+9を選択の方、ご記載お願いします。 <span class="line"></span></div>
+
+<div class="q"><strong>② 現在、ジムに通っていますか？</strong><br>
+1．はい　2．以前通っていた　3．通ったことがない<br>
+1の方、どのような形態のジムですか<br>
+1．総合型（プール、スタジオ有）　2．24時間型　3．パーソナル　4．その他</div>
+
+<div class="q"><strong>③ ジムを検討されている目的は何ですか？</strong><br>
+1．健康維持　2．体力強化　3．スタイル改善　4．その他（　　　　　　　　　　　）</div>
+
+<div class="q"><strong>④ ジムを選ぶ際に重要視している点は何ですか？</strong><br>
+1．口コミ　2．価格　3．営業時間・アクセスの良さ　4．設備　5．ご質問・その他<br>
+4の方、どのような設備ですか？ <span class="line"></span><br>
+5の方、具体的に教えてください。その他ご要望等<br><br><br></div>
+
+<div class="office"><strong>弊社使用欄</strong>　ダイエット無料カウンセリング　
+${date} ${start}${end ? " - "+end : ""}　受付 □　確認 □</div>
+</section>
+
+<section class="sheet page2">
+<h1>会員登録書</h1>
+<h2>●メディカルチェック（該当する方へ✓を入れて下さい）</h2>
+<table class="medical">
+<tr><td>医師から、脳卒中（脳出血、脳梗塞等）にかかっているといわれたり、治療を受けたことがありますか？</td><td>□はい　□いいえ</td></tr>
+<tr><td>医師から、心臓病（狭心症、心筋梗塞等）にかかっているといわれたり、治療を受けたことがありますか？</td><td>□はい　□いいえ</td></tr>
+<tr><td>医師から、慢性の腎不全にかかっているといわれたり、治療（人工透析）を受けたことがありますか？</td><td>□はい　□いいえ</td></tr>
+<tr><td>医師から貧血と言われたことがありますか？</td><td>□はい　□いいえ</td></tr>
+<tr><td>これまで長く通院していたとか、入院手術をした病気はありませんか？<br>「はい」の場合、病名を記載してください。<br>（病名：　　　　　　　　　　　　　　　　　　　　　　　　　）</td><td>□はい　□いいえ</td></tr>
+<tr><td>＜女性の方のみ＞現在、妊娠中ですか？</td><td>□はい　□いいえ</td></tr>
+<tr><td>最近お身体で気になることはありますか？<br>「はい」の場合、内容を記載してください。<br>（内容：　　　　　　　　　　　　　　　　　　　　　　　　　）</td><td>□はい　□いいえ</td></tr>
+</table>
+<p class="note">※「はい」がある方は、必要に応じて医師への確認をおすすめします。</p>
+
+<h2>●緊急連絡先</h2>
+<table>
+<tr><th>お名前</th><td></td><th>ご関係</th><td></td></tr>
+<tr><th>お電話番号</th><td colspan="3"></td></tr>
+</table>
+
+<h2>公式LINE登録（任意）</h2>
+<p class="note">The Forest Gym公式LINEアカウントでは、健康に関する情報、マシントレーニングに関する情報などを不定期でお届けします。　□ご登録済</p>
+
+<h2>入会申込み</h2>
+<p class="note">The Forest Gymにおける入会規則について同意し、会員になることを申し込みます。</p>
+<table>
+<tr><th>会員№</th><td></td><th>日付</th><td>2026／　　／　　</td></tr>
+<tr><th>お名前</th><td colspan="3"></td></tr>
+<tr><th>プラン</th><td colspan="3"></td></tr>
+</table>
+<div class="office"><strong>弊社使用欄</strong>　受付 □　確認 □</div>
+</section>
+</body>
+</html>`;
+  }
+
+  function openCounselVisitorQuestionnaire_(r){
+    const win=window.open("","_blank");
+    if(!win){
+      throw new Error("ブラウザのポップアップがブロックされています。");
+    }
+    win.document.open();
+    win.document.write(buildCounselVisitorQuestionnaireHtml_(r));
+    win.document.close();
+    try{win.focus();}catch(e){}
   }
 
   function escapeHtml(v){
@@ -179,6 +315,16 @@
   }
 
   function openPrintModal(r){
+    /*
+     * COUNSEL非会員はGASのTOUR専用PDF生成を通さず、
+     * ブラウザ上で即時2ページ表示→印刷する。
+     * 「作成中のまま」「表示されない」を回避。
+     */
+    if(isCounselVisitorReservation_(r)){
+      openCounselVisitorQuestionnaire_(r);
+      return;
+    }
+
     closeModal();
     injectStyles();
 
@@ -479,8 +625,8 @@
       setTimeout(boot,200);
       return;
     }
-    if(window.__questionnaireUiV36Installed)return;
-    window.__questionnaireUiV36Installed=true;
+    if(window.__questionnaireUiV37Installed)return;
+    window.__questionnaireUiV37Installed=true;
 
     const original=window.renderStaffSchedule;
     window.renderStaffSchedule=function(d){
