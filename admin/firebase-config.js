@@ -9,6 +9,6 @@ window.addEventListener("load", function () {
   document.body.appendChild(monthly);
 
   var enrollment = document.createElement("script");
-  enrollment.src = "./admin-tour-enrollment.js?v=20260823-2115";
+  enrollment.src = "./admin-tour-enrollment.js?v=20260823-2128";
   document.body.appendChild(enrollment);
 });
