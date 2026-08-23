@@ -16,7 +16,8 @@
   function esc(v){return String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;")}
   function isTour(r){return String(r?.service_code||"").trim().toUpperCase()==="TOUR"}
   function orderedReservations(){
-    const d=window.state?.staffSchedule||{};
+    if(typeof state==="undefined")return [];
+    const d=state.staffSchedule||{};
     const rs=Array.isArray(d.reservations)?d.reservations:[],sh=Array.isArray(d.shifts)?d.shifts:[];
     const codes=[...new Set([...sh.map(x=>x.staff_code),...rs.map(x=>x.staff_code)].filter(Boolean))],out=[];
     codes.forEach(c=>rs.filter(x=>x.staff_code===c&&String(x.status||"").toUpperCase()!=="CANCELLED").sort((a,b)=>String(a.start_time).localeCompare(String(b.start_time))).forEach(x=>out.push(x)));
@@ -39,8 +40,15 @@
     };
   }
   function decorate(){
-    const board=document.querySelector("#staffScheduleBoard");if(!board||typeof state==="undefined")return;const rows=[...board.querySelectorAll(".staff-reservation-row")],rs=orderedReservations();rows.forEach((row,i)=>{const r=rs[i];if(!r||!isTour(r)||row.querySelector(".tour-enroll-button"))return;let actions=row.querySelector(".tour-row-actions");if(!actions){actions=document.createElement("span");actions.className="tour-row-actions";row.appendChild(actions)}const b=document.createElement("button");b.type="button";b.className="primary-button tour-enroll-button";b.textContent="入会手続き";b.onclick=()=>open(r);actions.appendChild(b)});
+    const board=document.querySelector("#staffScheduleBoard");if(!board||typeof state==="undefined")return;
+    const rows=[...board.querySelectorAll(".staff-reservation-row")],rs=orderedReservations();
+    rows.forEach((row,i)=>{
+      const r=rs[i];if(!r||!isTour(r)||row.querySelector(".tour-enroll-button"))return;
+      let actions=row.querySelector(".tour-row-actions");
+      if(!actions){actions=document.createElement("span");actions.className="tour-row-actions";const existing=row.querySelector(".tour-print-button");if(existing&&existing.parentElement){existing.parentElement.appendChild(actions)}else{row.appendChild(actions)}}
+      const b=document.createElement("button");b.type="button";b.className="primary-button tour-enroll-button";b.textContent="入会手続き";b.onclick=()=>open(r);actions.appendChild(b);
+    });
   }
-  function boot(){injectCss();decorate();const board=document.querySelector("#staffScheduleBoard");if(board)new MutationObserver(()=>setTimeout(decorate,0)).observe(board,{childList:true,subtree:true});setInterval(decorate,1200)}
+  function boot(){injectCss();decorate();const board=document.querySelector("#staffScheduleBoard");if(board)new MutationObserver(()=>setTimeout(decorate,0)).observe(board,{childList:true,subtree:true});setInterval(decorate,700)}
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot);else boot();
 })();
