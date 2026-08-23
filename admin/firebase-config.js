@@ -11,4 +11,8 @@ window.addEventListener("load", function () {
   var enrollment = document.createElement("script");
   enrollment.src = "./admin-tour-enrollment.js?v=20260823-2150";
   document.body.appendChild(enrollment);
+
+  var polish = document.createElement("script");
+  polish.src = "./admin-tour-ui-polish.js?v=20260823-2200";
+  document.body.appendChild(polish);
 });
