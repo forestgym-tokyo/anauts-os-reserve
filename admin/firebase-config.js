@@ -4,7 +4,11 @@ window.ANAUTS_AUTH = {
 };
 
 window.addEventListener("load", function () {
-  var s = document.createElement("script");
-  s.src = "./admin-monthly-v58.js?v=20260823-1942";
-  document.body.appendChild(s);
+  var monthly = document.createElement("script");
+  monthly.src = "./admin-monthly-v58.js?v=20260823-1942";
+  document.body.appendChild(monthly);
+
+  var enrollment = document.createElement("script");
+  enrollment.src = "./admin-tour-enrollment.js?v=20260823-2115";
+  document.body.appendChild(enrollment);
 });
