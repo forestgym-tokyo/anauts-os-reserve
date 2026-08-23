@@ -1,10 +1,10 @@
-/* A-nauts OS Reserve - Personal booking enhancements v55 */
+/* A-nauts OS Reserve - Personal booking enhancements v56 */
 (() => {
   const routeKey = location.pathname.split("/").filter(Boolean).pop() || "personal";
   if (routeKey !== "personal") return;
 
   let selectedTrainerCode = "";
-  let trainerDiscoveryServiceCode = "";
+  let loadedStoreCode = "";
   const trainerMap = new Map();
   const nativeFetch = window.fetch.bind(window);
 
@@ -27,7 +27,7 @@
     box.innerHTML = `
       <div style="font-weight:800;font-size:16px;margin-bottom:10px">トレーナーで絞り込む</div>
       <div id="personalTrainerChoices" style="display:flex;flex-wrap:wrap;gap:8px"></div>
-      <p id="personalTrainerStatus" style="margin:9px 0 0;font-size:12px;opacity:.72">予約可能期間のトレーナーを確認しています…</p>
+      <p id="personalTrainerStatus" style="margin:9px 0 0;font-size:12px;opacity:.72">トレーナー一覧を読み込んでいます…</p>
     `;
     toolbar.insertAdjacentElement("beforebegin", box);
     renderTrainerChoices();
@@ -73,81 +73,62 @@
     });
   }
 
-  function collectTrainerCandidates(results) {
-    let changed = false;
-    (results || []).forEach((result) => {
-      const slots = Array.isArray(result?.data?.slots) ? result.data.slots : [];
-      slots.forEach((slot) => {
-        const candidates = Array.isArray(slot?.staff_candidates) ? slot.staff_candidates : [];
-        candidates.forEach((staff) => {
-          const code = String(staff?.staff_code || "").trim();
-          if (!code) return;
-          const name = String(staff?.staff_name || staff?.display_name || code).trim();
-          if (!trainerMap.has(code) || trainerMap.get(code).name !== name) changed = true;
-          trainerMap.set(code, { code, name });
-        });
-      });
-    });
-    if (changed) renderTrainerChoices();
-  }
+  async function loadPublicTrainers_() {
+    ensureTrainerFilter();
 
-  async function fetchSlotsUnfiltered_(date, serviceCode) {
-    const url = new URL(API_URL);
-    url.searchParams.set("action", "getAvailableSlots");
-    url.searchParams.set("service_code", serviceCode);
-    url.searchParams.set("date", date);
-    url.searchParams.set("_", Date.now().toString());
-
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 12000);
-    try {
-      const response = await nativeFetch(url.toString(), { cache: "no-store", signal: controller.signal });
-      return await response.json();
-    } catch (_) {
-      return { ok: false, data: { date, slots: [] } };
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-
-  async function discoverTrainersForSelectedService_() {
-    const serviceCode = String(selectedService?.service_code || "").trim();
-    if (!serviceCode || trainerDiscoveryServiceCode === serviceCode) return;
-
-    trainerDiscoveryServiceCode = serviceCode;
-    trainerMap.clear();
-    selectedTrainerCode = "";
-    renderTrainerChoices();
+    const storeCode = String(selectedService?.store_code || "YACHIYO").trim().toUpperCase();
+    if (loadedStoreCode === storeCode && trainerMap.size) return;
 
     const status = document.querySelector("#personalTrainerStatus");
-    if (status) status.textContent = "予約可能期間のトレーナーを確認しています…";
+    if (status) status.textContent = "トレーナー一覧を読み込んでいます…";
 
-    const days = Math.max(1, Number(publicDays) || 30);
-    const dates = [];
-    for (let i = 0; i <= days; i++) {
-      const d = new Date(today);
-      d.setDate(d.getDate() + i);
-      dates.push(apiDate(d));
-    }
+    try {
+      const url = new URL(API_URL);
+      url.searchParams.set("action", "getPublicTrainers");
+      if (storeCode) url.searchParams.set("store_code", storeCode);
+      url.searchParams.set("_", Date.now().toString());
 
-    // GASへの同時アクセスを増やしすぎないよう6日ずつ確認する。
-    for (let i = 0; i < dates.length; i += 6) {
-      if (trainerDiscoveryServiceCode !== serviceCode) return;
-      const batch = dates.slice(i, i + 6);
-      const results = await Promise.all(batch.map((date) => fetchSlotsUnfiltered_(date, serviceCode)));
-      collectTrainerCandidates(results);
-    }
+      const response = await nativeFetch(url.toString(), { cache: "no-store" });
+      const result = await response.json();
 
-    if (trainerDiscoveryServiceCode !== serviceCode) return;
-    const finalStatus = document.querySelector("#personalTrainerStatus");
-    if (finalStatus) {
-      finalStatus.textContent = trainerMap.size
-        ? "トレーナーを指定すると、そのトレーナーの予約可能時間だけを表示します。"
-        : "予約可能期間に表示できるトレーナーが見つかりませんでした。";
+      if (!result.ok) {
+        throw new Error(result.message || "トレーナー一覧を取得できませんでした。");
+      }
+
+      const trainers = Array.isArray(result.data?.trainers) ? result.data.trainers : [];
+
+      trainerMap.clear();
+      trainers.forEach((staff) => {
+        const code = String(staff?.staff_code || "").trim().toUpperCase();
+        if (!code) return;
+        const name = String(staff?.staff_name || staff?.display_name || code).trim();
+        trainerMap.set(code, { code, name });
+      });
+
+      loadedStoreCode = storeCode;
+      if (selectedTrainerCode && !trainerMap.has(selectedTrainerCode)) {
+        selectedTrainerCode = "";
+      }
+
+      renderTrainerChoices();
+
+      if (status) {
+        status.textContent = trainerMap.size
+          ? "トレーナーを指定すると、そのトレーナーの予約可能時間だけを表示します。"
+          : "現在表示できるトレーナーがいません。";
+      }
+    } catch (error) {
+      trainerMap.clear();
+      selectedTrainerCode = "";
+      renderTrainerChoices();
+      if (status) {
+        status.textContent = "トレーナー一覧を取得できませんでした。GASの公開トレーナーAPIを確認してください。";
+      }
+      console.error("getPublicTrainers failed", error);
     }
   }
 
-  // getAvailableSlots: trainer filter + timeout so week navigation cannot remain locked indefinitely.
+  // getAvailableSlots: trainer filter + timeout.
   fetchSlots = async function(date) {
     const url = new URL(API_URL);
     url.searchParams.set("action", "getAvailableSlots");
@@ -172,15 +153,9 @@
     }
   };
 
-  const originalRenderWeek = renderWeek;
-  renderWeek = function(results) {
-    collectTrainerCandidates(results);
-    originalRenderWeek(results);
-  };
-
-  // サービス選択後、表示中の週だけでなく予約可能期間全体からトレーナー候補を収集する。
+  // プラン選択後、空き枠とは独立してstaffマスターからトレーナー一覧を取得する。
   document.querySelector("#serviceGrid")?.addEventListener("click", () => {
-    setTimeout(discoverTrainersForSelectedService_, 0);
+    setTimeout(loadPublicTrainers_, 0);
   });
 
   // Reservation POST: preserve chosen trainer in createReservation payload.
