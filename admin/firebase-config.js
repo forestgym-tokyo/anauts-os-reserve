@@ -5,6 +5,6 @@ window.ANAUTS_AUTH = {
 
 window.addEventListener("load", function () {
   var s = document.createElement("script");
-  s.src = "./admin-monthly-v58.js?v=20260823-1929";
+  s.src = "./admin-monthly-v58.js?v=20260823-1937";
   document.body.appendChild(s);
 });
