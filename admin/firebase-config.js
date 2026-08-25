@@ -5,7 +5,7 @@ window.ANAUTS_AUTH = {
 
 window.addEventListener("load", function () {
   var monthly = document.createElement("script");
-  monthly.src = "./admin-monthly-v58.js?v=20260825-1552";
+  monthly.src = "./admin-monthly-v58.js?v=20260825-1556";
   document.body.appendChild(monthly);
 
   var enrollment = document.createElement("script");
