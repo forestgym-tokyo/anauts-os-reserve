@@ -8,7 +8,19 @@
     s.textContent=`
       .tour-mail-button{display:none!important}
 
-      /* TOUR操作は必ず同じ1行の専用グリッドへ */
+      /* 質問・ご要望は予約カードの横幅いっぱい */
+      .staff-reservation-row .tour-question-inline{
+        display:block!important;
+        width:100%!important;
+        max-width:none!important;
+        box-sizing:border-box!important;
+        grid-column:1 / -1!important;
+        margin:10px 0 0!important;
+        padding:12px 14px!important;
+        cursor:pointer!important;
+      }
+
+      /* TOUR操作は同じ専用グリッドへ */
       .staff-reservation-row .tour-row-actions{
         display:grid!important;
         grid-template-columns:repeat(3,minmax(0,1fr))!important;
@@ -47,12 +59,12 @@
         overflow-wrap:anywhere!important;
       }
 
-      .tour-row-actions .tour-print-button{order:1!important}
-      .tour-row-actions .reservation-manage-button{order:2!important}
+      /* キャンセル・変更 → アンケート → 入会手続き */
+      .tour-row-actions .reservation-manage-button{order:1!important}
+      .tour-row-actions .tour-print-button{order:2!important}
       .tour-row-actions .tour-enroll-button{order:3!important}
       .tour-reply-inside{min-width:120px!important}
 
-      /* iPad / タブレット：3枚を均等幅のまま維持 */
       @media (min-width:701px) and (max-width:1100px){
         .staff-reservation-row .tour-row-actions{
           max-width:none!important;
@@ -67,7 +79,6 @@
         }
       }
 
-      /* スマホ：3枚を縦に揃える */
       @media (max-width:700px){
         .staff-reservation-row .tour-row-actions{
           grid-template-columns:1fr!important;
@@ -92,16 +103,43 @@
 
   let activeMail=null;
 
+  function openReplyForRow(row){
+    const mail=row?.querySelector(".tour-mail-button");
+    if(!mail)return;
+    activeMail=mail;
+    mail.click();
+  }
+
   function normalizeRows(){
     document.querySelectorAll(".staff-reservation-row").forEach(row=>{
       const q=row.querySelector(".tour-print-button");
       const enroll=row.querySelector(".tour-enroll-button");
       const manage=row.querySelector(".reservation-manage-button");
       const mail=row.querySelector(".tour-mail-button");
+      const question=row.querySelector(".tour-question-inline");
 
       if(q&&mail&&!q.dataset.replyLinked){
         q.dataset.replyLinked="1";
         q.addEventListener("click",()=>{activeMail=mail},{capture:true});
+      }
+
+      /* 質問・ご要望欄をタップすると直接返信画面 */
+      if(question&&mail&&!question.dataset.replyLinked){
+        question.dataset.replyLinked="1";
+        question.setAttribute("role","button");
+        question.setAttribute("tabindex","0");
+        question.title="タップして返信";
+        question.addEventListener("click",e=>{
+          e.preventDefault();
+          e.stopPropagation();
+          openReplyForRow(row);
+        });
+        question.addEventListener("keydown",e=>{
+          if(e.key==="Enter"||e.key===" "){
+            e.preventDefault();
+            openReplyForRow(row);
+          }
+        });
       }
 
       if(!q&&!enroll&&!manage)return;
@@ -113,9 +151,10 @@
         row.appendChild(actions);
       }
 
-      if(q&&q.parentElement!==actions)actions.appendChild(q);
-      if(manage&&manage.parentElement!==actions)actions.appendChild(manage);
-      if(enroll&&enroll.parentElement!==actions)actions.appendChild(enroll);
+      /* DOM順も表示順と同じに固定 */
+      if(manage)actions.appendChild(manage);
+      if(q)actions.appendChild(q);
+      if(enroll)actions.appendChild(enroll);
     });
   }
 
