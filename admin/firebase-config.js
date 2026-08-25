@@ -25,6 +25,6 @@ window.addEventListener("load", function () {
   document.body.appendChild(questionnaireFix);
 
   var eventCalendar = document.createElement("script");
-  eventCalendar.src = "./admin-event-calendar.js?v=20260825-1945";
+  eventCalendar.src = "./admin-event-calendar.js?v=20260825-2047";
   document.body.appendChild(eventCalendar);
 });
