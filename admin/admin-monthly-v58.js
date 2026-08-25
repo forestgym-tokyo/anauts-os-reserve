@@ -9,7 +9,7 @@
     const originalRender=renderMyShiftRows;
     renderMyShiftRows=function(){renderMyShiftCalendar();};
 
-    function ensureCalendarCss(){if(document.querySelector("#anautsCalendarCss"))return;const style=document.createElement("style");style.id="anautsCalendarCss";style.textContent=`.mcal-wrap{overflow-x:auto}.mcal{min-width:980px;border:1px solid #294037;border-radius:14px;overflow:hidden;background:#10231d}.mcal-week{display:grid;grid-template-columns:repeat(7,1fr);background:#183129}.mcal-week div{padding:10px;text-align:center;font-weight:900;color:#b9c9c2;border-right:1px solid #294037}.mcal-week div:last-child{border-right:0}.mcal-grid{display:grid;grid-template-columns:repeat(7,1fr)}.mcal-day{min-height:145px;padding:8px;border-right:1px solid #294037;border-top:1px solid #294037;background:#10231d;cursor:pointer}.mcal-day:nth-child(7n){border-right:0}.mcal-day.out{background:#0c1b16;opacity:.5}.mcal-day.today{box-shadow:inset 0 0 0 2px #7ed6a5}.mcal-num{font-weight:900;color:#e7f1ed;margin-bottom:6px}.mcal-event{display:block;padding:5px 6px;margin:4px 0;border-radius:7px;background:#24483b;color:#fff;font-size:11px;line-height:1.25;white-space:normal;overflow:hidden}.mcal-event b{display:block;font-size:12px}.mcal-detail{margin-top:14px;padding:14px;border:1px solid #294037;border-radius:12px;background:#10231d}.mcal-detail h3{margin:0 0 10px}.mcal-detail-row{padding:9px 0;border-top:1px solid #294037}.mcal-detail-row:first-of-type{border-top:0}.mycal-actions{display:flex;gap:7px;margin-top:8px;flex-wrap:wrap}.mycal-actions button{font-size:12px;padding:6px 9px}@media(max-width:700px){.mcal{min-width:760px}.mcal-day{min-height:105px;padding:5px}.mcal-event{font-size:10px;padding:4px}.mcal-event b{font-size:10px}}`;document.head.appendChild(style)}
+    function ensureCalendarCss(){if(document.querySelector("#anautsCalendarCss"))return;const style=document.createElement("style");style.id="anautsCalendarCss";style.textContent=`.mcal-wrap{overflow-x:auto}.mcal{min-width:980px;border:1px solid #294037;border-radius:14px;overflow:hidden;background:#10231d}.mcal-week{display:grid;grid-template-columns:repeat(7,1fr);background:#183129}.mcal-week div{padding:10px;text-align:center;font-weight:900;color:#b9c9c2;border-right:1px solid #294037}.mcal-week div:last-child{border-right:0}.mcal-grid{display:grid;grid-template-columns:repeat(7,1fr)}.mcal-day{min-height:145px;padding:8px;border-right:1px solid #294037;border-top:1px solid #294037;background:#10231d;cursor:pointer}.mcal-day:nth-child(7n){border-right:0}.mcal-day.out{background:#0c1b16;opacity:.5}.mcal-day.today{box-shadow:inset 0 0 0 2px #7ed6a5}.mcal-day.my-shift-selected{background:#173f2a!important;box-shadow:inset 0 0 0 3px #63d179!important}.mcal-num{font-weight:900;color:#e7f1ed;margin-bottom:6px}.mcal-event{display:block;padding:5px 6px;margin:4px 0;border-radius:7px;background:#24483b;color:#fff;font-size:11px;line-height:1.25;white-space:normal;overflow:hidden}.mcal-event b{display:block;font-size:12px}.mcal-detail{margin-top:14px;padding:14px;border:1px solid #294037;border-radius:12px;background:#10231d}.mcal-detail h3{margin:0 0 10px}.mcal-detail-row{padding:9px 0;border-top:1px solid #294037}.mcal-detail-row:first-of-type{border-top:0}.mycal-actions{display:flex;gap:7px;margin-top:8px;flex-wrap:wrap}.mycal-actions button{font-size:12px;padding:6px 9px}@media(max-width:700px){.mcal{min-width:760px}.mcal-day{min-height:105px;padding:5px}.mcal-event{font-size:10px;padding:4px}.mcal-event b{font-size:10px}}`;document.head.appendChild(style)}
 
     function renderMyShiftCalendar(){
       ensureCalendarCss();const box=document.querySelector("#myShiftList"),rows=(state.myShiftRows||[]).filter(x=>x.active!==false);if(!box)return;
@@ -20,9 +20,44 @@
       box.innerHTML=`<div class="mcal-wrap"><div class="mcal"><div class="mcal-week"><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div>土</div><div>日</div></div><div class="mcal-grid">${cells}</div></div></div><div id="myCalDetail" class="mcal-detail is-hidden"></div>`;
       box.querySelectorAll("[data-mydate]").forEach(c=>c.onclick=()=>showMyDay(c.dataset.mydate));
     }
-    function showMyDay(date){const detail=document.querySelector("#myCalDetail"),rows=(state.myShiftRows||[]).filter(x=>x.active!==false&&x.date===date);detail.classList.remove("is-hidden");detail.innerHTML=`<h3>${esc(date)} の自分のシフト</h3>${rows.length?rows.map((x,i)=>`<div class="mcal-detail-row"><strong>${esc(String(x.start_time).slice(0,5))}〜${esc(String(x.end_time).slice(0,5))}</strong>　${esc(x.store_code||"")}<div class="mycal-actions">${isManagementUser()?`<button class="ghost-button" data-my-edit="${i}">直接変更</button><button class="danger-ghost" data-my-delete="${i}">直接削除</button>`:`<button class="ghost-button" data-my-request-edit="${i}">変更申請</button><button class="danger-ghost" data-my-request-delete="${i}">削除申請</button>`}</div></div>`).join(""):'<div>シフトはありません。</div>'}`;
-      if(isManagementUser()){detail.querySelectorAll("[data-my-edit]").forEach(b=>b.onclick=()=>directEdit(rows[+b.dataset.myEdit]));detail.querySelectorAll("[data-my-delete]").forEach(b=>b.onclick=()=>directDelete(rows[+b.dataset.myDelete]));}
-      else{detail.querySelectorAll("[data-my-request-edit]").forEach(b=>b.onclick=()=>{const r=rows[+b.dataset.myRequestEdit];if(typeof openShiftChangeRequestModal==="function")openShiftChangeRequestModal(r,"CHANGE")});detail.querySelectorAll("[data-my-request-delete]").forEach(b=>b.onclick=()=>{const r=rows[+b.dataset.myRequestDelete];if(typeof openShiftChangeRequestModal==="function")openShiftChangeRequestModal(r,"DELETE")});}
+    function myShiftRule_(date){
+      const today=localYmd();
+      if(!date||date<today)return "PAST";
+      const [y,m,d]=today.split("-").map(Number),tomorrowDate=new Date(y,m-1,d+1);
+      const tomorrow=`${tomorrowDate.getFullYear()}-${String(tomorrowDate.getMonth()+1).padStart(2,"0")}-${String(tomorrowDate.getDate()).padStart(2,"0")}`;
+      return (date===today||date===tomorrow)?"PHONE":"WEB";
+    }
+    function showMyShiftPhone_(r,actionLabel){
+      const phone="080-3553-4259";
+      if(typeof showTodayShiftContactCard_==="function"){
+        showTodayShiftContactCard_(r,actionLabel);
+        const action=document.querySelector("#todayShiftContactAction"),detail=document.querySelector("#todayShiftContactDetail");
+        if(action)action.textContent=`${actionLabel}について電話連絡`;
+        if(detail)detail.innerHTML=`<strong>${esc(formatStaffDate(r.date))}</strong><br>${esc(r.start_time)}〜${esc(r.end_time)}<br><br>当日・前日のシフト${esc(actionLabel)}はWeb申請できません。<br>080-3553-4259まで直接ご連絡ください。`;
+        return;
+      }
+      if(typeof myShiftMsg==="function")myShiftMsg(`当日・前日のシフト${actionLabel}はWeb申請できません。${phone}まで直接ご連絡ください。`,true);
+    }
+    function showMyDay(date){
+      const detail=document.querySelector("#myCalDetail"),rows=(state.myShiftRows||[]).filter(x=>x.active!==false&&x.date===date),mode=myShiftRule_(date);
+      document.querySelectorAll("#myShiftList [data-mydate]").forEach(c=>c.classList.toggle("my-shift-selected",c.dataset.mydate===date));
+      detail.classList.remove("is-hidden");
+      const actions=(x,i)=>{
+        if(isManagementUser())return `<button class="ghost-button" data-my-edit="${i}">直接変更</button><button class="danger-ghost" data-my-delete="${i}">直接削除</button>`;
+        if(mode==="PAST")return `<button class="ghost-button" type="button" disabled>変更申請不可</button><button class="danger-ghost" type="button" disabled>削除申請不可</button>`;
+        if(mode==="PHONE")return `<button class="ghost-button" data-my-phone-edit="${i}">電話で変更連絡</button><button class="danger-ghost" data-my-phone-delete="${i}">電話で削除連絡</button>`;
+        return `<button class="ghost-button" data-my-request-edit="${i}">変更申請</button><button class="danger-ghost" data-my-request-delete="${i}">削除申請</button>`;
+      };
+      detail.innerHTML=`<h3>${esc(date)} の自分のシフト</h3>${rows.length?rows.map((x,i)=>`<div class="mcal-detail-row"><strong>${esc(String(x.start_time).slice(0,5))}〜${esc(String(x.end_time).slice(0,5))}</strong>　${esc(x.store_code||"")}<div class="mycal-actions">${actions(x,i)}</div></div>`).join(""):'<div>シフトはありません。</div>'}`;
+      if(isManagementUser()){
+        detail.querySelectorAll("[data-my-edit]").forEach(b=>b.onclick=()=>directEdit(rows[+b.dataset.myEdit]));
+        detail.querySelectorAll("[data-my-delete]").forEach(b=>b.onclick=()=>directDelete(rows[+b.dataset.myDelete]));
+        return;
+      }
+      detail.querySelectorAll("[data-my-phone-edit]").forEach(b=>b.onclick=()=>showMyShiftPhone_(rows[+b.dataset.myPhoneEdit],"変更"));
+      detail.querySelectorAll("[data-my-phone-delete]").forEach(b=>b.onclick=()=>showMyShiftPhone_(rows[+b.dataset.myPhoneDelete],"削除"));
+      detail.querySelectorAll("[data-my-request-edit]").forEach(b=>b.onclick=()=>{const r=rows[+b.dataset.myRequestEdit];if(r&&typeof editMyShiftRequest==="function")editMyShiftRequest(r)});
+      detail.querySelectorAll("[data-my-request-delete]").forEach(b=>b.onclick=()=>{const r=rows[+b.dataset.myRequestDelete];if(r&&typeof requestDeleteMyShift==="function")requestDeleteMyShift(r)});
     }
     async function directEdit(r){const s=prompt("開始時刻",String(r.start_time).slice(0,5));if(s===null)return;const e=prompt("終了時刻",String(r.end_time).slice(0,5));if(e===null)return;if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(s)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(e)||s>=e)return alert("時刻を確認してください。");try{await apiPost({action:"saveStaffShift",shift_id:r.shift_id,staff_code:state.authUser.staff_code,store_code:r.store_code||state.authUser.store_code||"YACHIYO",date:r.date,start_time:s,end_time:e});await loadMyShiftView()}catch(x){alert(x.message)}}
     async function directDelete(r){if(!confirm(`${r.date} ${r.start_time}〜${r.end_time} を削除しますか？`))return;try{await apiPost({action:"deleteStaffShift",shift_id:r.shift_id});await loadMyShiftView()}catch(x){alert(x.message)}}
