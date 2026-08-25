@@ -31,4 +31,8 @@ window.addEventListener("load", function () {
   var withdrawalLink = document.createElement("script");
   withdrawalLink.src = "./admin-withdrawal-link.js?v=20260825-2103";
   document.body.appendChild(withdrawalLink);
+
+  var calendarLayout = document.createElement("script");
+  calendarLayout.src = "./admin-ui-calendar-layout.js?v=20260825-2125";
+  document.body.appendChild(calendarLayout);
 });
