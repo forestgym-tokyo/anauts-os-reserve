@@ -17,6 +17,6 @@ window.addEventListener("load", function () {
   document.body.appendChild(polish);
 
   var questionnaireFix = document.createElement("script");
-  questionnaireFix.src = "./admin-questionnaire-fix.js?v=20260825-1105";
+  questionnaireFix.src = "./admin-questionnaire-fix.js?v=20260825-1145";
   document.body.appendChild(questionnaireFix);
 });
