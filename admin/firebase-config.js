@@ -5,7 +5,7 @@ window.ANAUTS_AUTH = {
 
 window.addEventListener("load", function () {
   var monthly = document.createElement("script");
-  monthly.src = "./admin-monthly-v58.js?v=20260823-1942";
+  monthly.src = "./admin-monthly-v58.js?v=20260825-1548";
   document.body.appendChild(monthly);
 
   var enrollment = document.createElement("script");
@@ -23,8 +23,4 @@ window.addEventListener("load", function () {
   var questionnaireFix = document.createElement("script");
   questionnaireFix.src = "./admin-questionnaire-fix.js?v=20260825-1158";
   document.body.appendChild(questionnaireFix);
-
-  var myShiftFix = document.createElement("script");
-  myShiftFix.src = "./admin-myshift-final.js?v=20260825-1515";
-  document.body.appendChild(myShiftFix);
 });
