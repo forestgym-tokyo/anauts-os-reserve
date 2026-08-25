@@ -25,6 +25,6 @@ window.addEventListener("load", function () {
   document.body.appendChild(questionnaireFix);
 
   var myShiftFix = document.createElement("script");
-  myShiftFix.src = "./admin-myshift-fix.js?v=20260825-1305";
+  myShiftFix.src = "./admin-myshift-fix.js?v=20260825-1315";
   document.body.appendChild(myShiftFix);
 });
