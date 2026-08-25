@@ -1,123 +1,121 @@
 (()=>{
   "use strict";
 
-  function ymd(d){
-    const y=d.getFullYear();
-    const m=String(d.getMonth()+1).padStart(2,"0");
-    const day=String(d.getDate()).padStart(2,"0");
-    return `${y}-${m}-${day}`;
-  }
+  const TODAY=()=>localDate_(0);
+  const TOMORROW=()=>localDate_(1);
 
-  function tomorrowYmd(){
+  function localDate_(add){
     const d=new Date();
     d.setHours(0,0,0,0);
-    d.setDate(d.getDate()+1);
-    return ymd(d);
+    d.setDate(d.getDate()+(add||0));
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
   }
 
-  function injectCss(){
-    if(document.getElementById("myShiftFixCss"))return;
+  function css_(){
+    if(document.getElementById("myShiftHardFixCss"))return;
     const s=document.createElement("style");
-    s.id="myShiftFixCss";
+    s.id="myShiftHardFixCss";
     s.textContent=`
-      #myShiftList .registered-shift-actions{position:relative!important;z-index:2!important;pointer-events:auto!important}
+      #myShiftList .registered-shift-row{cursor:pointer;transition:background .15s,border-color .15s,box-shadow .15s}
+      #myShiftList .registered-shift-row.is-shift-selected{
+        background:rgba(99,209,121,.14)!important;
+        border-color:#63d179!important;
+        box-shadow:0 0 0 2px rgba(99,209,121,.22)!important;
+      }
+      #myShiftList .registered-shift-actions,
       #myShiftList [data-my-shift-edit],
-      #myShiftList [data-my-shift-delete]{position:relative!important;z-index:3!important;pointer-events:auto!important;cursor:pointer!important}
-      #myShiftList [data-my-shift-edit]:not(:disabled),
-      #myShiftList [data-my-shift-delete]:not(:disabled){opacity:1!important}
+      #myShiftList [data-my-shift-delete]{pointer-events:auto!important;position:relative!important;z-index:20!important}
     `;
     document.head.appendChild(s);
   }
 
-  function findShift(button){
-    const id=button.dataset.myShiftEdit || button.dataset.myShiftDelete || "";
-    const rows=(typeof state!=="undefined" && Array.isArray(state.myShiftRows)) ? state.myShiftRows : [];
-    return rows.find(x=>String(x.shift_id||"")===String(id)) || null;
+  function rowShift_(row){
+    const edit=row?.querySelector("[data-my-shift-edit]");
+    const del=row?.querySelector("[data-my-shift-delete]");
+    const id=String(edit?.dataset.myShiftEdit||del?.dataset.myShiftDelete||"");
+    try{
+      if(typeof state!=="undefined"&&Array.isArray(state.myShiftRows)){
+        const r=state.myShiftRows.find(x=>String(x.shift_id||"")===id);
+        if(r)return r;
+      }
+    }catch(_e){}
+    return null;
   }
 
-  function showMessage(text,error=true){
-    if(typeof myShiftMsg==="function"){
-      myShiftMsg(text,error);
-      return;
-    }
-    alert(text);
+  function selectRow_(row){
+    document.querySelectorAll("#myShiftList .registered-shift-row").forEach(x=>x.classList.toggle("is-shift-selected",x===row));
   }
 
-  function showPhoneCard(r,actionLabel){
-    const date=String(r?.date||"");
-    const today=ymd(new Date());
-    const timing=date===today ? "当日" : "前日";
-    const staffName=(typeof roleHonorific==="function" && typeof state!=="undefined")
-      ? roleHonorific(state.authUser||{})
-      : "";
-    const dateText=typeof formatStaffDate==="function" ? formatStaffDate(date) : date;
-    const escape=typeof esc==="function" ? esc : v=>String(v??"");
-
+  function phone_(r,isDelete){
     const action=document.querySelector("#todayShiftContactAction");
-    if(action)action.textContent=`${timing}の${actionLabel}について直接連絡`;
-
     const detail=document.querySelector("#todayShiftContactDetail");
-    if(detail){
-      detail.innerHTML=
-        (staffName ? `<strong>${escape(staffName)}</strong><br>` : "")+
-        `${escape(dateText)}<br>`+
-        `${escape(r.start_time||"")}〜${escape(r.end_time||"")}<br><br>`+
-        `シフト日の当日および前日の変更・削除はWebから申請できません。<br>`+
-        `お手数ですが、下のボタンから080-3553-4259へ直接お電話ください。`;
-    }
-
     const card=document.querySelector("#todayShiftContactCard");
+    const timing=String(r.date)===TODAY()?"当日":"前日";
+    if(action)action.textContent=`${timing}の${isDelete?"シフト削除":"シフト変更"}について直接連絡`;
+    if(detail)detail.innerHTML=`${r.date}<br>${r.start_time}〜${r.end_time}<br><br>シフト日の当日および前日の変更・削除はWebから申請できません。<br>下のボタンから080-3553-4259へ直接ご連絡ください。`;
     card?.classList.remove("is-hidden");
     card?.scrollIntoView({behavior:"smooth",block:"start"});
   }
 
-  function handle(button,e){
-    if(button.disabled)return;
-    const r=findShift(button);
+  function act_(btn){
+    const row=btn.closest(".registered-shift-row");
+    selectRow_(row);
+    const r=rowShift_(row);
     if(!r){
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      showMessage("対象のシフトを取得できませんでした。画面を更新してもう一度お試しください。",true);
+      if(typeof myShiftMsg==="function")myShiftMsg("対象のシフトを取得できませんでした。画面を更新してください。",true);
       return;
     }
-
     const date=String(r.date||"");
-    const today=ymd(new Date());
-    const tomorrow=tomorrowYmd();
-    const isDelete=button.hasAttribute("data-my-shift-delete");
-    const label=isDelete ? "シフト削除" : "シフト変更";
-
-    e.preventDefault();
-    e.stopImmediatePropagation();
-
-    if(date<today){
-      showMessage("過去のシフトは変更・削除申請できません。",true);
+    const isDelete=btn.hasAttribute("data-my-shift-delete");
+    if(date<TODAY()){
+      if(typeof myShiftMsg==="function")myShiftMsg("過去のシフトは変更・削除申請できません。",true);
       return;
     }
-
-    if(date===today || date===tomorrow){
-      showPhoneCard(r,label);
+    if(date===TODAY()||date===TOMORROW()){
+      phone_(r,isDelete);
       return;
     }
-
     if(isDelete){
       if(typeof requestDeleteMyShift==="function")requestDeleteMyShift(r);
-      else showMessage("シフト削除申請を開始できませんでした。",true);
     }else{
       if(typeof editMyShiftRequest==="function")editMyShiftRequest(r);
-      else showMessage("シフト変更申請を開始できませんでした。",true);
     }
   }
 
-  function boot(){
-    injectCss();
-    document.addEventListener("click",e=>{
-      const b=e.target.closest?.("[data-my-shift-edit],[data-my-shift-delete]");
-      if(!b || !b.closest("#myShiftList"))return;
-      handle(b,e);
-    },true);
+  function wire_(){
+    const box=document.querySelector("#myShiftList");
+    if(!box)return;
+
+    box.querySelectorAll(".registered-shift-row").forEach(row=>{
+      if(row.dataset.hardShiftWired==="1")return;
+      row.dataset.hardShiftWired="1";
+      row.addEventListener("click",e=>{
+        if(e.target.closest("button"))return;
+        selectRow_(row);
+      });
+
+      row.querySelectorAll("[data-my-shift-edit],[data-my-shift-delete]").forEach(btn=>{
+        /* 過去日以外はブラウザのdisabledを解除し、判定はこの処理で行う */
+        const r=rowShift_(row);
+        if(r&&String(r.date||"")>=TODAY())btn.disabled=false;
+        btn.onclick=null;
+        btn.addEventListener("click",e=>{
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          act_(btn);
+        },true);
+      });
+    });
   }
 
-  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot,{once:true});
-  else boot();
+  function boot_(){
+    css_();
+    wire_();
+    const box=document.querySelector("#myShiftList");
+    if(box)new MutationObserver(()=>wire_()).observe(box,{childList:true,subtree:true});
+  }
+
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot_,{once:true});
+  else boot_();
 })();
