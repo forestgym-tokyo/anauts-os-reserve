@@ -45,6 +45,67 @@
     activeReservation=orderedReservations(data||{})[index]||null;
   }
 
+  async function saveCorrectedAddress(modal,editor){
+    if(!activeReservation){
+      editor.querySelector("#tourAddressNote").style.color="#b42318";
+      editor.querySelector("#tourAddressNote").textContent="対象の見学予約を特定できません。";
+      return;
+    }
+    const value=String(editor.querySelector("textarea").value||"").trim();
+    if(!value){
+      editor.querySelector("#tourAddressNote").style.color="#b42318";
+      editor.querySelector("#tourAddressNote").textContent="住所を入力してください。";
+      return;
+    }
+    if(typeof apiPost!=="function"){
+      editor.querySelector("#tourAddressNote").style.color="#b42318";
+      editor.querySelector("#tourAddressNote").textContent="管理画面APIを利用できません。";
+      return;
+    }
+
+    const apply=editor.querySelector("#tourAddressApply");
+    apply.disabled=true;
+    apply.textContent="保存中…";
+    try{
+      const j=await apiPost({
+        action:"updateTourCustomerAddress",
+        reservation_id:activeReservation.reservation_id,
+        customer_address:value
+      });
+      const saved=String(j?.data?.customer_address||value).trim();
+      activeReservation.customer_address=saved;
+      activeReservation.address=saved;
+      modal.dataset.correctedAddress=saved;
+
+      const reservationBox=modal.querySelector(".tour-print-reservation");
+      if(reservationBox){
+        let addressView=reservationBox.querySelector(".tour-current-address");
+        if(!addressView){
+          addressView=document.createElement("div");
+          addressView.className="tour-current-address";
+          addressView.style.marginTop="8px";
+          addressView.style.fontWeight="700";
+          reservationBox.appendChild(addressView);
+        }
+        addressView.textContent="住所："+saved;
+      }
+
+      editor.querySelector("#tourAddressNote").style.color="#067647";
+      editor.querySelector("#tourAddressNote").textContent="住所を保存しました。PDF・管理画面とも訂正住所が使用されます。";
+
+      /* 可能ならスタッフ予定も再取得して管理画面側表示を最新化 */
+      if(typeof loadStaffSchedule==="function"){
+        try{await loadStaffSchedule();}catch(ignore){}
+      }
+    }catch(e){
+      editor.querySelector("#tourAddressNote").style.color="#b42318";
+      editor.querySelector("#tourAddressNote").textContent=e.message||"住所の保存に失敗しました。";
+    }finally{
+      apply.disabled=false;
+      apply.textContent="保存して反映";
+    }
+  }
+
   function openAddressEditor(modal){
     if(!activeReservation)return;
     let editor=modal.querySelector("#tourAddressEditor");
@@ -53,20 +114,12 @@
     editor=document.createElement("div");
     editor.id="tourAddressEditor";
     editor.className="tour-address-editor";
-    editor.innerHTML='<label for="tourCorrectedAddress">PDFに記載する住所</label><textarea id="tourCorrectedAddress"></textarea><div class="tour-address-actions"><button type="button" class="ghost-button" id="tourAddressCancel">取消</button><button type="button" class="primary-button" id="tourAddressApply">PDFへ反映</button></div><div class="tour-address-note" id="tourAddressNote"></div>';
+    editor.innerHTML='<label for="tourCorrectedAddress">訂正後の住所</label><textarea id="tourCorrectedAddress"></textarea><div class="tour-address-actions"><button type="button" class="ghost-button" id="tourAddressCancel">取消</button><button type="button" class="primary-button" id="tourAddressApply">保存して反映</button></div><div class="tour-address-note" id="tourAddressNote"></div>';
     editor.querySelector("textarea").value=current;
     const body=modal.querySelector(".tour-print-body");
     body?.appendChild(editor);
     editor.querySelector("#tourAddressCancel").onclick=()=>editor.remove();
-    editor.querySelector("#tourAddressApply").onclick=()=>{
-      const value=String(editor.querySelector("textarea").value||"").trim();
-      if(!value){editor.querySelector("#tourAddressNote").style.color="#b42318";editor.querySelector("#tourAddressNote").textContent="住所を入力してください。";return;}
-      activeReservation.customer_address=value;
-      activeReservation.address=value;
-      modal.dataset.correctedAddress=value;
-      editor.querySelector("#tourAddressNote").style.color="#067647";
-      editor.querySelector("#tourAddressNote").textContent="訂正住所をPDF用に反映しました。";
-    };
+    editor.querySelector("#tourAddressApply").onclick=()=>saveCorrectedAddress(modal,editor);
     editor.querySelector("textarea").focus();
   }
 
@@ -90,18 +143,6 @@
 
     if(!modal.querySelector("#tourAddressCorrect")){
       const addressBtn=document.createElement("button");addressBtn.type="button";addressBtn.id="tourAddressCorrect";addressBtn.textContent="住所訂正";addressBtn.onclick=()=>openAddressEditor(modal);actions.insertBefore(addressBtn,generate);
-    }
-
-    /* PDF APIへ訂正住所も渡す。GAS側が対応済みならその住所が使われる。 */
-    if(!generate.dataset.addressOverrideBound){
-      generate.dataset.addressOverrideBound="1";
-      generate.addEventListener("click",()=>{
-        const value=String(modal.dataset.correctedAddress||"").trim();
-        if(value && activeReservation){
-          activeReservation.customer_address=value;
-          activeReservation.address=value;
-        }
-      },{capture:true});
     }
 
     if(!generate.dataset.autoCloseFixed){
