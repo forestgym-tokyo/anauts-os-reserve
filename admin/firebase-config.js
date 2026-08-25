@@ -12,6 +12,10 @@ window.addEventListener("load", function () {
   enrollment.src = "./admin-tour-enrollment.js?v=20260825-1215";
   document.body.appendChild(enrollment);
 
+  var startDateFix = document.createElement("script");
+  startDateFix.src = "./admin-tour-startdate-fix.js?v=20260825-1235";
+  document.body.appendChild(startDateFix);
+
   var polish = document.createElement("script");
   polish.src = "./admin-tour-ui-polish.js?v=20260825-1045";
   document.body.appendChild(polish);
