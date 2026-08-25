@@ -41,6 +41,21 @@
       select.appendChild(option);
     }
 
+    const initialValue = old.value || ymd(now);
+    if ([...select.options].some(o=>o.value===initialValue)) {
+      select.value = initialValue;
+    }
+
+    // admin-tour-enrollment.js は元の input 要素を変数 start に保持している。
+    // select へ置換後も、その保持済み要素の value を同期しないと
+    // 送信時の start_date が常に初期値（本日）のままになる。
+    const syncToOriginal = ()=>{
+      old.value = select.value;
+      old.dispatchEvent(new Event("change", {bubbles:true}));
+    };
+    select.addEventListener("change", syncToOriginal);
+    syncToOriginal();
+
     old.replaceWith(select);
   }
 
