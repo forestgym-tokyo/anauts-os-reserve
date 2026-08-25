@@ -23,4 +23,8 @@ window.addEventListener("load", function () {
   var questionnaireFix = document.createElement("script");
   questionnaireFix.src = "./admin-questionnaire-fix.js?v=20260825-1205";
   document.body.appendChild(questionnaireFix);
+
+  var myShiftFix = document.createElement("script");
+  myShiftFix.src = "./admin-myshift-fix.js?v=20260825-1255";
+  document.body.appendChild(myShiftFix);
 });
