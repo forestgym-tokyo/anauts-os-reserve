@@ -23,4 +23,8 @@ window.addEventListener("load", function () {
   var questionnaireFix = document.createElement("script");
   questionnaireFix.src = "./admin-questionnaire-fix.js?v=20260825-1158";
   document.body.appendChild(questionnaireFix);
+
+  var eventCalendar = document.createElement("script");
+  eventCalendar.src = "./admin-event-calendar.js?v=20260825-1945";
+  document.body.appendChild(eventCalendar);
 });
