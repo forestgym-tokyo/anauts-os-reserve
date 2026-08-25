@@ -9,7 +9,7 @@ window.addEventListener("load", function () {
   document.body.appendChild(monthly);
 
   var enrollment = document.createElement("script");
-  enrollment.src = "./admin-tour-enrollment.js?v=20260825-1045";
+  enrollment.src = "./admin-tour-enrollment.js?v=20260825-1215";
   document.body.appendChild(enrollment);
 
   var polish = document.createElement("script");
@@ -17,6 +17,6 @@ window.addEventListener("load", function () {
   document.body.appendChild(polish);
 
   var questionnaireFix = document.createElement("script");
-  questionnaireFix.src = "./admin-questionnaire-fix.js?v=20260825-1158";
+  questionnaireFix.src = "./admin-questionnaire-fix.js?v=20260825-1205";
   document.body.appendChild(questionnaireFix);
 });
