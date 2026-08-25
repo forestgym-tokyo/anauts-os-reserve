@@ -35,4 +35,8 @@ window.addEventListener("load", function () {
   var calendarLayout = document.createElement("script");
   calendarLayout.src = "./admin-ui-calendar-layout.js?v=20260825-2125";
   document.body.appendChild(calendarLayout);
+
+  var dailyReport = document.createElement("script");
+  dailyReport.src = "./admin-daily-report.js?v=20260825-2142";
+  document.body.appendChild(dailyReport);
 });
