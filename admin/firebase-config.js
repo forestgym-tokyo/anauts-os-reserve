@@ -27,4 +27,8 @@ window.addEventListener("load", function () {
   var eventCalendar = document.createElement("script");
   eventCalendar.src = "./admin-event-calendar.js?v=20260825-2047";
   document.body.appendChild(eventCalendar);
+
+  var withdrawalLink = document.createElement("script");
+  withdrawalLink.src = "./admin-withdrawal-link.js?v=20260825-2103";
+  document.body.appendChild(withdrawalLink);
 });
