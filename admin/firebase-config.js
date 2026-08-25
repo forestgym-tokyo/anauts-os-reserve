@@ -4,16 +4,23 @@ window.ANAUTS_AUTH = {
 };
 
 window.addEventListener("load", function () {
-  function load(src){
-    var s=document.createElement("script");
-    s.src=src;
-    document.body.appendChild(s);
-  }
-  load("./admin-monthly-v58.js?v=20260823-1942");
-  load("./admin-tour-enrollment.js?v=20260825-1215");
-  load("./admin-tour-startdate-fix.js?v=20260825-1235");
-  load("./admin-tour-ui-polish.js?v=20260825-1045");
-  load("./admin-questionnaire-fix.js?v=20260825-1205");
-  /* Always request the current self-shift controller, bypassing the stale child-script cache. */
-  load("./admin-myshift-v3.js?v=" + Date.now());
+  var monthly = document.createElement("script");
+  monthly.src = "./admin-monthly-v58.js?v=20260823-1942";
+  document.body.appendChild(monthly);
+
+  var enrollment = document.createElement("script");
+  enrollment.src = "./admin-tour-enrollment.js?v=20260825-1215";
+  document.body.appendChild(enrollment);
+
+  var startDateFix = document.createElement("script");
+  startDateFix.src = "./admin-tour-startdate-fix.js?v=20260825-1235";
+  document.body.appendChild(startDateFix);
+
+  var polish = document.createElement("script");
+  polish.src = "./admin-tour-ui-polish.js?v=20260825-1045";
+  document.body.appendChild(polish);
+
+  var questionnaireFix = document.createElement("script");
+  questionnaireFix.src = "./admin-questionnaire-fix.js?v=20260825-1205";
+  document.body.appendChild(questionnaireFix);
 });
