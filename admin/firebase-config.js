@@ -47,4 +47,8 @@ window.addEventListener("load", function () {
   var operationsRefreshFix = document.createElement("script");
   operationsRefreshFix.src = "./admin-operations-refresh-fix.js?v=20260826-1040";
   document.body.appendChild(operationsRefreshFix);
+
+  var internalReservationBridge = document.createElement("script");
+  internalReservationBridge.src = "./admin-reservation-internal-bridge.js?v=20260826-1055";
+  document.body.appendChild(internalReservationBridge);
 });
