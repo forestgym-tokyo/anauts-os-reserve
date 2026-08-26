@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#080a09">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="A-nauts OS">
+  <title>A-nauts OS | ホーム画面に追加</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="./icons/favicon-32.png">
+  <style>
+    :root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100svh;display:grid;place-items:center;background:#080a09;color:#f5f7f8;padding:24px}
+    main{width:min(460px,100%);text-align:center}
+    .icon{width:156px;height:156px;border-radius:34px;box-shadow:0 18px 60px rgba(0,0,0,.45);margin-bottom:22px}
+    h1{font-size:28px;margin:0 0 8px}
+    p{color:#b9c2ca;line-height:1.75;margin:0 0 18px}
+    .card{background:#111513;border:1px solid #27302b;border-radius:18px;padding:18px;text-align:left;margin:18px 0}
+    .card strong{display:block;margin-bottom:8px;color:#fff}
+    .card ol{margin:0;padding-left:22px;color:#d9dfe3;line-height:1.8}
+    a{display:flex;align-items:center;justify-content:center;min-height:52px;border-radius:14px;background:#2587da;color:#fff;font-weight:800;text-decoration:none}
+    small{display:block;margin-top:14px;color:#7f8a83;line-height:1.6}
+  </style>
+</head>
+<body>
+  <main>
+    <img class="icon" src="./icons/icon-512.png" alt="A-nauts OS">
+    <h1>A-nauts OS</h1>
+    <p>このページからホーム画面に追加すると、A-nauts OSのアイコンから管理画面を開けます。</p>
+    <div class="card">
+      <strong>iPhone / iPad</strong>
+      <ol><li>Safariの共有ボタンをタップ</li><li>「ホーム画面に追加」を選択</li><li>右上の「追加」をタップ</li></ol>
+    </div>
+    <div class="card">
+      <strong>Android</strong>
+      <ol><li>Chromeのメニューを開く</li><li>「ホーム画面に追加」または「アプリをインストール」を選択</li></ol>
+    </div>
+    <a href="./">A-nauts OSを開く</a>
+    <small>ホーム画面から起動した場合は、自動的に管理画面へ移動します。</small>
+  </main>
+  <script>
+    (function(){
+      var standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+      if (standalone) location.replace('./');
+    })();
+  </script>
+</body>
+</html>
