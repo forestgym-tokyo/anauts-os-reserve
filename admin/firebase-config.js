@@ -204,6 +204,10 @@ window.addEventListener("load", function () {
   internalReservationBridge.src = "./admin-reservation-internal-bridge.js?v=20260826-1055";
   document.body.appendChild(internalReservationBridge);
 
+  var autoReassign = document.createElement("script");
+  autoReassign.src = "./admin-auto-reassign-enforce.js?v=20260826-safe-batch-v1";
+  document.body.appendChild(autoReassign);
+
   var withdrawalButtonColor = document.createElement("script");
   withdrawalButtonColor.src = "./admin-withdrawal-button-color.js?v=20260826-1258";
   document.body.appendChild(withdrawalButtonColor);
