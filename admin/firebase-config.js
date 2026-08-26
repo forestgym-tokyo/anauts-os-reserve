@@ -193,7 +193,7 @@ window.addEventListener("load", function () {
   document.body.appendChild(dailyReport);
 
   var operationsCenter = document.createElement("script");
-  operationsCenter.src = "./admin-operations-center.js?v=20260826-1605";
+  operationsCenter.src = "./admin-operations-center.js?v=20260826-operations-perf-v1";
   document.body.appendChild(operationsCenter);
 
   var operationsRefreshFix = document.createElement("script");
