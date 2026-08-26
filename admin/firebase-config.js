@@ -39,4 +39,8 @@ window.addEventListener("load", function () {
   var dailyReport = document.createElement("script");
   dailyReport.src = "./admin-daily-report.js?v=20260825-2142";
   document.body.appendChild(dailyReport);
+
+  var operationsCenter = document.createElement("script");
+  operationsCenter.src = "./admin-operations-center.js?v=20260826-1030";
+  document.body.appendChild(operationsCenter);
 });
