@@ -205,7 +205,7 @@ window.addEventListener("load", function () {
   document.body.appendChild(internalReservationBridge);
 
   var autoReassign = document.createElement("script");
-  autoReassign.src = "./admin-auto-reassign-enforce.js?v=20260826-safe-batch-v1";
+  autoReassign.src = "./admin-auto-reassign-enforce.js?v=20260826-safe-batch-v2";
   document.body.appendChild(autoReassign);
 
   var withdrawalButtonColor = document.createElement("script");
