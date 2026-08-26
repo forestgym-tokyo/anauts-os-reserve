@@ -4,6 +4,11 @@
   if(window.__ANAUTS_SCHEDULE_REASSIGN_FIX__)return;
   window.__ANAUTS_SCHEDULE_REASSIGN_FIX__=true;
 
+  // Emergency kill switch. This legacy repair path calls updateReservation,
+  // which currently sends a customer-facing reservation change email.
+  window.__ANAUTS_SCHEDULE_REASSIGN_DISABLED__=true;
+  return;
+
   const STORE_CODE="YACHIYO";
   const HORIZON_DAYS=14;
   const q=s=>document.querySelector(s);

@@ -1,6 +1,12 @@
 (()=>{
   "use strict";
 
+  // Emergency kill switch: updateReservation sends customer-facing change mail.
+  // Automatic assignment must remain disabled until the backend exposes a
+  // verified no-notification operation.
+  window.__ANAUTS_AUTO_REASSIGN_DISABLED__=true;
+  return;
+
   const STORE_CODE="YACHIYO";
   const HORIZON_DAYS=30;
   const AUTO_SERVICES=new Set(["TOUR","COUNSEL","MEAL_PLANNING"]);

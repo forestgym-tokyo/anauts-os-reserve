@@ -193,7 +193,7 @@ window.addEventListener("load", function () {
   document.body.appendChild(dailyReport);
 
   var operationsCenter = document.createElement("script");
-  operationsCenter.src = "./admin-operations-center.js?v=20260826-1030";
+  operationsCenter.src = "./admin-operations-center.js?v=20260826-1605";
   document.body.appendChild(operationsCenter);
 
   var operationsRefreshFix = document.createElement("script");
@@ -204,15 +204,8 @@ window.addEventListener("load", function () {
   internalReservationBridge.src = "./admin-reservation-internal-bridge.js?v=20260826-1055";
   document.body.appendChild(internalReservationBridge);
 
-  var scheduleReassignFix = document.createElement("script");
-  scheduleReassignFix.src = "./admin-schedule-reassign-fix.js?v=20260826-1148";
-  document.body.appendChild(scheduleReassignFix);
-
   var withdrawalButtonColor = document.createElement("script");
   withdrawalButtonColor.src = "./admin-withdrawal-button-color.js?v=20260826-1258";
   document.body.appendChild(withdrawalButtonColor);
 
-  var autoReassignEnforce = document.createElement("script");
-  autoReassignEnforce.src = "./admin-auto-reassign-enforce.js?v=20260826-1329";
-  document.body.appendChild(autoReassignEnforce);
 });

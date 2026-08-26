@@ -113,7 +113,7 @@
     await Promise.all(Array.from({length:Math.min(5,dates.length)},worker));
     OPS.reservations=dedupe(all);
     OPS.alerts=OPS.reservations.map(r=>({r,state:assignmentState(r)})).filter(x=>!x.state.valid);
-    await autoResolveAssignable();
+    // Automatic updateReservation is disabled because it sends customer mail.
     OPS.alerts=OPS.reservations.map(r=>({r,state:assignmentState(r)})).filter(x=>!x.state.valid);
     return OPS.alerts;
   }
