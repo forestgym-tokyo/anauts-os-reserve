@@ -55,4 +55,8 @@ window.addEventListener("load", function () {
   var scheduleReassignFix = document.createElement("script");
   scheduleReassignFix.src = "./admin-schedule-reassign-fix.js?v=20260826-1148";
   document.body.appendChild(scheduleReassignFix);
+
+  var withdrawalButtonColor = document.createElement("script");
+  withdrawalButtonColor.src = "./admin-withdrawal-button-color.js?v=20260826-1220";
+  document.body.appendChild(withdrawalButtonColor);
 });
