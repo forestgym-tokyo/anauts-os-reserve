@@ -37,8 +37,8 @@ const context={
     calls.push({method:"GET",action,params});
     if(action==="getStaff")return{ok:true,data:{staff}};
     if(action==="getServices")return{ok:true,data:{services:[{service_code:"TOUR",provider_role:"STAFF"}]}};
-    if(action==="getStaffShifts")return{ok:true,data:{shifts}};
-    if(action==="getStaffSchedule"&&params.date==="2026-08-26")return{ok:true,data:{reservations:[{...reservation}]}};
+    if(action==="getStaffShifts")return{ok:true,data:{shifts:[]}};
+    if(action==="getStaffSchedule"&&params.date==="2026-08-26")return{ok:true,data:{reservations:[{...reservation}],shifts}};
     return{ok:true,data:{reservations:[]}};
   },
   apiPost:async payload=>{calls.push({method:"POST",payload});return{ok:true};}
@@ -52,6 +52,8 @@ vm.runInNewContext(source,context,{filename:"admin-auto-reassign-enforce.js"});
   assert.equal(hooks.eligible({...staff[1],can_counsel:true},{service_code:"COUNSEL",provider_role:"STAFF"}),true);
   assert.equal(hooks.eligible({...staff[1],can_meal_planning:true},{service_code:"MEAL_PLANNING",provider_role:"STAFF"}),true);
   assert.equal(hooks.eligible({...staff[1],role:"TRAINER"},{service_code:"TOUR",provider_role:"STAFF"}),false);
+  assert.equal(hooks.eligible({...staff[1],active:1,can_tour:1},{service_code:"TOUR",provider_role:"STAFF"}),true);
+  assert.equal(hooks.shiftDateOf({shift_date:"2026-08-26"}),"2026-08-26");
   assert.equal(hooks.works(staff[1],shifts,reservation),true);
   assert.equal(hooks.works(staff[1],[{...shifts[0],end_time:"14:30"}],reservation),false);
   assert.equal(hooks.free(staff[1],reservation,[{reservation_id:"OTHER",staff_code:"KAWAKAMI",start_time:"14:30",end_time:"15:30",status:"RESERVED"}]),false);
