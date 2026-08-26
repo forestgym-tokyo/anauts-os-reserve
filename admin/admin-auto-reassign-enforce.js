@@ -4,13 +4,12 @@
   const STORE_CODE="YACHIYO";
   const HORIZON_DAYS=30;
   const AUTO_SERVICES=new Set(["TOUR","COUNSEL","MEAL_PLANNING"]);
-
-  const bool=v=>v===true||String(v||"").trim().toUpperCase()==="TRUE";
   const code=v=>String(v||"").trim().toUpperCase();
-  const padTime=v=>String(v||"").slice(0,5);
-  const min=v=>{const m=/^(\d{1,2}):(\d{2})/.exec(String(v||""));return m?Number(m[1])*60+Number(m[2]):NaN;};
-  const overlap=(a1,a2,b1,b2)=>min(a1)<min(b2)&&min(a2)>min(b1);
-  const covers=(s,e,rs,re)=>min(s)<=min(rs)&&min(e)>=min(re);
+  const bool=v=>v===true||code(v)==="TRUE";
+  const hhmm=v=>String(v||"").slice(0,5);
+  const mins=v=>{const m=/^(\d{1,2}):(\d{2})/.exec(String(v||""));return m?Number(m[1])*60+Number(m[2]):NaN;};
+  const covers=(s,e,rs,re)=>mins(s)<=mins(rs)&&mins(e)>=mins(re);
+  const overlap=(a1,a2,b1,b2)=>mins(a1)<mins(b2)&&mins(a2)>mins(b1);
   const ymd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
   const addDays=(v,n)=>{const [y,m,d]=String(v).split("-").map(Number),x=new Date(y,m-1,d+n);return ymd(x);};
   const dateOf=r=>String(r?.date||r?.reservation_date||"").slice(0,10);
@@ -20,6 +19,15 @@
   let running=false;
   let queued=false;
   let authRunDone=false;
+
+  function permissionOf(s){
+    return code(s?.permission||s?.auth_permission||s?.user_permission||"");
+  }
+
+  function isManagement(s){
+    const p=permissionOf(s);
+    return p==="ADMIN"||p==="MANAGER";
+  }
 
   function permissionColumn(serviceCode){
     if(serviceCode==="TOUR")return"can_tour";
@@ -33,16 +41,17 @@
   }
 
   function roleAllowed(s,service){
-    const roles=String(service?.provider_role||"")
-      .split(",")
-      .map(code)
-      .filter(Boolean);
+    const roles=String(service?.provider_role||"").split(",").map(code).filter(Boolean);
     return !roles.length||roles.includes(code(s?.role));
   }
 
   function serviceAllowed(s,service){
-    const col=permissionColumn(code(service?.service_code));
-    return !col||bool(s?.[col]);
+    const serviceCode=code(service?.service_code);
+    const col=permissionColumn(serviceCode);
+    if(!col)return true;
+    if(bool(s?.[col]))return true;
+    if(AUTO_SERVICES.has(serviceCode)&&isManagement(s))return true;
+    return false;
   }
 
   function eligible(s,service){
@@ -52,15 +61,14 @@
   function uniqueReservations(rows){
     const map=new Map();
     (rows||[]).forEach(r=>{
-      const key=String(r?.reservation_id||"")||[dateOf(r),padTime(r?.start_time),serviceCodeOf(r),r?.customer_name||""].join("|");
+      const key=String(r?.reservation_id||"")||[dateOf(r),hhmm(r?.start_time),serviceCodeOf(r),r?.customer_name||""].join("|");
       if(!map.has(key))map.set(key,r);
     });
     return Array.from(map.values());
   }
 
   function works(staff,shifts,r){
-    const staffCode=code(staff?.staff_code);
-    const date=dateOf(r);
+    const staffCode=code(staff?.staff_code),date=dateOf(r);
     return shifts.some(x=>
       code(x?.staff_code)===staffCode&&
       String(x?.date||"").slice(0,10)===date&&
@@ -78,20 +86,13 @@
     });
   }
 
-  function permissionRank(s){
-    const p=code(s?.permission||s?.auth_permission||s?.user_permission||"STAFF");
-    return p==="ADMIN"?0:(p==="MANAGER"?1:2);
-  }
-
   function rankCandidate(s,dateRows){
+    const p=permissionOf(s);
+    const permissionRank=p==="ADMIN"?0:(p==="MANAGER"?1:2);
     const staffCode=code(s?.staff_code);
-    const assigned=dateRows.filter(r=>
-      activeReservation(r)&&
-      AUTO_SERVICES.has(serviceCodeOf(r))&&
-      code(r?.staff_code)===staffCode
-    );
-    const last=assigned.reduce((v,r)=>Math.max(v,min(r?.start_time)||0),0);
-    return[permissionRank(s),assigned.length,last,staffCode];
+    const assigned=dateRows.filter(r=>activeReservation(r)&&AUTO_SERVICES.has(serviceCodeOf(r))&&code(r?.staff_code)===staffCode);
+    const last=assigned.reduce((v,r)=>Math.max(v,mins(r?.start_time)||0),0);
+    return[permissionRank,assigned.length,last,staffCode];
   }
 
   function chooseCandidate(candidates,dateRows){
@@ -111,20 +112,10 @@
       apiGet("getServices"),
       apiGet("getStaffShifts",{start_date:start,end_date:end})
     ]);
-
-    const staff=Array.isArray(staffJson?.data?.staff)
-      ?staffJson.data.staff
-      :(Array.isArray(staffJson?.data)?staffJson.data:[]);
-
-    const services=Array.isArray(serviceJson?.data?.services)
-      ?serviceJson.data.services
-      :(Array.isArray(serviceJson?.data)?serviceJson.data:[]);
-
-    const shifts=(Array.isArray(shiftJson?.data?.shifts)
-      ?shiftJson.data.shifts
-      :(Array.isArray(shiftJson?.data)?shiftJson.data:[]))
+    const staff=Array.isArray(staffJson?.data?.staff)?staffJson.data.staff:(Array.isArray(staffJson?.data)?staffJson.data:[]);
+    const services=Array.isArray(serviceJson?.data?.services)?serviceJson.data.services:(Array.isArray(serviceJson?.data)?serviceJson.data:[]);
+    const shifts=(Array.isArray(shiftJson?.data?.shifts)?shiftJson.data.shifts:(Array.isArray(shiftJson?.data)?shiftJson.data:[]))
       .filter(x=>x?.active!==false&&code(x?.store_code||STORE_CODE)===STORE_CODE);
-
     return{staff,services,shifts};
   }
 
@@ -133,8 +124,8 @@
     for(const action of ["getStaffSchedule","getTrainerSchedule"]){
       try{
         const j=await apiGet(action,{date,store_code:STORE_CODE});
-        const reservations=Array.isArray(j?.data?.reservations)?j.data.reservations:[];
-        rows.push(...reservations.map(r=>({...r,date:dateOf(r)||date})));
+        const a=Array.isArray(j?.data?.reservations)?j.data.reservations:[];
+        rows.push(...a.map(r=>({...r,date:dateOf(r)||date})));
       }catch(error){
         console.warn("A-nauts auto reassign schedule fetch failed",action,date,error);
       }
@@ -143,14 +134,31 @@
   }
 
   async function reassignOne(r,chosen){
-    return apiPost({
+    const result=await apiPost({
       action:"updateReservation",
       internal_operation:true,
       reservation_id:r.reservation_id,
       date:dateOf(r),
-      start_time:padTime(r.start_time),
+      start_time:hhmm(r.start_time),
       staff_code:chosen.staff_code
     });
+    if(result&&result.ok===false){
+      throw new Error(result.message||"予約担当者の変更に失敗しました。");
+    }
+    return result;
+  }
+
+  function showFailures(failures){
+    if(!failures.length)return;
+    const f=failures[0];
+    const text=`自動担当変更に失敗しました：${f.customer||f.reservation_id} / ${f.message}`;
+    for(const id of ["staffScheduleMessage","opsTopMessage"]){
+      const el=document.getElementById(id);
+      if(!el)continue;
+      el.textContent=text;
+      el.classList.remove("is-hidden");
+      el.classList.add("is-error");
+    }
   }
 
   async function enforceAutoReassign(days=HORIZON_DAYS){
@@ -176,16 +184,22 @@
           const serviceCode=serviceCodeOf(r);
           if(!AUTO_SERVICES.has(serviceCode)||!r?.reservation_id)continue;
 
-          const service=serviceByCode.get(serviceCode)||{service_code:serviceCode,provider_role:r?.provider_role||r?.staff_role||"STAFF"};
+          const service=serviceByCode.get(serviceCode)||{service_code:serviceCode,provider_role:r?.provider_role||"STAFF"};
           const assigned=staffByCode.get(code(r?.staff_code))||null;
           const assignedValid=!!assigned&&eligible(assigned,service)&&works(assigned,master.shifts,r);
           if(assignedValid)continue;
 
-          const candidates=master.staff.filter(s=>
-            eligible(s,service)&&
-            works(s,master.shifts,r)&&
-            free(s,r,rows)
-          );
+          let candidates=master.staff.filter(s=>eligible(s,service)&&works(s,master.shifts,r)&&free(s,r,rows));
+
+          if(!candidates.length){
+            candidates=master.staff.filter(s=>
+              isActiveStaff(s)&&
+              roleAllowed(s,service)&&
+              isManagement(s)&&
+              works(s,master.shifts,r)&&
+              free(s,r,rows)
+            );
+          }
 
           const chosen=chooseCandidate(candidates,rows);
           if(!chosen)continue;
@@ -196,28 +210,42 @@
             r.staff_name=chosen.staff_name||chosen.display_name||chosen.staff_code;
             changed++;
           }catch(error){
-            failures.push({reservation_id:r.reservation_id,service_code:serviceCode,new_staff_code:chosen.staff_code,message:error?.message||String(error)});
+            failures.push({
+              reservation_id:r.reservation_id,
+              customer:String(r?.customer_name||""),
+              service_code:serviceCode,
+              new_staff_code:chosen.staff_code,
+              message:error?.message||String(error)
+            });
             console.error("A-nauts auto reassign failed",failures[failures.length-1]);
           }
         }
       }
+    }catch(error){
+      failures.push({reservation_id:"SYSTEM",customer:"",message:error?.message||String(error)});
+      console.error("A-nauts auto reassign scan failed",error);
     }finally{
       running=false;
       window.__ANAUTS_AUTO_REASSIGN_LAST_FAILURES__=failures;
+      showFailures(failures);
 
       if(changed){
-        try{
-          if(document.querySelector("#staffScheduleView.is-active")&&typeof loadStaffSchedule==="function"){
-            await loadStaffSchedule();
-          }else if(document.querySelector("#trainerScheduleView.is-active")&&typeof loadTrainerSchedule==="function"){
-            await loadTrainerSchedule();
-          }
-        }catch(_){ }
+        const last=Number(sessionStorage.getItem("anautsAutoReassignReloadAt")||0);
+        const now=Date.now();
+        if(now-last>3000){
+          sessionStorage.setItem("anautsAutoReassignReloadAt",String(now));
+          setTimeout(()=>location.reload(),180);
+        }else{
+          try{
+            if(document.querySelector("#staffScheduleView.is-active")&&typeof loadStaffSchedule==="function")await loadStaffSchedule();
+            if(document.querySelector("#trainerScheduleView.is-active")&&typeof loadTrainerSchedule==="function")await loadTrainerSchedule();
+          }catch(_){ }
+        }
       }
 
       if(queued){
         queued=false;
-        setTimeout(()=>enforceAutoReassign(days),150);
+        setTimeout(()=>enforceAutoReassign(days),180);
       }
     }
 
@@ -225,9 +253,7 @@
   }
 
   function trigger(delay=100){
-    if(typeof state!=="undefined"&&state?.authUser){
-      setTimeout(()=>enforceAutoReassign(HORIZON_DAYS),delay);
-    }
+    if(typeof state!=="undefined"&&state?.authUser)setTimeout(()=>enforceAutoReassign(HORIZON_DAYS),delay);
   }
 
   function waitForAuth(){
@@ -235,34 +261,24 @@
       setTimeout(waitForAuth,100);
       return;
     }
-
     if(state?.authUser){
-      if(!authRunDone){
-        authRunDone=true;
-        trigger(50);
-      }
+      if(!authRunDone){authRunDone=true;trigger(30);}
       return;
     }
-
-    setTimeout(waitForAuth,150);
+    setTimeout(waitForAuth,120);
   }
 
   function boot(){
     waitForAuth();
-
     document.addEventListener("click",event=>{
-      const button=event.target.closest?.("#opsReload,[data-view='operationsTop'],[data-view='staffSchedule']");
-      if(button)trigger(120);
+      const b=event.target.closest?.("#opsReload,[data-view='operationsTop'],[data-view='staffSchedule']");
+      if(b)trigger(80);
     },true);
-
-    window.addEventListener("focus",()=>trigger(120));
-    document.addEventListener("visibilitychange",()=>{
-      if(!document.hidden)trigger(120);
-    });
+    window.addEventListener("focus",()=>trigger(100));
+    document.addEventListener("visibilitychange",()=>{if(!document.hidden)trigger(100);});
   }
 
   window.ANAUTS_ENFORCE_AUTO_REASSIGN=enforceAutoReassign;
-
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot,{once:true});
   else boot();
 })();
