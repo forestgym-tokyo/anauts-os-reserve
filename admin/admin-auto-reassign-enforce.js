@@ -64,8 +64,8 @@
     let cursor=0;const results=new Array(items.length),run=async()=>{while(cursor<items.length){const index=cursor++;results[index]=await worker(items[index],index);}};
     await Promise.all(Array.from({length:Math.min(limit,items.length)},run));return results;
   }
-  async function scanAndReassign(days){
-    const start=typeof localYmd==="function"?localYmd():ymd(new Date()),end=addDays(start,days),master=await loadMaster(start,end);
+  async function scanAndReassign(days,startOverride=""){
+    const start=startOverride||(typeof localYmd==="function"?localYmd():ymd(new Date())),end=addDays(start,days),master=await loadMaster(start,end);
     const staffByCode=new Map(master.staff.map(s=>[code(s?.staff_code),s])),serviceByCode=new Map(master.services.map(s=>[code(s?.service_code),s]));
     const dates=Array.from({length:days+1},(_,index)=>addDays(start,index)),dateSchedules=await mapWithConcurrency(dates,MAX_DATE_WORKERS,loadDateSchedule);
     let changed=0;const failures=[],unresolved=[];
@@ -97,11 +97,11 @@
     try{if(document.querySelector("#staffScheduleView.is-active")&&typeof loadStaffSchedule==="function")await loadStaffSchedule();else if(document.querySelector("#trainerScheduleView.is-active")&&typeof loadTrainerSchedule==="function")await loadTrainerSchedule();}
     catch(error){console.warn("A-nauts schedule refresh after reassignment failed",error);}
   }
-  function enforceAutoReassign(days=HORIZON_DAYS,{force=false}={}){
+  function enforceAutoReassign(days=HORIZON_DAYS,{force=false,start=""}={}){
     if(typeof state==="undefined"||!state?.authUser||typeof apiGet!=="function"||typeof apiPost!=="function")return Promise.resolve(0);
     if(runningPromise){queuedDays=Math.max(queuedDays,days);return runningPromise;}
     const wait=force?0:Math.max(0,MIN_SCAN_INTERVAL_MS-(Date.now()-lastStartedAt));
-    runningPromise=(async()=>{if(wait)await new Promise(resolve=>setTimeout(resolve,wait));lastStartedAt=Date.now();const changed=await scanAndReassign(days);if(changed)await refreshVisibleSchedule();return changed;})()
+    runningPromise=(async()=>{if(wait)await new Promise(resolve=>setTimeout(resolve,wait));lastStartedAt=Date.now();const changed=await scanAndReassign(days,start);if(changed)await refreshVisibleSchedule();return changed;})()
       .catch(error=>{window.__ANAUTS_AUTO_REASSIGN_LAST_FAILURES__=[{reservation_id:"SYSTEM",message:error?.message||String(error)}];console.error("A-nauts auto reassign scan failed",error);return 0;})
       .finally(()=>{runningPromise=null;if(queuedDays){const nextDays=queuedDays;queuedDays=0;scheduleAutoReassign(nextDays,250);}});
     return runningPromise;
@@ -118,18 +118,28 @@
       const wasAuthenticated=authRunDone;
       const result=original.apply(this,arguments);
       authRunDone=!!state?.authUser;
-      if(authRunDone&&!wasAuthenticated)scheduleAutoReassign(HORIZON_DAYS,2500);
+      if(authRunDone&&!wasAuthenticated)scheduleAutoReassign(0,800);
       return result;
     };
     authHookInstalled=true;
   }
+  function installScheduleTriggers(){
+    document.addEventListener("click",event=>{
+      if(!event.target.closest?.("[data-view='staffSchedule'],#staffPrevDay,#staffNextDay,#staffToday"))return;
+      setTimeout(()=>{
+        if(!state?.authUser)return;
+        const date=String(state.staffScheduleDate||(typeof localYmd==="function"?localYmd():ymd(new Date()))).slice(0,10);
+        enforceAutoReassign(0,{force:true,start:date});
+      },700);
+    },true);
+  }
   function waitForAuth(){
     if(typeof state==="undefined"||typeof apiGet!=="function"||typeof apiPost!=="function"){setTimeout(waitForAuth,100);return;}
-    installApiHook();installAuthHook();if(state?.authUser){if(!authRunDone){authRunDone=true;scheduleAutoReassign(HORIZON_DAYS,2500);}return;}setTimeout(waitForAuth,150);
+    installApiHook();installAuthHook();if(state?.authUser){if(!authRunDone){authRunDone=true;scheduleAutoReassign(0,800);}return;}setTimeout(waitForAuth,150);
   }
 
   window.ANAUTS_ENFORCE_AUTO_REASSIGN=enforceAutoReassign;
   window.ANAUTS_SCHEDULE_AUTO_REASSIGN=scheduleAutoReassign;
   window.__ANAUTS_AUTO_REASSIGN_TEST__={eligible,works,free,chooseCandidate,uniqueReservations,activeStaff,shiftDateOf};
-  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",waitForAuth,{once:true});else waitForAuth();
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",()=>{installScheduleTriggers();waitForAuth();},{once:true});else{installScheduleTriggers();waitForAuth();}
 })();

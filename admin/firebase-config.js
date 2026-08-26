@@ -213,6 +213,6 @@ window.addEventListener("load", function () {
   document.body.appendChild(withdrawalButtonColor);
 
   var autoReassignEnforce = document.createElement("script");
-  autoReassignEnforce.src = "./admin-auto-reassign-enforce.js?v=20260826-1545";
+  autoReassignEnforce.src = "./admin-auto-reassign-enforce.js?v=20260826-1555";
   document.body.appendChild(autoReassignEnforce);
 });
