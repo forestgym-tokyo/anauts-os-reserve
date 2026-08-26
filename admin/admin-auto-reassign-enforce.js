@@ -35,13 +35,13 @@
     if(!message)return;
     if(failures.length){
       const first=failures[0]||{};
-      message.textContent=`諡・ｽ楢・ｒ蜀榊牡繧雁ｽ薙※縺ｧ縺阪↑縺・ｺ育ｴ・′${failures.length}莉ｶ縺ゅｊ縺ｾ縺吶・{first.reservation_id||""}`.trim();
+      message.textContent=`担当者を再割り当てできない予約が${failures.length}件あります。${first.reservation_id||""}`.trim();
       message.classList.remove("is-hidden");
       message.classList.add("is-error");
       return;
     }
     if(changed>0){
-      message.textContent=`${changed}莉ｶ縺ｮ諡・ｽ楢・ｒ閾ｪ蜍募､画峩縺励∪縺励◆・医♀螳｢讒倥∈縺ｮ螟画峩繝｡繝ｼ繝ｫ騾∽ｿ｡縺ｪ縺暦ｼ峨Ａ;
+      message.textContent=`${changed}件の担当者を自動変更しました（お客様への変更メール送信なし）。`;
       message.classList.remove("is-hidden","is-error");
     }
   }
@@ -75,7 +75,7 @@
         days:normalizedDays
       });
       if(result&&result.ok===false){
-        throw new Error(result.message||"莠育ｴ・球蠖楢・ｒ蜀榊愛螳壹〒縺阪∪縺帙ｓ縺ｧ縺励◆縲・);
+        throw new Error(result.message||"予約担当者を再判定できませんでした。");
       }
       showResult(result);
       if(Number(result?.data?.changed_count||0)>0){
@@ -125,4 +125,3 @@
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot,{once:true});
   else boot();
 })();
-
