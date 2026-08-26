@@ -57,6 +57,6 @@ window.addEventListener("load", function () {
   document.body.appendChild(scheduleReassignFix);
 
   var withdrawalButtonColor = document.createElement("script");
-  withdrawalButtonColor.src = "./admin-withdrawal-button-color.js?v=20260826-1220";
+  withdrawalButtonColor.src = "./admin-withdrawal-button-color.js?v=20260826-1235";
   document.body.appendChild(withdrawalButtonColor);
 });
