@@ -2,9 +2,10 @@
   "use strict";
 
   const STORE_CODE="YACHIYO";
+  const SINGLE_AUTO=new Set(["TOUR","COUNSEL","MEAL_PLANNING"]);
   const ALL_CAPACITY=new Set(["PROCEDURE","UNSUBSCRIBE","TRAINING_SUPPORT45"]);
   const PERSONAL_RE=/^PT(?:_|\d|$)/;
-  const OPS={loading:false,alerts:[],staff:[],services:[],shifts:[],reservations:[],horizon:14,staffSaveBypass:false,shiftSubmitBypass:false,pendingConflictText:"",apiWrapped:false,refreshTimer:0,enhanceTimer:0};
+  const OPS={loading:false,alerts:[],staff:[],services:[],shifts:[],reservations:[],horizon:14,staffSaveBypass:false,shiftSubmitBypass:false,pendingConflictText:"",apiWrapped:false};
   const q=s=>document.querySelector(s), qa=s=>Array.from(document.querySelectorAll(s));
   const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const ymd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
@@ -74,6 +75,35 @@
     return dedupe(rows.filter(r=>!isCancelled(r)));
   }
 
+  function fairnessRank(s,r){
+    const p=String(s.permission||s.auth_permission||s.user_permission||"").toUpperCase();
+    const pr=p==="ADMIN"?0:(p==="MANAGER"?1:2);
+    const date=reservationDate(r);
+    const assigned=OPS.reservations.filter(x=>reservationDate(x)===date&&String(x.staff_code||"")===String(s.staff_code||"")&&SINGLE_AUTO.has(codeOf(x)));
+    const last=assigned.reduce((m,x)=>Math.max(m,min(x.start_time)||0),0);
+    return[pr,assigned.length,last,String(s.staff_code||"")];
+  }
+  function bestAutoCandidate(r,cands){return cands.slice().sort((a,b)=>{const x=fairnessRank(a,r),y=fairnessRank(b,r);for(let i=0;i<x.length;i++){if(x[i]<y[i])return-1;if(x[i]>y[i])return 1;}return 0;})[0]||null;}
+  async function autoResolveAssignable(){
+    const targets=OPS.alerts.filter(x=>SINGLE_AUTO.has(codeOf(x.r))&&(x.state.candidates||[]).length>0);
+    for(const x of targets){
+      const cands=x.state.candidates||[];
+      /*
+       * 候補1名なら自動割当。複数候補は、全候補のpermissionが取得できる場合だけ
+       * ADMIN > MANAGER > 当日割当件数 > 最終割当 > staff_code の順で自動決定する。
+       * permissionが取得できない環境では誤った優先付けを避け、TOPで手動選択に残す。
+       */
+      const hasPermissions=cands.every(s=>String(s.permission||s.auth_permission||s.user_permission||"").trim());
+      if(cands.length>1&&!hasPermissions)continue;
+      const chosen=cands.length===1?cands[0]:bestAutoCandidate(x.r,cands);
+      if(!chosen||!x.r.reservation_id)continue;
+      try{
+        await apiPost({action:"updateReservation",reservation_id:x.r.reservation_id,date:reservationDate(x.r),start_time:String(x.r.start_time||"").slice(0,5),staff_code:chosen.staff_code});
+        x.r.staff_code=chosen.staff_code;x.r.staff_name=chosen.staff_name||chosen.display_name||chosen.staff_code;
+      }catch(_){ }
+    }
+  }
+
   async function scanOperations(start=localYmd(),days=OPS.horizon){
     const end=addDays(start,days);
     await ensureMaster(start,end);
@@ -83,7 +113,7 @@
     await Promise.all(Array.from({length:Math.min(5,dates.length)},worker));
     OPS.reservations=dedupe(all);
     OPS.alerts=OPS.reservations.map(r=>({r,state:assignmentState(r)})).filter(x=>!x.state.valid);
-    // Automatic writes are owned by admin-auto-reassign-enforce.js.
+    await autoResolveAssignable();
     OPS.alerts=OPS.reservations.map(r=>({r,state:assignmentState(r)})).filter(x=>!x.state.valid);
     return OPS.alerts;
   }
@@ -177,10 +207,10 @@
   function installStaffRoleWarning(){const form=q("#staffForm");if(!form||form.dataset.opsRoleCheck)return;form.dataset.opsRoleCheck="1";form.addEventListener("submit",async e=>{if(OPS.staffSaveBypass){OPS.staffSaveBypass=false;return;}const code=String(q("#staffCode")?.value||"").trim().toUpperCase(),old=state.staff?.find(s=>String(s.staff_code)===code);if(!old)return;const changed=String(old.role||"")!==String(q("#staffRole")?.value||"")||bool(old.can_personal)!==q("#staffCanPersonal")?.checked||bool(old.can_tour)!==q("#staffCanTour")?.checked||bool(old.can_counsel)!==q("#staffCanCounsel")?.checked||bool(old.can_meal_planning)!==q("#staffCanMealPlanning")?.checked||bool(old.can_procedure)!==q("#staffCanProcedure")?.checked||bool(old.can_unsubscribe)!==q("#staffCanUnsubscribe")?.checked||bool(old.can_training_support)!==q("#staffCanTrainingSupport")?.checked||isActive(old)!==q("#staffActive")?.checked;if(!changed)return;e.preventDefault();e.stopImmediatePropagation();try{await scanOperations(localYmd(),30);const future=OPS.reservations.filter(r=>String(r.staff_code)===code);if(future.length){const ok=confirm(`このスタッフ設定の変更により、現在担当している未来の予約を再判定します。\n対象予約 ${future.length}件\n\n担当者なしになる可能性があります。このまま変更しますか？`);if(!ok)return;}}catch(_){ }OPS.staffSaveBypass=true;form.requestSubmit();},true);}
 
 
-  function wrapApiPost(){if(OPS.apiWrapped||typeof apiPost!=="function")return;const original=apiPost;apiPost=async function(payload){let p=payload;if(p&&p.action==="createShiftChangeRequest"&&OPS.pendingConflictText){const warning=`【重要：既存予定あり】\n${OPS.pendingConflictText}`;p={...p,reason:[warning,p.reason||""].filter(Boolean).join("\n\n"),has_existing_reservation:true,existing_reservation_summary:OPS.pendingConflictText};OPS.pendingConflictText="";}const result=await original(p);if(p&&!p.internal_operation&&["saveStaff","saveStaffShift","deleteStaffShift","createShiftChangeRequest","updateReservation"].includes(p.action)){clearTimeout(OPS.refreshTimer);OPS.refreshTimer=setTimeout(async()=>{if(!state?.authUser||!q("#operationsTopView.is-active"))return;try{await loadTop(true);}catch(_){ }},700);}return result;};OPS.apiWrapped=true;}
+  function wrapApiPost(){if(OPS.apiWrapped||typeof apiPost!=="function")return;const original=apiPost;apiPost=async function(payload){let p=payload;if(p&&p.action==="createShiftChangeRequest"&&OPS.pendingConflictText){const warning=`【重要：既存予定あり】\n${OPS.pendingConflictText}`;p={...p,reason:[warning,p.reason||""].filter(Boolean).join("\n\n"),has_existing_reservation:true,existing_reservation_summary:OPS.pendingConflictText};OPS.pendingConflictText="";}const result=await original(p);if(p&&["saveStaff","saveStaffShift","deleteStaffShift","createShiftChangeRequest","updateReservation"].includes(p.action)){setTimeout(async()=>{if(!state?.authUser)return;try{if(q("#operationsTopView.is-active"))await loadTop(true);else await scanOperations(localYmd(),OPS.horizon);}catch(_){ }},700);}return result;};OPS.apiWrapped=true;}
 
   function wrapPermissionUi(){if(typeof applyPermissionUi!=="function"||applyPermissionUi.__opsWrapped)return;const original=applyPermissionUi;const wrapped=function(){original();q("#operationsTopNav")?.classList.toggle("is-hidden",!state?.authUser);};wrapped.__opsWrapped=true;applyPermissionUi=wrapped;}
   function wrapInitialize(){if(typeof initializeAppAfterAuth!=="function"||initializeAppAfterAuth.__opsWrapped)return;const original=initializeAppAfterAuth;const wrapped=async function(){if(state?.authUser){await openTop();return;}return original();};wrapped.__opsWrapped=true;initializeAppAfterAuth=wrapped;}
-  function boot(){if(typeof state==="undefined"||typeof apiGet!=="function"||typeof apiPost!=="function"||typeof localYmd!=="function"){setTimeout(boot,100);return;}buildTop();wrapApiPost();wrapPermissionUi();wrapInitialize();installShiftWarnings();installStaffRoleWarning();if(state.authUser){q("#operationsTopNav")?.classList.remove("is-hidden");setTimeout(openTop,0);}const mo=new MutationObserver(()=>{clearTimeout(OPS.enhanceTimer);OPS.enhanceTimer=setTimeout(()=>{enhanceCalendarDetails();fixWithdrawalLayout();installShiftWarnings();installStaffRoleWarning();},40);});mo.observe(document.documentElement,{childList:true,subtree:true});q("#logoutButton")?.addEventListener("click",()=>q("#operationsTopNav")?.classList.add("is-hidden"));}
+  function boot(){if(typeof state==="undefined"||typeof apiGet!=="function"||typeof apiPost!=="function"||typeof localYmd!=="function"){setTimeout(boot,100);return;}buildTop();wrapApiPost();wrapPermissionUi();wrapInitialize();installShiftWarnings();installStaffRoleWarning();if(state.authUser){q("#operationsTopNav")?.classList.remove("is-hidden");setTimeout(openTop,0);}const mo=new MutationObserver(()=>{enhanceCalendarDetails();fixWithdrawalLayout();installShiftWarnings();installStaffRoleWarning();if(q("#staffScheduleView.is-active")||q("#trainerScheduleView.is-active"))setTimeout(enhanceCurrentSchedule,20);});mo.observe(document.documentElement,{childList:true,subtree:true});q("#logoutButton")?.addEventListener("click",()=>q("#operationsTopNav")?.classList.add("is-hidden"));}
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot);else boot();
 })();

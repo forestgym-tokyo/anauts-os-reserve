@@ -193,11 +193,11 @@ window.addEventListener("load", function () {
   document.body.appendChild(dailyReport);
 
   var operationsCenter = document.createElement("script");
-  operationsCenter.src = "./admin-operations-center.js?v=20260826-1500";
+  operationsCenter.src = "./admin-operations-center.js?v=20260826-1030";
   document.body.appendChild(operationsCenter);
 
   var operationsRefreshFix = document.createElement("script");
-  operationsRefreshFix.src = "./admin-operations-refresh-fix.js?v=20260826-1500";
+  operationsRefreshFix.src = "./admin-operations-refresh-fix.js?v=20260826-1040";
   document.body.appendChild(operationsRefreshFix);
 
   var internalReservationBridge = document.createElement("script");
@@ -205,7 +205,7 @@ window.addEventListener("load", function () {
   document.body.appendChild(internalReservationBridge);
 
   var scheduleReassignFix = document.createElement("script");
-  scheduleReassignFix.src = "./admin-schedule-reassign-fix.js?v=20260826-1500";
+  scheduleReassignFix.src = "./admin-schedule-reassign-fix.js?v=20260826-1148";
   document.body.appendChild(scheduleReassignFix);
 
   var withdrawalButtonColor = document.createElement("script");
@@ -213,6 +213,6 @@ window.addEventListener("load", function () {
   document.body.appendChild(withdrawalButtonColor);
 
   var autoReassignEnforce = document.createElement("script");
-  autoReassignEnforce.src = "./admin-auto-reassign-enforce.js?v=20260826-1555";
+  autoReassignEnforce.src = "./admin-auto-reassign-enforce.js?v=20260826-1329";
   document.body.appendChild(autoReassignEnforce);
 });
