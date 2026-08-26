@@ -43,4 +43,8 @@ window.addEventListener("load", function () {
   var operationsCenter = document.createElement("script");
   operationsCenter.src = "./admin-operations-center.js?v=20260826-1030";
   document.body.appendChild(operationsCenter);
+
+  var operationsRefreshFix = document.createElement("script");
+  operationsRefreshFix.src = "./admin-operations-refresh-fix.js?v=20260826-1040";
+  document.body.appendChild(operationsRefreshFix);
 });
