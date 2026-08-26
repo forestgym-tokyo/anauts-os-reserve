@@ -105,6 +105,32 @@
   }
 
   async function scanOperations(start=localYmd(),days=OPS.horizon){
+    try{
+      const result=await apiPost({
+        action:"reassignInvalidReservations",
+        start_date:start,
+        days:days,
+        include_snapshot:true
+      });
+      const snapshot=result?.data?.snapshot;
+      if(
+        snapshot&&
+        Array.isArray(snapshot.staff)&&
+        Array.isArray(snapshot.services)&&
+        Array.isArray(snapshot.shifts)&&
+        Array.isArray(snapshot.reservations)
+      ){
+        OPS.staff=snapshot.staff;
+        OPS.services=snapshot.services;
+        OPS.shifts=snapshot.shifts.filter(x=>x&&x.active!==false);
+        OPS.reservations=dedupe(snapshot.reservations.filter(r=>!isCancelled(r)));
+        OPS.alerts=OPS.reservations.map(r=>({r,state:assignmentState(r)})).filter(x=>!x.state.valid);
+        return OPS.alerts;
+      }
+    }catch(error){
+      console.warn("A-nauts operations snapshot fallback",error);
+    }
+
     const end=addDays(start,days);
     await ensureMaster(start,end);
     const dates=Array.from({length:days+1},(_,i)=>addDays(start,i));
@@ -112,8 +138,6 @@
     const worker=async()=>{while(cursor<dates.length){const d=dates[cursor++];all.push(...await fetchDateReservations(d));}};
     await Promise.all(Array.from({length:Math.min(5,dates.length)},worker));
     OPS.reservations=dedupe(all);
-    OPS.alerts=OPS.reservations.map(r=>({r,state:assignmentState(r)})).filter(x=>!x.state.valid);
-    // Automatic updateReservation is disabled because it sends customer mail.
     OPS.alerts=OPS.reservations.map(r=>({r,state:assignmentState(r)})).filter(x=>!x.state.valid);
     return OPS.alerts;
   }
