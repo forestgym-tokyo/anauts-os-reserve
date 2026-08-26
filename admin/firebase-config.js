@@ -51,4 +51,8 @@ window.addEventListener("load", function () {
   var internalReservationBridge = document.createElement("script");
   internalReservationBridge.src = "./admin-reservation-internal-bridge.js?v=20260826-1055";
   document.body.appendChild(internalReservationBridge);
+
+  var scheduleReassignFix = document.createElement("script");
+  scheduleReassignFix.src = "./admin-schedule-reassign-fix.js?v=20260826-1148";
+  document.body.appendChild(scheduleReassignFix);
 });
