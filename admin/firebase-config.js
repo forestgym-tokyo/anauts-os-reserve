@@ -57,10 +57,10 @@ window.addEventListener("load", function () {
   document.body.appendChild(scheduleReassignFix);
 
   var withdrawalButtonColor = document.createElement("script");
-  withdrawalButtonColor.src = "./admin-withdrawal-button-color.js?v=20260826-1235";
+  withdrawalButtonColor.src = "./admin-withdrawal-button-color.js?v=20260826-1258";
   document.body.appendChild(withdrawalButtonColor);
 
   var autoReassignEnforce = document.createElement("script");
-  autoReassignEnforce.src = "./admin-auto-reassign-enforce.js?v=20260826-1248";
+  autoReassignEnforce.src = "./admin-auto-reassign-enforce.js?v=20260826-1258";
   document.body.appendChild(autoReassignEnforce);
 });
