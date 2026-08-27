@@ -27,9 +27,19 @@
   window.ANAUTS_PERSONAL_GENDER = "";
   window.ANAUTS_PERSONAL_GENDER_SOURCE = "";
 
+  function applyStepNumbers_() {
+    const availabilityStep = document.querySelector("#availabilityStep");
+    const customerStep = document.querySelector("#customerStep");
+    if (availabilityStep) availabilityStep.textContent = "3";
+    if (customerStep) customerStep.textContent = "4";
+  }
+
   function ensureEligibilitySection() {
     let section = document.querySelector("#personalEligibilitySection");
-    if (section) return section;
+    if (section) {
+      applyStepNumbers_();
+      return section;
+    }
 
     section = document.createElement("section");
     section.id = "personalEligibilitySection";
@@ -79,9 +89,7 @@
     }
 
     serviceSection.insertAdjacentElement("afterend", section);
-
-    document.querySelector("#availabilityStep")?.replaceChildren(document.createTextNode("3"));
-    document.querySelector("#customerStep")?.replaceChildren(document.createTextNode("4"));
+    applyStepNumbers_();
 
     if (routeKey === "personal") {
       const memberInput = section.querySelector("#eligibilityMemberNo");
@@ -105,6 +113,7 @@
 
   function showGate() {
     const section = ensureEligibilitySection();
+    applyStepNumbers_();
     section.classList.remove("is-hidden");
     availabilitySection.classList.add("is-hidden");
     customerSection?.classList.add("is-hidden");
@@ -138,6 +147,20 @@
     document.querySelectorAll('input[name="eligibility_gender"]').forEach((radio) => {
       radio.checked = false;
     });
+  }
+
+  function syncVerifiedIdentityToReservationForm_() {
+    if (routeKey !== "personal" || !ready) return;
+
+    const member = document.querySelector("#memberNo");
+    const email = document.querySelector("#customerEmail");
+
+    if (member) member.value = verifiedMemberNo;
+    if (email) email.value = verifiedEmail;
+
+    // 会員番号・メールはSTEP 2で確認済みなので、お客様情報では再入力させない。
+    document.querySelector("#memberNoField")?.classList.add("is-hidden");
+    email?.closest("label.field")?.classList.add("is-hidden");
   }
 
   function invalidateEligibility() {
@@ -291,13 +314,8 @@
         : "予約可能な日時を表示します。"
     );
 
-    if (routeKey === "personal") {
-      const member = document.querySelector("#memberNo");
-      const email = document.querySelector("#customerEmail");
-      if (member) member.value = verifiedMemberNo;
-      if (email) email.value = verifiedEmail;
-    }
-
+    applyStepNumbers_();
+    syncVerifiedIdentityToReservationForm_();
     availabilitySection.classList.remove("is-hidden");
 
     document.dispatchEvent(new CustomEvent("anauts:booking-gender-ready", {
@@ -340,7 +358,11 @@
   if (routeKey === "personal") {
     serviceGrid?.addEventListener("click", () => {
       setTimeout(() => {
-        if (ready) return;
+        applyStepNumbers_();
+        if (ready) {
+          syncVerifiedIdentityToReservationForm_();
+          return;
+        }
         showGate();
         ensureEligibilitySection().scrollIntoView({ behavior: "smooth", block: "start" });
       }, 0);
@@ -354,6 +376,7 @@
       } catch (_) {
         return false;
       }
+      applyStepNumbers_();
       if (!ready) showGate();
       return true;
     };
@@ -407,5 +430,6 @@
   };
 
   ensureEligibilitySection();
+  applyStepNumbers_();
   availabilitySection.classList.add("is-hidden");
 })();
