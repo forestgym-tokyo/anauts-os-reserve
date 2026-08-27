@@ -1,4 +1,4 @@
-/* A-nauts OS Reserve - Yoshimaru first booking gender check */
+/* A-nauts OS Reserve - Yoshimaru member-master gender check */
 (() => {
   "use strict";
 
@@ -17,6 +17,11 @@
   let genderRequired = false;
   let policyChecking = false;
   let allowNextSubmit = false;
+
+  const GENDER_REQUIRED_MESSAGE =
+    "会員マスターに性別情報がありません。ご予約予定の吉丸りなトレーナーは女性限定となりますので、性別をお答えください。";
+  const FEMALE_ONLY_MESSAGE =
+    "吉丸りなトレーナーは女性限定です。他のトレーナーをお選びください。";
 
   function showError(message) {
     const node = document.querySelector("#formError");
@@ -47,7 +52,7 @@
         <label><input type="radio" name="yoshimaru_gender" value="男性"> 男性</label>
       </div>
       <p style="margin:9px 0 0;font-size:12px;line-height:1.6;opacity:.72">
-        吉丸りなトレーナーは女性専用です。スタッフによる初回確認が完了するまで、予約時に表示されます。
+        ${GENDER_REQUIRED_MESSAGE}
       </p>
     `;
 
@@ -57,7 +62,7 @@
     field.querySelectorAll('input[name="yoshimaru_gender"]').forEach((radio) => {
       radio.addEventListener("change", () => {
         if (radio.value === "男性") {
-          showError("吉丸りなトレーナーは女性専用です。");
+          showError(FEMALE_ONLY_MESSAGE);
         } else {
           hideError();
         }
@@ -75,13 +80,17 @@
     ensureGenderField().classList.toggle("is-hidden", !visible);
   }
 
+  function clearGenderSelection() {
+    document.querySelectorAll('input[name="yoshimaru_gender"]').forEach((radio) => {
+      radio.checked = false;
+    });
+  }
+
   function resetGenderCheck() {
     genderRequired = false;
     allowNextSubmit = false;
     setGenderVisible(false);
-    document.querySelectorAll('input[name="yoshimaru_gender"]').forEach((radio) => {
-      radio.checked = false;
-    });
+    clearGenderSelection();
   }
 
   function summaryShowsYoshimaru() {
@@ -167,7 +176,7 @@
     }
   });
 
-  // 吉丸トレーナー確定後、実予約を作る前に確認済みかを事前判定する。
+  // 吉丸トレーナー確定後、実予約を作る前に会員マスターのgenderを確認する。
   form.addEventListener("submit", async (event) => {
     if (!isYoshimaruSelected()) {
       resetGenderCheck();
@@ -191,7 +200,7 @@
       if (gender !== "女性") {
         event.preventDefault();
         event.stopImmediatePropagation();
-        showError("吉丸りなトレーナーは女性専用です。");
+        showError(FEMALE_ONLY_MESSAGE);
       }
       return;
     }
@@ -219,8 +228,16 @@
       if (code === "YOSHIMARU_GENDER_REQUIRED") {
         genderRequired = true;
         setGenderVisible(true);
-        showError("吉丸りなトレーナーは女性専用です。スタッフ確認が完了するまで、予約時に性別を選択してください。");
+        showError(GENDER_REQUIRED_MESSAGE);
         ensureGenderField().scrollIntoView({ behavior: "smooth", block: "nearest" });
+        return;
+      }
+
+      if (code === "YOSHIMARU_FEMALE_ONLY") {
+        genderRequired = false;
+        setGenderVisible(false);
+        clearGenderSelection();
+        showError(FEMALE_ONLY_MESSAGE);
         return;
       }
 
@@ -231,16 +248,16 @@
         return;
       }
 
-      throw new Error(result?.message || "確認状態を確認できませんでした。");
+      throw new Error(result?.message || "性別情報を確認できませんでした。");
     } catch (error) {
-      showError(error?.message || "確認状態を確認できませんでした。再度お試しください。");
+      showError(error?.message || "性別情報を確認できませんでした。再度お試しください。");
     } finally {
       policyChecking = false;
     }
   }, true);
 
   // 実予約時だけ、吉丸トレーナーと必要な場合の性別をpayloadへ含める。
-  // サーバー側でも同じポリシーを再検証するため、フロント判定だけには依存しない。
+  // サーバー側でも会員マスターを再確認するため、フロント判定だけには依存しない。
   window.fetch = async function(input, init) {
     let isYoshimaruReservation = false;
 
@@ -282,15 +299,15 @@
         const result = await response.clone().json();
         const code = responseCode(result);
 
-        // サーバー側の最終防御。事前確認と実予約の間に状態が変わっても安全に処理する。
         if (code === "YOSHIMARU_GENDER_REQUIRED") {
           genderRequired = true;
           setGenderVisible(true);
-          showError("吉丸りなトレーナーは女性専用です。スタッフ確認が完了するまで、予約時に性別を選択してください。");
+          showError(GENDER_REQUIRED_MESSAGE);
         } else if (code === "YOSHIMARU_FEMALE_ONLY") {
-          genderRequired = true;
-          setGenderVisible(true);
-          showError("吉丸りなトレーナーは女性専用です。");
+          genderRequired = false;
+          setGenderVisible(false);
+          clearGenderSelection();
+          showError(FEMALE_ONLY_MESSAGE);
         } else if (result?.ok) {
           resetGenderCheck();
         }
