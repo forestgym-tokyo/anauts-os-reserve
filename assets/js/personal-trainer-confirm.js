@@ -1,7 +1,7 @@
 /* A-nauts OS Reserve - personal trainer final confirmation */
 (()=>{
   "use strict";
-  if((location.pathname.split("/").filter(Boolean).pop()||"")!=="personal")return;
+  if(!["personal","trial"].includes(location.pathname.split("/").filter(Boolean).pop()||""))return;
 
   let filterTrainerCode="";
   let confirmedTrainerCode="";

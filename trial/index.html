@@ -18,7 +18,7 @@
   <section id="serviceSection" class="card is-hidden">
     <div class="step">
       <span class="step-num">1</span>
-      <h2>サービスを選択</h2>
+      <h2>プラン</h2>
     </div>
     <div id="serviceGrid" class="service-grid"></div>
   </section>
@@ -27,6 +27,12 @@
     <div class="step">
       <span id="availabilityStep" class="step-num">2</span>
       <h2>日時を選択</h2>
+    </div>
+
+    <div id="personalTrainerFilter" style="margin:0 0 22px">
+      <div style="font-weight:800;font-size:16px;margin-bottom:10px">トレーナーで絞り込む</div>
+      <div id="personalTrainerChoices" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+      <p id="personalTrainerStatus" style="margin:9px 0 0;font-size:12px;opacity:.72">トレーナー一覧を読み込んでいます…</p>
     </div>
 
     <div class="week-toolbar">
@@ -55,17 +61,17 @@
       <fieldset id="customerTypeField" class="field is-hidden">
         <legend>会員区分</legend>
         <div class="choice-row">
-          <label><input type="radio" name="customer_type" value="MEMBER"> 会員</label>
-          <label><input type="radio" name="customer_type" value="VISITOR"> 非会員</label>
+          <label><input type="radio" name="customer_type" value="MEMBER"> 会員様</label>
+          <label><input type="radio" name="customer_type" value="VISITOR"> 非会員様</label>
         </div>
       </fieldset>
 
       <div id="memberNoField" class="field is-hidden">
         <label for="memberNo"><span>会員番号</span></label>
-        <input id="memberNo" type="text" placeholder="例：108035">
+        <input id="memberNo" type="text" inputmode="numeric" maxlength="6" placeholder="6桁の数字のみ">
         <div style="margin-top:10px;font-size:13px;">
           <span>会員番号がわからない方</span><br>
-          <a href="https://forestgym-tokyo.github.io/tfg-member-id-lookup/" target="_blank" rel="noopener" style="display:inline-block;margin-top:6px;padding:9px 14px;border:1px solid #178447;border-radius:8px;color:#178447;background:#ffffff;text-decoration:none;font-weight:700;">会員番号を確認する</a>
+          <a href="https://forestgym-tokyo.github.io/tfg-member-id-lookup/" target="_blank" rel="noopener" style="display:inline-block;margin-top:6px;padding:9px 14px;border:1px solid #178447;border-radius:8px;color:#178447;background:#ffffff;text-decoration:none;font-size:13px;font-weight:700;">会員番号を確認する</a>
         </div>
       </div>
 
@@ -74,36 +80,14 @@
         <input id="customerName" type="text" autocomplete="name">
       </label>
 
-      <label class="field">
-        <span>メールアドレス</span>
-        <input id="customerEmail" type="email" autocomplete="email" placeholder="example@gmail.com" required>
-      </label>
-
-      <label id="phoneField" class="field">
-        <span>電話番号</span>
-        <input id="customerPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="09012345678">
-      </label>
-
-      <label id="postalField" class="field is-hidden">
-        <span>郵便番号</span>
-        <input id="postalCode" type="text" inputmode="numeric" placeholder="1234567">
-      </label>
-
-      <label id="addressField" class="field is-hidden">
-        <span>住所</span>
-        <input id="address" type="text" autocomplete="street-address">
-      </label>
-
-      <label class="field">
-        <span>ご要望・備考</span>
-        <textarea id="note" rows="4"></textarea>
-      </label>
+      <label class="field"><span>メールアドレス</span><input id="customerEmail" type="email" autocomplete="email" placeholder="example@gmail.com" required></label>
+      <label id="phoneField" class="field"><span>電話番号</span><input id="customerPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="09012345678"></label>
+      <label id="postalField" class="field is-hidden"><span>郵便番号</span><input id="postalCode" type="text" inputmode="numeric" placeholder="2760040"></label>
+      <label id="addressField" class="field is-hidden"><span>住所</span><input id="address" type="text" autocomplete="street-address"></label>
+      <label class="field"><span>ご要望・備考</span><textarea id="note" rows="4"></textarea></label>
 
       <div id="formError" class="alert alert-error is-hidden" role="alert"></div>
-
-      <button id="submitButton" class="button button-primary" type="submit">
-        この内容で予約する
-      </button>
+      <button id="submitButton" class="button button-primary" type="submit">この内容で予約する</button>
     </form>
   </section>
 
@@ -121,7 +105,8 @@
 </main>
 
 <script src="../assets/js/reserve.js" defer></script>
-<script src="../assets/js/trial-trainer.js?v=20260827-1" defer></script>
+<script src="../assets/js/personal-v54.js?v=20260827-1737" defer></script>
+<script src="../assets/js/personal-trainer-confirm.js?v=20260827-1737" defer></script>
 <script src="../assets/js/yoshimaru-gender.js?v=20260827-1" defer></script>
 </body>
 </html>

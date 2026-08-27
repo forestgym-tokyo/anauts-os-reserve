@@ -1,7 +1,7 @@
 /* A-nauts OS Reserve - Personal booking enhancements v56 */
 (() => {
   const routeKey = location.pathname.split("/").filter(Boolean).pop() || "personal";
-  if (routeKey !== "personal") return;
+  if (!["personal", "trial"].includes(routeKey)) return;
 
   let selectedTrainerCode = "";
   let loadedStoreCode = "";
@@ -128,6 +128,30 @@
     }
   }
 
+  function showTrialFixedPlan_() {
+    if (routeKey !== "trial" || !selectedService) return;
+
+    const section = document.querySelector("#serviceSection");
+    const grid = document.querySelector("#serviceGrid");
+    if (!section || !grid) return;
+
+    grid.replaceChildren();
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "service-card is-selected";
+    card.disabled = true;
+    card.setAttribute("aria-disabled", "true");
+    card.style.cursor = "default";
+    card.innerHTML = `無料体験パーソナル<small>${Number(selectedService.duration) || ""}分</small>`;
+    grid.append(card);
+
+    section.classList.remove("is-hidden");
+    const availabilityStep = document.querySelector("#availabilityStep");
+    const customerStep = document.querySelector("#customerStep");
+    if (availabilityStep) availabilityStep.textContent = "2";
+    if (customerStep) customerStep.textContent = "3";
+  }
+
   // getAvailableSlots: trainer filter + timeout.
   fetchSlots = async function(date) {
     const url = new URL(API_URL);
@@ -153,10 +177,30 @@
     }
   };
 
-  // プラン選択後、空き枠とは独立してstaffマスターからトレーナー一覧を取得する。
-  document.querySelector("#serviceGrid")?.addEventListener("click", () => {
-    setTimeout(loadPublicTrainers_, 0);
-  });
+  // 通常パーソナルはプラン選択後にトレーナー一覧を取得する。
+  if (routeKey === "personal") {
+    document.querySelector("#serviceGrid")?.addEventListener("click", () => {
+      setTimeout(loadPublicTrainers_, 0);
+    });
+  }
+
+  // 無料体験は固定サービスが初期化された時点で、通常パーソナルと同じUIを表示する。
+  if (routeKey === "trial") {
+    const availability = document.querySelector("#availabilitySection");
+    const initializeTrialUi = () => {
+      if (!selectedService) return false;
+      showTrialFixedPlan_();
+      loadPublicTrainers_();
+      return true;
+    };
+
+    if (!initializeTrialUi() && availability) {
+      const observer = new MutationObserver(() => {
+        if (initializeTrialUi()) observer.disconnect();
+      });
+      observer.observe(availability, { attributes: true, attributeFilter: ["class"] });
+    }
+  }
 
   // Reservation POST: preserve chosen trainer in createReservation payload.
   window.fetch = async function(input, init) {
