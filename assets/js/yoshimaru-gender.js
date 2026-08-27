@@ -339,6 +339,22 @@
   }
 
   document.addEventListener("click", (event) => {
+    if (event.target.closest?.("#newReservationButton") && genderSource === "SELF_DECLARED") {
+      invalidateEligibility();
+      showGate();
+      ensureEligibilitySection().scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+
+    if (event.target.closest?.(".service-card")) {
+      filterTrainerCode = "";
+      finalTrainerCode = "";
+    }
+
+    if (event.target.closest?.(".slot-button")) {
+      finalTrainerCode = "";
+    }
+
     const trainer = event.target.closest?.("#personalTrainerChoices [data-trainer-code]");
     if (trainer) {
       filterTrainerCode = String(trainer.dataset.trainerCode || "").trim().toUpperCase();

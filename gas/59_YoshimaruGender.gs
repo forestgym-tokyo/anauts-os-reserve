@@ -37,10 +37,61 @@ function createReservationWithTrainerPolicy_(params) {
     return getYoshimaruBookingGenderStateResponse_(params);
   }
 
+  const trainerSelection = validatePersonalTrainerSelection_(params);
+  if (!trainerSelection.ok) return trainerSelection.response;
+
   const policy = validateYoshimaruGenderPolicy_(params);
   if (!policy.ok) return policy.response;
 
   return createReservation(params);
+}
+
+
+/**
+ * パーソナル系予約は、性別ポリシー確認前に担当トレーナーを確定させる。
+ * staff_code 未指定のまま createReservation() に渡すと、その内部の
+ * 自動割当で女性限定トレーナーが選ばれる可能性があるため、必ず拒否する。
+ */
+function validatePersonalTrainerSelection_(params) {
+  params = params || {};
+
+  const staffCode = normalizeYoshimaruText_(params.staff_code).toUpperCase();
+  if (staffCode || !isPersonalServiceForGenderPolicy_(params.service_code)) {
+    return { ok: true };
+  }
+
+  return {
+    ok: false,
+    response: errorResponse(
+      "担当トレーナーを確認できませんでした。空き状況を更新し、日時を選び直してください。",
+      "PERSONAL_TRAINER_REQUIRED",
+      {
+        service_code: normalizeYoshimaruText_(params.service_code)
+      }
+    )
+  };
+}
+
+
+/**
+ * 現行サービスコードは PT60 / PT_*。将来コード体系が変わった場合は
+ * services の category=PERSONAL も参照する。
+ */
+function isPersonalServiceForGenderPolicy_(serviceCodeValue) {
+  const serviceCode = normalizeYoshimaruText_(serviceCodeValue).toUpperCase();
+  if (!serviceCode) return false;
+  if (/^PT(?:\d|_)/.test(serviceCode)) return true;
+
+  if (typeof getAvailabilityService_ === "function") {
+    try {
+      const service = getAvailabilityService_(serviceCode);
+      return normalizeYoshimaruText_(service && service.category).toUpperCase() === "PERSONAL";
+    } catch (_) {
+      return false;
+    }
+  }
+
+  return false;
 }
 
 

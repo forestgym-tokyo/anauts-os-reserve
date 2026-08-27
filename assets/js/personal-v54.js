@@ -291,10 +291,11 @@
 
   // プラン選択直後は会員・性別確認を優先する。日程は確認完了後に読み込む。
   if (routeKey === "personal") {
-    document.querySelector("#serviceGrid")?.addEventListener("click", () => {
+    document.querySelector("#serviceGrid")?.addEventListener("click", (event) => {
+      if (!event.target.closest?.(".service-card")) return;
       selectedTrainerCode = "";
       renderTrainerChoices();
-    });
+    }, true);
   }
 
   if (routeKey === "trial") {
