@@ -8,6 +8,7 @@
   const GET_ACTION="getPendingYoshimaruVerifications";
   const POST_ACTION="verifyYoshimaruCustomer";
   let refreshTimer=null;
+  let authObserver=null;
   let loading=false;
 
   const esc=v=>String(v??"")
@@ -174,8 +175,16 @@
     }
   }
 
+  function watchAuthState(){
+    const authArea=document.getElementById("authUserArea");
+    if(!authArea||authObserver)return;
+    authObserver=new MutationObserver(()=>refreshCount());
+    authObserver.observe(authArea,{attributes:true,attributeFilter:["class"]});
+  }
+
   function start(){
     ensureLauncher();
+    watchAuthState();
     refreshCount();
     clearInterval(refreshTimer);
     refreshTimer=setInterval(refreshCount,60000);
