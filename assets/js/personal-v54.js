@@ -9,21 +9,17 @@
   const trainerMap = new Map();
   const nativeFetch = window.fetch.bind(window);
 
-  function bookingGenderReady_() {
-    return window.ANAUTS_PERSONAL_GENDER_READY === true;
+  function bookingEligibilityReady_() {
+    return window.ANAUTS_PERSONAL_ELIGIBILITY_READY === true;
   }
 
-  function bookingGender_() {
-    return String(window.ANAUTS_PERSONAL_GENDER || "").trim();
-  }
-
-  function isMaleBooking_() {
-    return bookingGender_() === "男性";
+  function womenOnlyTrainerAllowed_() {
+    return window.ANAUTS_YOSHIMARU_ALLOWED === true;
   }
 
   function trainerAllowed_(code) {
     const normalized = String(code || "").trim().toUpperCase();
-    return !(isMaleBooking_() && normalized === WOMEN_ONLY_TRAINER_CODE);
+    return womenOnlyTrainerAllowed_() || normalized !== WOMEN_ONLY_TRAINER_CODE;
   }
 
   function visibleTrainers_() {
@@ -104,9 +100,9 @@
   async function loadPublicTrainers_() {
     ensureTrainerFilter();
 
-    if (!bookingGenderReady_()) {
+    if (!bookingEligibilityReady_()) {
       const status = document.querySelector("#personalTrainerStatus");
-      if (status) status.textContent = "会員情報・性別の確認後に表示します。";
+      if (status) status.textContent = "会員情報の確認後に表示します。";
       return;
     }
 
@@ -259,10 +255,10 @@
     };
   }
 
-  // getAvailableSlots: 性別確定前は日程を出さない。
-  // 男性の「すべて」は女性限定トレーナーを除く各トレーナーの空きを統合する。
+  // getAvailableSlots: 会員確認前は日程を出さない。
+  // 吉丸対象外会員の「すべて」は、吉丸以外の各トレーナーの空きを統合する。
   fetchSlots = async function(date) {
-    if (!bookingGenderReady_()) {
+    if (!bookingEligibilityReady_()) {
       return { ok: true, data: { date, slots: [] } };
     }
 
@@ -273,7 +269,7 @@
       return fetchSlotsForTrainer_(date, selectedTrainerCode);
     }
 
-    if (!isMaleBooking_()) {
+    if (womenOnlyTrainerAllowed_()) {
       return fetchSlotsForTrainer_(date, "");
     }
 
@@ -289,7 +285,7 @@
     return mergeTrainerSlotResults_(date, results);
   };
 
-  // プラン選択直後は会員・性別確認を優先する。日程は確認完了後に読み込む。
+  // プラン選択直後は会員確認を優先する。日程は確認完了後に読み込む。
   if (routeKey === "personal") {
     document.querySelector("#serviceGrid")?.addEventListener("click", (event) => {
       if (!event.target.closest?.(".service-card")) return;
@@ -314,7 +310,7 @@
     }
   }
 
-  document.addEventListener("anauts:booking-gender-ready", async () => {
+  document.addEventListener("anauts:booking-eligibility-ready", async () => {
     selectedTrainerCode = "";
     selectedSlot = null;
     document.querySelector("#customerSection")?.classList.add("is-hidden");
@@ -322,7 +318,7 @@
     loadWeek();
   });
 
-  document.addEventListener("anauts:booking-gender-invalidated", () => {
+  document.addEventListener("anauts:booking-eligibility-invalidated", () => {
     selectedTrainerCode = "";
     selectedSlot = null;
     renderTrainerChoices();

@@ -145,15 +145,6 @@ function doGet(e) {
           params
         );
 
-      case "getPendingYoshimaruVerifications":
-        requireAuth_(
-          params,
-          ["ADMIN", "MANAGER", "STAFF"]
-        );
-        return getPendingYoshimaruVerifications(
-          params
-        );
-
       case "getCalendars":
         requireAuth_(
           params,
@@ -295,19 +286,6 @@ function doPost(e) {
           ]
         );
         return sendReservationRescheduleRequest(
-          body
-        );
-
-      case "verifyYoshimaruCustomer":
-        requireAuth_(
-          body,
-          [
-            "ADMIN",
-            "MANAGER",
-            "STAFF"
-          ]
-        );
-        return verifyYoshimaruCustomer(
           body
         );
 

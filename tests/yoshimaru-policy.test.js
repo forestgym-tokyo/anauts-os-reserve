@@ -11,7 +11,8 @@ const source = fs.readFileSync(
 const members = {
   "000001": { memberNo: "000001", email: "female@example.com", gender: "F" },
   "000002": { memberNo: "000002", email: "male@example.com", gender: "M" },
-  "000003": { memberNo: "000003", email: "blank@example.com", gender: "" }
+  "000003": { memberNo: "000003", email: "blank@example.com", gender: "" },
+  "000004": { memberNo: "000004", email: "unknown@example.com", gender: "UNKNOWN" }
 };
 
 const services = {
@@ -114,6 +115,43 @@ function reserve(context, overrides) {
 {
   const context = createContext();
   const result = reserve(context, {
+    service_code: "PT_TRIAL60",
+    staff_code: "YOSHIMARU",
+    member_no: "000002",
+    customer_email: "male@example.com"
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "YOSHIMARU_FEMALE_ONLY");
+  assert.equal(context.created.length, 0);
+}
+
+{
+  const context = createContext();
+  const result = reserve(context, {
+    service_code: "PT_TRIAL60",
+    staff_code: "YOSHIMARU"
+  });
+  assert.equal(result.ok, true);
+  assert.equal(context.created.length, 1);
+}
+
+{
+  const context = createContext();
+  const result = reserve(context, {
+    service_code: "PT_TRIAL60",
+    policy_check_only: true,
+    staff_code: "YOSHIMARU",
+    member_no: "999999",
+    customer_email: "not-member@example.com"
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "MEMBER_NOT_FOUND");
+  assert.equal(context.created.length, 0);
+}
+
+{
+  const context = createContext();
+  const result = reserve(context, {
     staff_code: "OTHER_TRAINER",
     member_no: "000002",
     customer_email: "male@example.com"
@@ -137,16 +175,22 @@ function reserve(context, overrides) {
     customer_email: "blank@example.com"
   });
   assert.equal(missing.ok, false);
-  assert.equal(missing.code, "YOSHIMARU_GENDER_REQUIRED");
+  assert.equal(missing.code, "YOSHIMARU_FEMALE_ONLY");
 
-  const female = reserve(context, {
+  assert.equal(context.created.length, 0);
+}
+
+{
+  const context = createContext();
+  const result = reserve(context, {
+    policy_check_only: true,
     staff_code: "YOSHIMARU",
-    member_no: "000003",
-    customer_email: "blank@example.com",
-    gender: "女性"
+    member_no: "000004",
+    customer_email: "unknown@example.com"
   });
-  assert.equal(female.ok, true);
-  assert.equal(context.created.length, 1);
+  assert.equal(result.ok, true);
+  assert.equal(result.data.yoshimaru_eligible, false);
+  assert.equal(context.created.length, 0);
 }
 
 {
@@ -158,7 +202,44 @@ function reserve(context, overrides) {
     customer_email: "male@example.com"
   });
   assert.equal(result.ok, true);
-  assert.equal(result.data.gender_state, "MALE");
+  assert.equal(result.data.yoshimaru_eligible, false);
+  assert.equal(context.created.length, 0);
+}
+
+{
+  const context = createContext();
+  const result = reserve(context, {
+    policy_check_only: true,
+    staff_code: "YOSHIMARU"
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.data.yoshimaru_eligible, true);
+  assert.equal(context.created.length, 0);
+}
+
+{
+  const context = createContext();
+  const result = reserve(context, {
+    policy_check_only: true,
+    staff_code: "YOSHIMARU",
+    member_no: "000003",
+    customer_email: "blank@example.com"
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.data.yoshimaru_eligible, false);
+  assert.equal(context.created.length, 0);
+}
+
+{
+  const context = createContext();
+  const result = reserve(context, {
+    policy_check_only: true,
+    staff_code: "YOSHIMARU",
+    member_no: "",
+    customer_email: ""
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "MEMBER_NUMBER_REQUIRED");
   assert.equal(context.created.length, 0);
 }
 
