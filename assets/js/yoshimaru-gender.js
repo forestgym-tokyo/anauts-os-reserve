@@ -19,9 +19,9 @@
   let allowNextSubmit = false;
 
   const GENDER_REQUIRED_MESSAGE =
-    "会員マスターに性別情報がありません。ご予約予定の吉丸りなトレーナーは女性限定となりますので、性別をお答えください。";
+    "会員マスターに性別情報がありません。ご予約予定のトレーナーは女性限定となりますので、性別をお答えください。";
   const FEMALE_ONLY_MESSAGE =
-    "吉丸りなトレーナーは女性限定です。他のトレーナーをお選びください。";
+    "ご予約予定のトレーナーは女性限定です。他のトレーナーをお選びください。";
 
   function showError(message) {
     const node = document.querySelector("#formError");
