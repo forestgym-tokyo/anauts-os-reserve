@@ -6,18 +6,14 @@
   if (!["personal", "trial"].includes(routeKey)) return;
 
   const YOSHIMARU_CODE = "YOSHIMARU";
-  const YOSHIMARU_NAME = "吉丸りな";
-  const nativeFetch = window.fetch.bind(window);
-
-  let selectedTrainerCode = "";
-  let checkedIdentityKey = "";
-  let genderRequired = null;
-  let checking = false;
-  let bypass = false;
-
+  const previousFetch = window.fetch.bind(window);
   const form = document.querySelector("#reservationForm");
   const noteField = document.querySelector("#note")?.closest("label, .field");
+
   if (!form) return;
+
+  let selectedTrainerCode = "";
+  let genderRequired = false;
 
   function showError(message) {
     const node = document.querySelector("#formError");
@@ -48,7 +44,7 @@
         <label><input type="radio" name="yoshimaru_gender" value="男性"> 男性</label>
       </div>
       <p style="margin:9px 0 0;font-size:12px;line-height:1.6;opacity:.72">
-        吉丸りなトレーナーをご予約される初回のみ確認しています。
+        吉丸りなトレーナーを初めてご予約される場合のみ確認しています。
       </p>
     `;
 
@@ -76,6 +72,14 @@
     ensureGenderField().classList.toggle("is-hidden", !visible);
   }
 
+  function resetGenderCheck() {
+    genderRequired = false;
+    setGenderVisible(false);
+    document.querySelectorAll('input[name="yoshimaru_gender"]').forEach((radio) => {
+      radio.checked = false;
+    });
+  }
+
   function summaryShowsYoshimaru() {
     return String(document.querySelector("#selectedSlotText")?.textContent || "").includes("吉丸");
   }
@@ -84,52 +88,14 @@
     return selectedTrainerCode === YOSHIMARU_CODE || summaryShowsYoshimaru();
   }
 
-  function currentIdentityKey() {
-    const memberNo = String(document.querySelector("#memberNo")?.value || "").trim();
-    const email = String(document.querySelector("#customerEmail")?.value || "").trim().toLowerCase();
-    return `${memberNo}|${email}`;
-  }
-
-  function resetCheck() {
-    checkedIdentityKey = "";
-    genderRequired = null;
-    setGenderVisible(false);
-    document.querySelectorAll('input[name="yoshimaru_gender"]').forEach((radio) => {
-      radio.checked = false;
-    });
-  }
-
-  async function checkFirstBooking() {
-    const memberNo = String(document.querySelector("#memberNo")?.value || "").trim();
-    const email = String(document.querySelector("#customerEmail")?.value || "").trim().toLowerCase();
-    const serviceCode = String(selectedService?.service_code || "").trim();
-
-    const url = new URL(API_URL);
-    url.searchParams.set("action", "checkTrainerFirstGender");
-    url.searchParams.set("staff_code", YOSHIMARU_CODE);
-    url.searchParams.set("member_no", memberNo);
-    url.searchParams.set("email", email);
-    url.searchParams.set("service_code", serviceCode);
-    url.searchParams.set("_", Date.now().toString());
-
-    const response = await nativeFetch(url.toString(), { cache: "no-store" });
-    const result = await response.json();
-
-    if (!result.ok) {
-      throw new Error(result.message || "性別確認の初回判定に失敗しました。");
-    }
-
-    return Boolean(result.data?.gender_required);
-  }
-
-  // トレーナー選択を追跡。personalのフィルター、trialの選択、最終確認モーダルに対応。
+  // personalの絞り込み、trialのトレーナー選択、personalの最終担当選択を追跡する。
   document.addEventListener("click", (event) => {
-    const filterButton = event.target.closest?.("[data-trainer-code]");
-    if (filterButton) {
-      const nextCode = String(filterButton.dataset.trainerCode || "").trim().toUpperCase();
-      if (selectedTrainerCode !== nextCode) {
+    const trainerButton = event.target.closest?.("[data-trainer-code]");
+    if (trainerButton) {
+      const nextCode = String(trainerButton.dataset.trainerCode || "").trim().toUpperCase();
+      if (nextCode !== selectedTrainerCode) {
         selectedTrainerCode = nextCode;
-        resetCheck();
+        resetGenderCheck();
       }
       return;
     }
@@ -139,122 +105,97 @@
       const nextCode = String(confirmButton.textContent || "").includes("吉丸")
         ? YOSHIMARU_CODE
         : "OTHER";
-      if (selectedTrainerCode !== nextCode) {
+      if (nextCode !== selectedTrainerCode) {
         selectedTrainerCode = nextCode;
-        resetCheck();
+        resetGenderCheck();
       }
     }
   }, true);
 
-  document.querySelector("#customerEmail")?.addEventListener("input", () => {
-    if (checkedIdentityKey && checkedIdentityKey !== currentIdentityKey()) resetCheck();
-  });
-  document.querySelector("#memberNo")?.addEventListener("input", () => {
-    if (checkedIdentityKey && checkedIdentityKey !== currentIdentityKey()) resetCheck();
-  });
+  // 初回確認が表示された後は、女性を選ぶまで予約送信させない。
+  form.addEventListener("submit", (event) => {
+    if (!isYoshimaruSelected()) {
+      resetGenderCheck();
+      return;
+    }
 
-  // 予約POSTに初回確認済みの性別を付与する。
+    if (!genderRequired) return;
+
+    const gender = selectedGender();
+    if (!gender) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      showError("性別を選択してください。");
+      return;
+    }
+
+    if (gender !== "女性") {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      showError("吉丸りなトレーナーは女性専用です。");
+    }
+  }, true);
+
+  // createReservationへ吉丸トレーナーと、必要な場合だけ性別を渡す。
+  // GASが「初回確認が必要」と返した場合だけ性別欄を表示する。
   window.fetch = async function(input, init) {
+    let isYoshimaruReservation = false;
+
     try {
       const method = String(init?.method || "GET").toUpperCase();
       const target = typeof input === "string" ? input : String(input?.url || input || "");
 
-      if (method === "POST" && target === API_URL && typeof init?.body === "string" && isYoshimaruSelected()) {
+      if (
+        method === "POST" &&
+        target === API_URL &&
+        typeof init?.body === "string" &&
+        isYoshimaruSelected()
+      ) {
         const body = JSON.parse(init.body);
+
         if (body?.action === "createReservation") {
+          isYoshimaruReservation = true;
           body.staff_code = YOSHIMARU_CODE;
+
           const gender = selectedGender();
-          if (genderRequired === true && gender) body.gender = gender;
-          init = { ...init, body: JSON.stringify(body) };
+          if (genderRequired && gender) {
+            body.gender = gender;
+          }
+
+          init = {
+            ...init,
+            body: JSON.stringify(body)
+          };
         }
       }
     } catch (_) {
-      // JSON以外は変更しない。
+      // JSON以外は既存処理へそのまま渡す。
     }
 
-    return nativeFetch(input, init);
+    const response = await previousFetch(input, init);
+
+    if (isYoshimaruReservation) {
+      try {
+        const result = await response.clone().json();
+
+        if (result?.code === "YOSHIMARU_GENDER_REQUIRED") {
+          genderRequired = true;
+          setGenderVisible(true);
+          showError("吉丸りなトレーナーは女性専用です。初回のみ性別を選択してください。");
+        } else if (result?.code === "YOSHIMARU_FEMALE_ONLY") {
+          genderRequired = true;
+          setGenderVisible(true);
+          showError("吉丸りなトレーナーは女性専用です。");
+        } else if (result?.ok) {
+          resetGenderCheck();
+        }
+      } catch (_) {
+        // 共通予約処理側で通常の通信エラー処理を行う。
+      }
+    }
+
+    return response;
   };
-
-  form.addEventListener("submit", async (event) => {
-    if (bypass) {
-      bypass = false;
-      return;
-    }
-
-    if (!isYoshimaruSelected()) {
-      setGenderVisible(false);
-      return;
-    }
-
-    const email = String(document.querySelector("#customerEmail")?.value || "").trim();
-    if (!email) return; // 共通フォーム側の通常バリデーションを優先。
-
-    const identityKey = currentIdentityKey();
-
-    if (checkedIdentityKey === identityKey && genderRequired !== null) {
-      if (!genderRequired) {
-        setGenderVisible(false);
-        return;
-      }
-
-      setGenderVisible(true);
-      const gender = selectedGender();
-      if (!gender) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        showError("性別を選択してください。");
-        return;
-      }
-      if (gender !== "女性") {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        showError("吉丸りなトレーナーは女性専用です。");
-        return;
-      }
-      return;
-    }
-
-    if (checking) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      return;
-    }
-
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    checking = true;
-
-    const submit = document.querySelector("#submitButton");
-    const oldText = submit?.textContent;
-    if (submit) {
-      submit.disabled = true;
-      submit.textContent = "初回確認中…";
-    }
-
-    try {
-      genderRequired = await checkFirstBooking();
-      checkedIdentityKey = identityKey;
-
-      if (genderRequired) {
-        setGenderVisible(true);
-        showError("吉丸りなトレーナーは女性専用です。初回のみ性別を選択してください。");
-        return;
-      }
-
-      setGenderVisible(false);
-      hideError();
-      bypass = true;
-      form.requestSubmit();
-    } catch (error) {
-      showError(error.message || "性別確認を行えませんでした。再度お試しください。");
-    } finally {
-      checking = false;
-      if (submit) {
-        submit.disabled = false;
-        submit.textContent = oldText || "この内容で予約する";
-      }
-    }
-  }, true);
 
   ensureGenderField();
 })();
