@@ -269,6 +269,16 @@ function doPost(e) {
           body
         );
 
+      case "reassignReservationStaff":
+        return reassignReservationStaff(
+          body
+        );
+
+      case "reassignInvalidReservations":
+        return reassignInvalidReservations(
+          body
+        );
+
       /*
        * =====================================================
        * 担当者都合による予約変更・キャンセル依頼メール
