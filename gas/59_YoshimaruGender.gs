@@ -70,7 +70,7 @@ function validateYoshimaruGenderPolicy_(params) {
     return {
       ok: false,
       response: errorResponse(
-        "吉丸りなトレーナーは女性限定です。他のトレーナーをお選びください。",
+        "ご予約予定のトレーナーは女性限定です。他のトレーナーをお選びください。",
         "YOSHIMARU_FEMALE_ONLY",
         {
           staff_code: YOSHIMARU_GENDER_POLICY_.STAFF_CODE,
@@ -86,7 +86,7 @@ function validateYoshimaruGenderPolicy_(params) {
     return {
       ok: false,
       response: errorResponse(
-        "会員マスターに性別情報がありません。ご予約予定の吉丸りなトレーナーは女性限定となりますので、性別をお答えください。",
+        "会員マスターに性別情報がありません。ご予約予定のトレーナーは女性限定となりますので、性別をお答えください。",
         "YOSHIMARU_GENDER_REQUIRED",
         {
           staff_code: YOSHIMARU_GENDER_POLICY_.STAFF_CODE,
@@ -100,7 +100,7 @@ function validateYoshimaruGenderPolicy_(params) {
     return {
       ok: false,
       response: errorResponse(
-        "吉丸りなトレーナーは女性限定です。他のトレーナーをお選びください。",
+        "ご予約予定のトレーナーは女性限定です。他のトレーナーをお選びください。",
         "YOSHIMARU_FEMALE_ONLY",
         {
           staff_code: YOSHIMARU_GENDER_POLICY_.STAFF_CODE,
