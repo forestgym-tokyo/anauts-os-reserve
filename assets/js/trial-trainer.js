@@ -28,7 +28,7 @@
     box.id = "trialTrainerFilter";
     box.style.margin = "0 0 22px";
     box.innerHTML = `
-      <div style="font-weight:800;font-size:16px;margin-bottom:10px">トレーナーで絞り込む</div>
+      <div style="font-weight:800;font-size:16px;margin-bottom:10px">担当トレーナーを選択</div>
       <div id="trialTrainerChoices" style="display:flex;flex-wrap:wrap;gap:8px"></div>
       <p id="trialTrainerStatus" style="margin:9px 0 0;font-size:12px;opacity:.72">トレーナー一覧を読み込んでいます…</p>
     `;
@@ -40,55 +40,46 @@
     const area = document.querySelector("#trialTrainerChoices");
     if (!area) return;
 
-    const choices = [
-      { code: "", name: "すべてのトレーナー" },
-      ...Array.from(trainerMap.values()).sort((a, b) =>
-        String(a.name || "").localeCompare(String(b.name || ""), "ja")
-      )
-    ];
-
     area.replaceChildren();
 
-    choices.forEach((trainer) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.textContent = trainer.code
-        ? trainerLabel(trainer.name || trainer.code)
-        : trainer.name;
-      button.dataset.trainerCode = trainer.code;
-      button.style.padding = "9px 13px";
-      button.style.borderRadius = "999px";
-      button.style.border = trainer.code === selectedTrainerCode
-        ? "1px solid #d9b85d"
-        : "1px solid rgba(255,255,255,.18)";
-      button.style.background = trainer.code === selectedTrainerCode
-        ? "rgba(217,184,93,.18)"
-        : "transparent";
-      button.style.color = "inherit";
-      button.style.fontWeight = "700";
-      button.style.cursor = "pointer";
+    Array.from(trainerMap.values())
+      .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "ja"))
+      .forEach((trainer) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = trainerLabel(trainer.name || trainer.code);
+        button.dataset.trainerCode = trainer.code;
+        button.style.padding = "9px 13px";
+        button.style.borderRadius = "999px";
+        button.style.border = trainer.code === selectedTrainerCode
+          ? "1px solid #d9b85d"
+          : "1px solid rgba(255,255,255,.18)";
+        button.style.background = trainer.code === selectedTrainerCode
+          ? "rgba(217,184,93,.18)"
+          : "transparent";
+        button.style.color = "inherit";
+        button.style.fontWeight = "700";
+        button.style.cursor = "pointer";
 
-      button.addEventListener("click", () => {
-        if (selectedTrainerCode === trainer.code) return;
+        button.addEventListener("click", () => {
+          if (selectedTrainerCode === trainer.code) return;
 
-        selectedTrainerCode = trainer.code;
-        selectedTrainerName = trainer.code ? trainer.name : "";
-        selectedSlot = null;
-        document.querySelector("#customerSection")?.classList.add("is-hidden");
-        renderTrainerChoices();
+          selectedTrainerCode = trainer.code;
+          selectedTrainerName = trainer.name;
+          selectedSlot = null;
+          document.querySelector("#customerSection")?.classList.add("is-hidden");
+          renderTrainerChoices();
 
-        const status = document.querySelector("#trialTrainerStatus");
-        if (status) {
-          status.textContent = trainer.code
-            ? `${trainerLabel(trainer.name)}の予約可能時間を表示します。`
-            : "すべてのトレーナーの予約可能時間を表示します。";
-        }
+          const status = document.querySelector("#trialTrainerStatus");
+          if (status) {
+            status.textContent = `${trainerLabel(trainer.name)}の予約可能時間を表示します。`;
+          }
 
-        nativeLoadWeek();
+          nativeLoadWeek();
+        });
+
+        area.append(button);
       });
-
-      area.append(button);
-    });
   }
 
   async function loadPublicTrainers() {
@@ -119,22 +110,15 @@
         trainerMap.set(code, { code, name });
       });
 
-      if (selectedTrainerCode && !trainerMap.has(selectedTrainerCode)) {
-        selectedTrainerCode = "";
-        selectedTrainerName = "";
-      }
-
       renderTrainerChoices();
 
       if (status) {
         status.textContent = trainerMap.size
-          ? "トレーナーを指定すると、そのトレーナーの予約可能時間だけを表示します。"
-          : "現在表示できるトレーナーがいません。";
+          ? "最初に担当トレーナーを選択してください。"
+          : "現在選択できるトレーナーがいません。";
       }
     } catch (error) {
       trainerMap.clear();
-      selectedTrainerCode = "";
-      selectedTrainerName = "";
       renderTrainerChoices();
       if (status) {
         status.textContent = "トレーナー一覧を取得できませんでした。";
@@ -143,20 +127,31 @@
     }
   }
 
-  // 通常パーソナルと同じく、未指定は「すべてのトレーナー」として空き枠を表示する。
+  // 体験は担当トレーナー選択を必須にする。
   loadWeek = async function() {
+    if (!selectedTrainerCode) {
+      selectedSlot = null;
+      document.querySelector("#customerSection")?.classList.add("is-hidden");
+      const list = document.querySelector("#weekList");
+      const status = document.querySelector("#weekStatus");
+      if (list) list.replaceChildren();
+      if (status) status.textContent = "まず担当トレーナーを選択してください。";
+      return;
+    }
     return nativeLoadWeek();
   };
 
-  // 個別指定時だけ担当トレーナーで絞り込む。
+  // 選択したトレーナーの枠だけを取得する。
   fetchSlots = async function(date) {
+    if (!selectedTrainerCode) {
+      return { ok: true, data: { date, slots: [] } };
+    }
+
     const url = new URL(API_URL);
     url.searchParams.set("action", "getAvailableSlots");
     url.searchParams.set("service_code", selectedService.service_code);
     url.searchParams.set("date", date);
-    if (selectedTrainerCode) {
-      url.searchParams.set("staff_code", selectedTrainerCode);
-    }
+    url.searchParams.set("staff_code", selectedTrainerCode);
     url.searchParams.set("_", Date.now().toString());
 
     const controller = new AbortController();
@@ -178,7 +173,7 @@
     }
   };
 
-  // 個別指定した場合だけ予約POSTへ担当者を含める。
+  // 予約POSTへ選択した担当者を確実に含める。
   window.fetch = async function(input, init) {
     try {
       const method = String(init?.method || "GET").toUpperCase();
