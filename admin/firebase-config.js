@@ -87,11 +87,6 @@ document.addEventListener("DOMContentLoaded", function () {
         return json;
       } catch (error) {
         lastError = error;
-
-        /*
-         * JSONとして返ってきた業務エラーはparse後に処理するためここには来ない。
-         * HTML応答・通信失敗のみ次候補URLを試す。
-         */
         continue;
       }
     }
@@ -113,9 +108,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         return {
           url: url,
-          options: {
-            cache: "no-store"
-          }
+          options: { cache: "no-store" }
         };
       },
       action
@@ -212,4 +205,7 @@ window.addEventListener("load", function () {
   withdrawalButtonColor.src = "./admin-withdrawal-button-color.js?v=20260826-1258";
   document.body.appendChild(withdrawalButtonColor);
 
+  var yoshimaruVerification = document.createElement("script");
+  yoshimaruVerification.src = "./admin-yoshimaru-verification.js?v=20260827-1";
+  document.body.appendChild(yoshimaruVerification);
 });
