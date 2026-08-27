@@ -38,13 +38,13 @@
     field.id = "yoshimaruGenderField";
     field.className = "field is-hidden";
     field.innerHTML = `
-      <legend>性別（初回確認）</legend>
+      <legend>性別確認</legend>
       <div class="choice-row">
         <label><input type="radio" name="yoshimaru_gender" value="女性"> 女性</label>
         <label><input type="radio" name="yoshimaru_gender" value="男性"> 男性</label>
       </div>
       <p style="margin:9px 0 0;font-size:12px;line-height:1.6;opacity:.72">
-        吉丸りなトレーナーは女性専用です。スタッフによる初回確認が完了するまで表示されます。
+        吉丸りなトレーナーは女性専用です。スタッフによる初回確認が完了するまで、予約時に表示されます。
       </p>
     `;
 
@@ -88,6 +88,16 @@
     return selectedTrainerCode === YOSHIMARU_CODE || summaryShowsYoshimaru();
   }
 
+  function responseCode(result) {
+    return String(
+      result?.code ||
+      result?.error_code ||
+      result?.data?.code ||
+      result?.detail?.code ||
+      ""
+    ).trim().toUpperCase();
+  }
+
   // personalの絞り込み、trialのトレーナー選択、personalの最終担当選択を追跡する。
   document.addEventListener("click", (event) => {
     const trainerButton = event.target.closest?.("[data-trainer-code]");
@@ -112,7 +122,7 @@
     }
   }, true);
 
-  // 初回確認が表示された後は、女性を選ぶまで予約送信させない。
+  // スタッフ確認前は、性別欄が表示された後に女性を選ぶまで予約送信させない。
   form.addEventListener("submit", (event) => {
     if (!isYoshimaruSelected()) {
       resetGenderCheck();
@@ -137,7 +147,7 @@
   }, true);
 
   // createReservationへ吉丸トレーナーと、必要な場合だけ性別を渡す。
-  // GASが「初回確認が必要」と返した場合だけ性別欄を表示する。
+  // GASが「スタッフ確認前のため性別確認が必要」と返した場合だけ性別欄を表示する。
   window.fetch = async function(input, init) {
     let isYoshimaruReservation = false;
 
@@ -177,12 +187,13 @@
     if (isYoshimaruReservation) {
       try {
         const result = await response.clone().json();
+        const code = responseCode(result);
 
-        if (result?.code === "YOSHIMARU_GENDER_REQUIRED") {
+        if (code === "YOSHIMARU_GENDER_REQUIRED") {
           genderRequired = true;
           setGenderVisible(true);
-          showError("吉丸りなトレーナーは女性専用です。初回確認のため性別を選択してください。");
-        } else if (result?.code === "YOSHIMARU_FEMALE_ONLY") {
+          showError("吉丸りなトレーナーは女性専用です。スタッフ確認が完了するまで、予約時に性別を選択してください。");
+        } else if (code === "YOSHIMARU_FEMALE_ONLY") {
           genderRequired = true;
           setGenderVisible(true);
           showError("吉丸りなトレーナーは女性専用です。");
