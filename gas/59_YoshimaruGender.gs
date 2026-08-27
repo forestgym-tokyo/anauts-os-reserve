@@ -6,13 +6,13 @@
  *
  * 性別情報の正本:
  * - 会員マスター master シートの gender 列
- * - 値は「女性」「男性」「空欄」
+ * - 値は「F」「M」「空欄」
  *
  * 予約画面の流れ:
  * - 日程表示前に会員番号＋登録メールで会員マスターを照合する。
- * - gender=女性: 全トレーナーの日程を表示可能。
- * - gender=男性: 女性限定トレーナーを日程取得対象から除外する。
- * - gender=空欄: 日程表示前に「女性 / 男性」を確認し、その回答を当該予約中だけ使用する。
+ * - gender=F: 全トレーナーの日程を表示可能。
+ * - gender=M: 女性限定トレーナーを日程取得対象から除外する。
+ * - gender=空欄: 日程表示前に画面上で「女性 / 男性」を確認し、その回答を当該予約中だけ使用する。
  * - 非会員の無料体験: 会員マスターを使わず、日程表示前に「女性 / 男性」を確認する。
  * - 画面での回答内容から会員マスターは自動更新しない。
  */
@@ -20,7 +20,9 @@
 const YOSHIMARU_GENDER_POLICY_ = Object.freeze({
   STAFF_CODE: "YOSHIMARU",
   FEMALE: "女性",
-  MALE: "男性"
+  MALE: "男性",
+  MASTER_FEMALE: "F",
+  MASTER_MALE: "M"
 });
 
 
@@ -219,7 +221,7 @@ function getYoshimaruBookingGenderState_(params) {
     return {
       member_found: true,
       gender_state: "FEMALE",
-      gender: gender,
+      gender: YOSHIMARU_GENDER_POLICY_.MASTER_FEMALE,
       gender_source: "MEMBER_MASTER",
       validation_error: null
     };
@@ -229,7 +231,7 @@ function getYoshimaruBookingGenderState_(params) {
     return {
       member_found: true,
       gender_state: "MALE",
-      gender: gender,
+      gender: YOSHIMARU_GENDER_POLICY_.MASTER_MALE,
       gender_source: "MEMBER_MASTER",
       validation_error: null
     };
@@ -268,10 +270,21 @@ function normalizeYoshimaruText_(value) {
   return String(value).trim();
 }
 
+/**
+ * 会員マスターは F / M、画面からの自己申告は 女性 / 男性。
+ * どちらも内部では 女性 / 男性へ正規化する。
+ */
 function normalizeYoshimaruGender_(value) {
-  const text = normalizeYoshimaruText_(value);
-  if (text === YOSHIMARU_GENDER_POLICY_.FEMALE) return YOSHIMARU_GENDER_POLICY_.FEMALE;
-  if (text === YOSHIMARU_GENDER_POLICY_.MALE) return YOSHIMARU_GENDER_POLICY_.MALE;
+  const text = normalizeYoshimaruText_(value).toUpperCase();
+
+  if (text === YOSHIMARU_GENDER_POLICY_.MASTER_FEMALE || text === "女性") {
+    return YOSHIMARU_GENDER_POLICY_.FEMALE;
+  }
+
+  if (text === YOSHIMARU_GENDER_POLICY_.MASTER_MALE || text === "男性") {
+    return YOSHIMARU_GENDER_POLICY_.MALE;
+  }
+
   return "";
 }
 
