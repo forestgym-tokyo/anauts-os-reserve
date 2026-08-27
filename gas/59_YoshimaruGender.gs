@@ -23,19 +23,10 @@ const YOSHIMARU_GENDER_POLICY_ = Object.freeze({
   MALE: "男性"
 });
 
-
-/**
- * 公開予約の createReservation 前に吉丸トレーナーの利用条件を判定する。
- * policy_check_only=true の場合は予約を作らず、判定だけ返す。
- */
 function createReservationWithTrainerPolicy_(params) {
   params = params || {};
-
   const policy = validateYoshimaruGenderPolicy_(params);
-
-  if (!policy.ok) {
-    return policy.response;
-  }
+  if (!policy.ok) return policy.response;
 
   if (normalizeYoshimaruBoolean_(params.policy_check_only)) {
     return successResponse({
@@ -49,20 +40,12 @@ function createReservationWithTrainerPolicy_(params) {
   return createReservation(params);
 }
 
-
-/**
- * 吉丸トレーナー予約時の女性限定チェック。
- */
 function validateYoshimaruGenderPolicy_(params) {
   params = params || {};
-
   const staffCode = normalizeYoshimaruText_(params.staff_code).toUpperCase();
 
   if (staffCode !== YOSHIMARU_GENDER_POLICY_.STAFF_CODE) {
-    return {
-      ok: true,
-      gender_source: "NOT_APPLICABLE"
-    };
+    return { ok: true, gender_source: "NOT_APPLICABLE" };
   }
 
   const master = getYoshimaruMemberGender_(params);
@@ -79,12 +62,8 @@ function validateYoshimaruGenderPolicy_(params) {
     };
   }
 
-  /* 会員マスターを最優先する。 */
   if (master.gender === YOSHIMARU_GENDER_POLICY_.FEMALE) {
-    return {
-      ok: true,
-      gender_source: "MEMBER_MASTER"
-    };
+    return { ok: true, gender_source: "MEMBER_MASTER" };
   }
 
   if (master.gender === YOSHIMARU_GENDER_POLICY_.MALE) {
@@ -101,10 +80,6 @@ function validateYoshimaruGenderPolicy_(params) {
     };
   }
 
-  /*
-   * gender が空欄、または会員マスターを参照できない予約は
-   * その予約時だけ本人へ確認する。
-   */
   const answeredGender = normalizeYoshimaruGender_(params.gender);
 
   if (!answeredGender) {
@@ -136,10 +111,7 @@ function validateYoshimaruGenderPolicy_(params) {
   }
 
   if (answeredGender === YOSHIMARU_GENDER_POLICY_.FEMALE) {
-    return {
-      ok: true,
-      gender_source: "SELF_DECLARED"
-    };
+    return { ok: true, gender_source: "SELF_DECLARED" };
   }
 
   return {
@@ -147,39 +119,20 @@ function validateYoshimaruGenderPolicy_(params) {
     response: errorResponse(
       "性別は「女性」または「男性」を選択してください。",
       "YOSHIMARU_GENDER_INVALID",
-      {
-        staff_code: YOSHIMARU_GENDER_POLICY_.STAFF_CODE
-      }
+      { staff_code: YOSHIMARU_GENDER_POLICY_.STAFF_CODE }
     )
   };
 }
 
-
-/**
- * 既存の会員マスター接続を利用して gender を取得する。
- * 29_Reservation 側の getReservationMemberMasterRows_() は
- * ヘッダーを動的にオブジェクト化するため、gender 列を追加するだけで参照できる。
- */
 function getYoshimaruMemberGender_(params) {
   params = params || {};
-
   const memberNo = normalizeYoshimaruText_(params.member_no);
-  const customerEmail = normalizeYoshimaruText_(
-    params.customer_email || params.email
-  );
+  const customerEmail = normalizeYoshimaruText_(params.customer_email || params.email);
 
   if (!memberNo) {
-    return {
-      found: false,
-      gender: "",
-      validation_error: null
-    };
+    return { found: false, gender: "", validation_error: null };
   }
 
-  /*
-   * policy_check_only でも、会員番号だけでマスター情報を推測できないよう
-   * 既存の会員番号・メール・在籍状態チェックを先に通す。
-   */
   if (typeof validateReservationMemberMaster_ === "function") {
     const validation = validateReservationMemberMaster_({
       memberNo: memberNo,
@@ -200,20 +153,11 @@ function getYoshimaruMemberGender_(params) {
   }
 
   if (typeof findReservationMemberByNo_ !== "function") {
-    throw new Error(
-      "会員マスター検索関数 findReservationMemberByNo_ が見つかりません。"
-    );
+    throw new Error("会員マスター検索関数 findReservationMemberByNo_ が見つかりません。");
   }
 
   const member = findReservationMemberByNo_(memberNo);
-
-  if (!member) {
-    return {
-      found: false,
-      gender: "",
-      validation_error: null
-    };
-  }
+  if (!member) return { found: false, gender: "", validation_error: null };
 
   return {
     found: true,
@@ -222,11 +166,6 @@ function getYoshimaruMemberGender_(params) {
   };
 }
 
-
-/**
- * 旧スタッフ確認UIとの互換用。
- * スタッフ確認方式は廃止済みのため常に0件を返す。
- */
 function getPendingYoshimaruVerifications(params) {
   return successResponse({
     pending: [],
@@ -236,11 +175,6 @@ function getPendingYoshimaruVerifications(params) {
   });
 }
 
-
-/**
- * 旧スタッフ確認UIとの互換用。
- * 今後は会員マスターの gender 列を管理側で更新する。
- */
 function verifyYoshimaruCustomer(params) {
   return errorResponse(
     "スタッフによる初回確認は使用しません。会員マスターのgender列を更新してください。",
@@ -248,12 +182,10 @@ function verifyYoshimaruCustomer(params) {
   );
 }
 
-
 function normalizeYoshimaruText_(value) {
   if (value === null || value === undefined) return "";
   return String(value).trim();
 }
-
 
 function normalizeYoshimaruGender_(value) {
   const text = normalizeYoshimaruText_(value);
@@ -261,7 +193,6 @@ function normalizeYoshimaruGender_(value) {
   if (text === YOSHIMARU_GENDER_POLICY_.MALE) return YOSHIMARU_GENDER_POLICY_.MALE;
   return "";
 }
-
 
 function normalizeYoshimaruBoolean_(value) {
   if (value === true) return true;
