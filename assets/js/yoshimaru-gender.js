@@ -38,13 +38,13 @@
     field.id = "yoshimaruGenderField";
     field.className = "field is-hidden";
     field.innerHTML = `
-      <legend>性別（初回のみ）</legend>
+      <legend>性別（初回確認）</legend>
       <div class="choice-row">
         <label><input type="radio" name="yoshimaru_gender" value="女性"> 女性</label>
         <label><input type="radio" name="yoshimaru_gender" value="男性"> 男性</label>
       </div>
       <p style="margin:9px 0 0;font-size:12px;line-height:1.6;opacity:.72">
-        吉丸りなトレーナーを初めてご予約される場合のみ確認しています。
+        吉丸りなトレーナーは女性専用です。スタッフによる初回確認が完了するまで表示されます。
       </p>
     `;
 
@@ -181,7 +181,7 @@
         if (result?.code === "YOSHIMARU_GENDER_REQUIRED") {
           genderRequired = true;
           setGenderVisible(true);
-          showError("吉丸りなトレーナーは女性専用です。初回のみ性別を選択してください。");
+          showError("吉丸りなトレーナーは女性専用です。初回確認のため性別を選択してください。");
         } else if (result?.code === "YOSHIMARU_FEMALE_ONLY") {
           genderRequired = true;
           setGenderVisible(true);
