@@ -1,12 +1,35 @@
-/* A-nauts OS Reserve - Personal booking enhancements v56 */
+/* A-nauts OS Reserve - Personal booking enhancements v57 */
 (() => {
   const routeKey = location.pathname.split("/").filter(Boolean).pop() || "personal";
   if (!["personal", "trial"].includes(routeKey)) return;
 
+  const WOMEN_ONLY_TRAINER_CODE = "YOSHIMARU";
   let selectedTrainerCode = "";
   let loadedStoreCode = "";
   const trainerMap = new Map();
   const nativeFetch = window.fetch.bind(window);
+
+  function bookingGenderReady_() {
+    return window.ANAUTS_PERSONAL_GENDER_READY === true;
+  }
+
+  function bookingGender_() {
+    return String(window.ANAUTS_PERSONAL_GENDER || "").trim();
+  }
+
+  function isMaleBooking_() {
+    return bookingGender_() === "男性";
+  }
+
+  function trainerAllowed_(code) {
+    const normalized = String(code || "").trim().toUpperCase();
+    return !(isMaleBooking_() && normalized === WOMEN_ONLY_TRAINER_CODE);
+  }
+
+  function visibleTrainers_() {
+    return Array.from(trainerMap.values())
+      .filter((trainer) => trainerAllowed_(trainer.code));
+  }
 
   function trainerLabel(name) {
     const text = String(name || "").trim();
@@ -38,12 +61,17 @@
     const area = document.querySelector("#personalTrainerChoices");
     if (!area) return;
 
+    const allowed = visibleTrainers_();
     const choices = [
       { code: "", name: "すべてのトレーナー" },
-      ...Array.from(trainerMap.values()).sort((a, b) =>
+      ...allowed.sort((a, b) =>
         String(a.name || "").localeCompare(String(b.name || ""), "ja")
       )
     ];
+
+    if (selectedTrainerCode && !trainerAllowed_(selectedTrainerCode)) {
+      selectedTrainerCode = "";
+    }
 
     area.replaceChildren();
 
@@ -76,8 +104,19 @@
   async function loadPublicTrainers_() {
     ensureTrainerFilter();
 
+    if (!bookingGenderReady_()) {
+      const status = document.querySelector("#personalTrainerStatus");
+      if (status) status.textContent = "会員情報・性別の確認後に表示します。";
+      return;
+    }
+
     const storeCode = String(selectedService?.store_code || "YACHIYO").trim().toUpperCase();
-    if (loadedStoreCode === storeCode && trainerMap.size) return;
+
+    if (loadedStoreCode === storeCode && trainerMap.size) {
+      renderTrainerChoices();
+      updateTrainerStatus_();
+      return;
+    }
 
     const status = document.querySelector("#personalTrainerStatus");
     if (status) status.textContent = "トレーナー一覧を読み込んでいます…";
@@ -109,14 +148,12 @@
       if (selectedTrainerCode && !trainerMap.has(selectedTrainerCode)) {
         selectedTrainerCode = "";
       }
+      if (selectedTrainerCode && !trainerAllowed_(selectedTrainerCode)) {
+        selectedTrainerCode = "";
+      }
 
       renderTrainerChoices();
-
-      if (status) {
-        status.textContent = trainerMap.size
-          ? "トレーナーを指定すると、そのトレーナーの予約可能時間だけを表示します。"
-          : "現在表示できるトレーナーがいません。";
-      }
+      updateTrainerStatus_();
     } catch (error) {
       trainerMap.clear();
       selectedTrainerCode = "";
@@ -126,6 +163,16 @@
       }
       console.error("getPublicTrainers failed", error);
     }
+  }
+
+  function updateTrainerStatus_() {
+    const status = document.querySelector("#personalTrainerStatus");
+    if (!status) return;
+
+    const count = visibleTrainers_().length;
+    status.textContent = count
+      ? "トレーナーを指定すると、そのトレーナーの予約可能時間だけを表示します。"
+      : "現在表示できるトレーナーがいません。";
   }
 
   function showTrialFixedPlan_() {
@@ -146,19 +193,14 @@
     grid.append(card);
 
     section.classList.remove("is-hidden");
-    const availabilityStep = document.querySelector("#availabilityStep");
-    const customerStep = document.querySelector("#customerStep");
-    if (availabilityStep) availabilityStep.textContent = "2";
-    if (customerStep) customerStep.textContent = "3";
   }
 
-  // getAvailableSlots: trainer filter + timeout.
-  fetchSlots = async function(date) {
+  async function fetchSlotsForTrainer_(date, staffCode) {
     const url = new URL(API_URL);
     url.searchParams.set("action", "getAvailableSlots");
     url.searchParams.set("service_code", selectedService.service_code);
     url.searchParams.set("date", date);
-    if (selectedTrainerCode) url.searchParams.set("staff_code", selectedTrainerCode);
+    if (staffCode) url.searchParams.set("staff_code", staffCode);
     url.searchParams.set("_", Date.now().toString());
 
     const controller = new AbortController();
@@ -175,22 +217,91 @@
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  function slotKey_(slot) {
+    return [
+      String(slot?.date || ""),
+      String(slot?.start_time || "").slice(0, 5),
+      String(slot?.end_time || "").slice(0, 5)
+    ].join("|");
+  }
+
+  function mergeTrainerSlotResults_(date, results) {
+    const successful = results.filter((result) => result?.ok);
+    if (!successful.length) {
+      return results[0] || { ok: false, message: "空き時間を取得できませんでした。", data: { date, slots: [] } };
+    }
+
+    const base = successful[0];
+    const merged = new Map();
+
+    successful.forEach((result) => {
+      const slots = Array.isArray(result?.data?.slots) ? result.data.slots : [];
+      slots.forEach((slot) => {
+        const key = slotKey_(slot);
+        if (!merged.has(key)) merged.set(key, slot);
+      });
+    });
+
+    const slots = Array.from(merged.values()).sort((a, b) =>
+      String(a?.start_time || "").localeCompare(String(b?.start_time || ""))
+    );
+
+    return {
+      ...base,
+      ok: true,
+      data: {
+        ...(base.data || {}),
+        date,
+        slots
+      }
+    };
+  }
+
+  // getAvailableSlots: 性別確定前は日程を出さない。
+  // 男性の「すべて」は女性限定トレーナーを除く各トレーナーの空きを統合する。
+  fetchSlots = async function(date) {
+    if (!bookingGenderReady_()) {
+      return { ok: true, data: { date, slots: [] } };
+    }
+
+    if (selectedTrainerCode) {
+      if (!trainerAllowed_(selectedTrainerCode)) {
+        return { ok: true, data: { date, slots: [] } };
+      }
+      return fetchSlotsForTrainer_(date, selectedTrainerCode);
+    }
+
+    if (!isMaleBooking_()) {
+      return fetchSlotsForTrainer_(date, "");
+    }
+
+    const trainers = visibleTrainers_();
+    if (!trainers.length) {
+      return { ok: true, data: { date, slots: [] } };
+    }
+
+    const results = await Promise.all(
+      trainers.map((trainer) => fetchSlotsForTrainer_(date, trainer.code))
+    );
+
+    return mergeTrainerSlotResults_(date, results);
   };
 
-  // 通常パーソナルはプラン選択後にトレーナー一覧を取得する。
+  // プラン選択直後は会員・性別確認を優先する。日程は確認完了後に読み込む。
   if (routeKey === "personal") {
     document.querySelector("#serviceGrid")?.addEventListener("click", () => {
-      setTimeout(loadPublicTrainers_, 0);
+      selectedTrainerCode = "";
+      renderTrainerChoices();
     });
   }
 
-  // 無料体験は固定サービスが初期化された時点で、通常パーソナルと同じUIを表示する。
   if (routeKey === "trial") {
     const availability = document.querySelector("#availabilitySection");
     const initializeTrialUi = () => {
       if (!selectedService) return false;
       showTrialFixedPlan_();
-      loadPublicTrainers_();
       return true;
     };
 
@@ -201,6 +312,23 @@
       observer.observe(availability, { attributes: true, attributeFilter: ["class"] });
     }
   }
+
+  document.addEventListener("anauts:booking-gender-ready", async () => {
+    selectedTrainerCode = "";
+    selectedSlot = null;
+    document.querySelector("#customerSection")?.classList.add("is-hidden");
+    await loadPublicTrainers_();
+    loadWeek();
+  });
+
+  document.addEventListener("anauts:booking-gender-invalidated", () => {
+    selectedTrainerCode = "";
+    selectedSlot = null;
+    renderTrainerChoices();
+    document.querySelector("#weekList")?.replaceChildren();
+    const status = document.querySelector("#weekStatus");
+    if (status) status.textContent = "";
+  });
 
   // Reservation POST: preserve chosen trainer in createReservation payload.
   window.fetch = async function(input, init) {
