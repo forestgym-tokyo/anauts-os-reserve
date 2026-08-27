@@ -54,6 +54,18 @@ function createReservationWithTrainerPolicy_(params) {
     return policy.response;
   }
 
+  /*
+   * 予約作成前のポリシー確認専用。
+   * UI側が最終担当確定後に利用し、実予約は作成しない。
+   */
+  if (params.policy_check_only === true || String(params.policy_check_only || "").toUpperCase() === "TRUE") {
+    return successResponse({
+      policy_ok: true,
+      staff_code: normalizeYoshimaruText_(params.staff_code).toUpperCase(),
+      gender_required: false
+    });
+  }
+
   return createReservation(params);
 }
 
@@ -90,7 +102,7 @@ function validateYoshimaruGenderPolicy_(params) {
     return {
       ok: false,
       response: errorResponse(
-        "吉丸りなトレーナーは女性専用です。初回のみ性別を選択してください。",
+        "吉丸りなトレーナーは女性専用です。スタッフによる初回確認が完了するまで性別を選択してください。",
         "YOSHIMARU_GENDER_REQUIRED",
         {
           staff_code: YOSHIMARU_GENDER_POLICY_.STAFF_CODE,
