@@ -204,8 +204,4 @@ window.addEventListener("load", function () {
   var withdrawalButtonColor = document.createElement("script");
   withdrawalButtonColor.src = "./admin-withdrawal-button-color.js?v=20260826-1258";
   document.body.appendChild(withdrawalButtonColor);
-
-  var yoshimaruVerification = document.createElement("script");
-  yoshimaruVerification.src = "./admin-yoshimaru-verification.js?v=20260827-1";
-  document.body.appendChild(yoshimaruVerification);
 });
