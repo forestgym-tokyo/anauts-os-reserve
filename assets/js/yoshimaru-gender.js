@@ -61,9 +61,12 @@
     serviceSection.insertAdjacentElement("afterend", section);
     applyStepNumbers_();
 
-    section.querySelector("#eligibilityMemberNo")?.addEventListener("input", handleIdentityEdit);
-    section.querySelector("#eligibilityEmail")?.addEventListener("input", handleIdentityEdit);
-    section.querySelector("#eligibilityCheckButton")?.addEventListener("click", verifyMemberEligibility);
+    const memberInput = section.querySelector("#eligibilityMemberNo");
+    const emailInput = section.querySelector("#eligibilityEmail");
+    const checkButton = section.querySelector("#eligibilityCheckButton");
+    if (memberInput) memberInput.addEventListener("input", handleIdentityEdit);
+    if (emailInput) emailInput.addEventListener("input", handleIdentityEdit);
+    if (checkButton) checkButton.addEventListener("click", verifyMemberEligibility);
 
     return section;
   }
@@ -73,8 +76,8 @@
     applyStepNumbers_();
     section.classList.remove("is-hidden");
     availabilitySection.classList.add("is-hidden");
-    customerSection?.classList.add("is-hidden");
-    completeSection?.classList.add("is-hidden");
+    if (customerSection) customerSection.classList.add("is-hidden");
+    if (completeSection) completeSection.classList.add("is-hidden");
   }
 
   function hideGateError() {
@@ -105,8 +108,10 @@
     if (member) member.value = verifiedMemberNo;
     if (email) email.value = verifiedEmail;
 
-    document.querySelector("#memberNoField")?.classList.add("is-hidden");
-    email?.closest("label.field")?.classList.add("is-hidden");
+    const memberNoField = document.querySelector("#memberNoField");
+    if (memberNoField) memberNoField.classList.add("is-hidden");
+    const emailField = email && email.closest("label.field");
+    if (emailField) emailField.classList.add("is-hidden");
   }
 
   function invalidateEligibility() {
@@ -122,7 +127,7 @@
     try { selectedSlot = null; } catch (_) {}
 
     availabilitySection.classList.add("is-hidden");
-    customerSection?.classList.add("is-hidden");
+    if (customerSection) customerSection.classList.add("is-hidden");
     setGateStatus("");
 
     document.dispatchEvent(new CustomEvent("anauts:booking-eligibility-invalidated"));
@@ -131,8 +136,10 @@
   function handleIdentityEdit() {
     if (!ready) return;
 
-    const memberNo = String(document.querySelector("#eligibilityMemberNo")?.value || "").trim();
-    const email = String(document.querySelector("#eligibilityEmail")?.value || "").trim().toLowerCase();
+    const memberInput = document.querySelector("#eligibilityMemberNo");
+    const emailInput = document.querySelector("#eligibilityEmail");
+    const memberNo = String((memberInput && memberInput.value) || "").trim();
+    const email = String((emailInput && emailInput.value) || "").trim().toLowerCase();
 
     if (memberNo !== verifiedMemberNo || email !== verifiedEmail.toLowerCase()) {
       invalidateEligibility();
@@ -142,10 +149,10 @@
 
   function responseCode(result) {
     return String(
-      result?.code ||
-      result?.error_code ||
-      result?.data?.code ||
-      result?.detail?.code ||
+      (result && result.code) ||
+      (result && result.error_code) ||
+      (result && result.data && result.data.code) ||
+      (result && result.detail && result.detail.code) ||
       ""
     ).trim().toUpperCase();
   }
@@ -158,12 +165,14 @@
       MEMBER_INACTIVE: "現在有効な会員番号ではありません。",
       MEMBER_NAME_NOT_SET: "会員マスターに氏名が設定されていません。"
     };
-    return messages[code] || result?.message || "会員情報を確認できませんでした。";
+    return messages[code] || (result && result.message) || "会員情報を確認できませんでした。";
   }
 
   async function verifyMemberEligibility() {
-    const memberNo = String(document.querySelector("#eligibilityMemberNo")?.value || "").trim();
-    const email = String(document.querySelector("#eligibilityEmail")?.value || "").trim();
+    const memberInput = document.querySelector("#eligibilityMemberNo");
+    const emailInput = document.querySelector("#eligibilityEmail");
+    const memberNo = String((memberInput && memberInput.value) || "").trim();
+    const email = String((emailInput && emailInput.value) || "").trim();
     const button = document.querySelector("#eligibilityCheckButton");
 
     hideGateError();
@@ -198,16 +207,16 @@
       });
 
       const result = await response.json();
-      if (!result?.ok) {
+      if (!result || !result.ok) {
         showGateError(userMessage(result));
         return;
       }
 
       verifiedMemberNo = memberNo;
       verifiedEmail = email;
-      setReadyEligibility(result.data?.yoshimaru_eligible === true);
+      setReadyEligibility(result.data && result.data.yoshimaru_eligible === true);
     } catch (error) {
-      showGateError(error?.message || "会員情報を確認できませんでした。再度お試しください。");
+      showGateError((error && error.message) || "会員情報を確認できませんでした。再度お試しください。");
     } finally {
       if (button) {
         button.disabled = false;
@@ -239,7 +248,7 @@
   }
 
   if (routeKey === "personal") {
-    serviceGrid?.addEventListener("click", () => {
+    if (serviceGrid) serviceGrid.addEventListener("click", () => {
       setTimeout(() => {
         applyStepNumbers_();
         if (ready) {
@@ -284,13 +293,15 @@
 
   window.fetch = async function(input, init) {
     try {
-      const method = String(init?.method || "GET").toUpperCase();
-      const target = typeof input === "string" ? input : String(input?.url || input || "");
+      const method = String((init && init.method) || "GET").toUpperCase();
+      const target = typeof input === "string"
+        ? input
+        : String((input && input.url) || input || "");
 
-      if (method === "POST" && target === API_URL && typeof init?.body === "string") {
+      if (method === "POST" && target === API_URL && init && typeof init.body === "string") {
         const body = JSON.parse(init.body);
 
-        if (body?.action === "createReservation" && !body?.policy_check_only && ready) {
+        if (body && body.action === "createReservation" && !body.policy_check_only && ready) {
           body.member_no = verifiedMemberNo;
           body.customer_email = verifiedEmail;
           init = { ...init, body: JSON.stringify(body) };
