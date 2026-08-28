@@ -192,7 +192,7 @@ function isEnabled(service) {
 }
 
 function renderServiceCards(list) {
-  el.serviceGrid.replaceChildren();
+  el.serviceGrid.textContent = "";
 
   list.forEach((service) => {
     const button = document.createElement("button");
@@ -671,7 +671,7 @@ async function fetchSlots(date) {
 }
 
 function renderWeek(results) {
-  el.weekList.replaceChildren();
+  el.weekList.textContent = "";
 
   results.forEach((result, index) => {
     const date = new Date(weekStart);
@@ -914,6 +914,7 @@ function userMessage(result) {
     MEMBER_NOT_FOUND: "会員番号が確認できません。",
     MEMBER_EMAIL_MISMATCH: "会員番号と登録メールが一致しません。",
     MEMBER_INACTIVE: "現在有効な会員番号ではありません。",
+    PERSONAL_TRAINER_REQUIRED: "担当トレーナーを確認できませんでした。空き状況を更新し、日時を選び直してください。",
     SLOT_NOT_AVAILABLE: "選択した時間は埋まりました。空き状況を更新してください。",
     CUSTOMER_TYPE_REQUIRED: "会員または非会員を選択してください。",
     CUSTOMER_PHONE_REQUIRED: "電話番号を入力してください。"
@@ -953,9 +954,9 @@ function jpDate(value) {
 
 function escapeHtml(value) {
   return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }

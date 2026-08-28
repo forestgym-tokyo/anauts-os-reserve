@@ -1,12 +1,36 @@
-/* A-nauts OS Reserve - Personal booking enhancements v56 */
+/* A-nauts OS Reserve - Personal booking enhancements v57 */
 (() => {
   const routeKey = location.pathname.split("/").filter(Boolean).pop() || "personal";
   if (!["personal", "trial"].includes(routeKey)) return;
 
+  const WOMEN_ONLY_TRAINER_CODE = "YOSHIMARU";
   let selectedTrainerCode = "";
   let loadedStoreCode = "";
   const trainerMap = new Map();
   const nativeFetch = window.fetch.bind(window);
+  const nativeLoadWeek = loadWeek;
+
+  function bookingEligibilityReady_() {
+    return window.ANAUTS_PERSONAL_ELIGIBILITY_READY === true;
+  }
+
+  function womenOnlyTrainerAllowed_() {
+    return window.ANAUTS_YOSHIMARU_ALLOWED === true;
+  }
+
+  function trainerSelectionRequired_() {
+    return bookingEligibilityReady_() && !womenOnlyTrainerAllowed_();
+  }
+
+  function trainerAllowed_(code) {
+    const normalized = String(code || "").trim().toUpperCase();
+    return womenOnlyTrainerAllowed_() || normalized !== WOMEN_ONLY_TRAINER_CODE;
+  }
+
+  function visibleTrainers_() {
+    return Array.from(trainerMap.values())
+      .filter((trainer) => trainerAllowed_(trainer.code));
+  }
 
   function trainerLabel(name) {
     const text = String(name || "").trim();
@@ -38,14 +62,21 @@
     const area = document.querySelector("#personalTrainerChoices");
     if (!area) return;
 
+    const allowed = visibleTrainers_();
     const choices = [
-      { code: "", name: "すべてのトレーナー" },
-      ...Array.from(trainerMap.values()).sort((a, b) =>
+      ...(womenOnlyTrainerAllowed_()
+        ? [{ code: "", name: "すべてのトレーナー" }]
+        : []),
+      ...allowed.sort((a, b) =>
         String(a.name || "").localeCompare(String(b.name || ""), "ja")
       )
     ];
 
-    area.replaceChildren();
+    if (selectedTrainerCode && !trainerAllowed_(selectedTrainerCode)) {
+      selectedTrainerCode = "";
+    }
+
+    area.textContent = "";
 
     choices.forEach((trainer) => {
       const button = document.createElement("button");
@@ -76,8 +107,19 @@
   async function loadPublicTrainers_() {
     ensureTrainerFilter();
 
+    if (!bookingEligibilityReady_()) {
+      const status = document.querySelector("#personalTrainerStatus");
+      if (status) status.textContent = "会員情報の確認後に表示します。";
+      return;
+    }
+
     const storeCode = String(selectedService?.store_code || "YACHIYO").trim().toUpperCase();
-    if (loadedStoreCode === storeCode && trainerMap.size) return;
+
+    if (loadedStoreCode === storeCode && trainerMap.size) {
+      renderTrainerChoices();
+      updateTrainerStatus_();
+      return;
+    }
 
     const status = document.querySelector("#personalTrainerStatus");
     if (status) status.textContent = "トレーナー一覧を読み込んでいます…";
@@ -109,14 +151,12 @@
       if (selectedTrainerCode && !trainerMap.has(selectedTrainerCode)) {
         selectedTrainerCode = "";
       }
+      if (selectedTrainerCode && !trainerAllowed_(selectedTrainerCode)) {
+        selectedTrainerCode = "";
+      }
 
       renderTrainerChoices();
-
-      if (status) {
-        status.textContent = trainerMap.size
-          ? "トレーナーを指定すると、そのトレーナーの予約可能時間だけを表示します。"
-          : "現在表示できるトレーナーがいません。";
-      }
+      updateTrainerStatus_();
     } catch (error) {
       trainerMap.clear();
       selectedTrainerCode = "";
@@ -128,6 +168,21 @@
     }
   }
 
+  function updateTrainerStatus_() {
+    const status = document.querySelector("#personalTrainerStatus");
+    if (!status) return;
+
+    const count = visibleTrainers_().length;
+    if (!count) {
+      status.textContent = "現在表示できるトレーナーがいません。";
+      return;
+    }
+
+    status.textContent = trainerSelectionRequired_() && !selectedTrainerCode
+      ? "トレーナーを選択すると予約可能時間を表示します。"
+      : "トレーナーを指定すると、そのトレーナーの予約可能時間だけを表示します。";
+  }
+
   function showTrialFixedPlan_() {
     if (routeKey !== "trial" || !selectedService) return;
 
@@ -135,7 +190,7 @@
     const grid = document.querySelector("#serviceGrid");
     if (!section || !grid) return;
 
-    grid.replaceChildren();
+    grid.textContent = "";
     const card = document.createElement("button");
     card.type = "button";
     card.className = "service-card is-selected";
@@ -146,26 +201,23 @@
     grid.append(card);
 
     section.classList.remove("is-hidden");
-    const availabilityStep = document.querySelector("#availabilityStep");
-    const customerStep = document.querySelector("#customerStep");
-    if (availabilityStep) availabilityStep.textContent = "2";
-    if (customerStep) customerStep.textContent = "3";
   }
 
-  // getAvailableSlots: trainer filter + timeout.
-  fetchSlots = async function(date) {
+  async function fetchSlotsForTrainer_(date, staffCode) {
     const url = new URL(API_URL);
     url.searchParams.set("action", "getAvailableSlots");
     url.searchParams.set("service_code", selectedService.service_code);
     url.searchParams.set("date", date);
-    if (selectedTrainerCode) url.searchParams.set("staff_code", selectedTrainerCode);
+    if (staffCode) url.searchParams.set("staff_code", staffCode);
     url.searchParams.set("_", Date.now().toString());
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 12000);
+    const controller = typeof AbortController === "function" ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), 12000) : null;
 
     try {
-      const response = await nativeFetch(url.toString(), { cache: "no-store", signal: controller.signal });
+      const options = { cache: "no-store" };
+      if (controller) options.signal = controller.signal;
+      const response = await nativeFetch(url.toString(), options);
       return await response.json();
     } catch (error) {
       const message = error?.name === "AbortError"
@@ -173,24 +225,58 @@
         : (error?.message || "取得失敗");
       return { ok: false, message, data: { date, slots: [] } };
     } finally {
-      clearTimeout(timer);
+      if (timer) clearTimeout(timer);
     }
-  };
-
-  // 通常パーソナルはプラン選択後にトレーナー一覧を取得する。
-  if (routeKey === "personal") {
-    document.querySelector("#serviceGrid")?.addEventListener("click", () => {
-      setTimeout(loadPublicTrainers_, 0);
-    });
   }
 
-  // 無料体験は固定サービスが初期化された時点で、通常パーソナルと同じUIを表示する。
+  // getAvailableSlots: 会員確認前は日程を出さない。
+  // 吉丸対象外会員はトレーナーを1人選択してから、その担当者の空きだけを取得する。
+  fetchSlots = async function(date) {
+    if (!bookingEligibilityReady_()) {
+      return { ok: true, data: { date, slots: [] } };
+    }
+
+    if (trainerSelectionRequired_() && !selectedTrainerCode) {
+      return { ok: true, data: { date, slots: [] } };
+    }
+
+    if (selectedTrainerCode && !trainerAllowed_(selectedTrainerCode)) {
+      return { ok: true, data: { date, slots: [] } };
+    }
+
+    return fetchSlotsForTrainer_(date, selectedTrainerCode);
+  };
+
+  loadWeek = async function() {
+    if (!bookingEligibilityReady_()) return;
+
+    if (trainerSelectionRequired_() && !selectedTrainerCode) {
+      selectedSlot = null;
+      document.querySelector("#customerSection")?.classList.add("is-hidden");
+      const list = document.querySelector("#weekList");
+      const status = document.querySelector("#weekStatus");
+      if (list) list.textContent = "";
+      if (status) status.textContent = "トレーナーを選択すると予約可能時間を表示します。";
+      return;
+    }
+
+    return nativeLoadWeek();
+  };
+
+  // プラン選択直後は会員確認を優先する。日程は確認完了後に読み込む。
+  if (routeKey === "personal") {
+    document.querySelector("#serviceGrid")?.addEventListener("click", (event) => {
+      if (!event.target.closest?.(".service-card")) return;
+      selectedTrainerCode = "";
+      renderTrainerChoices();
+    }, true);
+  }
+
   if (routeKey === "trial") {
     const availability = document.querySelector("#availabilitySection");
     const initializeTrialUi = () => {
       if (!selectedService) return false;
       showTrialFixedPlan_();
-      loadPublicTrainers_();
       return true;
     };
 
@@ -201,6 +287,24 @@
       observer.observe(availability, { attributes: true, attributeFilter: ["class"] });
     }
   }
+
+  document.addEventListener("anauts:booking-eligibility-ready", async () => {
+    selectedTrainerCode = "";
+    selectedSlot = null;
+    document.querySelector("#customerSection")?.classList.add("is-hidden");
+    await loadPublicTrainers_();
+    loadWeek();
+  });
+
+  document.addEventListener("anauts:booking-eligibility-invalidated", () => {
+    selectedTrainerCode = "";
+    selectedSlot = null;
+    renderTrainerChoices();
+    const list = document.querySelector("#weekList");
+    if (list) list.textContent = "";
+    const status = document.querySelector("#weekStatus");
+    if (status) status.textContent = "";
+  });
 
   // Reservation POST: preserve chosen trainer in createReservation payload.
   window.fetch = async function(input, init) {

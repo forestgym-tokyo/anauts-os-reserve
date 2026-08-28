@@ -1,4 +1,4 @@
-/* A-nauts OS Reserve - Yoshimaru first booking gender check */
+/* A-nauts OS Reserve - member-master eligibility gate for women-only trainer */
 (() => {
   "use strict";
 
@@ -7,85 +7,137 @@
 
   const YOSHIMARU_CODE = "YOSHIMARU";
   const previousFetch = window.fetch.bind(window);
-  const form = document.querySelector("#reservationForm");
-  const noteField = document.querySelector("#note")?.closest("label, .field");
+  const serviceSection = document.querySelector("#serviceSection");
+  const availabilitySection = document.querySelector("#availabilitySection");
+  const customerSection = document.querySelector("#customerSection");
+  const completeSection = document.querySelector("#completeSection");
+  const serviceGrid = document.querySelector("#serviceGrid");
 
-  if (!form) return;
+  if (!serviceSection || !availabilitySection) return;
 
-  let selectedTrainerCode = "";
-  let genderRequired = false;
+  let ready = false;
+  let yoshimaruAllowed = false;
+  let verifiedMemberNo = "";
+  let verifiedEmail = "";
 
-  function showError(message) {
-    const node = document.querySelector("#formError");
-    if (!node) return;
-    node.textContent = message;
-    node.classList.remove("is-hidden");
-    node.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  window.ANAUTS_PERSONAL_ELIGIBILITY_READY = false;
+  window.ANAUTS_YOSHIMARU_ALLOWED = false;
+
+  function applyStepNumbers_() {
+    const availabilityStep = document.querySelector("#availabilityStep");
+    const customerStep = document.querySelector("#customerStep");
+    if (availabilityStep) availabilityStep.textContent = "3";
+    if (customerStep) customerStep.textContent = "4";
   }
 
-  function hideError() {
-    const node = document.querySelector("#formError");
+  function ensureEligibilitySection() {
+    let section = document.querySelector("#personalEligibilitySection");
+    if (section) {
+      applyStepNumbers_();
+      return section;
+    }
+
+    section = document.createElement("section");
+    section.id = "personalEligibilitySection";
+    section.className = "card is-hidden";
+    section.innerHTML = `
+      <div class="step">
+        <span class="step-num">2</span>
+        <h2>会員情報を確認</h2>
+      </div>
+      <label class="field">
+        <span>会員番号</span>
+        <input id="eligibilityMemberNo" type="text" inputmode="numeric" maxlength="6" placeholder="6桁の数字のみ">
+      </label>
+      <label class="field">
+        <span>登録メールアドレス</span>
+        <input id="eligibilityEmail" type="email" autocomplete="email" placeholder="example@gmail.com">
+      </label>
+      <div id="eligibilityError" class="alert alert-error is-hidden" role="alert"></div>
+      <p id="eligibilityStatus" class="status" aria-live="polite"></p>
+      <button id="eligibilityCheckButton" class="button button-primary" type="button">会員情報を確認</button>
+    `;
+
+    serviceSection.insertAdjacentElement("afterend", section);
+    applyStepNumbers_();
+
+    section.querySelector("#eligibilityMemberNo")?.addEventListener("input", handleIdentityEdit);
+    section.querySelector("#eligibilityEmail")?.addEventListener("input", handleIdentityEdit);
+    section.querySelector("#eligibilityCheckButton")?.addEventListener("click", verifyMemberEligibility);
+
+    return section;
+  }
+
+  function showGate() {
+    const section = ensureEligibilitySection();
+    applyStepNumbers_();
+    section.classList.remove("is-hidden");
+    availabilitySection.classList.add("is-hidden");
+    customerSection?.classList.add("is-hidden");
+    completeSection?.classList.add("is-hidden");
+  }
+
+  function hideGateError() {
+    const node = document.querySelector("#eligibilityError");
     if (!node) return;
     node.textContent = "";
     node.classList.add("is-hidden");
   }
 
-  function ensureGenderField() {
-    let field = document.querySelector("#yoshimaruGenderField");
-    if (field) return field;
-
-    field = document.createElement("fieldset");
-    field.id = "yoshimaruGenderField";
-    field.className = "field is-hidden";
-    field.innerHTML = `
-      <legend>性別確認</legend>
-      <div class="choice-row">
-        <label><input type="radio" name="yoshimaru_gender" value="女性"> 女性</label>
-        <label><input type="radio" name="yoshimaru_gender" value="男性"> 男性</label>
-      </div>
-      <p style="margin:9px 0 0;font-size:12px;line-height:1.6;opacity:.72">
-        吉丸りなトレーナーは女性専用です。スタッフによる初回確認が完了するまで、予約時に表示されます。
-      </p>
-    `;
-
-    if (noteField) noteField.insertAdjacentElement("beforebegin", field);
-    else form.prepend(field);
-
-    field.querySelectorAll('input[name="yoshimaru_gender"]').forEach((radio) => {
-      radio.addEventListener("change", () => {
-        if (radio.value === "男性") {
-          showError("吉丸りなトレーナーは女性専用です。");
-        } else {
-          hideError();
-        }
-      });
-    });
-
-    return field;
+  function showGateError(message) {
+    const node = document.querySelector("#eligibilityError");
+    if (!node) return;
+    node.textContent = message;
+    node.classList.remove("is-hidden");
   }
 
-  function selectedGender() {
-    return document.querySelector('input[name="yoshimaru_gender"]:checked')?.value || "";
+  function setGateStatus(message) {
+    const node = document.querySelector("#eligibilityStatus");
+    if (node) node.textContent = message || "";
   }
 
-  function setGenderVisible(visible) {
-    ensureGenderField().classList.toggle("is-hidden", !visible);
+  function syncVerifiedIdentityToReservationForm_() {
+    if (!ready) return;
+
+    const member = document.querySelector("#memberNo");
+    const email = document.querySelector("#customerEmail");
+
+    if (member) member.value = verifiedMemberNo;
+    if (email) email.value = verifiedEmail;
+
+    document.querySelector("#memberNoField")?.classList.add("is-hidden");
+    email?.closest("label.field")?.classList.add("is-hidden");
   }
 
-  function resetGenderCheck() {
-    genderRequired = false;
-    setGenderVisible(false);
-    document.querySelectorAll('input[name="yoshimaru_gender"]').forEach((radio) => {
-      radio.checked = false;
-    });
+  function invalidateEligibility() {
+    if (!ready && !verifiedMemberNo && !verifiedEmail) return;
+
+    ready = false;
+    yoshimaruAllowed = false;
+    verifiedMemberNo = "";
+    verifiedEmail = "";
+    window.ANAUTS_PERSONAL_ELIGIBILITY_READY = false;
+    window.ANAUTS_YOSHIMARU_ALLOWED = false;
+
+    try { selectedSlot = null; } catch (_) {}
+
+    availabilitySection.classList.add("is-hidden");
+    customerSection?.classList.add("is-hidden");
+    setGateStatus("");
+
+    document.dispatchEvent(new CustomEvent("anauts:booking-eligibility-invalidated"));
   }
 
-  function summaryShowsYoshimaru() {
-    return String(document.querySelector("#selectedSlotText")?.textContent || "").includes("吉丸");
-  }
+  function handleIdentityEdit() {
+    if (!ready) return;
 
-  function isYoshimaruSelected() {
-    return selectedTrainerCode === YOSHIMARU_CODE || summaryShowsYoshimaru();
+    const memberNo = String(document.querySelector("#eligibilityMemberNo")?.value || "").trim();
+    const email = String(document.querySelector("#eligibilityEmail")?.value || "").trim().toLowerCase();
+
+    if (memberNo !== verifiedMemberNo || email !== verifiedEmail.toLowerCase()) {
+      invalidateEligibility();
+      showGate();
+    }
   }
 
   function responseCode(result) {
@@ -98,115 +150,160 @@
     ).trim().toUpperCase();
   }
 
-  // personalの絞り込み、trialのトレーナー選択、personalの最終担当選択を追跡する。
-  document.addEventListener("click", (event) => {
-    const trainerButton = event.target.closest?.("[data-trainer-code]");
-    if (trainerButton) {
-      const nextCode = String(trainerButton.dataset.trainerCode || "").trim().toUpperCase();
-      if (nextCode !== selectedTrainerCode) {
-        selectedTrainerCode = nextCode;
-        resetGenderCheck();
+  function userMessage(result) {
+    const code = responseCode(result);
+    const messages = {
+      MEMBER_NOT_FOUND: "会員番号が確認できません。",
+      MEMBER_EMAIL_MISMATCH: "会員番号と登録メールアドレスが一致しません。",
+      MEMBER_INACTIVE: "現在有効な会員番号ではありません。",
+      MEMBER_NAME_NOT_SET: "会員マスターに氏名が設定されていません。"
+    };
+    return messages[code] || result?.message || "会員情報を確認できませんでした。";
+  }
+
+  async function verifyMemberEligibility() {
+    const memberNo = String(document.querySelector("#eligibilityMemberNo")?.value || "").trim();
+    const email = String(document.querySelector("#eligibilityEmail")?.value || "").trim();
+    const button = document.querySelector("#eligibilityCheckButton");
+
+    hideGateError();
+    setGateStatus("");
+
+    if (!/^\d{6}$/.test(memberNo)) {
+      showGateError("会員番号は6桁の数字で入力してください。");
+      return;
+    }
+
+    if (!email) {
+      showGateError("登録メールアドレスを入力してください。");
+      return;
+    }
+
+    if (button) {
+      button.disabled = true;
+      button.textContent = "確認中…";
+    }
+
+    try {
+      const response = await previousFetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          action: "createReservation",
+          policy_check_only: true,
+          staff_code: YOSHIMARU_CODE,
+          member_no: memberNo,
+          customer_email: email
+        })
+      });
+
+      const result = await response.json();
+      if (!result?.ok) {
+        showGateError(userMessage(result));
+        return;
       }
-      return;
-    }
 
-    const confirmButton = event.target.closest?.(".ptc-trainer");
-    if (confirmButton) {
-      const nextCode = String(confirmButton.textContent || "").includes("吉丸")
-        ? YOSHIMARU_CODE
-        : "OTHER";
-      if (nextCode !== selectedTrainerCode) {
-        selectedTrainerCode = nextCode;
-        resetGenderCheck();
+      verifiedMemberNo = memberNo;
+      verifiedEmail = email;
+      setReadyEligibility(result.data?.yoshimaru_eligible === true);
+    } catch (error) {
+      showGateError(error?.message || "会員情報を確認できませんでした。再度お試しください。");
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = "会員情報を確認";
       }
     }
-  }, true);
+  }
 
-  // スタッフ確認前は、性別欄が表示された後に女性を選ぶまで予約送信させない。
-  form.addEventListener("submit", (event) => {
-    if (!isYoshimaruSelected()) {
-      resetGenderCheck();
-      return;
+  function setReadyEligibility(allowed) {
+    ready = true;
+    yoshimaruAllowed = allowed === true;
+
+    window.ANAUTS_PERSONAL_ELIGIBILITY_READY = true;
+    window.ANAUTS_YOSHIMARU_ALLOWED = yoshimaruAllowed;
+
+    hideGateError();
+    setGateStatus("会員情報を確認しました。予約可能な日時を表示します。");
+    applyStepNumbers_();
+    syncVerifiedIdentityToReservationForm_();
+    availabilitySection.classList.remove("is-hidden");
+
+    document.dispatchEvent(new CustomEvent("anauts:booking-eligibility-ready", {
+      detail: {
+        yoshimaru_allowed: yoshimaruAllowed,
+        member_no: verifiedMemberNo,
+        customer_email: verifiedEmail
+      }
+    }));
+  }
+
+  if (routeKey === "personal") {
+    serviceGrid?.addEventListener("click", () => {
+      setTimeout(() => {
+        applyStepNumbers_();
+        if (ready) {
+          syncVerifiedIdentityToReservationForm_();
+          return;
+        }
+        showGate();
+        ensureEligibilitySection().scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 0);
+    });
+  }
+
+  if (routeKey === "trial") {
+    const tryShowTrialGate = () => {
+      try {
+        if (!selectedService) return false;
+      } catch (_) {
+        return false;
+      }
+      applyStepNumbers_();
+      if (!ready) showGate();
+      return true;
+    };
+
+    if (!tryShowTrialGate()) {
+      const observer = new MutationObserver(() => {
+        if (tryShowTrialGate()) observer.disconnect();
+      });
+      observer.observe(availabilitySection, { attributes: true, attributeFilter: ["class"] });
     }
+  }
 
-    if (!genderRequired) return;
-
-    const gender = selectedGender();
-    if (!gender) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      showError("性別を選択してください。");
-      return;
+  const availabilityGuard = new MutationObserver(() => {
+    if (!ready && !availabilitySection.classList.contains("is-hidden")) {
+      availabilitySection.classList.add("is-hidden");
+      try {
+        if (selectedService) showGate();
+      } catch (_) {}
     }
+  });
+  availabilityGuard.observe(availabilitySection, { attributes: true, attributeFilter: ["class"] });
 
-    if (gender !== "女性") {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      showError("吉丸りなトレーナーは女性専用です。");
-    }
-  }, true);
-
-  // createReservationへ吉丸トレーナーと、必要な場合だけ性別を渡す。
-  // GASが「スタッフ確認前のため性別確認が必要」と返した場合だけ性別欄を表示する。
   window.fetch = async function(input, init) {
-    let isYoshimaruReservation = false;
-
     try {
       const method = String(init?.method || "GET").toUpperCase();
       const target = typeof input === "string" ? input : String(input?.url || input || "");
 
-      if (
-        method === "POST" &&
-        target === API_URL &&
-        typeof init?.body === "string" &&
-        isYoshimaruSelected()
-      ) {
+      if (method === "POST" && target === API_URL && typeof init?.body === "string") {
         const body = JSON.parse(init.body);
 
-        if (body?.action === "createReservation") {
-          isYoshimaruReservation = true;
-          body.staff_code = YOSHIMARU_CODE;
-
-          const gender = selectedGender();
-          if (genderRequired && gender) {
-            body.gender = gender;
-          }
-
-          init = {
-            ...init,
-            body: JSON.stringify(body)
-          };
+        if (body?.action === "createReservation" && !body?.policy_check_only && ready) {
+          body.member_no = verifiedMemberNo;
+          body.customer_email = verifiedEmail;
+          init = { ...init, body: JSON.stringify(body) };
         }
       }
     } catch (_) {
-      // JSON以外は既存処理へそのまま渡す。
+      // 既存処理を優先する。
     }
 
-    const response = await previousFetch(input, init);
-
-    if (isYoshimaruReservation) {
-      try {
-        const result = await response.clone().json();
-        const code = responseCode(result);
-
-        if (code === "YOSHIMARU_GENDER_REQUIRED") {
-          genderRequired = true;
-          setGenderVisible(true);
-          showError("吉丸りなトレーナーは女性専用です。スタッフ確認が完了するまで、予約時に性別を選択してください。");
-        } else if (code === "YOSHIMARU_FEMALE_ONLY") {
-          genderRequired = true;
-          setGenderVisible(true);
-          showError("吉丸りなトレーナーは女性専用です。");
-        } else if (result?.ok) {
-          resetGenderCheck();
-        }
-      } catch (_) {
-        // 共通予約処理側で通常の通信エラー処理を行う。
-      }
-    }
-
-    return response;
+    return previousFetch(input, init);
   };
 
-  ensureGenderField();
+  ensureEligibilitySection();
+  applyStepNumbers_();
+  availabilitySection.classList.add("is-hidden");
 })();
