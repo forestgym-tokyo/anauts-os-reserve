@@ -64,16 +64,6 @@ function doGet(e) {
           params
         );
 
-      case "getMySogaShiftRequests":
-        return getMySogaShiftRequests(
-          params
-        );
-
-      case "getSogaShiftBoard":
-        return getSogaShiftBoard(
-          params
-        );
-
       case "getStaffPresenceHours":
         return getStaffPresenceHours(
           params
@@ -316,21 +306,6 @@ function doPost(e) {
 
       case "createShiftChangeRequest":
         return createShiftChangeRequest(
-          body
-        );
-
-      case "saveMySogaShiftRequests":
-        return saveMySogaShiftRequests(
-          body
-        );
-
-      case "saveSogaShiftAssignments":
-        return saveSogaShiftAssignments(
-          body
-        );
-
-      case "importSogaShiftRequests":
-        return importSogaShiftRequests(
           body
         );
 
