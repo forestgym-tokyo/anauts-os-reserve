@@ -109,6 +109,8 @@ const today = startOfDay(new Date());
 let weekStart = new Date(today);
 let publicDays = 30;
 let loading = false;
+let weekLoadVersion = 0;
+let pendingWeekReload = false;
 
 init();
 
@@ -180,7 +182,7 @@ async function fetchServices() {
   }
 
   if (Array.isArray(result.data)) return result.data;
-  if (Array.isArray(result.data?.services)) return result.data.services;
+  if (result.data && Array.isArray(result.data.services)) return result.data.services;
 
   throw new Error("getServicesのレスポンス形式を確認してください。");
 }
@@ -234,13 +236,16 @@ function ensureSplitNameFields_() {
   if (last && first) {
     el.customerLastName = last;
     el.customerFirstName = first;
-    if (el.customerName) el.customerName.closest("label, .field")?.classList.add("is-hidden");
+    if (el.customerName) {
+      const customerNameField = el.customerName.closest("label, .field");
+      if (customerNameField) customerNameField.classList.add("is-hidden");
+    }
     return;
   }
 
   // 旧 customerName 欄の位置を利用して姓・名に置換
   const legacy = el.customerName;
-  const legacyField = legacy?.closest("label, .field") || el.nameField;
+  const legacyField = (legacy && legacy.closest("label, .field")) || el.nameField;
 
   if (!legacyField) return;
 
@@ -271,8 +276,8 @@ function ensureSplitNameFields_() {
 function getCustomerNameParts_() {
   ensureSplitNameFields_();
 
-  const lastName = String(el.customerLastName?.value || "").trim();
-  const firstName = String(el.customerFirstName?.value || "").trim();
+  const lastName = String((el.customerLastName && el.customerLastName.value) || "").trim();
+  const firstName = String((el.customerFirstName && el.customerFirstName.value) || "").trim();
 
   return {
     lastName,
@@ -307,15 +312,17 @@ function isCustomerNameRequired_(serviceCode, customerType) {
 }
 
 function setCustomerNameVisible_(visible) {
-  el.nameField?.classList.add("is-hidden");
+  if (el.nameField) el.nameField.classList.add("is-hidden");
 
   const splitNameField =
     document.querySelector("#splitNameField");
 
-  splitNameField?.classList.toggle(
-    "is-hidden",
-    !visible
-  );
+  if (splitNameField) {
+    splitNameField.classList.toggle(
+      "is-hidden",
+      !visible
+    );
+  }
 
   if (el.customerLastName) {
     el.customerLastName.required = !!visible;
@@ -331,9 +338,10 @@ function getCurrentCustomerType_(formType) {
     String(formType || "").toUpperCase();
 
   if (normalized === "BOTH") {
-    return document.querySelector(
+    const checked = document.querySelector(
       'input[name="customer_type"]:checked'
-    )?.value || "";
+    );
+    return (checked && checked.value) || "";
   }
 
   return normalized;
@@ -345,12 +353,12 @@ function configureCustomerForm() {
 
   const formType =
     String(
-      selectedService?.form_type || ""
+      (selectedService && selectedService.form_type) || ""
     ).toUpperCase();
 
   const code =
     String(
-      selectedService?.service_code || ""
+      (selectedService && selectedService.service_code) || ""
     ).toUpperCase();
 
   const isTour =
@@ -364,19 +372,25 @@ function configureCustomerForm() {
 
   // トレーニングサポートは会員専用
   if (isTrainingSupport) {
-    el.customerTypeField?.classList.add(
-      "is-hidden"
-    );
+    if (el.customerTypeField) {
+      el.customerTypeField.classList.add(
+        "is-hidden"
+      );
+    }
 
-    el.memberNoField?.classList.remove(
-      "is-hidden"
-    );
+    if (el.memberNoField) {
+      el.memberNoField.classList.remove(
+        "is-hidden"
+      );
+    }
 
     setCustomerNameVisible_(false);
 
-    el.phoneField?.classList.add(
-      "is-hidden"
-    );
+    if (el.phoneField) {
+      el.phoneField.classList.add(
+        "is-hidden"
+      );
+    }
 
     setAddressFieldsVisible_(false);
 
@@ -385,15 +399,19 @@ function configureCustomerForm() {
     return;
   }
 
-  el.customerTypeField?.classList.toggle(
-    "is-hidden",
-    formType !== "BOTH"
-  );
+  if (el.customerTypeField) {
+    el.customerTypeField.classList.toggle(
+      "is-hidden",
+      formType !== "BOTH"
+    );
+  }
 
-  el.memberNoField?.classList.toggle(
-    "is-hidden",
-    formType === "VISITOR"
-  );
+  if (el.memberNoField) {
+    el.memberNoField.classList.toggle(
+      "is-hidden",
+      formType === "VISITOR"
+    );
+  }
 
   const initialCustomerType =
     getCurrentCustomerType_(formType);
@@ -431,10 +449,12 @@ function configureCustomerForm() {
         const customerType =
           radio.value;
 
-        el.memberNoField?.classList.toggle(
-          "is-hidden",
-          customerType !== "MEMBER"
-        );
+        if (el.memberNoField) {
+          el.memberNoField.classList.toggle(
+            "is-hidden",
+            customerType !== "MEMBER"
+          );
+        }
 
         setCustomerNameVisible_(
           isCustomerNameRequired_(
@@ -480,7 +500,7 @@ function configureMemberNumberInput_() {
 }
 
 function hasCounselMemberNo_() {
-  return /^\d{6}$/.test(String(el.memberNo?.value || "").trim());
+  return /^\d{6}$/.test(String((el.memberNo && el.memberNo.value) || "").trim());
 }
 
 function setAddressFieldsVisible_(visible) {
@@ -589,10 +609,10 @@ async function lookupPostalAddress_(postalCode) {
 function getAddressParts_() {
   ensureSplitAddressFields_();
 
-  const postalCode = String(el.postalCode?.value || "").trim();
-  const prefecture = String(el.prefecture?.value || "").trim();
-  const city = String(el.city?.value || "").trim();
-  const addressDetail = String(el.addressDetail?.value || "").trim();
+  const postalCode = String((el.postalCode && el.postalCode.value) || "").trim();
+  const prefecture = String((el.prefecture && el.prefecture.value) || "").trim();
+  const city = String((el.city && el.city.value) || "").trim();
+  const addressDetail = String((el.addressDetail && el.addressDetail.value) || "").trim();
 
   return {
     postalCode,
@@ -615,7 +635,13 @@ el.newReservationButton.addEventListener("click", () => {
 });
 
 async function loadWeek() {
-  if (!selectedService || loading) return;
+  const requestVersion = ++weekLoadVersion;
+
+  if (!selectedService) return;
+  if (loading) {
+    pendingWeekReload = true;
+    return;
+  }
 
   loading = true;
   selectedSlot = null;
@@ -631,28 +657,81 @@ async function loadWeek() {
   });
 
   try {
-    const results = await Promise.all(dates.map(fetchSlots));
+    let results = null;
+
+    if (typeof window.ANAUTS_FETCH_WEEK_SLOTS === "function") {
+      results = await window.ANAUTS_FETCH_WEEK_SLOTS(dates.slice());
+    }
+
+    if (requestVersion !== weekLoadVersion) return;
+
+    if (!Array.isArray(results) || results.length !== dates.length) {
+      results = await fetchSlotsWithLimit_(dates, requestVersion);
+    }
+
+    if (requestVersion !== weekLoadVersion) return;
+
     const first = results.find((result) => result.ok && result.data);
 
-    if (first?.data?.public_days !== undefined) {
+    if (first && first.data && first.data.public_days !== undefined) {
       publicDays = Number(first.data.public_days) || 30;
     }
 
     renderWeek(results);
 
     const total = results.reduce((sum, result) =>
-      sum + (Array.isArray(result.data?.slots) ? result.data.slots.length : 0), 0
+      sum + (result.data && Array.isArray(result.data.slots) ? result.data.slots.length : 0), 0
     );
+    const failed = results.filter((result) => !result.ok).length;
 
-    el.weekStatus.textContent = total
-      ? `この7日間に${total}件の空きがあります。`
-      : "この7日間に空きはありません。";
+    if (failed) {
+      el.weekStatus.textContent = `${DAYS - failed}日分を表示しました。${failed}日分は取得できませんでした。`;
+    } else {
+      el.weekStatus.textContent = total
+        ? `この7日間に${total}件の空きがあります。`
+        : "この7日間に空きはありません。";
+    }
   } catch (error) {
     el.weekStatus.textContent = error.message || "空き時間の取得に失敗しました。";
   } finally {
     loading = false;
     updateNav();
+
+    if (pendingWeekReload) {
+      pendingWeekReload = false;
+      loadWeek();
+    }
   }
+}
+
+async function fetchSlotsWithLimit_(dates, requestVersion) {
+  const pending = dates.map((date) => ({
+    ok: true,
+    pending: true,
+    data: { date, slots: [] }
+  }));
+  let cursor = 0;
+  let completed = 0;
+
+  renderWeek(pending);
+
+  async function worker_() {
+    while (cursor < dates.length && requestVersion === weekLoadVersion) {
+      const index = cursor++;
+      pending[index] = await fetchSlots(dates[index]);
+      completed += 1;
+
+      if (requestVersion !== weekLoadVersion) return;
+      renderWeek(pending);
+      el.weekStatus.textContent = `予約可能時間を確認しています… ${completed}/${dates.length}日`;
+    }
+  }
+
+  const workerCount = typeof window.ANAUTS_FETCH_WEEK_SLOTS === "function"
+    ? Math.min(2, dates.length)
+    : dates.length;
+  await Promise.all(Array.from({ length: workerCount }, () => worker_()));
+  return pending;
 }
 
 async function fetchSlots(date) {
@@ -689,9 +768,14 @@ function renderWeek(results) {
     const area = document.createElement("div");
     area.className = "day-slots";
 
-    const slots = Array.isArray(result.data?.slots) ? result.data.slots : [];
+    const slots = result.data && Array.isArray(result.data.slots) ? result.data.slots : [];
 
-    if (!result.ok || !slots.length) {
+    if (result.pending) {
+      const p = document.createElement("p");
+      p.className = "no-slots";
+      p.textContent = "読込中…";
+      area.append(p);
+    } else if (!result.ok || !slots.length) {
       const p = document.createElement("p");
       p.className = "no-slots";
       p.textContent = result.ok ? "空きなし" : (result.message || "取得失敗");
@@ -769,7 +853,8 @@ async function submitReservation(event) {
   let customerType = formType;
 
   if (formType === "BOTH") {
-    customerType = document.querySelector('input[name="customer_type"]:checked')?.value || "";
+    const checkedCustomerType = document.querySelector('input[name="customer_type"]:checked');
+    customerType = (checkedCustomerType && checkedCustomerType.value) || "";
     if (!customerType) {
       showError("会員または非会員を選択してください。");
       return;
@@ -953,7 +1038,7 @@ function jpDate(value) {
 }
 
 function escapeHtml(value) {
-  return String(value ?? "")
+  return String(value === null || value === undefined ? "" : value)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")

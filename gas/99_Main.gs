@@ -187,6 +187,11 @@ function doGet(e) {
           params
         );
 
+      case "getAvailableSlotsRange":
+        return getAvailableSlotsRange(
+          params
+        );
+
       case "getServiceHours":
         return getServiceHours(
           params

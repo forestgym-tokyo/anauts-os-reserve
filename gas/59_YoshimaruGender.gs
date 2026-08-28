@@ -16,6 +16,145 @@ const YOSHIMARU_POLICY_ = Object.freeze({
 
 
 /**
+ * 7日分の空き枠を1回のHTTP通信で返す。
+ * iPad/SafariからgetAvailableSlotsを日数分並列実行しないための公開API。
+ */
+function getAvailableSlotsRange(params) {
+  params = params || {};
+
+  const startDate = normalizeYoshimaruText_(params.start_date || params.date);
+  const serviceCode = normalizeYoshimaruText_(params.service_code).toUpperCase();
+  const staffCode = normalizeYoshimaruText_(params.staff_code).toUpperCase();
+  const requestedDays = Number(params.days || 7);
+  const days = Math.max(1, Math.min(7, Math.floor(requestedDays || 7)));
+
+  if (!serviceCode) {
+    return errorResponse(
+      "サービスコードを指定してください。",
+      "SERVICE_CODE_REQUIRED",
+      null
+    );
+  }
+
+  if (!staffCode) {
+    return errorResponse(
+      "担当トレーナーを指定してください。",
+      "STAFF_CODE_REQUIRED",
+      null
+    );
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+    return errorResponse(
+      "開始日をYYYY-MM-DD形式で指定してください。",
+      "START_DATE_REQUIRED",
+      { start_date: startDate }
+    );
+  }
+
+  const cacheKey = [
+    "available-range-v1",
+    serviceCode,
+    staffCode,
+    startDate,
+    days
+  ].join(":");
+
+  const cached = getYoshimaruRangeCache_(cacheKey);
+  if (cached) return successResponse(cached);
+
+  const results = [];
+  let allSucceeded = true;
+
+  for (let index = 0; index < days; index += 1) {
+    const dayParams = {};
+    Object.keys(params).forEach(function(key) {
+      dayParams[key] = params[key];
+    });
+    dayParams.action = "getAvailableSlots";
+    dayParams.date = addYoshimaruUtcDays_(startDate, index);
+
+    try {
+      const result = parseYoshimaruApiResponse_(getAvailableSlots(dayParams));
+      if (!result || result.ok !== true) allSucceeded = false;
+      results.push(result || {
+        ok: false,
+        message: "空き状況を取得できませんでした。",
+        code: "AVAILABLE_SLOTS_EMPTY_RESPONSE",
+        data: { date: dayParams.date, slots: [] }
+      });
+    } catch (error) {
+      allSucceeded = false;
+      results.push({
+        ok: false,
+        message: error && error.message
+          ? error.message
+          : "空き状況を取得できませんでした。",
+        code: "AVAILABLE_SLOTS_RANGE_ERROR",
+        data: { date: dayParams.date, slots: [] }
+      });
+    }
+  }
+
+  const data = {
+    start_date: startDate,
+    days: days,
+    results: results
+  };
+
+  // 予約確定時に再検証されるため、短時間だけ同一結果を再利用する。
+  if (allSucceeded) putYoshimaruRangeCache_(cacheKey, data, 20);
+
+  return successResponse(data);
+}
+
+
+function parseYoshimaruApiResponse_(response) {
+  let value = response;
+
+  if (value && typeof value.getContent === "function") {
+    value = value.getContent();
+  }
+
+  if (typeof value === "string") {
+    value = JSON.parse(value);
+  }
+
+  return value && typeof value === "object" ? value : null;
+}
+
+
+function addYoshimaruUtcDays_(dateText, offset) {
+  const parts = String(dateText).split("-").map(Number);
+  const date = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2] + Number(offset || 0)));
+  return [
+    date.getUTCFullYear(),
+    String(date.getUTCMonth() + 1).padStart(2, "0"),
+    String(date.getUTCDate()).padStart(2, "0")
+  ].join("-");
+}
+
+
+function getYoshimaruRangeCache_(key) {
+  try {
+    const raw = CacheService.getScriptCache().get(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+
+function putYoshimaruRangeCache_(key, value, seconds) {
+  try {
+    CacheService.getScriptCache().put(key, JSON.stringify(value), seconds);
+  } catch (_) {
+    // キャッシュ不可でもAPI結果は返す。
+  }
+}
+
+
+/**
  * createReservation の入口。
  * policy_check_only=true の場合は予約を作らず、吉丸予約可否だけを返す。
  */
