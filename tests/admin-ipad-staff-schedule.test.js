@@ -28,7 +28,7 @@ assert.match(config, /for \(var i = 0; i < addonSources\.length; i \+= 1\)/);
 assert.doesNotMatch(config, /window\.addEventListener\("load", function \(\) \{\s*var monthly/);
 
 assert.match(indexHtml, /rel="preconnect" href="https:\/\/script\.google\.com"/);
-assert.match(indexHtml, /20260828-ipad-staff-schedule-v3/);
+assert.match(indexHtml, /20260828-ipad-staff-schedule-v4/);
 
 assert.match(auth, /getStaffSchedule\(params\)/);
 assert.match(auth, /CacheService\.getScriptCache\(\)/);
