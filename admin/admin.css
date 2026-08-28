@@ -47,6 +47,29 @@ html,body,.app-shell{max-width:100%;overflow-x:hidden}
   margin:0!important;
 }
 .staff-reservation-row>.withdrawal-link-actions{grid-column:5;grid-row:1 / span 2}
+.staff-reservation-row>.withdrawal-link-actions{
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  gap:8px;
+  width:158px;
+}
+.staff-reservation-row>.withdrawal-link-actions>button{
+  width:158px;
+  min-width:158px;
+  min-height:44px;
+  margin:0;
+  border-radius:10px;
+  padding:8px 12px;
+  font-size:13px;
+  font-weight:800;
+  white-space:nowrap;
+}
+.staff-reservation-row .withdrawal-form-shortcut{
+  border:1px solid #ff6673;
+  background:#ff4f63;
+  color:#fff;
+}
 .staff-reservation-row>.tour-row-actions,
 .staff-reservation-row>.tour-question-inline{grid-column:1 / -1}
 @media(max-width:1100px){
@@ -74,6 +97,7 @@ html,body,.app-shell{max-width:100%;overflow-x:hidden}
   .staff-reservation-row>.tour-row-actions,
   .staff-reservation-row>.tour-question-inline{grid-column:1 / -1;grid-row:auto;width:100%!important;max-width:none!important}
   .staff-reservation-row>.reservation-manage-button{min-width:0!important}
+  .staff-reservation-row>.withdrawal-link-actions>button{width:100%;min-width:0}
 }
 
 html{color-scheme:dark;background:#090d0a}
