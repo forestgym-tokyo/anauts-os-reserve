@@ -1,6 +1,6 @@
 // BUILD: 20260818-logout-message-v49
 const API_URL="https://script.google.com/macros/s/AKfycbyvpQRxRpMRfpaQHtBar77dViCqPl-hdFW-2yMdozhN8RHtwcrFiNEM9cvEbny4x9q0/exec";
-const state={staff:[],stores:[],services:[],serviceHours:[],presenceWeekdays:[],presenceSpecials:[],selectedServiceCode:"",selectedStaffCode:"",shiftRows:[],shiftPreview:null,staffScheduleDate:"",staffSchedule:null,trainerScheduleDate:"",trainerSchedule:null,myShiftMonth:"",myShiftDate:"",myShiftRows:[],myShiftRequests:[],authUser:null,idToken:""};
+const state={staff:[],stores:[],services:[],serviceHours:[],presenceWeekdays:[],presenceSpecials:[],selectedServiceCode:"",selectedStaffCode:"",shiftRows:[],shiftPreview:null,staffScheduleDate:"",staffSchedule:null,staffScheduleBootstrapDate:"",staffScheduleBootstrapError:"",trainerScheduleDate:"",trainerSchedule:null,myShiftMonth:"",myShiftDate:"",myShiftRows:[],myShiftRequests:[],authUser:null,idToken:""};
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
 function authEnabled(){return !!window.ANAUTS_AUTH?.enabled}
 function withAuth(params={}){const o={...params};if(authEnabled()&&state.idToken)o.id_token=state.idToken;return o}
@@ -28,6 +28,45 @@ function applyPermissionUi(){
   if($("#authUserPermission"))$("#authUserPermission").textContent=permission;
 }
 
+function applyAuthBootstrap_(data){
+  const payload=data||{};
+  state.authUser=payload.profile||payload;
+
+  if(payload.profile&&(
+    Object.prototype.hasOwnProperty.call(payload,"staff_schedule")||
+    Object.prototype.hasOwnProperty.call(payload,"staff_schedule_error")
+  )){
+    state.staffScheduleBootstrapDate=String(
+      payload.staff_schedule_date||state.staffScheduleDate||""
+    );
+    state.staffScheduleBootstrapError=String(payload.staff_schedule_error||"");
+    state.staffSchedule=payload.staff_schedule||null;
+  }
+}
+
+async function loadCurrentUserWithSchedule_(){
+  if(!state.staffScheduleDate)state.staffScheduleDate=localYmd();
+  const j=await apiGet("getCurrentUser",{
+    include_staff_schedule:"1",
+    date:state.staffScheduleDate,
+    store_code:"YACHIYO"
+  });
+  applyAuthBootstrap_(j.data||null);
+}
+
+function markAdminCoreReady_(){
+  if(window.__ANAUTS_ADMIN_CORE_READY__===true)return;
+  window.__ANAUTS_ADMIN_CORE_READY__=true;
+  let event;
+  try{
+    event=new CustomEvent("anauts:admin-core-ready");
+  }catch(_){
+    event=document.createEvent("Event");
+    event.initEvent("anauts:admin-core-ready",false,false);
+  }
+  window.dispatchEvent(event);
+}
+
 function showLoginMessage(text,error=true){
   const n=$("#loginMessage"); if(!n)return;
   n.textContent=text||"";
@@ -51,8 +90,7 @@ async function restoreAuthSession(){
   if(!token)return false;
   state.idToken=token;
   try{
-    const j=await apiGet("getCurrentUser");
-    state.authUser=j.data||null;
+    await loadCurrentUserWithSchedule_();
     applyPermissionUi();
     return !!state.authUser;
   }catch(e){
@@ -67,7 +105,22 @@ async function initializeAppAfterAuth(){
   if(!state.myShiftMonth)state.myShiftMonth=localYmd().slice(0,7);
   const activeButton=document.querySelector(".nav-button.is-active");
   const activeView=activeButton?.dataset?.view||"staffSchedule";
-  if(activeView==="staffSchedule"){await loadStaffSchedule();return;}
+  if(activeView==="staffSchedule"){
+    if(state.staffScheduleBootstrapDate===state.staffScheduleDate){
+      const bootstrapError=state.staffScheduleBootstrapError;
+      state.staffScheduleBootstrapDate="";
+      state.staffScheduleBootstrapError="";
+      $("#staffScheduleDateLabel").textContent=formatStaffDate(state.staffScheduleDate);
+      if(bootstrapError){
+        showStaffScheduleError_(bootstrapError);
+      }else{
+        renderStaffSchedule(state.staffSchedule||{});
+      }
+      return;
+    }
+    await loadStaffSchedule();
+    return;
+  }
   if(activeView==="trainerSchedule"){await loadTrainerSchedule();return;}
   if(activeView==="myShift"){await loadMyShiftView();return;}
 }
@@ -80,12 +133,12 @@ async function doLogin(e){
     const auth=await firebaseSignIn($("#loginEmail").value.trim(),$("#loginPassword").value);
     state.idToken=auth.idToken;
     sessionStorage.setItem("anauts_id_token",auth.idToken);
-    const j=await apiGet("getCurrentUser");
-    state.authUser=j.data||null;
+    await loadCurrentUserWithSchedule_();
     if(!state.authUser)throw new Error("このアカウントにはA-nauts OS Reserveの利用権限がありません。");
     $("#loginGate").classList.add("is-hidden");
     applyPermissionUi();
     await initializeAppAfterAuth();
+    markAdminCoreReady_();
   }catch(err){
     state.idToken="";
     sessionStorage.removeItem("anauts_id_token");
@@ -648,7 +701,45 @@ function localYmd(d=new Date()){return `${d.getFullYear()}-${String(d.getMonth()
 function parseYmd(v){const [y,m,d]=String(v).split("-").map(Number);return new Date(y,m-1,d)}
 function moveStaffScheduleDate(days){const d=parseYmd(state.staffScheduleDate||localYmd());d.setDate(d.getDate()+days);state.staffScheduleDate=localYmd(d);loadStaffSchedule()}
 function formatStaffDate(v){const d=parseYmd(v),w=["日","月","火","水","木","金","土"];return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日（${w[d.getDay()]}）`}
-async function loadStaffSchedule(){if(!$("#staffScheduleBoard"))return;if(!state.staffScheduleDate)state.staffScheduleDate=localYmd();$("#staffScheduleDateLabel").textContent=formatStaffDate(state.staffScheduleDate);$("#staffScheduleBoard").innerHTML='<div class="staff-schedule-loading">スタッフ予定を読み込んでいます…</div>';$("#staffScheduleMessage").classList.add("is-hidden");try{const j=await apiGet("getStaffSchedule",{date:state.staffScheduleDate,store_code:"YACHIYO"});state.staffSchedule=j.data||{};renderStaffSchedule(state.staffSchedule)}catch(e){$("#staffScheduleBoard").innerHTML='<div class="staff-schedule-empty"><strong>予定を取得できませんでした</strong><span>'+esc(e.message)+'</span></div>';const n=$("#staffScheduleMessage");n.textContent=e.message;n.classList.remove("is-hidden");n.classList.add("is-error")}}
+let staffScheduleRequestSequence_=0;
+function showStaffScheduleError_(message){
+  const text=String(message||"スタッフ予定を取得できませんでした。");
+  const board=$("#staffScheduleBoard");
+  if(board){
+    board.innerHTML='<div class="staff-schedule-empty"><strong>予定を取得できませんでした</strong><span>'+esc(text)+'</span><button type="button" class="ghost-button" id="retryStaffScheduleButton">再試行</button></div>';
+    $("#retryStaffScheduleButton")?.addEventListener("click",loadStaffSchedule,{once:true});
+  }
+  const n=$("#staffScheduleMessage");
+  if(n){
+    n.textContent=text;
+    n.classList.remove("is-hidden");
+    n.classList.add("is-error");
+  }
+}
+async function loadStaffSchedule(){
+  const board=$("#staffScheduleBoard");
+  if(!board)return;
+  if(!state.staffScheduleDate)state.staffScheduleDate=localYmd();
+  const requestedDate=state.staffScheduleDate;
+  const requestSequence=++staffScheduleRequestSequence_;
+  $("#staffScheduleDateLabel").textContent=formatStaffDate(requestedDate);
+  board.innerHTML='<div class="staff-schedule-loading">スタッフ予定を読み込んでいます…</div>';
+  const message=$("#staffScheduleMessage");
+  if(message){
+    message.textContent="";
+    message.classList.add("is-hidden");
+    message.classList.remove("is-error");
+  }
+  try{
+    const j=await apiGet("getStaffSchedule",{date:requestedDate,store_code:"YACHIYO"});
+    if(requestSequence!==staffScheduleRequestSequence_||requestedDate!==state.staffScheduleDate)return;
+    state.staffSchedule=j.data||{};
+    renderStaffSchedule(state.staffSchedule);
+  }catch(e){
+    if(requestSequence!==staffScheduleRequestSequence_||requestedDate!==state.staffScheduleDate)return;
+    showStaffScheduleError_(e&&e.message);
+  }
+}
 function renderStaffSchedule(d){const shifts=Array.isArray(d.shifts)?d.shifts:[],reservations=(Array.isArray(d.reservations)?d.reservations:[]).filter(r=>String(r.status||"").trim().toUpperCase()!=="CANCELLED");$("#staffScheduleSummary").innerHTML=`<span>勤務 <b>${shifts.length}</b>名</span><span>予約 <b>${reservations.length}</b>件</span>`;const staffCodes=[...new Set([...shifts.map(x=>x.staff_code),...reservations.map(x=>x.staff_code)].filter(Boolean))];if(!staffCodes.length){$("#staffScheduleBoard").innerHTML='<div class="staff-schedule-empty"><strong>この日のスタッフ予定はありません</strong><span>シフト・予約ともに登録されていません。</span></div>';return}const sections=staffCodes.map(code=>{const ss=shifts.filter(x=>x.staff_code===code),rr=reservations.filter(x=>x.staff_code===code).sort((a,b)=>String(a.start_time).localeCompare(String(b.start_time)));const name=ss[0]?.staff_name||rr[0]?.staff_name||code;const shiftText=ss.length?ss.map(x=>`${esc(x.start_time)}〜${esc(x.end_time)}`).join(" / "):"シフト登録なし";const rows=rr.length?rr.map(r=>`<div class="staff-reservation-row"><div class="staff-reservation-time">${esc(r.start_time)}〜${esc(r.end_time)}</div><div class="staff-reservation-service"><strong>${esc(r.service_name||r.service_code)}</strong><small>${esc(r.service_code||"")}</small></div><div class="staff-reservation-customer"><strong>${esc(r.customer_name||"氏名未登録")}</strong><small>${r.member_no?`会員番号 ${esc(r.member_no)}`:esc(r.customer_type||"")}</small></div><span class="reservation-status">${esc(r.status||"RESERVED")}</span><button type="button" class="reservation-manage-button" data-reservation-id="${esc(r.reservation_id||"")}" style="border:1px solid #cfd4d4;background:#fff;border-radius:8px;padding:7px 10px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">変更・キャンセル</button></div>`).join(""):'<div class="staff-no-reservation">予約はありません。</div>';return `<section class="staff-day-section"><div class="staff-day-head"><div class="staff-day-person"><span class="staff-day-avatar">${esc(String(name).slice(0,1))}</span><span><strong>${esc(name)}</strong><small>${esc(code)}</small></span></div><span class="shift-pill">${shiftText}</span></div><div class="staff-reservation-list">${rows}</div></section>`}).join("");$("#staffScheduleBoard").innerHTML=`<div class="staff-day-grid">${sections}</div>`}
 bindReservationManageButtons_($("#staffScheduleBoard"));
 $("#staffPrevDay")?.addEventListener("click",()=>moveStaffScheduleDate(-1));$("#staffNextDay")?.addEventListener("click",()=>moveStaffScheduleDate(1));$("#staffToday")?.addEventListener("click",()=>{state.staffScheduleDate=localYmd();loadStaffSchedule()});
@@ -1478,6 +1569,7 @@ window.addEventListener("DOMContentLoaded",async()=>{
   setupMyShiftTimeSelectors_();
   if(!authEnabled()){
     await initializeAppAfterAuth();
+    markAdminCoreReady_();
     return;
   }
 
@@ -1493,4 +1585,5 @@ window.addEventListener("DOMContentLoaded",async()=>{
   $("#loginGate")?.classList.add("is-hidden");
   applyPermissionUi();
   await initializeAppAfterAuth();
+  markAdminCoreReady_();
 });
