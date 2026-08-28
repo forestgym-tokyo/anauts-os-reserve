@@ -45,6 +45,22 @@ html,body,.app-shell{max-width:100%;overflow-x:hidden}
   min-width:158px!important;
   min-height:44px!important;
   margin:0!important;
+  border-color:#fcd34d!important;
+  background:#fbbf24!important;
+  color:#201500!important;
+  box-shadow:0 4px 12px rgba(251,191,36,.28)!important;
+}
+.staff-reservation-row .withdrawal-link-actions>.reservation-manage-button{
+  border-color:#fcd34d!important;
+  background:#fbbf24!important;
+  color:#201500!important;
+  box-shadow:0 4px 12px rgba(251,191,36,.28)!important;
+}
+.staff-reservation-row>.reservation-manage-button:hover,
+.staff-reservation-row .withdrawal-link-actions>.reservation-manage-button:hover{
+  border-color:#fde68a!important;
+  background:#fcd34d!important;
+  color:#171000!important;
 }
 .staff-reservation-row>.withdrawal-link-actions{grid-column:5;grid-row:1 / span 2}
 .staff-reservation-row>.withdrawal-link-actions{
