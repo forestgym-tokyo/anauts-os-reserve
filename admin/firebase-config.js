@@ -104,7 +104,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
-  async function fetchWithTimeout_(url, options, action, timeoutMs) {
+  async function fetchJsonWithTimeout_(url, options, action, timeoutMs) {
     const controller = typeof AbortController === "function"
       ? new AbortController()
       : null;
@@ -127,7 +127,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     try {
       return await Promise.race([
-        fetch(url, requestOptions),
+        (async function () {
+          const response = await fetch(url, requestOptions);
+          return parseApiResponse_(response, action);
+        })(),
         timeout
       ]);
     } finally {
@@ -145,13 +148,12 @@ document.addEventListener("DOMContentLoaded", function () {
     for (const baseUrl of urls.slice(0, maxAttempts)) {
       try {
         const request = buildRequest(baseUrl);
-        const response = await fetchWithTimeout_(
+        const json = await fetchJsonWithTimeout_(
           request.url,
           request.options || {},
           action,
           timeoutMs
         );
-        const json = await parseApiResponse_(response, action);
         rememberApiUrl_(baseUrl);
         return json;
       } catch (error) {

@@ -20,7 +20,8 @@ assert.ok(
   config.indexOf("workspaceUrl,") < config.indexOf("primaryUrl\n"),
   "Workspace route must be attempted before the public Apps Script route"
 );
-assert.match(config, /Promise\.race\(\[\s*fetch\(/);
+assert.match(config, /Promise\.race\(\[/);
+assert.match(config, /return parseApiResponse_\(response, action\)/);
 assert.match(config, /API_REQUEST_TIMEOUT_MS\s*=\s*20000/);
 assert.match(config, /anauts:admin-core-ready/);
 assert.match(config, /for \(var i = 0; i < addonSources\.length; i \+= 1\)/);
