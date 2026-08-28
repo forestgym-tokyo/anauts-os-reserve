@@ -48,7 +48,7 @@
         question.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openReplyForRow(row)}});
       }
 
-      if(!q&&!enroll&&!manage)return;
+      if(!q&&!enroll)return;
       let actions=row.querySelector(".tour-row-actions");
       if(!actions){actions=document.createElement("div");actions.className="tour-row-actions";row.appendChild(actions)}
 

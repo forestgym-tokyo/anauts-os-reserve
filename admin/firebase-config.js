@@ -223,7 +223,8 @@ document.addEventListener("DOMContentLoaded", function () {
 (function () {
   var addonSources = [
     "./admin-monthly-v58.js?v=20260828-stable-v2",
-    "./admin-tour-enrollment.js?v=20260828-stable-v2"
+    "./admin-tour-enrollment.js?v=20260828-stable-v2",
+    "./admin-tour-ui-polish.js?v=20260828-stable-v4"
   ];
   var started = false;
 
