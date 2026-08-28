@@ -192,7 +192,7 @@ function isEnabled(service) {
 }
 
 function renderServiceCards(list) {
-  el.serviceGrid.replaceChildren();
+  el.serviceGrid.textContent = "";
 
   list.forEach((service) => {
     const button = document.createElement("button");
@@ -671,7 +671,7 @@ async function fetchSlots(date) {
 }
 
 function renderWeek(results) {
-  el.weekList.replaceChildren();
+  el.weekList.textContent = "";
 
   results.forEach((result, index) => {
     const date = new Date(weekStart);
@@ -954,9 +954,9 @@ function jpDate(value) {
 
 function escapeHtml(value) {
   return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }

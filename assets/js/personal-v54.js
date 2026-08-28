@@ -8,6 +8,7 @@
   let loadedStoreCode = "";
   const trainerMap = new Map();
   const nativeFetch = window.fetch.bind(window);
+  const nativeLoadWeek = loadWeek;
 
   function bookingEligibilityReady_() {
     return window.ANAUTS_PERSONAL_ELIGIBILITY_READY === true;
@@ -15,6 +16,10 @@
 
   function womenOnlyTrainerAllowed_() {
     return window.ANAUTS_YOSHIMARU_ALLOWED === true;
+  }
+
+  function trainerSelectionRequired_() {
+    return bookingEligibilityReady_() && !womenOnlyTrainerAllowed_();
   }
 
   function trainerAllowed_(code) {
@@ -59,7 +64,9 @@
 
     const allowed = visibleTrainers_();
     const choices = [
-      { code: "", name: "すべてのトレーナー" },
+      ...(womenOnlyTrainerAllowed_()
+        ? [{ code: "", name: "すべてのトレーナー" }]
+        : []),
       ...allowed.sort((a, b) =>
         String(a.name || "").localeCompare(String(b.name || ""), "ja")
       )
@@ -69,7 +76,7 @@
       selectedTrainerCode = "";
     }
 
-    area.replaceChildren();
+    area.textContent = "";
 
     choices.forEach((trainer) => {
       const button = document.createElement("button");
@@ -166,9 +173,14 @@
     if (!status) return;
 
     const count = visibleTrainers_().length;
-    status.textContent = count
-      ? "トレーナーを指定すると、そのトレーナーの予約可能時間だけを表示します。"
-      : "現在表示できるトレーナーがいません。";
+    if (!count) {
+      status.textContent = "現在表示できるトレーナーがいません。";
+      return;
+    }
+
+    status.textContent = trainerSelectionRequired_() && !selectedTrainerCode
+      ? "トレーナーを選択すると予約可能時間を表示します。"
+      : "トレーナーを指定すると、そのトレーナーの予約可能時間だけを表示します。";
   }
 
   function showTrialFixedPlan_() {
@@ -178,7 +190,7 @@
     const grid = document.querySelector("#serviceGrid");
     if (!section || !grid) return;
 
-    grid.replaceChildren();
+    grid.textContent = "";
     const card = document.createElement("button");
     card.type = "button";
     card.className = "service-card is-selected";
@@ -199,11 +211,13 @@
     if (staffCode) url.searchParams.set("staff_code", staffCode);
     url.searchParams.set("_", Date.now().toString());
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 12000);
+    const controller = typeof AbortController === "function" ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), 12000) : null;
 
     try {
-      const response = await nativeFetch(url.toString(), { cache: "no-store", signal: controller.signal });
+      const options = { cache: "no-store" };
+      if (controller) options.signal = controller.signal;
+      const response = await nativeFetch(url.toString(), options);
       return await response.json();
     } catch (error) {
       const message = error?.name === "AbortError"
@@ -211,78 +225,42 @@
         : (error?.message || "取得失敗");
       return { ok: false, message, data: { date, slots: [] } };
     } finally {
-      clearTimeout(timer);
+      if (timer) clearTimeout(timer);
     }
-  }
-
-  function slotKey_(slot) {
-    return [
-      String(slot?.date || ""),
-      String(slot?.start_time || "").slice(0, 5),
-      String(slot?.end_time || "").slice(0, 5)
-    ].join("|");
-  }
-
-  function mergeTrainerSlotResults_(date, results) {
-    const successful = results.filter((result) => result?.ok);
-    if (!successful.length) {
-      return results[0] || { ok: false, message: "空き時間を取得できませんでした。", data: { date, slots: [] } };
-    }
-
-    const base = successful[0];
-    const merged = new Map();
-
-    successful.forEach((result) => {
-      const slots = Array.isArray(result?.data?.slots) ? result.data.slots : [];
-      slots.forEach((slot) => {
-        const key = slotKey_(slot);
-        if (!merged.has(key)) merged.set(key, slot);
-      });
-    });
-
-    const slots = Array.from(merged.values()).sort((a, b) =>
-      String(a?.start_time || "").localeCompare(String(b?.start_time || ""))
-    );
-
-    return {
-      ...base,
-      ok: true,
-      data: {
-        ...(base.data || {}),
-        date,
-        slots
-      }
-    };
   }
 
   // getAvailableSlots: 会員確認前は日程を出さない。
-  // 吉丸対象外会員の「すべて」は、吉丸以外の各トレーナーの空きを統合する。
+  // 吉丸対象外会員はトレーナーを1人選択してから、その担当者の空きだけを取得する。
   fetchSlots = async function(date) {
     if (!bookingEligibilityReady_()) {
       return { ok: true, data: { date, slots: [] } };
     }
 
-    if (selectedTrainerCode) {
-      if (!trainerAllowed_(selectedTrainerCode)) {
-        return { ok: true, data: { date, slots: [] } };
-      }
-      return fetchSlotsForTrainer_(date, selectedTrainerCode);
-    }
-
-    if (womenOnlyTrainerAllowed_()) {
-      return fetchSlotsForTrainer_(date, "");
-    }
-
-    const trainers = visibleTrainers_();
-    if (!trainers.length) {
+    if (trainerSelectionRequired_() && !selectedTrainerCode) {
       return { ok: true, data: { date, slots: [] } };
     }
 
-    const results = await Promise.all(
-      trainers.map((trainer) => fetchSlotsForTrainer_(date, trainer.code))
-    );
+    if (selectedTrainerCode && !trainerAllowed_(selectedTrainerCode)) {
+      return { ok: true, data: { date, slots: [] } };
+    }
 
-    return mergeTrainerSlotResults_(date, results);
+    return fetchSlotsForTrainer_(date, selectedTrainerCode);
+  };
+
+  loadWeek = async function() {
+    if (!bookingEligibilityReady_()) return;
+
+    if (trainerSelectionRequired_() && !selectedTrainerCode) {
+      selectedSlot = null;
+      document.querySelector("#customerSection")?.classList.add("is-hidden");
+      const list = document.querySelector("#weekList");
+      const status = document.querySelector("#weekStatus");
+      if (list) list.textContent = "";
+      if (status) status.textContent = "トレーナーを選択すると予約可能時間を表示します。";
+      return;
+    }
+
+    return nativeLoadWeek();
   };
 
   // プラン選択直後は会員確認を優先する。日程は確認完了後に読み込む。
@@ -322,7 +300,8 @@
     selectedTrainerCode = "";
     selectedSlot = null;
     renderTrainerChoices();
-    document.querySelector("#weekList")?.replaceChildren();
+    const list = document.querySelector("#weekList");
+    if (list) list.textContent = "";
     const status = document.querySelector("#weekStatus");
     if (status) status.textContent = "";
   });
