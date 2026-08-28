@@ -4,124 +4,236 @@
   if(window.__ANAUTS_AUTO_REASSIGN_CONTROLLER__)return;
   window.__ANAUTS_AUTO_REASSIGN_CONTROLLER__=true;
 
-  const MUTATION_ACTIONS=new Set([
-    "saveStaff",
-    "setStaffActive",
-    "saveService",
-    "setServiceActive",
-    "saveStaffShift",
-    "deleteStaffShift"
+  // Only these four services may be reassigned automatically.
+  const AUTO_ASSIGN_SERVICE_CODES=new Set([
+    "TOUR",
+    "PROCEDURE",
+    "UNSUBSCRIBE",
+    "TRAINING_SUPPORT45"
   ]);
-  const DEFAULT_DAYS=14;
-  const MUTATION_DAYS=30;
-  const MIN_INTERVAL_MS=60000;
+  const RESCHEDULE_ONLY_SERVICE_CODES=new Set([
+    "COUNSEL",
+    "MEAL_PLANNING"
+  ]);
+  const INACTIVE_RESERVATION_STATUSES=new Set([
+    "CANCELLED",
+    "CANCELED",
+    "CANCEL",
+    "CONSUMED"
+  ]);
+  const RETRY_AFTER_MS=60000;
+
   let running=false;
-  let pendingDays=null;
-  let apiWrapped=false;
-  let lastRunAt=0;
+  let queued=false;
+  let scheduleLoaderWrapped=false;
+  const attemptedAt=new Map();
 
-  function activeStaffDate(){
-    if(typeof state!=="undefined"&&state?.staffScheduleDate){
-      return String(state.staffScheduleDate).slice(0,10);
-    }
-    return typeof localYmd==="function"?localYmd():"";
+  const code=value=>String(value||"").trim().toUpperCase();
+  const hhmm=value=>String(value||"").slice(0,5);
+  const minutes=value=>{
+    const match=/^(\d{1,2}):(\d{2})/.exec(String(value||""));
+    return match?Number(match[1])*60+Number(match[2]):NaN;
+  };
+
+  function isActiveReservation(reservation){
+    return !INACTIVE_RESERVATION_STATUSES.has(code(reservation?.status));
   }
 
-  function showResult(result){
-    const data=result?.data||{};
-    const changed=Number(data.changed_count||0);
-    const failures=Array.isArray(data.failures)?data.failures:[];
+  function shiftCoversReservation(shift,reservation){
+    if(code(shift?.staff_code)!==code(reservation?.staff_code))return false;
+    const shiftStart=minutes(shift?.start_time);
+    const shiftEnd=minutes(shift?.end_time);
+    const reservationStart=minutes(reservation?.start_time);
+    const reservationEnd=minutes(reservation?.end_time);
+    return [shiftStart,shiftEnd,reservationStart,reservationEnd].every(Number.isFinite)&&
+      shiftStart<=reservationStart&&shiftEnd>=reservationEnd;
+  }
+
+  function needsAssignment(reservation,shifts){
+    if(!reservation?.reservation_id||!isActiveReservation(reservation))return false;
+    if(!code(reservation.staff_code))return true;
+    return !shifts.some(shift=>shiftCoversReservation(shift,reservation));
+  }
+
+  function scheduleRows(schedule){
+    const reservations=Array.isArray(schedule?.reservations)?schedule.reservations:[];
+    const shifts=Array.isArray(schedule?.shifts)?schedule.shifts:[];
+    return {
+      shifts,
+      automatic:reservations.filter(reservation=>
+        AUTO_ASSIGN_SERVICE_CODES.has(code(reservation?.service_code))&&
+        needsAssignment(reservation,shifts)
+      ),
+      rescheduleOnly:reservations.filter(reservation=>
+        RESCHEDULE_ONLY_SERVICE_CODES.has(code(reservation?.service_code))&&
+        needsAssignment(reservation,shifts)
+      )
+    };
+  }
+
+  function attemptKey(reservation,shifts){
+    const shiftSignature=shifts.map(shift=>[
+      code(shift?.staff_code),
+      hhmm(shift?.start_time),
+      hhmm(shift?.end_time)
+    ].join("/")).sort().join(",");
+    return [
+      reservation?.reservation_id||"",
+      code(reservation?.service_code),
+      code(reservation?.staff_code),
+      hhmm(reservation?.start_time),
+      hhmm(reservation?.end_time),
+      shiftSignature
+    ].join("|");
+  }
+
+  function canAttempt(reservation,shifts){
+    const key=attemptKey(reservation,shifts);
+    const last=Number(attemptedAt.get(key)||0);
+    if(Date.now()-last<RETRY_AFTER_MS)return false;
+    attemptedAt.set(key,Date.now());
+    return true;
+  }
+
+  function showMessage(text,isError=false){
     const message=document.getElementById("staffScheduleMessage");
-    if(!message)return;
-    if(failures.length){
-      const first=failures[0]||{};
-      message.textContent=`担当者を再割り当てできない予約が${failures.length}件あります。${first.reservation_id||""}`.trim();
-      message.classList.remove("is-hidden");
-      message.classList.add("is-error");
-      return;
-    }
-    if(changed>0){
-      message.textContent=`${changed}件の担当者を自動変更しました（お客様への変更メール送信なし）。`;
-      message.classList.remove("is-hidden","is-error");
+    if(!message||!text)return;
+    message.textContent=text;
+    message.classList.remove("is-hidden");
+    message.classList.toggle("is-error",!!isError);
+  }
+
+  function installRescheduleNotice(rows){
+    const board=document.getElementById("staffScheduleBoard");
+    if(!board)return;
+    board.querySelector(".auto-reassign-reschedule-notice")?.remove();
+    if(!rows.length)return;
+
+    const notice=document.createElement("div");
+    notice.className="auto-reassign-reschedule-notice";
+    const title=document.createElement("strong");
+    title.textContent=`リスケ対応が必要な予約 ${rows.length}件`;
+    notice.appendChild(title);
+
+    rows.forEach(reservation=>{
+      const row=document.createElement("div");
+      row.className="auto-reassign-reschedule-row";
+
+      const detail=document.createElement("span");
+      detail.textContent=[
+        hhmm(reservation.start_time),
+        reservation.service_name||reservation.service_code,
+        reservation.customer_name||"氏名未登録"
+      ].filter(Boolean).join(" / ");
+      row.appendChild(detail);
+
+      const button=document.createElement("button");
+      button.type="button";
+      button.className="reservation-manage-button";
+      button.dataset.reservationId=String(reservation.reservation_id||"");
+      button.textContent="変更・キャンセル";
+      row.appendChild(button);
+      notice.appendChild(row);
+    });
+
+    board.prepend(notice);
+    if(typeof bindReservationManageButtons_==="function"){
+      bindReservationManageButtons_(notice);
     }
   }
 
-  async function refreshVisibleSchedule(){
-    try{
-      if(document.querySelector("#staffScheduleView.is-active")&&typeof loadStaffSchedule==="function"){
-        await loadStaffSchedule();
-      }else if(document.querySelector("#trainerScheduleView.is-active")&&typeof loadTrainerSchedule==="function"){
-        await loadTrainerSchedule();
-      }
-    }catch(_){ }
+  async function reassignOne(reservation,date){
+    // The dedicated reassignment action is used instead of updateReservation.
+    // These flags also make the no-customer-mail intent explicit to the backend.
+    return apiPost({
+      action:"reassignReservationStaff",
+      reservation_id:reservation.reservation_id,
+      service_code:code(reservation.service_code),
+      date:String(date||reservation.date||reservation.reservation_date||"").slice(0,10),
+      start_time:hhmm(reservation.start_time),
+      expected_staff_code:code(reservation.staff_code),
+      internal_operation:true,
+      suppress_customer_notification:true,
+      notification_mode:"NONE"
+    });
   }
 
-  async function runReassignment(days=DEFAULT_DAYS,force=false){
-    const normalizedDays=Math.max(0,Math.min(30,Number(days)||0));
+  async function enforceCurrentSchedule(schedule,date){
     if(typeof state==="undefined"||!state?.authUser||typeof apiPost!=="function")return null;
-    if(running){
-      pendingDays=Math.max(pendingDays==null?0:pendingDays,normalizedDays);
-      return null;
-    }
-    const now=Date.now();
-    if(!force&&now-lastRunAt<MIN_INTERVAL_MS)return null;
+    if(!schedule||typeof schedule!=="object")return null;
+    if(running){queued=true;return null;}
 
     running=true;
-    lastRunAt=now;
+    let completed=0;
+    const failures=[];
+
     try{
-      const result=await apiPost({
-        action:"reassignInvalidReservations",
-        start_date:activeStaffDate(),
-        days:normalizedDays
-      });
-      if(result&&result.ok===false){
-        throw new Error(result.message||"予約担当者を再判定できませんでした。");
+      const rows=scheduleRows(schedule);
+      installRescheduleNotice(rows.rescheduleOnly);
+
+      for(const reservation of rows.automatic){
+        if(!canAttempt(reservation,rows.shifts))continue;
+        try{
+          await reassignOne(reservation,date);
+          completed+=1;
+        }catch(error){
+          failures.push({
+            reservation_id:reservation.reservation_id,
+            message:error?.message||String(error)
+          });
+        }
       }
-      showResult(result);
-      if(Number(result?.data?.changed_count||0)>0){
-        await refreshVisibleSchedule();
+
+      if(completed>0&&typeof window.loadStaffSchedule==="function"){
+        await window.loadStaffSchedule();
+      }else if(failures.length){
+        showMessage(
+          `自動割当てできない予約が${failures.length}件あります。変更・キャンセルから確認してください。`,
+          true
+        );
+      }else if(rows.rescheduleOnly.length){
+        showMessage(
+          `カウンセリング・ミールプランニングの担当者不在予約が${rows.rescheduleOnly.length}件あります。自動割当てせず、リスケしてください。`,
+          true
+        );
       }
-      return result;
-    }catch(error){
-      console.error("A-nauts automatic reassignment failed",error);
-      return null;
+
+      return {completed,failures,reschedule_only:rows.rescheduleOnly.length};
     }finally{
       running=false;
-      if(pendingDays!=null){
-        const nextDays=pendingDays;
-        pendingDays=null;
-        setTimeout(()=>runReassignment(nextDays,true),250);
+      if(queued){
+        queued=false;
+        window.setTimeout(()=>enforceVisibleSchedule(),0);
       }
     }
   }
 
-  function wrapApiPost(){
-    if(apiWrapped||typeof apiPost!=="function")return;
-    const original=apiPost;
-    apiPost=async function(payload){
-      const result=await original(payload);
-      if(payload&&MUTATION_ACTIONS.has(payload.action)&&result?.ok!==false){
-        setTimeout(()=>runReassignment(MUTATION_DAYS,true),250);
-      }
+  function enforceVisibleSchedule(){
+    if(typeof state==="undefined")return Promise.resolve(null);
+    return enforceCurrentSchedule(state.staffSchedule,state.staffScheduleDate);
+  }
+
+  function wrapScheduleLoader(){
+    if(scheduleLoaderWrapped||typeof window.loadStaffSchedule!=="function")return;
+    const original=window.loadStaffSchedule;
+    window.loadStaffSchedule=async function(){
+      const result=await original.apply(this,arguments);
+      await enforceVisibleSchedule();
       return result;
     };
-    apiWrapped=true;
+    scheduleLoaderWrapped=true;
   }
 
   function boot(){
     if(typeof state==="undefined"||typeof apiPost!=="function"){
-      setTimeout(boot,100);
+      window.setTimeout(boot,100);
       return;
     }
-    wrapApiPost();
-    document.addEventListener("click",event=>{
-      if(event.target.closest?.('[data-view="staffSchedule"]')){
-        setTimeout(()=>runReassignment(0,false),350);
-      }
-    },true);
+    wrapScheduleLoader();
+    window.setTimeout(()=>enforceVisibleSchedule(),0);
   }
 
-  window.ANAUTS_ENFORCE_AUTO_REASSIGN=days=>runReassignment(days,true);
+  window.ANAUTS_ENFORCE_AUTO_REASSIGN=()=>enforceVisibleSchedule();
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot,{once:true});
   else boot();
 })();
