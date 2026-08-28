@@ -13,8 +13,8 @@ const TOUR_JOIN_MASTER_SPREADSHEET_ID =
   "1kLK6Dbe05Uqd0pxnoKX8MbHpQH9AgDnVygwzDPzyXvw";
 
 const TOUR_JOIN_MASTER_SHEET_NAME = "master";
-const TOUR_JOIN_LINE_URL = "https://lin.ee/ZW4ll3d";
-const TOUR_JOIN_PROCEDURE_URL = "https://www.theforestgym.com/procedures";
+const TOUR_JOIN_ADMIN_EMAIL = "info@theforestgym.com";
+const TOUR_JOIN_LINE_URL = "https://lin.ee/w3sgJkw";
 
 const TOUR_JOIN_REQUIRED_HEADERS = [
   "memberNo",
@@ -127,7 +127,7 @@ function createTourSameDayEnrollment(body) {
     setTourJoinValue_(newRow, header, "スタート日", start);
     setTourJoinValue_(newRow, header, "初期費用", amount.initialFee);
     setTourJoinValue_(newRow, header, "初月日割り会費", amount.firstMonthFee);
-    setTourJoinValue_(newRow, header, "クレカ登録状況", "登録済");
+    setTourJoinValue_(newRow, header, "クレカ登録状況", "未登録");
 
     masterWriteStarted = true;
     sheet.getRange(targetRow, 1, 1, lastColumn).setValues([newRow]);
@@ -155,13 +155,22 @@ function createTourSameDayEnrollment(body) {
       benefitCode: input.benefitCode
     });
 
-    // 既存のWeb入会「登録済」メールと同じ本文にPDFを添付する。自動送信はしない。
+    // 指定された顧客案内にPDFを添付し、管理通知は同内容をBCCする。自動送信はしない。
     draft = GmailApp.createDraft(
       input.customerEmail,
-      "【The Forest Gym】ご入会手続き完了のお知らせ",
-      buildTourJoinWebRegisteredBody_(input.customerName, memberId, planInfo, benefit),
+      "【The Forest Gym】 ご入会ありがとうございました",
+      buildTourJoinCustomerDraftBody_(
+        input.customerName,
+        memberNo,
+        memberId,
+        planInfo,
+        benefit,
+        start,
+        amount
+      ),
       {
         name: "The Forest Gym",
+        bcc: TOUR_JOIN_ADMIN_EMAIL,
         attachments: [pdfFile.getBlob().setName(pdfFile.getName())]
       }
     );
@@ -390,73 +399,68 @@ function makeTourJoinMemberId_(plan, memberNo) {
 }
 
 
-function buildTourJoinWebRegisteredBody_(name, memberId, planInfo, benefit) {
-  const planText = planInfo.campaign
-    ? "2026夏本番 応援キャンペーン／" + planInfo.displayName + "／初期費用0円"
-    : planInfo.displayName;
+function getTourJoinCardUrl_(plan, campaign) {
+  const value = String(plan || "");
+  if (value.includes("NIGHT")) {
+    return campaign
+      ? "https://getsugaku-panda.jp/subscription/apply/17678"
+      : "https://getsugaku-panda.jp/subscription/apply/17681";
+  }
+  if (value.includes("DAY") || value.includes("平日")) {
+    return campaign
+      ? "https://getsugaku-panda.jp/subscription/apply/17677"
+      : "https://getsugaku-panda.jp/subscription/apply/17680";
+  }
+  return campaign
+    ? "https://getsugaku-panda.jp/subscription/apply/17643"
+    : "https://getsugaku-panda.jp/subscription/apply/17679";
+}
 
-  const benefitSection = planInfo.campaign
-    ? "\n━━━━━━━━━━━━━━━━━━━\n\n■ 選べる特典\n" + benefit
-    : "";
 
-  return `${name}さま
+function buildTourJoinCustomerDraftBody_(name, memberNo, memberId, planInfo, benefit, start, amount) {
+  const campaignText = planInfo.campaign ? "適用" : "適用なし";
+  const benefitText = planInfo.campaign ? benefit : "なし";
+  const cardUrl = getTourJoinCardUrl_(planInfo.plan, planInfo.campaign);
+  const initialAmount = Number(amount.initialAmount || 0).toLocaleString("ja-JP") + "円";
 
-このたびはWEBにてご入会いただき、誠にありがとうございます。
-計算書のご送付、ご入会に関するご案内及び会員番号（ID）をお知らせいたします。
+  return `${name}様
 
-━━━━━━━━━━━━━━━━━━━
+本日はThe Forest Gymへご来店いただき、誠にありがとうございました。
 
-■ ご入会プラン
-${planText}
+また、このたびはご入会いただき、ありがとうございます。
 
-━━━━━━━━━━━━━━━━━━━
+下記の内容にて入会手続きが完了いたしました。
 
-■ 会員ID
-${memberId}${benefitSection}
+【ご入会内容】
 
-━━━━━━━━━━━━━━━━━━━
+会員番号：${memberId}
+プラン：${planInfo.fullName}
+ご利用開始日：${formatTourJoinDate_(start)}
+キャンペーン：${campaignText}
+キャンペーン特典：${benefitText}
+初回決済額：${initialAmount}
 
-■ 公式LINEのご登録について（必須）
-以下URLよりThe Forest Gymの公式LINEをお友だち追加のうえ、
-トークで上記の会員ID（${memberId}）の送信をお願いいたします。
+続いて、以下のURLよりクレジットカードのご登録をお願いいたします。
 
-▶ 公式LINE
+【クレジットカード登録URL】
+${cardUrl}
+
+あわせて、The Forest Gym公式LINEへのお友達追加をお願いいたします。
+
+【The Forest Gym公式LINE】
 ${TOUR_JOIN_LINE_URL}
 
-━━━━━━━━━━━━━━━━━━━
+お友達追加後、会員番号の6桁の数字「${memberNo}」を送ってください。
 
-■ 会員証（入退室キー）について
-公式LINEをお友達追加後、トークで会員IDをご送信いただきますと
-「Akerun」より入退室キー（デジタル会員証）ダウンロード用のご案内メールが送信されます。
-（21時以降の場合、メールの送信が翌日になることもございます）
+公式LINEでは、お得な情報や新サービスなどをご案内いたします。
 
-メール送信元：「Akerun」
-ダウンロードURLの有効期限：24時間
+クレジットカードおよび公式LINEのご登録を確認後、スタッフより入退室キーを発行いたします。
 
-━━━━━━━━━━━━━━━━━━━
+ご入会内容および料金の詳細につきましては、添付の計算書をご確認ください。
 
-■ タッチ型入退室キー（ICカード）について
-交通系ICカード（Felica対応）を入退室キーとしてご利用いただくことも可能です。
+今後ともThe Forest Gymをよろしくお願いいたします。
 
-ご希望の場合は、下記URLよりご来店予約のうえ、店頭にて設定を行います。
-
-▶ 手続予約
-${TOUR_JOIN_PROCEDURE_URL}
-
-━━━━━━━━━━━━━━━━━━━
-
-ご不明点がございましたら、いつでもお気軽にお問い合わせください。
-
-━━━━━━━━━━━━━━━━━━━
-The Forest Gym【フォレストジム】
-八千代緑が丘店
-
-[ TEL ] 047-459-5623
-[ MAIL ] info@theforestgym.com
-[ WEB ] www.theforestgym.com
-
-Be active. Be natural.
-━━━━━━━━━━━━━━━━━━━`;
+The Forest Gym`;
 }
 
 
