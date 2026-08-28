@@ -27,6 +27,55 @@
   --radius:20px
 }
 
+/* Staff schedule layout v2: fixed action alignment on desktop and iPad. */
+html,body,.app-shell{max-width:100%;overflow-x:hidden}
+.topbar,.topbar-right,.topnav{min-width:0}
+.topbar-right{flex:1}
+.topnav{max-width:100%;overflow-x:auto;overscroll-behavior-x:contain}
+.staff-reservation-row{
+  display:grid!important;
+  grid-template-columns:105px minmax(180px,1.1fr) minmax(170px,1fr) 104px 158px!important;
+  gap:14px!important;
+  align-items:center!important;
+  padding:16px 18px!important;
+}
+.staff-reservation-row>.reservation-manage-button{
+  grid-column:5;
+  width:158px!important;
+  min-width:158px!important;
+  min-height:44px!important;
+  margin:0!important;
+}
+.staff-reservation-row>.withdrawal-link-actions{grid-column:5;grid-row:1 / span 2}
+.staff-reservation-row>.tour-row-actions,
+.staff-reservation-row>.tour-question-inline{grid-column:1 / -1}
+@media(max-width:1100px){
+  .staff-reservation-row{
+    grid-template-columns:88px minmax(0,1fr) 158px!important;
+    gap:10px 14px!important;
+  }
+  .staff-reservation-row>.staff-reservation-time{grid-column:1;grid-row:1 / span 2}
+  .staff-reservation-row>.staff-reservation-service{grid-column:2;grid-row:1}
+  .staff-reservation-row>.staff-reservation-customer{grid-column:2;grid-row:2}
+  .staff-reservation-row>.reservation-status{grid-column:3;grid-row:1;justify-self:end}
+  .staff-reservation-row>.reservation-manage-button,
+  .staff-reservation-row>.withdrawal-link-actions{grid-column:3;grid-row:2}
+  .staff-reservation-row>.tour-row-actions,
+  .staff-reservation-row>.tour-question-inline{grid-column:1 / -1;grid-row:auto}
+}
+@media(max-width:700px){
+  .staff-reservation-row{grid-template-columns:74px minmax(0,1fr)!important;padding:14px!important}
+  .staff-reservation-row>.staff-reservation-time{grid-column:1;grid-row:1 / span 2}
+  .staff-reservation-row>.staff-reservation-service{grid-column:2;grid-row:1}
+  .staff-reservation-row>.staff-reservation-customer{grid-column:2;grid-row:2}
+  .staff-reservation-row>.reservation-status{grid-column:1 / -1;grid-row:auto;justify-self:start}
+  .staff-reservation-row>.reservation-manage-button,
+  .staff-reservation-row>.withdrawal-link-actions,
+  .staff-reservation-row>.tour-row-actions,
+  .staff-reservation-row>.tour-question-inline{grid-column:1 / -1;grid-row:auto;width:100%!important;max-width:none!important}
+  .staff-reservation-row>.reservation-manage-button{min-width:0!important}
+}
+
 html{color-scheme:dark;background:#090d0a}
 body{
   min-width:320px;
