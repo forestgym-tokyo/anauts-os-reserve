@@ -330,29 +330,44 @@
     if (!bookingEligibilityReady_() || !selectedTrainerCode) return null;
     if (!weeklyRangeSupported) return null;
 
-    const url = new URL(API_URL);
-    url.searchParams.set("action", "getAvailableSlotsRange");
-    url.searchParams.set("service_code", selectedService.service_code);
-    url.searchParams.set("start_date", dates[0]);
-    url.searchParams.set("days", String(dates.length));
-    url.searchParams.set("staff_code", selectedTrainerCode);
-    url.searchParams.set("_", Date.now().toString());
+    const splitIndex = Math.ceil(dates.length / 2);
+    const chunks = [
+      dates.slice(0, splitIndex),
+      dates.slice(splitIndex)
+    ].filter((chunk) => chunk.length);
 
-    const result = await fetchJsonWithTimeout_(url, 90000);
-    if (!result || result.ok !== true) {
-      if (apiResultCode_(result) === "ACTION_NOT_FOUND") {
-        weeklyRangeSupported = false;
-        return null;
+    const responses = await Promise.all(chunks.map(async (chunk) => {
+      const url = new URL(API_URL);
+      url.searchParams.set("action", "getAvailableSlotsRange");
+      url.searchParams.set("service_code", selectedService.service_code);
+      url.searchParams.set("start_date", chunk[0]);
+      url.searchParams.set("days", String(chunk.length));
+      url.searchParams.set("staff_code", selectedTrainerCode);
+      url.searchParams.set("_", Date.now().toString());
+
+      return fetchJsonWithTimeout_(url, 90000);
+    }));
+
+    const results = [];
+    for (let index = 0; index < responses.length; index += 1) {
+      const response = responses[index];
+      if (!response || response.ok !== true) {
+        if (apiResultCode_(response) === "ACTION_NOT_FOUND") {
+          weeklyRangeSupported = false;
+          return null;
+        }
+        throw new Error((response && response.message) || "予約可能時間を取得できませんでした。");
       }
-      throw new Error((result && result.message) || "予約可能時間を取得できませんでした。");
-    }
 
-    const results = result.data && Array.isArray(result.data.results)
-      ? result.data.results
-      : null;
+      const chunkResults = response.data && Array.isArray(response.data.results)
+        ? response.data.results
+        : null;
 
-    if (!results || results.length !== dates.length) {
-      throw new Error("予約可能時間の応答形式を確認してください。");
+      if (!chunkResults || chunkResults.length !== chunks[index].length) {
+        throw new Error("予約可能時間の応答形式を確認してください。");
+      }
+
+      results.push(...chunkResults);
     }
 
     return results;

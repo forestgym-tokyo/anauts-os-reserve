@@ -32,6 +32,8 @@ assert.match(personal, /function trainerSelectionRequired_\(\)\s*{\s*return book
 assert.doesNotMatch(personal, /すべてのトレーナー/);
 assert.doesNotMatch(personal, /trainers\.map\(\(trainer\) => fetchSlotsForTrainer_/);
 assert.match(personal, /action", "getAvailableSlotsRange"/);
+assert.match(personal, /Math\.ceil\(dates\.length \/ 2\)/);
+assert.match(personal, /Promise\.all\(chunks\.map/);
 assert.match(reserve, /Math\.min\(2, dates\.length\)/);
 assert.doesNotMatch(reserve, /Promise\.all\(dates\.map\(fetchSlots\)\)/);
 assert.doesNotMatch(personalHtml, /personal-trainer-confirm\.js/);
