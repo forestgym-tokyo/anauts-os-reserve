@@ -26,15 +26,27 @@ document.addEventListener("DOMContentLoaded", function () {
     "https://script.google.com/a/theforestgym.com/macros/s/"
   );
 
+  let rememberedUrl = "";
+  try {
+    rememberedUrl = String(
+      window.sessionStorage.getItem("anauts_admin_api_url") || ""
+    ).trim();
+  } catch (_) {
+    rememberedUrl = "";
+  }
+
   const apiUrls = Array.from(
     new Set(
       [
+        rememberedUrl,
+        workspaceUrl,
         String(window.ANAUTS_API_URL || "").trim(),
-        primaryUrl,
-        workspaceUrl
+        primaryUrl
       ].filter(Boolean)
     )
   );
+
+  const API_REQUEST_TIMEOUT_MS = 20000;
 
   function isHtmlResponse_(text) {
     return /^\s*<!doctype\s+html/i.test(text) || /^\s*<html/i.test(text);
@@ -75,15 +87,72 @@ document.addEventListener("DOMContentLoaded", function () {
     return json;
   }
 
-  async function fetchJsonWithFallback_(buildRequest, action) {
+  function orderedApiUrls_() {
+    const activeUrl = String(window.__ANAUTS_ACTIVE_API_URL__ || "").trim();
+    if (!activeUrl) return apiUrls.slice();
+    return [activeUrl].concat(apiUrls.filter(function (url) {
+      return url !== activeUrl;
+    }));
+  }
+
+  function rememberApiUrl_(baseUrl) {
+    window.__ANAUTS_ACTIVE_API_URL__ = baseUrl;
+    try {
+      window.sessionStorage.setItem("anauts_admin_api_url", baseUrl);
+    } catch (_) {
+      // Safariのプライベートブラウズ等で保存できなくても通信は継続する。
+    }
+  }
+
+  async function fetchWithTimeout_(url, options, action, timeoutMs) {
+    const controller = typeof AbortController === "function"
+      ? new AbortController()
+      : null;
+    const requestOptions = Object.assign({}, options || {});
+    let timer = null;
+
+    if (controller) requestOptions.signal = controller.signal;
+
+    const timeout = new Promise(function (_, reject) {
+      timer = window.setTimeout(function () {
+        const error = new Error(
+          `通信が${timeoutMs / 1000}秒以内に完了しませんでした。再試行してください。` +
+          (action ? ` [${action}]` : "")
+        );
+        error.name = "TimeoutError";
+        reject(error);
+        if (controller) controller.abort();
+      }, timeoutMs);
+    });
+
+    try {
+      return await Promise.race([
+        fetch(url, requestOptions),
+        timeout
+      ]);
+    } finally {
+      if (timer !== null) window.clearTimeout(timer);
+    }
+  }
+
+  async function fetchJsonWithFallback_(buildRequest, action, settings) {
+    const requestSettings = settings || {};
+    const timeoutMs = Number(requestSettings.timeoutMs) || API_REQUEST_TIMEOUT_MS;
+    const urls = orderedApiUrls_();
+    const maxAttempts = Number(requestSettings.maxAttempts) || urls.length;
     let lastError = null;
 
-    for (const baseUrl of apiUrls) {
+    for (const baseUrl of urls.slice(0, maxAttempts)) {
       try {
         const request = buildRequest(baseUrl);
-        const response = await fetch(request.url, request.options || {});
+        const response = await fetchWithTimeout_(
+          request.url,
+          request.options || {},
+          action,
+          timeoutMs
+        );
         const json = await parseApiResponse_(response, action);
-        window.__ANAUTS_ACTIVE_API_URL__ = baseUrl;
+        rememberApiUrl_(baseUrl);
         return json;
       } catch (error) {
         lastError = error;
@@ -137,7 +206,8 @@ document.addEventListener("DOMContentLoaded", function () {
           }
         };
       },
-      action
+      action,
+      { timeoutMs: 60000, maxAttempts: 1 }
     );
 
     if (!json.ok) {
@@ -148,60 +218,69 @@ document.addEventListener("DOMContentLoaded", function () {
   };
 }, { once: true });
 
-window.addEventListener("load", function () {
-  var monthly = document.createElement("script");
-  monthly.src = "./admin-monthly-v58.js?v=20260825-1556";
-  document.body.appendChild(monthly);
+(function () {
+  var addonSources = [
+    "./admin-monthly-v58.js?v=20260825-1556",
+    "./admin-tour-enrollment.js?v=20260825-1045",
+    "./admin-tour-startdate-fix.js?v=20260825-1440",
+    "./admin-tour-ui-polish.js?v=20260825-1045",
+    "./admin-questionnaire-fix.js?v=20260825-1158",
+    "./admin-event-calendar.js?v=20260825-2047",
+    "./admin-withdrawal-link.js?v=20260825-2103",
+    "./admin-ui-calendar-layout.js?v=20260825-2125",
+    "./admin-daily-report.js?v=20260825-2142",
+    "./admin-operations-center.js?v=20260826-top-snapshot-v1",
+    "./admin-operations-refresh-fix.js?v=20260826-1040",
+    "./admin-reservation-internal-bridge.js?v=20260826-1055",
+    "./admin-auto-reassign-enforce.js?v=20260826-safe-batch-v2",
+    "./admin-withdrawal-button-color.js?v=20260826-1258"
+  ];
+  var started = false;
 
-  var enrollment = document.createElement("script");
-  enrollment.src = "./admin-tour-enrollment.js?v=20260825-1045";
-  document.body.appendChild(enrollment);
+  function appendAddon_(source) {
+    return new Promise(function (resolve) {
+      var script = document.createElement("script");
+      var settled = false;
+      var timer = null;
+      function finish() {
+        if (settled) return;
+        settled = true;
+        if (timer !== null) window.clearTimeout(timer);
+        resolve();
+      }
+      script.src = source;
+      script.async = false;
+      script.onload = finish;
+      script.onerror = finish;
+      timer = window.setTimeout(finish, 15000);
+      document.body.appendChild(script);
+    });
+  }
 
-  var startDateFix = document.createElement("script");
-  startDateFix.src = "./admin-tour-startdate-fix.js?v=20260825-1440";
-  document.body.appendChild(startDateFix);
+  async function loadAddonsSequentially_() {
+    if (started) return;
+    started = true;
 
-  var polish = document.createElement("script");
-  polish.src = "./admin-tour-ui-polish.js?v=20260825-1045";
-  document.body.appendChild(polish);
+    for (var i = 0; i < addonSources.length; i += 1) {
+      await appendAddon_(addonSources[i]);
+      await new Promise(function (resolve) {
+        if (typeof window.requestAnimationFrame === "function") {
+          window.requestAnimationFrame(function () { resolve(); });
+        } else {
+          window.setTimeout(resolve, 0);
+        }
+      });
+    }
+  }
 
-  var questionnaireFix = document.createElement("script");
-  questionnaireFix.src = "./admin-questionnaire-fix.js?v=20260825-1158";
-  document.body.appendChild(questionnaireFix);
+  function startWhenDocumentReady_() {
+    if (document.body) {
+      loadAddonsSequentially_();
+      return;
+    }
+    document.addEventListener("DOMContentLoaded", loadAddonsSequentially_, { once: true });
+  }
 
-  var eventCalendar = document.createElement("script");
-  eventCalendar.src = "./admin-event-calendar.js?v=20260825-2047";
-  document.body.appendChild(eventCalendar);
-
-  var withdrawalLink = document.createElement("script");
-  withdrawalLink.src = "./admin-withdrawal-link.js?v=20260825-2103";
-  document.body.appendChild(withdrawalLink);
-
-  var calendarLayout = document.createElement("script");
-  calendarLayout.src = "./admin-ui-calendar-layout.js?v=20260825-2125";
-  document.body.appendChild(calendarLayout);
-
-  var dailyReport = document.createElement("script");
-  dailyReport.src = "./admin-daily-report.js?v=20260825-2142";
-  document.body.appendChild(dailyReport);
-
-  var operationsCenter = document.createElement("script");
-  operationsCenter.src = "./admin-operations-center.js?v=20260826-top-snapshot-v1";
-  document.body.appendChild(operationsCenter);
-
-  var operationsRefreshFix = document.createElement("script");
-  operationsRefreshFix.src = "./admin-operations-refresh-fix.js?v=20260826-1040";
-  document.body.appendChild(operationsRefreshFix);
-
-  var internalReservationBridge = document.createElement("script");
-  internalReservationBridge.src = "./admin-reservation-internal-bridge.js?v=20260826-1055";
-  document.body.appendChild(internalReservationBridge);
-
-  var autoReassign = document.createElement("script");
-  autoReassign.src = "./admin-auto-reassign-enforce.js?v=20260826-safe-batch-v2";
-  document.body.appendChild(autoReassign);
-
-  var withdrawalButtonColor = document.createElement("script");
-  withdrawalButtonColor.src = "./admin-withdrawal-button-color.js?v=20260826-1258";
-  document.body.appendChild(withdrawalButtonColor);
-});
+  window.addEventListener("anauts:admin-core-ready", startWhenDocumentReady_, { once: true });
+  if (window.__ANAUTS_ADMIN_CORE_READY__ === true) startWhenDocumentReady_();
+})();
