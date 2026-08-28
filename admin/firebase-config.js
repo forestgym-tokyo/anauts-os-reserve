@@ -222,20 +222,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
 (function () {
   var addonSources = [
-    "./admin-monthly-v58.js?v=20260825-1556",
-    "./admin-tour-enrollment.js?v=20260825-1045",
-    "./admin-tour-startdate-fix.js?v=20260825-1440",
-    "./admin-tour-ui-polish.js?v=20260825-1045",
-    "./admin-questionnaire-fix.js?v=20260825-1158",
-    "./admin-event-calendar.js?v=20260825-2047",
-    "./admin-withdrawal-link.js?v=20260825-2103",
-    "./admin-ui-calendar-layout.js?v=20260825-2125",
-    "./admin-daily-report.js?v=20260825-2142",
-    "./admin-operations-center.js?v=20260826-top-snapshot-v1",
-    "./admin-operations-refresh-fix.js?v=20260826-1040",
-    "./admin-reservation-internal-bridge.js?v=20260826-1055",
-    "./admin-auto-reassign-enforce.js?v=20260826-safe-batch-v2",
-    "./admin-withdrawal-button-color.js?v=20260826-1258"
+    "./admin-monthly-v58.js?v=20260828-stable-v2",
+    "./admin-tour-enrollment.js?v=20260828-stable-v2"
   ];
   var started = false;
 

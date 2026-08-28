@@ -948,23 +948,23 @@ async function loadMyShiftView(){
   $("#myShiftRequestHistory").innerHTML='<div class="registered-shift-empty">申請履歴を読み込んでいます…</div>';
 
   try{
-    const [shiftRes,requestRes]=await Promise.all([
-      apiGet("getStaffShifts",{
-        staff_code:state.authUser.staff_code,
-        start_date:range.start,
-        end_date:range.end
-      }),
-      apiGet("getMyShiftChangeRequests")
-    ]);
+    const shiftRes=await apiGet("getStaffShifts",{
+      staff_code:state.authUser.staff_code,
+      start_date:range.start,
+      end_date:range.end
+    });
 
     state.myShiftRows=(Array.isArray(shiftRes.data)?shiftRes.data:Array.isArray(shiftRes.data?.shifts)?shiftRes.data.shifts:[])
       .filter(r=>r.active!==false)
       .sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.start_time).localeCompare(String(b.start_time)));
 
+    renderMyShiftRows();
+    $("#myShiftStatusSummary").textContent=`勤務 ${state.myShiftRows.length}件`;
+
+    let requestRes={data:[]};
+    try{requestRes=await apiGet("getMyShiftChangeRequests");}catch(_){ }
     state.myShiftRequests=(Array.isArray(requestRes.data)?requestRes.data:[])
       .filter(r=>String(r.date||"").slice(0,7)===state.myShiftMonth);
-
-    renderMyShiftRows();
     renderMyShiftRequestHistory();
 
     const pending=state.myShiftRequests.filter(r=>String(r.status||"").toUpperCase()==="PENDING").length;
