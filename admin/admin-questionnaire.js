@@ -59,7 +59,9 @@
     style.textContent=`
       .tour-print-button{margin-left:10px;white-space:nowrap}
       .tour-print-overlay{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.62);display:flex;align-items:center;justify-content:center;padding:18px}
-      .tour-print-modal{width:min(520px,100%);background:#fff;color:#111;border-radius:18px;box-shadow:0 24px 80px rgba(0,0,0,.35);overflow:hidden}
+      .tour-print-modal{position:relative;width:min(520px,100%);max-height:calc(100vh - 24px);background:#fff;color:#111;border-radius:18px;box-shadow:0 24px 80px rgba(0,0,0,.35);overflow:auto}
+      .tour-modal-x{position:absolute;top:10px;right:12px;z-index:5;width:38px;height:38px;min-width:38px;border:0;border-radius:50%;background:#f2f4f7;color:#111;font-size:27px;font-weight:400;line-height:36px;padding:0;cursor:pointer}
+      .tour-modal-x:hover{background:#e4e7ec}
       .tour-print-head{padding:20px 22px 14px;border-bottom:1px solid #e5e7eb}
       .tour-print-head h2{margin:0 0 6px;font-size:20px}
       .tour-print-head p{margin:0;color:#667085;font-size:13px;line-height:1.5}
@@ -75,6 +77,15 @@
       .tour-print-message{min-height:20px;margin-top:10px;color:#b42318;font-size:13px}
       .tour-print-actions{display:flex;justify-content:flex-end;gap:10px;padding:14px 22px 20px}
       .tour-print-actions button{min-height:42px}
+      .tour-print-modal #tourPrintCancel{display:none}
+      .tour-print-modal #tourAddressCorrect{background:#fff;color:#111;border:2px solid #344054;font-weight:800;min-height:46px;padding:10px 18px;border-radius:10px}
+      .tour-print-modal #tourAddressCorrect:hover{background:#f2f4f7}
+      .tour-address-editor{margin-top:12px;padding:14px;border:1px solid #d0d5dd;border-radius:12px;background:#f8fafc}
+      .tour-address-editor label{display:block;margin:0 0 6px;color:#344054;font-size:12px;font-weight:800}
+      .tour-address-editor textarea{box-sizing:border-box;width:100%;min-height:88px;padding:10px 12px;border:1px solid #98a2b3;border-radius:8px;background:#fff;color:#111;font:inherit;line-height:1.5}
+      .tour-address-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
+      .tour-address-note{margin-top:8px;color:#067647;font-size:12px;font-weight:700}
+      .tour-current-address{margin-top:8px;font-weight:700}
       .tour-info-box{margin-top:10px;padding:10px 12px;border-radius:10px;background:#f8fafc;border:1px solid #e3e8ef;font-size:13px;line-height:1.6}
       .tour-info-box strong{display:block;margin-bottom:3px;font-size:12px;color:#475467}
       .tour-row-actions{display:inline-flex;gap:7px;align-items:center;margin-left:10px;flex-wrap:wrap}
@@ -94,20 +105,25 @@
       .tour-save-result strong{display:block;margin-bottom:4px}
       .tour-save-result a{display:inline-block;margin-right:12px;font-weight:700;text-decoration:underline}
       @media(max-width:680px){
+        .tour-print-overlay{align-items:flex-start;padding:8px}
         .tour-print-button{margin-left:0}
         .tour-row-actions{margin-left:0;margin-top:8px;width:100%}
         .tour-row-actions .tour-print-button{flex:1}
         .tour-question-inline{margin-top:8px}
-        .tour-print-modal{border-radius:14px}
+        .tour-print-modal{margin-top:6px;max-height:calc(100vh - 20px);border-radius:14px}
         .tour-print-actions{flex-direction:column-reverse}
         .tour-print-actions button{width:100%}
+        .tour-modal-x{position:sticky;float:right;top:8px;margin:4px 4px -42px 0}
+        .tour-address-actions{display:grid;grid-template-columns:1fr}
+        .tour-address-actions button{width:100%}
       }
     `;
     document.head.appendChild(style);
   }
 
   function orderedReservations(d){
-    const reservations=Array.isArray(d?.reservations)?d.reservations:[];
+    const reservations=(Array.isArray(d?.reservations)?d.reservations:[])
+      .filter(r=>String(r?.status||"").trim().toUpperCase()!=="CANCELLED");
     const shifts=Array.isArray(d?.shifts)?d.shifts:[];
     const staffCodes=[...new Set([
       ...shifts.map(x=>x.staff_code),
@@ -128,6 +144,83 @@
     document.querySelector(".tour-print-overlay")?.remove();
   }
 
+  function addressOf_(reservation){
+    return String(reservation?.customer_address||reservation?.address||"").trim();
+  }
+
+  function showCurrentAddress_(modal,reservation){
+    const box=modal.querySelector(".tour-print-reservation");
+    if(!box)return;
+    let view=box.querySelector(".tour-current-address");
+    if(!view){
+      view=document.createElement("div");
+      view.className="tour-current-address";
+      box.appendChild(view);
+    }
+    const address=addressOf_(reservation);
+    view.textContent=address?`住所：${address}`:"住所：未登録";
+  }
+
+  async function saveCorrectedAddress_(reservation,modal,editor){
+    const textarea=editor.querySelector("#tourCorrectedAddress");
+    const note=editor.querySelector("#tourAddressNote");
+    const apply=editor.querySelector("#tourAddressApply");
+    const value=String(textarea?.value||"").trim();
+    if(!value){
+      note.style.color="#b42318";
+      note.textContent="住所を入力してください。";
+      return;
+    }
+
+    apply.disabled=true;
+    apply.textContent="保存中…";
+    note.textContent="";
+    try{
+      if(typeof apiPost!=="function")throw new Error("管理画面APIを利用できません。");
+      const result=await apiPost({
+        action:"updateTourCustomerAddress",
+        reservation_id:reservation.reservation_id,
+        customer_address:value
+      });
+      const saved=String(result?.data?.customer_address||value).trim();
+      reservation.customer_address=saved;
+      reservation.address=saved;
+      showCurrentAddress_(modal,reservation);
+      note.style.color="#067647";
+      note.textContent="住所を保存しました。PDFにも反映されます。";
+    }catch(error){
+      note.style.color="#b42318";
+      note.textContent=error?.message||"住所の保存に失敗しました。";
+    }finally{
+      apply.disabled=false;
+      apply.textContent="保存して反映";
+    }
+  }
+
+  function openAddressEditor_(reservation,modal){
+    let editor=modal.querySelector("#tourAddressEditor");
+    if(editor){
+      editor.querySelector("textarea")?.focus();
+      return;
+    }
+    editor=document.createElement("div");
+    editor.id="tourAddressEditor";
+    editor.className="tour-address-editor";
+    editor.innerHTML=`
+      <label for="tourCorrectedAddress">訂正後の住所</label>
+      <textarea id="tourCorrectedAddress"></textarea>
+      <div class="tour-address-actions">
+        <button type="button" class="ghost-button" id="tourAddressCancel">取消</button>
+        <button type="button" class="primary-button" id="tourAddressApply">保存して反映</button>
+      </div>
+      <div class="tour-address-note" id="tourAddressNote"></div>`;
+    editor.querySelector("textarea").value=addressOf_(reservation);
+    modal.querySelector(".tour-print-body")?.appendChild(editor);
+    editor.querySelector("#tourAddressCancel").onclick=()=>editor.remove();
+    editor.querySelector("#tourAddressApply").onclick=()=>saveCorrectedAddress_(reservation,modal,editor);
+    editor.querySelector("textarea").focus();
+  }
+
   function openPrintModal(r){
     closeModal();
     injectStyles();
@@ -136,6 +229,7 @@
     overlay.className="tour-print-overlay";
     overlay.innerHTML=`
       <div class="tour-print-modal" role="dialog" aria-modal="true" aria-label="アンケート閲覧・印刷">
+        <button type="button" class="tour-modal-x" aria-label="閉じる">×</button>
         <div class="tour-print-head">
           <h2>${isCounselVisitor_(r) ? "ダイエット無料カウンセリング アンケート" : "店内見学アンケート"}</h2>
           <p>転記内容を選択してPDFを作成します。</p>
@@ -164,13 +258,20 @@
         </div>
         <div class="tour-print-actions">
           <button type="button" class="ghost-button" id="tourPrintCancel">閉じる</button>
+          ${isTour_(r)?`<button type="button" id="tourAddressCorrect">住所訂正</button>`:``}
           <button type="button" class="primary-button" id="tourPrintGenerate">PDFを作成して閲覧・印刷</button>
         </div>
       </div>`;
 
     document.body.appendChild(overlay);
     overlay.addEventListener("click",e=>{if(e.target===overlay)closeModal()});
+    overlay.querySelector(".tour-modal-x").onclick=closeModal;
     overlay.querySelector("#tourPrintCancel").onclick=closeModal;
+    showCurrentAddress_(overlay.querySelector(".tour-print-modal"),r);
+    if(isTour_(r)){
+      overlay.querySelector("#tourAddressCorrect").onclick=()=>
+        openAddressEditor_(r,overlay.querySelector(".tour-print-modal"));
+    }
 
     overlay.querySelector("#tourPrintGenerate").onclick=async()=>{
       const btn=overlay.querySelector("#tourPrintGenerate");
@@ -246,6 +347,7 @@
     overlay.className="tour-print-overlay";
     overlay.innerHTML=`
       <div class="tour-print-modal" role="dialog" aria-modal="true" aria-label="見学者へメール返信">
+        <button type="button" class="tour-modal-x" aria-label="閉じる">×</button>
         <div class="tour-print-head">
           <h2>見学者へメール返信</h2>
           <p>info@theforestgym.com から送信します。</p>
@@ -273,6 +375,7 @@
 
     document.body.appendChild(overlay);
     overlay.addEventListener("click",e=>{if(e.target===overlay)closeModal()});
+    overlay.querySelector(".tour-modal-x").onclick=closeModal;
     overlay.querySelector("#tourReplyCancel").onclick=closeModal;
 
     overlay.querySelector("#tourReplySend").onclick=async()=>{
@@ -429,7 +532,7 @@
   function boot(){
     injectStyles();
     if(typeof window.renderStaffSchedule!=="function"){
-      setTimeout(boot,200);
+      window.addEventListener("load",boot,{once:true});
       return;
     }
     if(window.__questionnaireUiV39Installed)return;
@@ -441,6 +544,10 @@
       setTimeout(()=>enhanceStaffSchedule(d),0);
       return result;
     };
+
+    const currentData=window.state?.staffSchedule ||
+      (typeof state!=="undefined" ? state.staffSchedule : null);
+    if(currentData)setTimeout(()=>enhanceStaffSchedule(currentData),0);
   }
 
   boot();
