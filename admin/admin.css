@@ -40,9 +40,9 @@ html,body,.app-shell{max-width:100%;overflow-x:hidden}
   padding:16px 18px!important;
 }
 .staff-reservation-row>.reservation-manage-button{
-  grid-column:5;
-  width:158px!important;
-  min-width:158px!important;
+  grid-column:1 / -1;
+  width:calc((100% - 16px)/3)!important;
+  min-width:0!important;
   min-height:44px!important;
   margin:0!important;
   border-color:#fcd34d!important;
@@ -62,17 +62,17 @@ html,body,.app-shell{max-width:100%;overflow-x:hidden}
   background:#fcd34d!important;
   color:#171000!important;
 }
-.staff-reservation-row>.withdrawal-link-actions{grid-column:5;grid-row:1 / span 2}
+.staff-reservation-row>.withdrawal-link-actions{grid-column:1 / -1;grid-row:auto}
 .staff-reservation-row>.withdrawal-link-actions{
-  display:flex;
-  flex-direction:column;
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
   align-items:stretch;
   gap:8px;
-  width:158px;
+  width:100%;
 }
 .staff-reservation-row>.withdrawal-link-actions>button{
-  width:158px;
-  min-width:158px;
+  width:100%;
+  min-width:0;
   min-height:44px;
   margin:0;
   border-radius:10px;
@@ -98,7 +98,7 @@ html,body,.app-shell{max-width:100%;overflow-x:hidden}
   .staff-reservation-row>.staff-reservation-customer{grid-column:2;grid-row:2}
   .staff-reservation-row>.reservation-status{grid-column:3;grid-row:1;justify-self:end}
   .staff-reservation-row>.reservation-manage-button,
-  .staff-reservation-row>.withdrawal-link-actions{grid-column:3;grid-row:2}
+  .staff-reservation-row>.withdrawal-link-actions{grid-column:1 / -1;grid-row:auto}
   .staff-reservation-row>.tour-row-actions,
   .staff-reservation-row>.tour-question-inline{grid-column:1 / -1;grid-row:auto}
 }
@@ -113,6 +113,7 @@ html,body,.app-shell{max-width:100%;overflow-x:hidden}
   .staff-reservation-row>.tour-row-actions,
   .staff-reservation-row>.tour-question-inline{grid-column:1 / -1;grid-row:auto;width:100%!important;max-width:none!important}
   .staff-reservation-row>.reservation-manage-button{min-width:0!important}
+  .staff-reservation-row>.withdrawal-link-actions{grid-template-columns:1fr}
   .staff-reservation-row>.withdrawal-link-actions>button{width:100%;min-width:0}
 }
 
