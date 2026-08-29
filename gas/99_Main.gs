@@ -5,6 +5,19 @@
  * ============================================================
  */
 
+/**
+ * シフトの直接編集、削除、CSV取込は管理権限だけに許可する。
+ *
+ * doPost の各シフト操作から共通して呼ばれるため、ここで必ず
+ * Firebase IDトークンと auth_users の権限を検証する。
+ */
+function requireDirectShiftEditPermission_(params) {
+  return requireAuth_(
+    params || {},
+    ["ADMIN", "MANAGER"]
+  );
+}
+
 function doGet(e) {
   try {
     const params =
