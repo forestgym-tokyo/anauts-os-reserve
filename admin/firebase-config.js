@@ -225,7 +225,8 @@ document.addEventListener("DOMContentLoaded", function () {
     "./admin-monthly-v58.js?v=20260829-admin-direct-v3",
     "./admin-tour-enrollment.js?v=20260828-master-draft-v1",
     "./admin-tour-ui-polish.js?v=20260828-event-driven-v1",
-    "./admin-auto-reassign-enforce.js?v=20260828-lightweight-v1"
+    "./admin-auto-reassign-enforce.js?v=20260828-lightweight-v1",
+    "./admin-daily-report.js?v=20260830-daily-report-restore-v1"
   ];
   var started = false;
 
