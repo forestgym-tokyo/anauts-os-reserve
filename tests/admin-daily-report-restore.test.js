@@ -13,7 +13,7 @@ test("admin pages load the restored daily report without changing other addons",
     "./admin-tour-enrollment.js?v=20260828-master-draft-v1",
     "./admin-tour-ui-polish.js?v=20260828-event-driven-v1",
     "./admin-auto-reassign-enforce.js?v=20260828-lightweight-v1",
-    "./admin-daily-report.js?v=20260830-daily-cleaning-v2"
+    "./admin-daily-report.js?v=20260830-daily-cleaning-v3"
   ];
 
   expectedAddons.forEach((source) => assert.ok(config.includes(source)));
@@ -21,7 +21,7 @@ test("admin pages load the restored daily report without changing other addons",
   ["admin/index.html", "admin/admin.html"].forEach((relativePath) => {
     assert.match(
       read(relativePath),
-      /\.\/firebase-config\.js\?v=20260830-daily-cleaning-v2/
+      /\.\/firebase-config\.js\?v=20260830-daily-cleaning-v3/
     );
   });
 });
@@ -32,6 +32,10 @@ test("restored daily report contains the existing report sections", () => {
   assert.doesNotMatch(dailyReport, /②/);
   assert.doesNotMatch(dailyReport, /dr-clean-area-number/);
   assert.match(dailyReport, /<h3>■\$\{esc\(area\.name\)\}<\/h3>/);
+  assert.match(dailyReport, /\.dr-clean-area-head h3\{margin:0;color:#79dc8c/);
+  assert.match(dailyReport, /#dailyReportView \.page-heading h1,\.dr-section-head h2\{color:#151716\}/);
+  assert.match(dailyReport, /\.dr-inquiry-grid \.dr-field\{min-width:0\}/);
+  assert.match(dailyReport, /input\[data-i="time"\]\{width:110px;max-width:100%;min-width:0\}/);
   assert.match(dailyReport, /area:CLEANING_ITEMS\[i\]\?\.area/);
   assert.match(dailyReport, /instruction:CLEANING_ITEMS\[i\]\?\.instruction/);
   [
