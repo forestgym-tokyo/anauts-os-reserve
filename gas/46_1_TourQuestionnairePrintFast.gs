@@ -3,6 +3,8 @@ const TOUR_FAST_PRINT_EXPORT_VERSION_PROPERTY = "TOUR_FAST_PRINT_EXPORT_TEMPLATE
 const TOUR_FAST_PRINT_EXPORT_TEMPLATE_VERSION = "20260829-fast-2p-v1";
 const TOUR_FAST_PRINT_PAGE1_SHEET = "アンケート_1";
 const TOUR_FAST_PRINT_PAGE2_SHEET = "アンケート_2";
+const TOUR_QUESTIONNAIRE_SAVE_FOLDER_ID_PROPERTY = "TOUR_QUESTIONNAIRE_SAVE_FOLDER_ID";
+const TOUR_QUESTIONNAIRE_SAVE_FOLDER_NAME = "アンケート";
 
 function generateTourQuestionnairePdfFast(params) {
   const lock = LockService.getScriptLock();
@@ -109,7 +111,7 @@ function generateTourQuestionnairePdfFast(params) {
     const fileName = buildTourPrintFileName_(reservation, printMode);
     pdfBlob.setName(fileName);
 
-    const saveFolder = getOrCreateTourPrintFolder_();
+    const saveFolder = getOrCreateTourQuestionnaireSaveFolder_();
     const pdfFile = saveFolder.createFile(pdfBlob);
     pdfFile.setName(fileName);
 
@@ -122,6 +124,7 @@ function generateTourQuestionnairePdfFast(params) {
       filename: fileName,
       file_id: fileId,
       export_spreadsheet_id: exportSpreadsheet.getId(),
+      drive_folder: TOUR_QUESTIONNAIRE_SAVE_FOLDER_NAME,
       pages: 2
     });
 
@@ -133,7 +136,7 @@ function generateTourQuestionnairePdfFast(params) {
       file_id: fileId,
       file_url: fileUrl,
       folder_url: saveFolder.getUrl(),
-      drive_folder: TOUR_PRINT_DRIVE_ROOT_FOLDER + "/" + TOUR_PRINT_DRIVE_FOLDER,
+      drive_folder: TOUR_QUESTIONNAIRE_SAVE_FOLDER_NAME,
       pages: 2,
       duplex: true,
       duplex_instruction: "両面印刷・長辺とじ"
@@ -255,6 +258,36 @@ function isValidTourFastPrintExportSpreadsheet_(spreadsheet) {
 
 function clearTourFastPrintVariableCells_(page1) {
   page1.getRangeList(["F3", "G4", "F5", "F6", "F7", "D39"]).clearContent();
+}
+
+function getOrCreateTourQuestionnaireSaveFolder_() {
+  const properties = PropertiesService.getScriptProperties();
+  const storedId = String(
+    properties.getProperty(TOUR_QUESTIONNAIRE_SAVE_FOLDER_ID_PROPERTY) || ""
+  ).trim();
+
+  if (storedId) {
+    try {
+      const storedFolder = DriveApp.getFolderById(storedId);
+      if (!storedFolder.isTrashed()) {
+        return storedFolder;
+      }
+    } catch (ignore) {}
+    properties.deleteProperty(TOUR_QUESTIONNAIRE_SAVE_FOLDER_ID_PROPERTY);
+  }
+
+  const root = DriveApp.getRootFolder();
+  const folders = root.getFoldersByName(TOUR_QUESTIONNAIRE_SAVE_FOLDER_NAME);
+  const folder = folders.hasNext()
+    ? folders.next()
+    : root.createFolder(TOUR_QUESTIONNAIRE_SAVE_FOLDER_NAME);
+
+  properties.setProperty(
+    TOUR_QUESTIONNAIRE_SAVE_FOLDER_ID_PROPERTY,
+    folder.getId()
+  );
+
+  return folder;
 }
 
 function buildTourFastPrintExportUrl_(spreadsheetId) {
