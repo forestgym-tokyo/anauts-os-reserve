@@ -629,11 +629,8 @@ function setTourJoinWebPdfPaymentRows_(sheet, value, label) {
 
   const startYear = start.getFullYear();
   const startMonth = start.getMonth();
-  const nextDayText = Utilities.formatDate(
-    new Date(startYear, startMonth, start.getDate() + 1),
-    "Asia/Tokyo",
-    "yyyy/M/d"
-  );
+  // 26日以降の分岐でも初回決済日は「入会日翌日」。スタート日からは計算しない。
+  const nextDayText = label.paymentDateText;
   const nextMonth27Text = Utilities.formatDate(
     new Date(startYear, startMonth + 1, 27),
     "Asia/Tokyo",
