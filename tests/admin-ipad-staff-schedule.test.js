@@ -15,6 +15,11 @@ assert.match(admin, /staff_schedule_error/);
 assert.match(admin, /retryStaffScheduleButton/);
 assert.match(admin, /staffScheduleRequestSequence_/);
 assert.match(admin, /markAdminCoreReady_\(\)/);
+assert.match(admin, /function canUseMyShift\(\)\{return authEnabled\(\)&&!!state\.authUser\?\.staff_code\}/);
+assert.match(admin, /data-management-shift-edit/);
+assert.match(admin, /data-management-shift-delete/);
+assert.match(admin, /action:"saveStaffShift"/);
+assert.match(admin, /action:"deleteStaffShift"/);
 
 assert.ok(
   config.indexOf("workspaceUrl,") < config.indexOf("primaryUrl\n"),
@@ -28,7 +33,8 @@ assert.match(config, /for \(var i = 0; i < addonSources\.length; i \+= 1\)/);
 assert.doesNotMatch(config, /window\.addEventListener\("load", function \(\) \{\s*var monthly/);
 
 assert.match(indexHtml, /rel="preconnect" href="https:\/\/script\.google\.com"/);
-assert.match(indexHtml, /20260828-ipad-staff-schedule-v4/);
+assert.match(indexHtml, /20260829-admin-direct-shift-v1/);
+assert.match(config, /admin-monthly-v58\.js\?v=20260829-admin-direct-v3/);
 
 assert.match(auth, /getStaffSchedule\(params\)/);
 assert.match(auth, /CacheService\.getScriptCache\(\)/);

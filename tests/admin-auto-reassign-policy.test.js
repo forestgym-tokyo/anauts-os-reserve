@@ -24,7 +24,7 @@ const adminHtml = fs.readFileSync(
 assert.match(config, /admin-auto-reassign-enforce\.js\?v=20260828-lightweight-v1/);
 for (const html of [indexHtml, adminHtml]) {
   assert.match(html, /admin\.css\?v=20260828-lightweight-autoassign-v1/);
-  assert.match(html, /firebase-config\.js\?v=20260828-enrollment-master-draft-v1/);
+  assert.match(html, /firebase-config\.js\?v=20260829-admin-direct-shift-v1/);
 }
 assert.doesNotMatch(controller, /reassignInvalidReservations/);
 assert.doesNotMatch(controller, /action:\s*["']updateReservation["']/);
