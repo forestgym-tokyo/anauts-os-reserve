@@ -4,29 +4,27 @@
   const STORE_CODE="YACHIYO";
   const CLEANING_AREAS=[
     {
-      number:"①",
       name:"有酸素エリア",
       groups:[
         {
           name:"トレッドミル周辺",
           items:[
-            {item:"トレッドミル・本体ベルト",instruction:"②スプレー塗布後、緑のモップで拭き取る。"},
-            {item:"トレッドミル・フレーム（横）",instruction:"②スプレー塗布後、緑のモップで拭き取る。"},
-            {item:"トレッドミル・先端部",instruction:"グローブダスターまたは黄色モップで埃を除去した後、②スプレーを塗布し、水色雑巾で拭き取る。"},
-            {item:"トレッドミル・ゴムマット",instruction:"②スプレー塗布後、緑のモップで拭き取る。"}
+            {item:"トレッドミル・本体ベルト",instruction:"スプレー塗布後、緑のモップで拭き取る。"},
+            {item:"トレッドミル・フレーム（横）",instruction:"スプレー塗布後、緑のモップで拭き取る。"},
+            {item:"トレッドミル・先端部",instruction:"グローブダスターまたは黄色モップで埃を除去した後、スプレーを塗布し、水色雑巾で拭き取る。"},
+            {item:"トレッドミル・ゴムマット",instruction:"スプレー塗布後、緑のモップで拭き取る。"}
           ]
         },
         {
           name:"バイク・クロストレーナー",
           items:[
-            {item:"本体",instruction:"②スプレーを塗布し、水色雑巾で拭き取る。"},
-            {item:"周辺床",instruction:"②スプレー塗布後、緑のモップで拭き取る。"}
+            {item:"本体",instruction:"スプレーを塗布し、水色雑巾で拭き取る。"},
+            {item:"周辺床",instruction:"スプレー塗布後、緑のモップで拭き取る。"}
           ]
         }
       ]
     },
     {
-      number:"②",
       name:"マシンエリア",
       groups:[{
         name:"",
@@ -37,31 +35,28 @@
       }]
     },
     {
-      number:"③",
-      name:"フリーウェイトエリア",
+      name:"フリーウエイトエリア",
       groups:[{
         name:"",
         items:[
-          {item:"床",instruction:"掃除機で埃を取る。ラック周辺は、ほうきで埃をかき出した後、掃除機で吸い込む。プロテイン跡は、②スプレー後に刷毛でこすり、水色雑巾で拭き取る。"},
-          {item:"ラック本体",instruction:"グローブダスターで埃を取る。飲み物のボトル跡は、②スプレー後に刷毛でこすり、水色雑巾で拭き取る。"},
-          {item:"ベンチ",instruction:"グローブダスターで埃を取る。飲み物のボトル跡は、②スプレー後に刷毛でこすり、水色雑巾で拭き取る。"}
+          {item:"床",instruction:"掃除機で埃を取る。ラック周辺は、ほうきで埃をかき出した後、掃除機で吸い込む。プロテイン跡は、スプレー後に刷毛でこすり、水色雑巾で拭き取る。"},
+          {item:"ラック本体",instruction:"グローブダスターで埃を取る。飲み物のボトル跡は、スプレー後に刷毛でこすり、水色雑巾で拭き取る。"},
+          {item:"ベンチ",instruction:"グローブダスターで埃を取る。飲み物のボトル跡は、スプレー後に刷毛でこすり、水色雑巾で拭き取る。"}
         ]
       }]
     },
     {
-      number:"④",
       name:"ストレッチエリア",
       groups:[{
         name:"",
         items:[
           {item:"床",instruction:"土足禁止エリア用掃除機で埃を取る。"},
-          {item:"棚",instruction:"グローブダスターで埃を取る。汚れ具合によっては、②スプレー後に水色雑巾で拭き取る。"}
+          {item:"棚",instruction:"グローブダスターで埃を取る。汚れ具合によっては、スプレー後に水色雑巾で拭き取る。"}
         ]
       }]
     },
     {
-      number:"⑤",
-      name:"シャワールーム・更衣室",
+      name:"シャワー・更衣室",
       groups:[{
         name:"",
         items:[
@@ -72,13 +67,22 @@
       }]
     },
     {
-      number:"⑥",
       name:"トイレ",
       groups:[{
         name:"",
         items:[
           {item:"床",instruction:"基本は掃除機で清掃する。尿汚れは、トイレ洗剤とペーパータオルで拭き取る。"},
           {item:"便器",instruction:"トイレ洗剤を使用し、刷毛でこする。"}
+        ]
+      }]
+    },
+    {
+      name:"その他",
+      groups:[{
+        name:"",
+        items:[
+          {item:"アルコールの補充",instruction:""},
+          {item:"タオル交換",instruction:""}
         ]
       }]
     }
@@ -147,7 +151,6 @@
       .dr-clean-list{display:grid;gap:14px}
       .dr-clean-area{overflow:hidden;border:1px solid #294037;border-radius:14px;background:#0d1e18}
       .dr-clean-area-head{display:flex;align-items:center;gap:10px;padding:13px 15px;border-bottom:1px solid #294037;background:#10231d}
-      .dr-clean-area-number{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:#63d179;color:#07110d;font-weight:900}
       .dr-clean-area-head h3{margin:0;font-size:16px}
       .dr-clean-group{display:grid;gap:9px;padding:13px}
       .dr-clean-group+.dr-clean-group{border-top:1px solid #294037}
@@ -249,11 +252,11 @@
     const box=q("#drCleaning");if(!box)return;
     let itemIndex=0;
     box.innerHTML=CLEANING_AREAS.map(area=>`<section class="dr-clean-area">
-      <div class="dr-clean-area-head"><span class="dr-clean-area-number">${esc(area.number)}</span><h3>${esc(area.name)}</h3></div>
+      <div class="dr-clean-area-head"><h3>■${esc(area.name)}</h3></div>
       ${area.groups.map(group=>`<div class="dr-clean-group">
         ${group.name?`<h4>${esc(group.name)}</h4>`:""}
         ${group.items.map(item=>{const i=itemIndex;itemIndex+=1;return`<label class="dr-clean-item">
-          <span class="dr-clean-copy"><span class="dr-clean-target">${esc(item.item)}</span><span class="dr-clean-instruction">${esc(item.instruction)}</span></span>
+          <span class="dr-clean-copy"><span class="dr-clean-target">${esc(item.item)}</span>${item.instruction?`<span class="dr-clean-instruction">${esc(item.instruction)}</span>`:""}</span>
           <select data-dr-clean="${i}" aria-label="${esc(area.name)} ${esc(item.item)}"><option value="">未確認</option><option value="DONE">完了</option><option value="NOT_DONE">未完了</option><option value="NA">対象外</option></select>
         </label>`;}).join("")}
       </div>`).join("")}
