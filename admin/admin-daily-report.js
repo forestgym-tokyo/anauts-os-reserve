@@ -2,9 +2,10 @@
   "use strict";
 
   const STORE_CODE="YACHIYO";
-  const MAX_IMAGES=5;
+  const MAX_ATTACHMENTS=5;
   const MAX_IMAGE_EDGE=1280;
   const CLIENT_IMAGE_MAX_BYTES=720*1024;
+  const CLIENT_VIDEO_MAX_BYTES=8*1024*1024;
   const CLEANING_AREAS=[
     {
       name:"有酸素エリア",
@@ -12,17 +13,17 @@
         {
           name:"トレッドミル周辺",
           items:[
-            {item:"トレッドミル・本体ベルト",instruction:"スプレー塗布後、緑のモップで拭き取る。"},
-            {item:"トレッドミル・フレーム（横）",instruction:"スプレー塗布後、緑のモップで拭き取る。"},
-            {item:"トレッドミル・先端部",instruction:"グローブダスターまたは黄色モップで埃を除去した後、スプレーを塗布し、水色雑巾で拭き取る。"},
-            {item:"トレッドミル・ゴムマット",instruction:"スプレー塗布後、緑のモップで拭き取る。"}
+            {item:"トレッドミル・本体ベルト",instruction:"洗剤スプレー塗布後、緑のモップで拭き取る。"},
+            {item:"トレッドミル・フレーム（横）",instruction:"洗剤スプレー塗布後、緑のモップで拭き取る。"},
+            {item:"トレッドミル・先端部",instruction:"グローブダスターまたは黄色モップで埃を除去した後、洗剤スプレーを塗布し、ふき取りクロスで拭き取る。"},
+            {item:"トレッドミル・ゴムマット",instruction:"洗剤スプレー塗布後、緑のモップで拭き取る。"}
           ]
         },
         {
           name:"バイク・クロストレーナー",
           items:[
-            {item:"本体",instruction:"スプレーを塗布し、水色雑巾で拭き取る。"},
-            {item:"周辺床",instruction:"スプレー塗布後、緑のモップで拭き取る。"}
+            {item:"本体",instruction:"洗剤スプレーを塗布し、ふき取りクロスで拭き取る。"},
+            {item:"周辺床",instruction:"洗剤スプレー塗布後、緑のモップで拭き取る。"}
           ]
         }
       ]
@@ -42,9 +43,9 @@
       groups:[{
         name:"",
         items:[
-          {item:"床",instruction:"掃除機で埃を取る。ラック周辺は、ほうきで埃をかき出した後、掃除機で吸い込む。プロテイン跡は、スプレー後に刷毛でこすり、水色雑巾で拭き取る。"},
-          {item:"ラック本体",instruction:"グローブダスターで埃を取る。飲み物のボトル跡は、スプレー後に刷毛でこすり、水色雑巾で拭き取る。"},
-          {item:"ベンチ",instruction:"グローブダスターで埃を取る。飲み物のボトル跡は、スプレー後に刷毛でこすり、水色雑巾で拭き取る。"}
+          {item:"床",instruction:"掃除機で埃を取る。ラック周辺は、ほうきで埃をかき出した後、掃除機で吸い込む。プロテイン跡は、洗剤スプレー後に刷毛でこすり、ふき取りクロスで拭き取る。"},
+          {item:"ラック本体",instruction:"グローブダスターで埃を取る。飲み物のボトル跡は、洗剤スプレー後に刷毛でこすり、ふき取りクロスで拭き取る。"},
+          {item:"ベンチ",instruction:"グローブダスターで埃を取る。飲み物のボトル跡は、洗剤スプレー後に刷毛でこすり、ふき取りクロスで拭き取る。"}
         ]
       }]
     },
@@ -54,7 +55,7 @@
         name:"",
         items:[
           {item:"床",instruction:"土足禁止エリア用掃除機で埃を取る。"},
-          {item:"棚",instruction:"グローブダスターで埃を取る。汚れ具合によっては、スプレー後に水色雑巾で拭き取る。"}
+          {item:"棚",instruction:"グローブダスターで埃を取る。汚れ具合によっては、洗剤スプレー後にふき取りクロスで拭き取る。"}
         ]
       }]
     },
@@ -101,9 +102,6 @@
   const REPORT_STATE={
     date:"",
     autoRows:[],
-    scheduleShifts:[],
-    staff:[],
-    staffLoaded:false,
     version:0,
     status:"NOT_LOADED",
     existingImages:[],
@@ -113,7 +111,8 @@
     busy:false,
     imageProcessing:false,
     serverAvailable:false,
-    daySequence:0
+    daySequence:0,
+    contributors:[]
   };
 
   const q=s=>document.querySelector(s);
@@ -121,7 +120,6 @@
   const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const ymd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
   const today=()=>ymd(new Date());
-  const normalizeCode=v=>String(v||"").trim().toUpperCase();
 
   function reporterLabel(){
     try{
@@ -129,6 +127,63 @@
       const u=state?.authUser||{};
       return u.display_name||u.staff_name||u.staff_code||u.email||"—";
     }catch(_){return"—";}
+  }
+
+  function shortTimestamp(value){
+    const text=String(value||"").trim();
+    const match=text.match(/^\d{4}-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+    return match?`${Number(match[1])}/${Number(match[2])} ${match[3]}:${match[4]}`:text;
+  }
+
+  function savedAttribution(value,label,prefix="updated"){
+    const name=String(value?.[`${prefix}_by_name`]||value?.[`${prefix}_by_code`]||"").trim();
+    if(!name)return"";
+    const timestamp=shortTimestamp(value?.[`${prefix}_at`]);
+    return `${label}：${name}${timestamp?`（${timestamp}）`:""}`;
+  }
+
+  function setSavedAttribution(element,value,label){
+    if(!element)return;
+    const text=savedAttribution(value,label||"更新");
+    element.dataset.savedAttribution=text;
+    element.textContent=text;
+  }
+
+  function cleaningAttribution(item){
+    if(item?.status==="DONE")return savedAttribution(item,"完了","completed")||savedAttribution(item,"更新");
+    return savedAttribution(item,"更新");
+  }
+
+  function setPendingAttribution(element,label="更新"){
+    if(!element)return;
+    const saved=String(element.dataset.savedAttribution||"");
+    const pending=`${label}：${reporterLabel()}（未保存）`;
+    element.textContent=[saved,pending].filter(Boolean).join("／");
+  }
+
+  function updatePendingAttribution(target){
+    if(!target)return;
+    if(target.matches("[data-dr-clean]")){
+      const meta=q(`[data-dr-clean-meta="${target.dataset.drClean}"]`);
+      setPendingAttribution(meta,target.value==="DONE"?"完了":"更新");
+      return;
+    }
+    const inquiry=target.closest?.(".dr-inquiry");
+    if(inquiry){setPendingAttribution(inquiry.querySelector("[data-i-attribution]"),"更新");return;}
+    const id=target.id||"";
+    const name=target.name||"";
+    if(id==="drCleaningMemo")setPendingAttribution(q("#drCleaningMemoAttribution"));
+    else if(name==="drEquipment"||["drEquipmentCategory","drEquipmentMemo"].includes(id))setPendingAttribution(q("#drEquipmentAttribution"));
+    else if(name==="drTrouble"||["drTroubleCategory","drTroubleStatus","drTroubleMemo"].includes(id))setPendingAttribution(q("#drTroubleAttribution"));
+    else if(["drHandover","drHandoverAction"].includes(id))setPendingAttribution(q("#drHandoverAttribution"));
+    else if(id==="drOtherMemo")setPendingAttribution(q("#drOtherAttribution"));
+  }
+
+  function renderContributors(){
+    const chip=q("#drContributors");if(!chip)return;
+    const names=REPORT_STATE.contributors.map(item=>item.staff_name||item.staff_code).filter(Boolean);
+    chip.textContent=`保存した人 ${names.join("、")}`;
+    chip.classList.toggle("is-hidden",!names.length);
   }
 
   function serviceShort(r){
@@ -150,25 +205,21 @@
     const style=document.createElement("style");
     style.id="dailyReportStyle";
     style.textContent=`
-      #dailyReportView{padding-bottom:48px}
+      #dailyReportView{padding-bottom:118px}
+      #dailyReportView .card{border-color:#c5d0c9;background:#e3e9e5;color:#17211c;box-shadow:0 9px 24px rgba(0,0,0,.14)}
       .dr-toolbar{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:12px}
       .dr-date-field{display:grid;gap:4px;min-width:210px}
-      .dr-date-field>span{color:#77877f;font-size:11px;font-weight:900}
+      .dr-date-field>span{color:#46544c;font-size:11px;font-weight:900}
       .dr-toolbar .dr-date{width:100%;min-width:180px;box-sizing:border-box;border:1px solid #345047;border-radius:9px;background:#0b1713;color:#fff;padding:9px 10px;font:inherit}
       .dr-meta{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}
       .dr-chip{display:inline-flex;align-items:center;min-height:34px;padding:6px 10px;border:1px solid #294037;border-radius:999px;background:#10231d;color:#cbd8d1;font-size:12px;font-weight:800}
-      .dr-banner{margin-bottom:16px;padding:12px 14px;border:1px solid #356246;border-radius:12px;background:#10231d;color:#cbe7d2;font-size:12px;line-height:1.65}
       .dr-message{margin-bottom:16px;padding:11px 13px;border:1px solid #356246;border-radius:10px;background:#10231d;color:#d9f4df;font-size:12px;font-weight:800;line-height:1.6}
       .dr-message.is-error{border-color:#8a3e48;background:#2a1519;color:#ffd6db}
       .dr-section{margin-bottom:16px;padding:18px}
       .dr-section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
       #dailyReportView .page-heading h1,.dr-section-head h2{color:#151716}
       .dr-section-head h2{margin:0;font-size:18px}
-      .dr-section-head p{margin:4px 0 0;color:#91a198;font-size:12px;line-height:1.55}
-      .dr-staff-choices{display:flex;gap:9px;flex-wrap:wrap}
-      .dr-staff-choice{display:inline-flex;align-items:center;gap:8px;min-height:42px;padding:8px 12px;border:1px solid #345047;border-radius:10px;background:#0d1e18;color:#dce6e1;font-size:13px;font-weight:900;cursor:pointer}
-      .dr-staff-choice:has(input:checked){border-color:#63d179;background:#173424;color:#fff}
-      .dr-staff-choice input{accent-color:#63d179}
+      .dr-section-head p{margin:4px 0 0;color:#55635b;font-size:12px;line-height:1.55}
       .dr-summary-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
       .dr-summary-card{min-width:0;padding:12px;border:1px solid #294037;border-radius:12px;background:#0d1e18}
       .dr-summary-card strong{display:block;font-size:22px;color:#fff}
@@ -180,14 +231,19 @@
       .dr-clean-group{display:grid;gap:9px;padding:13px}
       .dr-clean-group+.dr-clean-group{border-top:1px solid #294037}
       .dr-clean-group h4{margin:0 0 2px;color:#79dc8c;font-size:13px}
-      .dr-clean-item{display:grid;grid-template-columns:minmax(0,1fr) 130px;gap:12px;align-items:center;padding:11px 12px;border:1px solid #263b33;border-radius:10px;background:#0a1712}
+      .dr-clean-item{display:grid;grid-template-columns:minmax(0,1fr) 170px;gap:12px;align-items:center;padding:11px 12px;border:1px solid #263b33;border-radius:10px;background:#0a1712}
       .dr-clean-copy{display:grid;gap:4px;min-width:0}
+      .dr-clean-status{display:grid;gap:5px;min-width:0}
       .dr-clean-target{color:#fff;font-size:13px;font-weight:900}
       .dr-clean-instruction{color:#b5c2bb;font-size:12px;line-height:1.65}
       .dr-clean-item select,.dr-field select,.dr-field input,.dr-field textarea{width:100%;box-sizing:border-box;border:1px solid #345047;border-radius:9px;background:#0b1713;color:#fff;padding:9px 10px;font:inherit}
       .dr-field{display:grid;gap:6px}
-      .dr-field>span{color:#aab8b1;font-size:11px;font-weight:800}
-      .dr-field small,.dr-help{color:#91a198;font-size:11px;line-height:1.55}
+      .dr-field>span{color:#34443b;font-size:11px;font-weight:800}
+      .dr-field small,.dr-help{color:#59675f;font-size:11px;line-height:1.55}
+      .dr-inquiry .dr-field>span{color:#aab8b1}
+      .dr-inquiry .dr-field small{color:#91a198}
+      .dr-attribution{display:block;min-height:16px;color:#8fa69a;font-size:10px;font-weight:800;line-height:1.45}
+      .dr-section-attribution{margin:0;color:#526159;font-size:11px;font-weight:800;line-height:1.55}
       .dr-inquiry-list{display:grid;gap:10px}
       .dr-inquiry{padding:12px;border:1px solid #294037;border-radius:12px;background:#0d1e18}
       .dr-inquiry-grid{display:grid;grid-template-columns:120px 110px minmax(130px,1fr) 130px 150px;gap:9px;align-items:end}
@@ -204,13 +260,13 @@
       .dr-image-row{display:flex;align-items:center;gap:9px;min-width:0;padding:9px 10px;border:1px solid #294037;border-radius:9px;background:#0d1e18}
       .dr-image-row a,.dr-image-row span{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#cfe6d6;font-size:12px;font-weight:800}
       .dr-image-row a{text-decoration:underline}
-      .dr-footer{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:18px}
+      .dr-footer{position:fixed;right:16px;bottom:max(12px,env(safe-area-inset-bottom));z-index:18;display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;padding:10px;border:1px solid #395247;border-radius:14px;background:rgba(8,18,13,.94);box-shadow:0 14px 34px rgba(0,0,0,.34);backdrop-filter:blur(14px)}
       .dr-review{margin-top:14px;padding:14px;border:1px solid #4b6b5e;border-radius:12px;background:#0d1e18;line-height:1.7}
       .dr-review h3{margin:0 0 8px;font-size:16px;color:#fff}
       .dr-review pre{margin:0;white-space:pre-wrap;font:inherit;color:#dce6e1}
       .dr-required-note{color:#ffcf7d;font-size:11px}
       @media(max-width:900px){.dr-summary-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.dr-inquiry-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.dr-inquiry .dr-field.detail{grid-column:1/-1}}
-      @media(max-width:600px){.dr-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.dr-clean-item{grid-template-columns:1fr}.dr-clean-item select{min-height:44px}.dr-inquiry-grid{grid-template-columns:1fr}.dr-inquiry .dr-field.detail{grid-column:auto}.dr-date-field{width:100%}.dr-meta{width:100%;margin-left:0}.dr-footer button{width:100%}}
+      @media(max-width:600px){#dailyReportView{padding-bottom:172px}.dr-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.dr-clean-item{grid-template-columns:1fr}.dr-clean-item select{min-height:44px}.dr-inquiry-grid{grid-template-columns:1fr}.dr-inquiry .dr-field.detail{grid-column:auto}.dr-date-field{width:100%}.dr-meta{width:100%;margin-left:0}.dr-footer{left:12px;right:12px;display:grid;grid-template-columns:1fr 1fr}.dr-footer #drReviewButton{grid-column:1/-1}.dr-footer button{width:100%;min-height:44px}}
     `;
     document.head.appendChild(style);
   }
@@ -226,15 +282,9 @@
       <div class="schedule-toolbar card dr-toolbar">
         <div class="toolbar-group"><button id="drPrev" class="icon-button" type="button" aria-label="前日">‹</button><button id="drToday" class="ghost-button" type="button">今日</button><button id="drNext" class="icon-button" type="button" aria-label="翌日">›</button></div>
         <label class="dr-date-field"><span>日報日付（過去分も閲覧可）</span><input id="drDate" class="dr-date" type="date"></label>
-        <div class="dr-meta"><span id="drReporter" class="dr-chip"></span><span id="drStatus" class="dr-chip">未読込</span></div>
+        <div class="dr-meta"><span id="drReporter" class="dr-chip"></span><span id="drContributors" class="dr-chip is-hidden"></span><span id="drStatus" class="dr-chip">未読込</span></div>
       </div>
       <div id="drMessage" class="dr-message is-hidden"></div>
-      <div class="dr-banner">1店舗・1日につき1つの共有日報です。早番は「下書き保存」、後番は内容を引き継いで追記し、最終勤務者が「日報提出」を行ってください。提出時は info@theforestgym.com と kawakamimihomiho@gmail.com の両方へ送信します。</div>
-
-      <section class="card dr-section">
-        <div class="dr-section-head"><div><h2>担当スタッフ</h2><p>実際に当日の日報を入力・確認したスタッフを選択してください。複数選択できます。</p></div></div>
-        <div id="drStaffChoices" class="dr-staff-choices"><div class="dr-empty">日報を開くとスタッフを読み込みます。</div></div>
-      </section>
 
       <section class="card dr-section">
         <div class="dr-section-head"><div><h2>本日の実績</h2><p>Reserveの予約データから自動集計します。</p></div><button id="drReloadAuto" class="ghost-button" type="button">再読込</button></div>
@@ -244,7 +294,7 @@
       <section class="card dr-section">
         <div class="dr-section-head"><div><h2>清掃チェック</h2><p>各項目を「完了／未完了／対象外」で確認します。</p></div><button id="drAllClean" class="ghost-button" type="button">すべて完了</button></div>
         <div id="drCleaning" class="dr-clean-list"></div>
-        <div class="dr-field" style="margin-top:12px"><span>清掃メモ（任意）</span><textarea id="drCleaningMemo" rows="2" placeholder="未完了箇所や補足があれば入力"></textarea></div>
+        <div class="dr-field" style="margin-top:12px"><span>清掃メモ（任意）</span><textarea id="drCleaningMemo" rows="2" placeholder="未完了箇所や補足があれば入力"></textarea><small id="drCleaningMemoAttribution" class="dr-section-attribution"></small></div>
       </section>
 
       <section class="card dr-section">
@@ -256,9 +306,13 @@
         <div class="dr-section-head"><div><h2>設備・施設異常</h2><p>異常があった場合だけ詳細を入力します。</p></div></div>
         <div class="dr-radio-row"><label class="dr-radio"><input type="radio" name="drEquipment" value="NONE" checked>異常なし</label><label class="dr-radio"><input type="radio" name="drEquipment" value="ISSUE">異常あり</label></div>
         <div id="drEquipmentDetail" class="dr-conditional is-hidden">
+          <p class="dr-help">マシンの不具合は、不具合箇所の画像または動画と、シリアルナンバーの画像を添付してください。</p>
           <div class="dr-field"><span>対象</span><select id="drEquipmentCategory"><option>マシン・ラック</option><option>Akerun・入退室</option><option>タブレット・IT機器</option><option>空調・照明</option><option>シャワー・トイレ</option><option>備品</option><option>その他</option></select></div>
           <div class="dr-field"><span>内容</span><textarea id="drEquipmentMemo" rows="3" placeholder="状態と必要な対応を入力"></textarea></div>
-          <div class="dr-field"><span>画像添付（最大5枚）</span><input id="drEquipmentImages" type="file" accept="image/*" multiple><small>選択した画像はiPad上で1枚ずつ最大1280pxに圧縮してから送信します。過去画像は軽量化のためリンクで表示します。</small><div id="drImageList" class="dr-image-list"><div class="dr-empty">画像はありません。</div></div></div>
+          <div class="dr-field"><span>不具合箇所の画像・動画</span><input id="drEquipmentMedia" type="file" accept="image/*,video/mp4,video/quicktime,video/webm" multiple><small>画像・動画は合計最大5件、動画は1本・8MBまでです。画像だけ端末上で1枚ずつ圧縮し、動画はプレビュー再生しません。</small></div>
+          <div class="dr-field"><span>シリアルナンバーの画像</span><input id="drSerialImage" type="file" accept="image/*"><small>シリアルナンバーが読める画像を1枚選択してください。</small></div>
+          <div id="drImageList" class="dr-image-list"><div class="dr-empty">添付はありません。</div></div>
+          <small id="drEquipmentAttribution" class="dr-section-attribution"></small>
         </div>
       </section>
 
@@ -266,6 +320,7 @@
         <div class="dr-section-head"><div><h2>クレーム・事故・トラブル</h2><p>通常の問い合わせとは分けて記録します。</p></div></div>
         <div class="dr-radio-row"><label class="dr-radio"><input type="radio" name="drTrouble" value="NONE" checked>なし</label><label class="dr-radio"><input type="radio" name="drTrouble" value="ISSUE">あり</label></div>
         <div id="drTroubleDetail" class="dr-conditional is-hidden"><div class="dr-field"><span>区分</span><select id="drTroubleCategory"><option>クレーム</option><option>怪我・事故</option><option>利用ルール違反</option><option>会員間トラブル</option><option>入退室トラブル</option><option>その他</option></select></div><div class="dr-field"><span>対応区分</span><select id="drTroubleStatus"><option>要確認</option><option>要対応</option><option>対応済み</option></select></div><div class="dr-field"><span>内容</span><textarea id="drTroubleMemo" rows="3" placeholder="発生内容・対応内容を入力"></textarea></div></div>
+        <small id="drTroubleAttribution" class="dr-section-attribution"></small>
       </section>
 
       <section class="card dr-section">
@@ -273,14 +328,16 @@
         <div class="dr-field"><span>引継ぎ内容</span><textarea id="drHandover" rows="4" placeholder="例：○○様へ明日電話／ラック2の部品確認"></textarea></div>
         <label class="dr-radio" style="margin-top:10px"><input id="drHandoverAction" type="checkbox">次のスタッフによる対応が必要</label>
         <p class="dr-help">チェックあり＝次のスタッフが対応する必要があります。チェックなし＝情報共有のみで、追加対応は不要です。</p>
+        <small id="drHandoverAttribution" class="dr-section-attribution"></small>
       </section>
 
       <section class="card dr-section">
         <div class="dr-section-head"><div><h2>その他メモ</h2><p>上記に含まれない事項がある場合のみ入力します。</p></div></div>
         <div class="dr-field"><textarea id="drOtherMemo" rows="3" placeholder="任意"></textarea></div>
+        <small id="drOtherAttribution" class="dr-section-attribution"></small>
       </section>
 
-      <div class="dr-footer"><button id="drReviewButton" class="ghost-button" type="button">入力内容を確認</button><button id="drSaveButton" class="ghost-button" type="button" disabled>下書き保存</button><button id="drSubmitButton" class="primary-button" type="button" disabled>日報提出</button></div>
+      <div class="dr-footer"><button id="drReviewButton" class="ghost-button" type="button">入力内容を確認</button><button id="drSaveButton" class="ghost-button" type="button" disabled>引継ぎ保存</button><button id="drSubmitButton" class="primary-button" type="button" disabled>最終提出・メール送信</button></div>
       <div id="drReview" class="dr-review is-hidden"></div>
     `;
 
@@ -303,7 +360,7 @@
         ${group.name?`<h4>${esc(group.name)}</h4>`:""}
         ${group.items.map(item=>{const i=itemIndex;itemIndex+=1;return`<label class="dr-clean-item">
           <span class="dr-clean-copy"><span class="dr-clean-target">${esc(item.item)}</span>${item.instruction?`<span class="dr-clean-instruction">${esc(item.instruction)}</span>`:""}</span>
-          <select data-dr-clean="${i}" aria-label="${esc(area.name)} ${esc(item.item)}"><option value="">未確認</option><option value="DONE">完了</option><option value="NOT_DONE">未完了</option><option value="NA">対象外</option></select>
+          <span class="dr-clean-status"><select data-dr-clean="${i}" aria-label="${esc(area.name)} ${esc(item.item)}"><option value="">未確認</option><option value="DONE">完了</option><option value="NOT_DONE">未完了</option><option value="NA">対象外</option></select><small class="dr-attribution" data-dr-clean-meta="${i}"></small></span>
         </label>`;}).join("")}
       </div>`).join("")}
     </section>`).join("");
@@ -315,20 +372,27 @@
     q("#drToday").onclick=()=>setDate(today());
     q("#drDate").onchange=()=>setDate(q("#drDate").value||today());
     q("#drReloadAuto").onclick=reloadAutoOnly;
-    q("#drAllClean").onclick=()=>{qa("[data-dr-clean]").forEach(s=>s.value="DONE");markDirty();};
+    q("#drAllClean").onclick=()=>{qa("[data-dr-clean]").forEach((s,i)=>{s.value="DONE";setPendingAttribution(q(`[data-dr-clean-meta="${i}"]`),"完了");});markDirty();};
     q("#drAddInquiry").onclick=()=>addInquiry({},true);
     qa('input[name="drEquipment"]').forEach(r=>r.onchange=()=>q("#drEquipmentDetail").classList.toggle("is-hidden",r.checked&&r.value==="NONE"));
     qa('input[name="drTrouble"]').forEach(r=>r.onchange=()=>q("#drTroubleDetail").classList.toggle("is-hidden",r.checked&&r.value==="NONE"));
-    q("#drEquipmentImages").onchange=handleImageSelection;
+    q("#drEquipmentMedia").onchange=event=>handleMediaSelection(event,"ISSUE_MEDIA");
+    q("#drSerialImage").onchange=event=>handleMediaSelection(event,"SERIAL");
     q("#drImageList").onclick=handleImageRemove;
     q("#drReviewButton").onclick=review;
     q("#drSaveButton").onclick=()=>writeReport(false);
     q("#drSubmitButton").onclick=()=>writeReport(true);
     q("#dailyReportView").addEventListener("input",event=>{
-      if(event.target.id!=="drDate"&&event.target.id!=="drEquipmentImages")markDirty();
+      if(event.target.id!=="drDate"&&!event.target.matches('input[type="file"]')){
+        updatePendingAttribution(event.target);
+        markDirty();
+      }
     });
     q("#dailyReportView").addEventListener("change",event=>{
-      if(event.target.id!=="drDate"&&event.target.id!=="drEquipmentImages")markDirty();
+      if(event.target.id!=="drDate"&&!event.target.matches('input[type="file"]')){
+        updatePendingAttribution(event.target);
+        markDirty();
+      }
     });
     q('[data-view="dailyReport"]')?.addEventListener("click",()=>{
       q("#drReporter").textContent=`入力者 ${reporterLabel()}`;
@@ -377,7 +441,8 @@
     q("#drEquipmentDetail").classList.add("is-hidden");
     q("#drEquipmentCategory").value="マシン・ラック";
     q("#drEquipmentMemo").value="";
-    q("#drEquipmentImages").value="";
+    q("#drEquipmentMedia").value="";
+    q("#drSerialImage").value="";
     q('input[name="drTrouble"][value="NONE"]').checked=true;
     q("#drTroubleDetail").classList.add("is-hidden");
     q("#drTroubleCategory").value="クレーム";
@@ -386,6 +451,10 @@
     q("#drHandover").value="";
     q("#drHandoverAction").checked=false;
     q("#drOtherMemo").value="";
+    qa("[data-dr-clean-meta]").forEach(element=>{element.textContent="";element.dataset.savedAttribution="";});
+    ["drCleaningMemoAttribution","drEquipmentAttribution","drTroubleAttribution","drHandoverAttribution","drOtherAttribution"].forEach(id=>{const element=q(`#${id}`);if(element){element.textContent="";element.dataset.savedAttribution="";}});
+    REPORT_STATE.contributors=[];
+    renderContributors();
     REPORT_STATE.existingImages=[];
     REPORT_STATE.newImages=[];
     renderImages();
@@ -405,39 +474,23 @@
     setStatus("読込中");
     showMessage("",false);
     q("#drAutoSummary").innerHTML='<div class="staff-schedule-loading">予約実績を読み込んでいます…</div>';
-    q("#drStaffChoices").innerHTML='<div class="staff-schedule-loading">担当スタッフを読み込んでいます…</div>';
     setActionState();
 
-    const [staffResult,reportResult,autoResult]=await Promise.allSettled([
-      fetchStaff(),
+    const [reportResult,autoResult]=await Promise.allSettled([
       apiGet("getDailyReport",{date:requestDate,store_code:STORE_CODE}),
       fetchAutoData(requestDate)
     ]);
     if(sequence!==REPORT_STATE.daySequence||requestDate!==REPORT_STATE.date)return;
 
-    if(staffResult.status==="fulfilled"){
-      REPORT_STATE.staff=normalizeStaffList(staffResult.value);
-      REPORT_STATE.staffLoaded=true;
-    }else{
-      REPORT_STATE.staff=[];
-    }
-
     if(autoResult.status==="fulfilled"){
       REPORT_STATE.autoRows=autoResult.value.rows;
-      REPORT_STATE.scheduleShifts=autoResult.value.shifts;
       renderAuto();
     }else{
       REPORT_STATE.autoRows=[];
-      REPORT_STATE.scheduleShifts=[];
       q("#drAutoSummary").innerHTML=`<div class="dr-empty">実績を取得できませんでした：${esc(autoResult.reason?.message||"取得失敗")}</div>`;
     }
 
     const record=reportResult.status==="fulfilled"?(reportResult.value?.data?.report||null):null;
-    const savedStaff=Array.isArray(record?.report?.staff)?record.report.staff:[];
-    ensureStaffEntries(REPORT_STATE.scheduleShifts);
-    ensureStaffEntries(savedStaff);
-    ensureStaffEntries([state?.authUser||{}]);
-    renderStaffChoices();
 
     if(reportResult.status==="fulfilled"){
       REPORT_STATE.serverAvailable=true;
@@ -458,55 +511,11 @@
     setActionState();
   }
 
-  async function fetchStaff(){
-    if(Array.isArray(state?.staff)&&state.staff.length)return state.staff;
-    const json=await apiGet("getStaff",{include_inactive:"false"});
-    return Array.isArray(json.data?.staff)?json.data.staff:(Array.isArray(json.data)?json.data:[]);
-  }
-
-  function normalizeStaffList(rows){
-    const seen=new Set();
-    return (Array.isArray(rows)?rows:[]).filter(row=>row&&row.active!==false).map(row=>{
-      const code=normalizeCode(row.staff_code);
-      if(!code||seen.has(code))return null;
-      seen.add(code);
-      return {staff_code:code,staff_name:String(row.display_name||row.staff_name||row.name||code).trim()||code};
-    }).filter(Boolean).sort((a,b)=>a.staff_name.localeCompare(b.staff_name,"ja"));
-  }
-
-  function ensureStaffEntries(rows){
-    const map=new Map(REPORT_STATE.staff.map(item=>[item.staff_code,item]));
-    (Array.isArray(rows)?rows:[]).forEach(row=>{
-      const code=normalizeCode(row?.staff_code);
-      if(!code||map.has(code))return;
-      const item={staff_code:code,staff_name:String(row.display_name||row.staff_name||row.name||code).trim()||code};
-      REPORT_STATE.staff.push(item);
-      map.set(code,item);
-    });
-    REPORT_STATE.staff.sort((a,b)=>a.staff_name.localeCompare(b.staff_name,"ja"));
-  }
-
-  function renderStaffChoices(selectedCodes){
-    const box=q("#drStaffChoices");if(!box)return;
-    const selected=new Set(selectedCodes||selectedStaffCodes());
-    box.innerHTML=REPORT_STATE.staff.length?REPORT_STATE.staff.map(item=>`<label class="dr-staff-choice"><input type="checkbox" data-dr-staff="${esc(item.staff_code)}" ${selected.has(item.staff_code)?"checked":""}><span>${esc(item.staff_name)}</span></label>`).join(""):'<div class="dr-empty">選択できるスタッフが見つかりません。</div>';
-  }
-
-  function selectedStaffCodes(){
-    return [...qa("[data-dr-staff]:checked")].map(input=>normalizeCode(input.dataset.drStaff));
-  }
-
-  function selectStaffCodes(codes){
-    const selected=new Set((codes||[]).map(normalizeCode));
-    qa("[data-dr-staff]").forEach(input=>{input.checked=selected.has(normalizeCode(input.dataset.drStaff));});
-  }
-
   function applyNewReportDefaults(){
     REPORT_STATE.status="NEW";
     REPORT_STATE.version=0;
-    const shiftCodes=[...new Set(REPORT_STATE.scheduleShifts.map(row=>normalizeCode(row.staff_code)).filter(Boolean))];
-    const currentCode=normalizeCode(state?.authUser?.staff_code);
-    selectStaffCodes(shiftCodes.length?shiftCodes:(currentCode?[currentCode]:[]));
+    REPORT_STATE.contributors=[];
+    renderContributors();
     setLocked(false);
     setStatus("未作成");
     renderImages();
@@ -516,13 +525,17 @@
     const data=record.report||{};
     REPORT_STATE.applying=true;
     const cleaningMap=new Map((Array.isArray(data.cleaning)?data.cleaning:[]).map(item=>[
-      [item.area,item.group,item.item].join("|"),item.status||""
+      [item.area,item.group,item.item].join("|"),item
     ]));
     qa("[data-dr-clean]").forEach((select,index)=>{
       const item=CLEANING_ITEMS[index]||{};
-      select.value=cleaningMap.get([item.area,item.group,item.item].join("|"))||data.cleaning?.[index]?.status||"";
+      const saved=cleaningMap.get([item.area,item.group,item.item].join("|"))||data.cleaning?.[index]||{};
+      select.value=saved.status||"";
+      const meta=q(`[data-dr-clean-meta="${index}"]`);
+      if(meta){const text=cleaningAttribution(saved);meta.dataset.savedAttribution=text;meta.textContent=text;}
     });
     q("#drCleaningMemo").value=data.cleaning_memo||"";
+    setSavedAttribution(q("#drCleaningMemoAttribution"),data.cleaning_memo_meta,"更新");
     q("#drInquiryList").innerHTML='<div class="dr-empty">本日の問い合わせは登録されていません。</div>';
     (data.inquiries||[]).forEach(item=>addInquiry(item,false));
 
@@ -531,6 +544,7 @@
     q("#drEquipmentDetail").classList.toggle("is-hidden",equipmentValue==="NONE");
     setSelectValue(q("#drEquipmentCategory"),data.equipment?.category,"マシン・ラック");
     q("#drEquipmentMemo").value=data.equipment?.memo||"";
+    setSavedAttribution(q("#drEquipmentAttribution"),data.equipment,"更新");
 
     const troubleValue=data.trouble?.has_issue?"ISSUE":"NONE";
     q(`input[name="drTrouble"][value="${troubleValue}"]`).checked=true;
@@ -538,10 +552,14 @@
     setSelectValue(q("#drTroubleCategory"),data.trouble?.category,"クレーム");
     setSelectValue(q("#drTroubleStatus"),data.trouble?.status,"要確認");
     q("#drTroubleMemo").value=data.trouble?.memo||"";
+    setSavedAttribution(q("#drTroubleAttribution"),data.trouble,"更新");
     q("#drHandover").value=data.handover?.memo||"";
     q("#drHandoverAction").checked=!!data.handover?.needs_action;
+    setSavedAttribution(q("#drHandoverAttribution"),data.handover,"更新");
     q("#drOtherMemo").value=data.other_memo||"";
-    selectStaffCodes((data.staff||[]).map(item=>item.staff_code));
+    setSavedAttribution(q("#drOtherAttribution"),data.other_meta,"更新");
+    REPORT_STATE.contributors=Array.isArray(data.contributors)?data.contributors.slice():(Array.isArray(data.staff)?data.staff.slice():[]);
+    renderContributors();
 
     REPORT_STATE.existingImages=Array.isArray(record.images)?record.images.slice():[];
     REPORT_STATE.newImages=[];
@@ -585,18 +603,13 @@
     if(staffResult.status==="rejected"&&trainerResult.status==="rejected")throw staffResult.reason;
     const payloads=[staffResult,trainerResult].filter(result=>result.status==="fulfilled").map(result=>result.value?.data||{});
     const rowMap=new Map();
-    const shiftMap=new Map();
     payloads.forEach(payload=>{
       (Array.isArray(payload.reservations)?payload.reservations:[]).filter(row=>String(row.status||"").toUpperCase()!=="CANCELLED").forEach(row=>{
         const key=String(row.reservation_id||`${date}|${row.start_time}|${row.customer_name}|${row.service_code||row.service_name}`);
         if(!rowMap.has(key))rowMap.set(key,row);
       });
-      (Array.isArray(payload.shifts)?payload.shifts:[]).forEach(row=>{
-        const key=`${row.staff_code}|${row.start_time}|${row.end_time}`;
-        if(!shiftMap.has(key))shiftMap.set(key,row);
-      });
     });
-    return {rows:[...rowMap.values()],shifts:[...shiftMap.values()]};
+    return {rows:[...rowMap.values()]};
   }
 
   async function reloadAutoOnly(){
@@ -607,13 +620,6 @@
     try{
       const result=await fetchAutoData(REPORT_STATE.date,true);
       REPORT_STATE.autoRows=result.rows;
-      REPORT_STATE.scheduleShifts=result.shifts;
-      const selected=selectedStaffCodes();
-      ensureStaffEntries(result.shifts);
-      renderStaffChoices(selected);
-      if(REPORT_STATE.status==="NEW"&&!selected.length){
-        selectStaffCodes([...new Set(result.shifts.map(row=>normalizeCode(row.staff_code)).filter(Boolean))]);
-      }
       renderAuto();
       showMessage("予約実績を再読込しました。",false);
     }catch(error){
@@ -637,6 +643,7 @@
     list.querySelector(".dr-empty")?.remove();
     const row=document.createElement("div");
     row.className="dr-inquiry";
+    row.dataset.inquiryId=String(data.inquiry_id||"");
     row.innerHTML=`<div class="dr-inquiry-grid">
       <label class="dr-field"><span>受付経路</span><select data-i="channel"><option>来店（直接）</option><option>電話</option><option>LINE</option><option>メール</option></select></label>
       <label class="dr-field"><span>時刻</span><input data-i="time" type="time"></label>
@@ -645,7 +652,7 @@
       <label class="dr-field"><span>対応状況</span><select data-i="status"><option>未対応</option><option>対応中</option><option>引継ぎ</option><option>対応済み</option></select></label>
       <label class="dr-field"><span>分類</span><select data-i="category"><option>見学・入会</option><option>退会・休会</option><option>料金・契約</option><option>トレーニング</option><option>設備・利用方法</option><option>その他</option></select></label>
       <label class="dr-field detail"><span>問い合わせ内容・対応内容</span><textarea data-i="detail" rows="2" placeholder="要点だけ入力"></textarea></label>
-    </div><div class="dr-inline-actions" style="justify-content:flex-end;margin-top:8px"><button class="danger-ghost" data-i-remove type="button">削除</button></div>`;
+    </div><div class="dr-inline-actions" style="justify-content:space-between;margin-top:8px"><small class="dr-attribution" data-i-attribution></small><button class="danger-ghost" data-i-remove type="button">削除</button></div>`;
     const set=(key,value)=>{const element=row.querySelector(`[data-i="${key}"]`);if(element&&value!=null)element.value=value;};
     set("channel",data.channel||"来店（直接）");
     set("time",data.time||"");
@@ -654,6 +661,11 @@
     set("status",data.status||"未対応");
     set("category",data.category||"見学・入会");
     set("detail",data.detail||"");
+    const attribution=row.querySelector("[data-i-attribution]");
+    const received=savedAttribution(data,"受付","received");
+    const updated=savedAttribution(data,"更新","updated");
+    attribution.dataset.savedAttribution=[received,updated&&updated!==received?updated:""].filter(Boolean).join("／");
+    attribution.textContent=attribution.dataset.savedAttribution||(shouldMark?`受付：${reporterLabel()}（未保存）`:"");
     row.querySelector("[data-i-remove]").onclick=()=>{
       row.remove();
       if(!list.querySelector(".dr-inquiry"))list.innerHTML='<div class="dr-empty">本日の問い合わせは登録されていません。</div>';
@@ -672,6 +684,7 @@
       status:select.value
     }));
     const inquiries=[...qa("#drInquiryList .dr-inquiry")].map(row=>({
+      inquiry_id:row.dataset.inquiryId||"",
       channel:row.querySelector('[data-i="channel"]')?.value||"",
       time:row.querySelector('[data-i="time"]')?.value||"",
       name:row.querySelector('[data-i="name"]')?.value||"",
@@ -680,14 +693,11 @@
       category:row.querySelector('[data-i="category"]')?.value||"",
       detail:row.querySelector('[data-i="detail"]')?.value||""
     }));
-    const staffMap=new Map(REPORT_STATE.staff.map(item=>[item.staff_code,item]));
-    const staff=selectedStaffCodes().map(code=>staffMap.get(code)||{staff_code:code,staff_name:code});
     return {
       date:REPORT_STATE.date,
       store_code:STORE_CODE,
       reporter:reporterLabel(),
       reporter_code:state?.authUser?.staff_code||"",
-      staff,
       cleaning,
       cleaning_memo:q("#drCleaningMemo")?.value.trim()||"",
       inquiries,
@@ -704,13 +714,15 @@
     const missing=data.cleaning.filter(item=>!item.status);
     const notDone=data.cleaning.filter(item=>item.status==="NOT_DONE");
     const inquiryStatus=data.inquiries.reduce((map,item)=>(map[item.status]=(map[item.status]||0)+1,map),{});
-    const imageCount=REPORT_STATE.existingImages.length+REPORT_STATE.newImages.length;
+    const attachmentCount=REPORT_STATE.existingImages.length+REPORT_STATE.newImages.length;
+    const contributorNames=REPORT_STATE.contributors.map(item=>item.staff_name||item.staff_code).filter(Boolean);
     const lines=[
-      `${data.date}　担当：${data.staff.map(item=>item.staff_name).join("、")||"未選択"}`,
+      `${data.date}　現在の入力者：${reporterLabel()}`,
+      `保存した人：${contributorNames.join("、")||"まだ保存されていません"}`,
       `予約実績：${data.reservation_count}件`,
       `清掃：完了 ${data.cleaning.filter(item=>item.status==="DONE").length}／未完了 ${notDone.length}／対象外 ${data.cleaning.filter(item=>item.status==="NA").length}／未確認 ${missing.length}`,
       `問い合わせ：${data.inquiries.length}件${data.inquiries.length?`（未対応 ${inquiryStatus["未対応"]||0}・対応中 ${inquiryStatus["対応中"]||0}・引継ぎ ${inquiryStatus["引継ぎ"]||0}・対応済み ${inquiryStatus["対応済み"]||0}）`:""}`,
-      `設備異常：${data.equipment.has_issue?"あり":"なし"}／画像 ${imageCount}枚`,
+      `設備異常：${data.equipment.has_issue?"あり":"なし"}／添付 ${attachmentCount}件`,
       `クレーム・事故・トラブル：${data.trouble.has_issue?"あり":"なし"}`,
       `引継ぎ：${data.handover.memo?(data.handover.needs_action?"次のスタッフの対応が必要":"情報共有のみ"):"なし"}`
     ];
@@ -723,17 +735,13 @@
   async function writeReport(shouldSubmit){
     if(REPORT_STATE.busy||REPORT_STATE.imageProcessing||!REPORT_STATE.serverAvailable)return;
     const report=serialize();
-    if(!report.staff.length){
-      showMessage("担当スタッフを1名以上選択してください。",true);
-      q("#drStaffChoices")?.scrollIntoView({behavior:"smooth",block:"center"});
-      return;
-    }
     if(shouldSubmit&&!window.confirm("この日報を確定し、管理用メール2宛先へ送信します。提出後は編集できません。よろしいですか？"))return;
 
     REPORT_STATE.busy=true;
     setActionState();
     showMessage(shouldSubmit?"日報を提出しています…":"下書きを保存しています…",false);
     try{
+      const attachments=await prepareNewAttachmentsForUpload();
       const json=await apiPost({
         action:shouldSubmit?"submitDailyReport":"saveDailyReport",
         date:REPORT_STATE.date,
@@ -741,13 +749,14 @@
         version:REPORT_STATE.version,
         report,
         existing_image_ids:REPORT_STATE.existingImages.map(image=>image.file_id),
-        images:REPORT_STATE.newImages.map(image=>({file_name:image.file_name,mime_type:image.mime_type,data_base64:image.data_base64}))
+        images:attachments
       });
       const record=json.data?.report;
       if(!record)throw new Error("保存結果を確認できませんでした。");
       applyReportRecord(record);
       REPORT_STATE.dirty=false;
-      q("#drEquipmentImages").value="";
+      q("#drEquipmentMedia").value="";
+      q("#drSerialImage").value="";
       showMessage(json.data?.message||(shouldSubmit?"日報を提出しました。":"下書きを保存しました。"),false);
     }catch(error){
       const message=String(error?.message||"保存に失敗しました。");
@@ -758,29 +767,77 @@
     }
   }
 
-  async function handleImageSelection(event){
+  async function handleMediaSelection(event,attachmentType){
     const files=[...(event.target.files||[])];
     event.target.value="";
-    const available=MAX_IMAGES-REPORT_STATE.existingImages.length-REPORT_STATE.newImages.length;
-    if(available<=0){showMessage("画像は最大5枚です。不要な画像を削除してから追加してください。",true);return;}
-    if(files.length>available){showMessage(`追加できる画像は残り${available}枚です。先頭から${available}枚だけ処理します。`,true);}
+    const allAttachments=()=>REPORT_STATE.existingImages.concat(REPORT_STATE.newImages);
+    const available=MAX_ATTACHMENTS-allAttachments().length;
+    if(available<=0){showMessage("添付は最大5件です。不要な添付を削除してから追加してください。",true);return;}
+    if(attachmentType==="SERIAL"&&allAttachments().some(item=>String(item.attachment_type||"")==="SERIAL")){
+      showMessage("シリアルナンバー画像は1枚です。差し替える場合は、現在の画像を削除してください。",true);
+      return;
+    }
+    if(files.length>available)showMessage(`追加できる添付は残り${available}件です。先頭から${available}件だけ処理します。`,true);
 
     REPORT_STATE.imageProcessing=true;
     setActionState();
     const errors=[];
-    for(const file of files.slice(0,available)){
+    for(const file of files.slice(0,attachmentType==="SERIAL"?1:available)){
       try{
-        showMessage(`画像を圧縮しています（${REPORT_STATE.newImages.length+1}/${Math.min(files.length,available)}）…`,false);
-        REPORT_STATE.newImages.push(await compressImageFile(file));
+        const type=String(file?.type||"").toLowerCase();
+        const isVideo=type.startsWith("video/");
+        if(attachmentType==="SERIAL"&&isVideo)throw new Error("シリアルナンバーには画像を選択してください。");
+        if(isVideo){
+          if(!["video/mp4","video/quicktime","video/webm"].includes(type))throw new Error("MP4・MOV・WebM動画を選択してください。");
+          if(allAttachments().some(item=>String(item.media_kind||"").toUpperCase()==="VIDEO"))throw new Error("動画は1本までです。");
+          if(Number(file.size||0)>CLIENT_VIDEO_MAX_BYTES)throw new Error("動画1本の上限は8MBです。");
+          REPORT_STATE.newImages.push({
+            local_id:`${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            file_name:file.name||"equipment-video",
+            mime_type:type,
+            size_bytes:Number(file.size||0),
+            attachment_type:attachmentType,
+            media_kind:"VIDEO",
+            file
+          });
+        }else{
+          showMessage("画像を圧縮しています…",false);
+          const image=await compressImageFile(file);
+          image.attachment_type=attachmentType;
+          image.media_kind="IMAGE";
+          REPORT_STATE.newImages.push(image);
+        }
         renderImages();
       }catch(error){
         errors.push(`${file.name}：${error?.message||"処理失敗"}`);
       }
     }
     REPORT_STATE.imageProcessing=false;
-    if(REPORT_STATE.newImages.length)markDirty();
+    if(REPORT_STATE.newImages.length){setPendingAttribution(q("#drEquipmentAttribution"));markDirty();}
     setActionState();
-    showMessage(errors.length?`処理できない画像がありました。${errors.join("／")}`:"画像を圧縮して追加しました。まだサーバーには保存されていません。",!!errors.length);
+    showMessage(errors.length?`処理できない添付がありました。${errors.join("／")}`:"添付を追加しました。まだサーバーには保存されていません。",!!errors.length);
+  }
+
+  async function prepareNewAttachmentsForUpload(){
+    const payload=[];
+    for(let index=0;index<REPORT_STATE.newImages.length;index+=1){
+      const item=REPORT_STATE.newImages[index];
+      let base64=item.data_base64||"";
+      if(item.media_kind==="VIDEO"){
+        showMessage(`動画を送信準備しています（${index+1}/${REPORT_STATE.newImages.length}）…`,false);
+        const dataUrl=await readFileAsDataUrl(item.file);
+        base64=dataUrl.split(",")[1]||"";
+        if(!base64)throw new Error("動画を読み込めませんでした。もう一度選択してください。");
+      }
+      payload.push({
+        file_name:item.file_name,
+        mime_type:item.mime_type,
+        data_base64:base64,
+        attachment_type:item.attachment_type||"ISSUE_MEDIA",
+        media_kind:item.media_kind||"IMAGE"
+      });
+    }
+    return payload;
   }
 
   function compressImageFile(file){
@@ -825,7 +882,7 @@
     return new Promise((resolve,reject)=>{
       const reader=new FileReader();
       reader.onload=()=>resolve(String(reader.result||""));
-      reader.onerror=()=>reject(new Error("画像を読み込めません。"));
+      reader.onerror=()=>reject(new Error("ファイルを読み込めません。"));
       reader.readAsDataURL(file);
     });
   }
@@ -852,6 +909,7 @@
     if(kind==="existing")REPORT_STATE.existingImages=REPORT_STATE.existingImages.filter(image=>String(image.file_id)!==id);
     else REPORT_STATE.newImages=REPORT_STATE.newImages.filter(image=>String(image.local_id)!==id);
     renderImages();
+    setPendingAttribution(q("#drEquipmentAttribution"));
     markDirty();
   }
 
@@ -860,14 +918,18 @@
     const locked=REPORT_STATE.status==="SUBMITTED"||REPORT_STATE.status==="SUBMITTING";
     const rows=[];
     REPORT_STATE.existingImages.forEach(image=>{
-      const name=image.original_name||image.file_name||"保存済み画像";
-      const label=`${name}（保存済み・${formatBytes(image.size_bytes)}）`;
+      const name=image.original_name||image.file_name||"保存済み添付";
+      const kind=String(image.media_kind||"IMAGE").toUpperCase()==="VIDEO"?"動画":"画像";
+      const purpose=String(image.attachment_type||"ISSUE_MEDIA")==="SERIAL"?"シリアル":"不具合箇所";
+      const label=`${purpose}・${kind}：${name}（保存済み・${formatBytes(image.size_bytes)}）`;
       rows.push(`<div class="dr-image-row">${image.url?`<a href="${esc(image.url)}" target="_blank" rel="noopener">${esc(label)}</a>`:`<span>${esc(label)}</span>`}${locked?"":`<button class="danger-ghost" type="button" data-image-kind="existing" data-image-remove="${esc(image.file_id)}">削除</button>`}</div>`);
     });
     REPORT_STATE.newImages.forEach(image=>{
-      rows.push(`<div class="dr-image-row"><span>${esc(image.file_name)}（未保存・${formatBytes(image.size_bytes)}）</span><button class="danger-ghost" type="button" data-image-kind="new" data-image-remove="${esc(image.local_id)}">削除</button></div>`);
+      const kind=image.media_kind==="VIDEO"?"動画":"画像";
+      const purpose=image.attachment_type==="SERIAL"?"シリアル":"不具合箇所";
+      rows.push(`<div class="dr-image-row"><span>${esc(`${purpose}・${kind}：${image.file_name}`)}（未保存・${formatBytes(image.size_bytes)}）</span><button class="danger-ghost" type="button" data-image-kind="new" data-image-remove="${esc(image.local_id)}">削除</button></div>`);
     });
-    box.innerHTML=rows.length?rows.join(""):'<div class="dr-empty">画像はありません。</div>';
+    box.innerHTML=rows.length?rows.join(""):'<div class="dr-empty">添付はありません。</div>';
   }
 
   function formatBytes(value){
@@ -891,7 +953,8 @@
     const disabled=!REPORT_STATE.serverAvailable||REPORT_STATE.busy||REPORT_STATE.imageProcessing||locked;
     if(q("#drSaveButton"))q("#drSaveButton").disabled=disabled;
     if(q("#drSubmitButton"))q("#drSubmitButton").disabled=disabled;
-    if(q("#drEquipmentImages"))q("#drEquipmentImages").disabled=disabled;
+    if(q("#drEquipmentMedia"))q("#drEquipmentMedia").disabled=disabled;
+    if(q("#drSerialImage"))q("#drSerialImage").disabled=disabled;
   }
 
   function boot(){
