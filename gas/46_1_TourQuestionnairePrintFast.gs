@@ -3,7 +3,7 @@ const TOUR_FAST_PRINT_EXPORT_VERSION_PROPERTY = "TOUR_FAST_PRINT_EXPORT_TEMPLATE
 const TOUR_FAST_PRINT_EXPORT_TEMPLATE_VERSION = "20260829-fast-2p-v1";
 const TOUR_FAST_PRINT_PAGE1_SHEET = "アンケート_1";
 const TOUR_FAST_PRINT_PAGE2_SHEET = "アンケート_2";
-const TOUR_QUESTIONNAIRE_SAVE_FOLDER_ID_PROPERTY = "TOUR_QUESTIONNAIRE_SAVE_FOLDER_ID";
+const TOUR_QUESTIONNAIRE_SAVE_FOLDER_ID = "1ceuC0FqgK8uuNL8IcJASMb6qqIxEDm66";
 const TOUR_QUESTIONNAIRE_SAVE_FOLDER_NAME = "アンケート";
 
 function generateTourQuestionnairePdfFast(params) {
@@ -261,32 +261,10 @@ function clearTourFastPrintVariableCells_(page1) {
 }
 
 function getOrCreateTourQuestionnaireSaveFolder_() {
-  const properties = PropertiesService.getScriptProperties();
-  const storedId = String(
-    properties.getProperty(TOUR_QUESTIONNAIRE_SAVE_FOLDER_ID_PROPERTY) || ""
-  ).trim();
-
-  if (storedId) {
-    try {
-      const storedFolder = DriveApp.getFolderById(storedId);
-      if (!storedFolder.isTrashed()) {
-        return storedFolder;
-      }
-    } catch (ignore) {}
-    properties.deleteProperty(TOUR_QUESTIONNAIRE_SAVE_FOLDER_ID_PROPERTY);
+  const folder = DriveApp.getFolderById(TOUR_QUESTIONNAIRE_SAVE_FOLDER_ID);
+  if (folder.isTrashed()) {
+    throw new Error("指定されたアンケート保存フォルダがゴミ箱にあります。");
   }
-
-  const root = DriveApp.getRootFolder();
-  const folders = root.getFoldersByName(TOUR_QUESTIONNAIRE_SAVE_FOLDER_NAME);
-  const folder = folders.hasNext()
-    ? folders.next()
-    : root.createFolder(TOUR_QUESTIONNAIRE_SAVE_FOLDER_NAME);
-
-  properties.setProperty(
-    TOUR_QUESTIONNAIRE_SAVE_FOLDER_ID_PROPERTY,
-    folder.getId()
-  );
-
   return folder;
 }
 
