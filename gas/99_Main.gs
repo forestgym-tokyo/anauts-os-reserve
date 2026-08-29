@@ -119,7 +119,7 @@ function doGet(e) {
             "STAFF"
           ]
         );
-        return generateTourQuestionnairePdf(
+        return generateTourQuestionnairePdfFast(
           params
         );
 
