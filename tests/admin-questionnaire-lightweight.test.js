@@ -39,7 +39,7 @@ assert.doesNotMatch(polish, /tour-reply-inside|openReplyForRow|wireModal/);
 
 for (const html of [indexHtml, adminHtml]) {
   assert.match(html, /admin-questionnaire\.js\?v=20260828-questionnaire-light-v1/);
-  assert.match(html, /firebase-config\.js\?v=20260828-enrollment-master-draft-v1/);
+  assert.match(html, /firebase-config\.js\?v=20260829-admin-direct-shift-v1/);
 }
 
 console.log("admin questionnaire lightweight tests passed");

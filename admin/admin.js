@@ -22,7 +22,7 @@ function applyPermissionUi(){
   const permission=String(state.authUser?.permission||"STAFF").toUpperCase();
   const isManagement=permission==="ADMIN"||permission==="MANAGER";
   document.querySelectorAll('[data-view="registration"]').forEach(el=>el.classList.toggle("is-hidden",!isManagement));
-  $("#myShiftNav")?.classList.toggle("is-hidden",isManagement);
+  $("#myShiftNav")?.classList.toggle("is-hidden",!state.authUser?.staff_code);
   $("#authUserArea")?.classList.remove("is-hidden");
   if($("#authUserName"))$("#authUserName").textContent=roleHonorific(state.authUser);
   if($("#authUserPermission"))$("#authUserPermission").textContent=permission;
@@ -864,7 +864,7 @@ function setupMyShiftTimeSelectors_(){
 }
 
 function isManagementUser(){return hasPermission("ADMIN","MANAGER")}
-function canUseMyShift(){return authEnabled()&&!isManagementUser()&&!!state.authUser?.staff_code}
+function canUseMyShift(){return authEnabled()&&!!state.authUser?.staff_code}
 
 function isAllowedShiftTime_(value){
   const m=/^(\d{2}):(\d{2})$/.exec(String(value||""));
@@ -999,6 +999,14 @@ async function loadMyShiftView(){
       .sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.start_time).localeCompare(String(b.start_time)));
 
     renderMyShiftRows();
+
+    if(isManagementUser()){
+      $("#myShiftStatusSummary").textContent=`勤務 ${state.myShiftRows.length}件 / 直接編集`;
+      $("#myShiftRequestHistory").innerHTML='<div class="registered-shift-empty">ADMIN / MANAGERは変更申請不要です。</div>';
+      resetMyShiftForm();
+      return;
+    }
+
     $("#myShiftStatusSummary").textContent=`勤務 ${state.myShiftRows.length}件`;
 
     let requestRes={data:[]};
@@ -1024,6 +1032,34 @@ function renderMyShiftRows(){
 
   if(!rows.length){
     box.innerHTML='<div class="registered-shift-empty">この月の確定シフトはありません。</div>';
+    return;
+  }
+
+  if(isManagementUser()){
+    box.innerHTML=rows.map(r=>`<div class="registered-shift-row"
+      style="grid-template-columns:minmax(125px,170px) minmax(0,1fr) auto">
+      <div class="registered-shift-time">
+        <strong>${esc(formatStaffDate(r.date))}</strong>
+        <small style="display:block;margin-top:4px;color:#91a198">${esc(r.date||"")}</small>
+      </div>
+      <div class="registered-shift-meta">
+        <span style="font-size:16px;font-weight:900;color:#fff">${esc(r.start_time)}〜${esc(r.end_time)}</span>
+        <small>${esc(r.store_code||state.authUser?.store_code||"")}</small>
+      </div>
+      <div class="registered-shift-actions">
+        <button class="ghost-button" type="button" data-management-shift-edit="${esc(r.shift_id||"")}">直接変更</button>
+        <button class="danger-ghost" type="button" data-management-shift-delete="${esc(r.shift_id||"")}">直接削除</button>
+      </div>
+    </div>`).join("");
+
+    $$('[data-management-shift-edit]').forEach(button=>button.onclick=()=>{
+      const row=rows.find(r=>String(r.shift_id)===String(button.dataset.managementShiftEdit));
+      if(row)directEditManagementShift_(row);
+    });
+    $$('[data-management-shift-delete]').forEach(button=>button.onclick=()=>{
+      const row=rows.find(r=>String(r.shift_id)===String(button.dataset.managementShiftDelete));
+      if(row)directDeleteManagementShift_(row);
+    });
     return;
   }
 
@@ -1092,6 +1128,44 @@ function renderMyShiftRows(){
     }
     requestDeleteMyShift(r);
   });
+}
+
+async function directEditManagementShift_(r){
+  const start=prompt("開始時刻",String(r.start_time||"").slice(0,5));
+  if(start===null)return;
+  const end=prompt("終了時刻",String(r.end_time||"").slice(0,5));
+  if(end===null)return;
+  if(!isAllowedShiftTime_(start)||!isAllowedShiftTime_(end)||start>=end){
+    alert("時刻を確認してください。分は00・15・30・45で指定します。");
+    return;
+  }
+  if(!confirm(`${r.date} ${start}〜${end} に直接変更しますか？`))return;
+  try{
+    await apiPost({
+      action:"saveStaffShift",
+      shift_id:r.shift_id,
+      staff_code:state.authUser.staff_code,
+      store_code:r.store_code||state.authUser.store_code||"YACHIYO",
+      date:r.date,
+      start_time:start,
+      end_time:end
+    });
+    myShiftMsg("シフトを直接変更しました。");
+    await loadMyShiftView();
+  }catch(error){
+    myShiftMsg(error.message||"シフトの直接変更に失敗しました。",true);
+  }
+}
+
+async function directDeleteManagementShift_(r){
+  if(!confirm(`${r.date} ${r.start_time}〜${r.end_time} を直接削除しますか？`))return;
+  try{
+    await apiPost({action:"deleteStaffShift",shift_id:r.shift_id});
+    myShiftMsg("シフトを直接削除しました。");
+    await loadMyShiftView();
+  }catch(error){
+    myShiftMsg(error.message||"シフトの直接削除に失敗しました。",true);
+  }
 }
 
 function showTodayShiftContactCard_(r,actionLabel){
