@@ -142,6 +142,7 @@
       .dr-banner{margin-bottom:16px;padding:12px 14px;border:1px solid #5f4b28;border-radius:12px;background:#251d10;color:#f2d18a;font-size:12px;line-height:1.65}
       .dr-section{margin-bottom:16px;padding:18px}
       .dr-section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
+      #dailyReportView .page-heading h1,.dr-section-head h2{color:#151716}
       .dr-section-head h2{margin:0;font-size:18px}
       .dr-section-head p{margin:4px 0 0;color:#91a198;font-size:12px}
       .dr-summary-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
@@ -151,7 +152,7 @@
       .dr-clean-list{display:grid;gap:14px}
       .dr-clean-area{overflow:hidden;border:1px solid #294037;border-radius:14px;background:#0d1e18}
       .dr-clean-area-head{display:flex;align-items:center;gap:10px;padding:13px 15px;border-bottom:1px solid #294037;background:#10231d}
-      .dr-clean-area-head h3{margin:0;font-size:16px}
+      .dr-clean-area-head h3{margin:0;color:#79dc8c;font-size:16px}
       .dr-clean-group{display:grid;gap:9px;padding:13px}
       .dr-clean-group+.dr-clean-group{border-top:1px solid #294037}
       .dr-clean-group h4{margin:0 0 2px;color:#79dc8c;font-size:13px}
@@ -164,7 +165,9 @@
       .dr-field>span{color:#aab8b1;font-size:11px;font-weight:800}
       .dr-inquiry-list{display:grid;gap:10px}
       .dr-inquiry{padding:12px;border:1px solid #294037;border-radius:12px;background:#0d1e18}
-      .dr-inquiry-grid{display:grid;grid-template-columns:120px 120px minmax(130px,1fr) 130px 150px;gap:9px;align-items:end}
+      .dr-inquiry-grid{display:grid;grid-template-columns:120px 110px minmax(130px,1fr) 130px 150px;gap:9px;align-items:end}
+      .dr-inquiry-grid .dr-field{min-width:0}
+      .dr-inquiry-grid input[data-i="time"]{width:110px;max-width:100%;min-width:0}
       .dr-inquiry .dr-field.detail{grid-column:1/-1}
       .dr-inline-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
       .dr-empty{padding:16px;border:1px dashed #345047;border-radius:12px;color:#91a198;text-align:center;font-size:12px}
