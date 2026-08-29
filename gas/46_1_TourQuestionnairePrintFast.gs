@@ -111,7 +111,14 @@ function generateTourQuestionnairePdfFast(params) {
     const fileName = buildTourPrintFileName_(reservation, printMode);
     pdfBlob.setName(fileName);
 
-    const saveFolder = getOrCreateTourQuestionnaireSaveFolder_();
+    const saveFolder = DriveApp.getFolderById(TOUR_QUESTIONNAIRE_SAVE_FOLDER_ID);
+    if (saveFolder.isTrashed()) {
+      throw new Error("指定されたアンケート保存フォルダがゴミ箱にあります。");
+    }
+    if (saveFolder.getId() !== TOUR_QUESTIONNAIRE_SAVE_FOLDER_ID) {
+      throw new Error("アンケート保存フォルダIDが一致しません。");
+    }
+
     const pdfFile = saveFolder.createFile(pdfBlob);
     pdfFile.setName(fileName);
 
@@ -125,6 +132,7 @@ function generateTourQuestionnairePdfFast(params) {
       file_id: fileId,
       export_spreadsheet_id: exportSpreadsheet.getId(),
       drive_folder: TOUR_QUESTIONNAIRE_SAVE_FOLDER_NAME,
+      drive_folder_id: saveFolder.getId(),
       pages: 2
     });
 
@@ -136,6 +144,7 @@ function generateTourQuestionnairePdfFast(params) {
       file_id: fileId,
       file_url: fileUrl,
       folder_url: saveFolder.getUrl(),
+      folder_id: saveFolder.getId(),
       drive_folder: TOUR_QUESTIONNAIRE_SAVE_FOLDER_NAME,
       pages: 2,
       duplex: true,
@@ -258,14 +267,6 @@ function isValidTourFastPrintExportSpreadsheet_(spreadsheet) {
 
 function clearTourFastPrintVariableCells_(page1) {
   page1.getRangeList(["F3", "G4", "F5", "F6", "F7", "D39"]).clearContent();
-}
-
-function getOrCreateTourQuestionnaireSaveFolder_() {
-  const folder = DriveApp.getFolderById(TOUR_QUESTIONNAIRE_SAVE_FOLDER_ID);
-  if (folder.isTrashed()) {
-    throw new Error("指定されたアンケート保存フォルダがゴミ箱にあります。");
-  }
-  return folder;
 }
 
 function buildTourFastPrintExportUrl_(spreadsheetId) {
