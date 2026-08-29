@@ -55,7 +55,7 @@ function doGet(e) {
         return health();
 
       case "getCurrentUser":
-        return getCurrentUser(
+        return getCurrentUserWithQuestionnaireCache_(
           params
         );
 
@@ -106,18 +106,13 @@ function doGet(e) {
           params,
           ["ADMIN", "MANAGER", "STAFF"]
         );
-        return getStaffSchedule(
+        return getStaffScheduleWithQuestionnaireCache_(
           params
         );
 
       case "generateTourQuestionnairePdf":
-        requireAuth_(
-          params,
-          [
-            "ADMIN",
-            "MANAGER",
-            "STAFF"
-          ]
+        requireQuestionnaireAuthFast_(
+          params
         );
         return generateTourQuestionnairePdfFast(
           params
@@ -436,7 +431,9 @@ function doPost(e) {
             "STAFF"
           ]
         );
-
+        clearTourQuestionnaireCache_(
+          body.reservation_id
+        );
         return updateTourCustomerAddress(
           body
         );
