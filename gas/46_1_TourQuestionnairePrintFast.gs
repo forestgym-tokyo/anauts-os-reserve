@@ -3,9 +3,9 @@ const TOUR_INSTANT_PRINT_VIEW_URL = "https://forestgym-tokyo.github.io/anauts-os
 /**
  * 店内見学アンケート高速表示。
  *
- * 従来の Spreadsheet -> PDF export -> Drive 保存を通常経路から完全に外し、
- * 予約情報だけを認証済みAPIから返して、GitHub Pages上の2ページ印刷ビューで描画する。
- * 個人情報は URL fragment (#...) に格納するため GitHub Pages サーバーへ送信されない。
+ * スタッフ予定取得時に作成済みの転記payloadがあれば最優先で使用する。
+ * キャッシュ未作成・失効時だけ従来どおり予約シートから読み直す。
+ * 表示先・文字位置・2ページ構成は従来と同じ。
  */
 function generateTourQuestionnairePdfFast(params) {
   try {
@@ -22,6 +22,18 @@ function generateTourQuestionnairePdfFast(params) {
       return errorResponse("印刷モードが正しくありません。", "INVALID_PRINT_MODE", {
         print_mode: printMode
       });
+    }
+
+    if (typeof getTourQuestionnaireCachedPayload_ === "function") {
+      const cachedPayload = getTourQuestionnaireCachedPayload_(reservationId, printMode);
+      if (cachedPayload) {
+        return buildTourQuestionnairePrintResponse_(
+          reservationId,
+          printMode,
+          cachedPayload,
+          true
+        );
+      }
     }
 
     const reservationInfo = findReservationRowById_(reservationId);
@@ -48,32 +60,17 @@ function generateTourQuestionnairePdfFast(params) {
     }
 
     const payload = buildTourInstantPrintPayload_(reservation, printMode);
-    const encoded = Utilities.base64EncodeWebSafe(
-      JSON.stringify(payload),
-      Utilities.Charset.UTF_8
-    ).replace(/=+$/g, "");
 
-    const fileUrl = TOUR_INSTANT_PRINT_VIEW_URL + "#" + encoded;
+    if (typeof putTourQuestionnaireCachedPayload_ === "function") {
+      putTourQuestionnaireCachedPayload_(reservationId, printMode, payload);
+    }
 
-    logInfo("generateTourQuestionnairePdf", "店内見学アンケート高速表示URL生成成功", {
-      reservation_id: reservationId,
-      print_mode: printMode,
-      render_mode: "BROWSER_PRINT",
-      pages: 2
-    });
-
-    return successResponse({
-      reservation_id: reservationId,
-      print_mode: printMode,
-      filename: "店内見学アンケート",
-      mime_type: "text/html",
-      file_url: fileUrl,
-      pages: 2,
-      render_mode: "BROWSER_PRINT",
-      rounded_font: true,
-      duplex: true,
-      duplex_instruction: "A4・両面印刷・長辺とじ"
-    });
+    return buildTourQuestionnairePrintResponse_(
+      reservationId,
+      printMode,
+      payload,
+      false
+    );
   } catch (error) {
     logError("generateTourQuestionnairePdf", error.message, {
       stack: error.stack
@@ -84,6 +81,37 @@ function generateTourQuestionnairePdfFast(params) {
       { message: error.message }
     );
   }
+}
+
+function buildTourQuestionnairePrintResponse_(reservationId, printMode, payload, cacheHit) {
+  const encoded = Utilities.base64EncodeWebSafe(
+    JSON.stringify(payload || {}),
+    Utilities.Charset.UTF_8
+  ).replace(/=+$/g, "");
+
+  const fileUrl = TOUR_INSTANT_PRINT_VIEW_URL + "#" + encoded;
+
+  logInfo("generateTourQuestionnairePdf", "店内見学アンケート高速表示URL生成成功", {
+    reservation_id: reservationId,
+    print_mode: printMode,
+    render_mode: "BROWSER_PRINT",
+    pages: 2,
+    cache_hit: cacheHit === true
+  });
+
+  return successResponse({
+    reservation_id: reservationId,
+    print_mode: printMode,
+    filename: "店内見学アンケート",
+    mime_type: "text/html",
+    file_url: fileUrl,
+    pages: 2,
+    render_mode: "BROWSER_PRINT",
+    rounded_font: true,
+    duplex: true,
+    cache_hit: cacheHit === true,
+    duplex_instruction: "A4・両面印刷・長辺とじ"
+  });
 }
 
 function buildTourInstantPrintPayload_(reservation, printMode) {
