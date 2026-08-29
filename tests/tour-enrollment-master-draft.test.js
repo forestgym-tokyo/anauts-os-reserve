@@ -112,5 +112,6 @@ assert.match(body, /キャンペーン特典：2か月目会費無料/);
 assert.match(body, /初回決済額：1,117円/);
 assert.match(body, /subscription\/apply\/17643/);
 assert.match(body, /会員番号の6桁の数字「160828」/);
+assert.match(body, /入退室キーを発行\nいたします/);
 
 console.log("tour enrollment master and draft tests passed");
