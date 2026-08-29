@@ -2,17 +2,94 @@
   "use strict";
 
   const STORE_CODE="YACHIYO";
-  const CLEANING_ITEMS=[
-    "トレーニングエリア",
-    "マシン・ラック周辺",
-    "更衣室",
-    "シャワー",
-    "トイレ",
-    "洗面",
-    "床",
-    "ゴミ箱",
-    "備品補充"
+  const CLEANING_AREAS=[
+    {
+      number:"①",
+      name:"有酸素エリア",
+      groups:[
+        {
+          name:"トレッドミル周辺",
+          items:[
+            {item:"トレッドミル・本体ベルト",instruction:"②スプレー塗布後、緑のモップで拭き取る。"},
+            {item:"トレッドミル・フレーム（横）",instruction:"②スプレー塗布後、緑のモップで拭き取る。"},
+            {item:"トレッドミル・先端部",instruction:"グローブダスターまたは黄色モップで埃を除去した後、②スプレーを塗布し、水色雑巾で拭き取る。"},
+            {item:"トレッドミル・ゴムマット",instruction:"②スプレー塗布後、緑のモップで拭き取る。"}
+          ]
+        },
+        {
+          name:"バイク・クロストレーナー",
+          items:[
+            {item:"本体",instruction:"②スプレーを塗布し、水色雑巾で拭き取る。"},
+            {item:"周辺床",instruction:"②スプレー塗布後、緑のモップで拭き取る。"}
+          ]
+        }
+      ]
+    },
+    {
+      number:"②",
+      name:"マシンエリア",
+      groups:[{
+        name:"",
+        items:[
+          {item:"各マシン",instruction:"グローブダスターで埃を取る。"},
+          {item:"床",instruction:"掃除機で埃を取る。マシン周辺は、ほうきで埃をかき出した後、掃除機で吸い込む。"}
+        ]
+      }]
+    },
+    {
+      number:"③",
+      name:"フリーウェイトエリア",
+      groups:[{
+        name:"",
+        items:[
+          {item:"床",instruction:"掃除機で埃を取る。ラック周辺は、ほうきで埃をかき出した後、掃除機で吸い込む。プロテイン跡は、②スプレー後に刷毛でこすり、水色雑巾で拭き取る。"},
+          {item:"ラック本体",instruction:"グローブダスターで埃を取る。飲み物のボトル跡は、②スプレー後に刷毛でこすり、水色雑巾で拭き取る。"},
+          {item:"ベンチ",instruction:"グローブダスターで埃を取る。飲み物のボトル跡は、②スプレー後に刷毛でこすり、水色雑巾で拭き取る。"}
+        ]
+      }]
+    },
+    {
+      number:"④",
+      name:"ストレッチエリア",
+      groups:[{
+        name:"",
+        items:[
+          {item:"床",instruction:"土足禁止エリア用掃除機で埃を取る。"},
+          {item:"棚",instruction:"グローブダスターで埃を取る。汚れ具合によっては、②スプレー後に水色雑巾で拭き取る。"}
+        ]
+      }]
+    },
+    {
+      number:"⑤",
+      name:"シャワールーム・更衣室",
+      groups:[{
+        name:"",
+        items:[
+          {item:"排水溝・金属部分",instruction:"排水溝付近の髪の毛を取り除き、風呂用洗剤をスプレーして、刷毛・スポンジ・ブラシ等で汚れと水垢を除去する。金属部分は、風呂用洗剤をスプレー後、スポンジで軽くこする。"},
+          {item:"床",instruction:"土足禁止エリア用掃除機で埃と髪の毛を取る。"},
+          {item:"ドライヤー",instruction:"汚れがないかチェックする。"}
+        ]
+      }]
+    },
+    {
+      number:"⑥",
+      name:"トイレ",
+      groups:[{
+        name:"",
+        items:[
+          {item:"床",instruction:"基本は掃除機で清掃する。尿汚れは、トイレ洗剤とペーパータオルで拭き取る。"},
+          {item:"便器",instruction:"トイレ洗剤を使用し、刷毛でこする。"}
+        ]
+      }]
+    }
   ];
+  const CLEANING_ITEMS=[];
+  CLEANING_AREAS.forEach(area=>area.groups.forEach(group=>group.items.forEach(item=>CLEANING_ITEMS.push({
+    area:area.name,
+    group:group.name,
+    item:item.item,
+    instruction:item.instruction
+  }))));
   const REPORT_STATE={
     date:"",
     drafts:new Map(),
@@ -67,9 +144,18 @@
       .dr-summary-card{min-width:0;padding:12px;border:1px solid #294037;border-radius:12px;background:#0d1e18}
       .dr-summary-card strong{display:block;font-size:22px;color:#fff}
       .dr-summary-card span{display:block;margin-top:2px;color:#9caea5;font-size:11px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-      .dr-clean-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
-      .dr-clean-item{display:grid;gap:7px;padding:12px;border:1px solid #294037;border-radius:12px;background:#0d1e18}
-      .dr-clean-item strong{font-size:13px}
+      .dr-clean-list{display:grid;gap:14px}
+      .dr-clean-area{overflow:hidden;border:1px solid #294037;border-radius:14px;background:#0d1e18}
+      .dr-clean-area-head{display:flex;align-items:center;gap:10px;padding:13px 15px;border-bottom:1px solid #294037;background:#10231d}
+      .dr-clean-area-number{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:#63d179;color:#07110d;font-weight:900}
+      .dr-clean-area-head h3{margin:0;font-size:16px}
+      .dr-clean-group{display:grid;gap:9px;padding:13px}
+      .dr-clean-group+.dr-clean-group{border-top:1px solid #294037}
+      .dr-clean-group h4{margin:0 0 2px;color:#79dc8c;font-size:13px}
+      .dr-clean-item{display:grid;grid-template-columns:minmax(0,1fr) 130px;gap:12px;align-items:center;padding:11px 12px;border:1px solid #263b33;border-radius:10px;background:#0a1712}
+      .dr-clean-copy{display:grid;gap:4px;min-width:0}
+      .dr-clean-target{color:#fff;font-size:13px;font-weight:900}
+      .dr-clean-instruction{color:#b5c2bb;font-size:12px;line-height:1.65}
       .dr-clean-item select,.dr-field select,.dr-field input,.dr-field textarea{width:100%;box-sizing:border-box;border:1px solid #345047;border-radius:9px;background:#0b1713;color:#fff;padding:9px 10px;font:inherit}
       .dr-field{display:grid;gap:6px}
       .dr-field>span{color:#aab8b1;font-size:11px;font-weight:800}
@@ -88,8 +174,8 @@
       .dr-review h3{margin:0 0 8px;font-size:16px}
       .dr-review pre{margin:0;white-space:pre-wrap;font:inherit;color:#dce6e1}
       .dr-required-note{color:#ffcf7d;font-size:11px}
-      @media(max-width:900px){.dr-summary-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.dr-clean-list{grid-template-columns:repeat(2,minmax(0,1fr))}.dr-inquiry-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.dr-inquiry .dr-field.detail{grid-column:1/-1}}
-      @media(max-width:600px){.dr-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.dr-clean-list{grid-template-columns:1fr}.dr-inquiry-grid{grid-template-columns:1fr}.dr-inquiry .dr-field.detail{grid-column:auto}.dr-toolbar .dr-date{width:100%}.dr-meta{width:100%;margin-left:0}.dr-footer button{width:100%}}
+      @media(max-width:900px){.dr-summary-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.dr-inquiry-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.dr-inquiry .dr-field.detail{grid-column:1/-1}}
+      @media(max-width:600px){.dr-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.dr-clean-item{grid-template-columns:1fr}.dr-clean-item select{min-height:44px}.dr-inquiry-grid{grid-template-columns:1fr}.dr-inquiry .dr-field.detail{grid-column:auto}.dr-toolbar .dr-date{width:100%}.dr-meta{width:100%;margin-left:0}.dr-footer button{width:100%}}
     `;
     document.head.appendChild(style);
   }
@@ -161,7 +247,17 @@
 
   function renderCleaning(){
     const box=q("#drCleaning");if(!box)return;
-    box.innerHTML=CLEANING_ITEMS.map((name,i)=>`<label class="dr-clean-item"><strong>${esc(name)}</strong><select data-dr-clean="${i}"><option value="">未確認</option><option value="DONE">完了</option><option value="NOT_DONE">未完了</option><option value="NA">対象外</option></select></label>`).join("");
+    let itemIndex=0;
+    box.innerHTML=CLEANING_AREAS.map(area=>`<section class="dr-clean-area">
+      <div class="dr-clean-area-head"><span class="dr-clean-area-number">${esc(area.number)}</span><h3>${esc(area.name)}</h3></div>
+      ${area.groups.map(group=>`<div class="dr-clean-group">
+        ${group.name?`<h4>${esc(group.name)}</h4>`:""}
+        ${group.items.map(item=>{const i=itemIndex;itemIndex+=1;return`<label class="dr-clean-item">
+          <span class="dr-clean-copy"><span class="dr-clean-target">${esc(item.item)}</span><span class="dr-clean-instruction">${esc(item.instruction)}</span></span>
+          <select data-dr-clean="${i}" aria-label="${esc(area.name)} ${esc(item.item)}"><option value="">未確認</option><option value="DONE">完了</option><option value="NOT_DONE">未完了</option><option value="NA">対象外</option></select>
+        </label>`;}).join("")}
+      </div>`).join("")}
+    </section>`).join("");
   }
 
   function bind(){
@@ -279,7 +375,13 @@
   }
 
   function serialize(){
-    const cleaning=[...qa("[data-dr-clean]")].map((s,i)=>({item:CLEANING_ITEMS[i],status:s.value}));
+    const cleaning=[...qa("[data-dr-clean]")].map((s,i)=>({
+      area:CLEANING_ITEMS[i]?.area||"",
+      group:CLEANING_ITEMS[i]?.group||"",
+      item:CLEANING_ITEMS[i]?.item||"",
+      instruction:CLEANING_ITEMS[i]?.instruction||"",
+      status:s.value
+    }));
     const inquiries=[...qa("#drInquiryList .dr-inquiry")].map(row=>({
       channel:row.querySelector('[data-i="channel"]')?.value||"",
       time:row.querySelector('[data-i="time"]')?.value||"",
