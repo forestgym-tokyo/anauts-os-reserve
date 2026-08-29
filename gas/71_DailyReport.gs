@@ -1,6 +1,6 @@
 /**
  * A-nauts OS Reserve
- * 業務日報の共有保存・過去閲覧・管理メール送信・設備画像保存
+ * 業務日報の共有保存・過去閲覧・入力者記録・管理メール送信・設備添付保存
  */
 
 const DAILY_REPORT_SHEET_NAME = "daily_reports";
@@ -10,9 +10,12 @@ const DAILY_REPORT_ADMIN_EMAILS = [
   "info@theforestgym.com",
   "kawakamimihomiho@gmail.com"
 ];
-const DAILY_REPORT_MAX_IMAGES = 5;
+const DAILY_REPORT_MAX_ATTACHMENTS = 5;
 const DAILY_REPORT_MAX_IMAGE_BYTES = 900 * 1024;
-const DAILY_REPORT_MAX_TOTAL_IMAGE_BYTES = 4 * 1024 * 1024;
+const DAILY_REPORT_MAX_VIDEO_BYTES = 8 * 1024 * 1024;
+const DAILY_REPORT_MAX_TOTAL_ATTACHMENT_BYTES = 12 * 1024 * 1024;
+const DAILY_REPORT_MAX_VIDEOS = 1;
+const DAILY_REPORT_MAX_SERIAL_IMAGES = 1;
 const DAILY_REPORT_MAX_JSON_LENGTH = 45000;
 const DAILY_REPORT_HEADERS = [
   "report_key",
@@ -67,7 +70,7 @@ function writeDailyReport_(body, auth, shouldSubmit) {
   auth = auth || requireAuth_(body, ["ADMIN", "MANAGER", "STAFF"]);
 
   const identity = normalizeDailyReportIdentity_(body);
-  const report = normalizeDailyReportPayload_(body.report);
+  const incomingReport = normalizeDailyReportPayload_(body.report);
   const expectedVersion = normalizeDailyReportVersion_(body.version);
   const requestedExistingIds = normalizeDailyReportIdList_(body.existing_image_ids);
   const incomingImages = normalizeDailyReportIncomingImages_(body.images);
@@ -94,6 +97,9 @@ function writeDailyReport_(body, auth, shouldSubmit) {
       const currentImages = found
         ? parseDailyReportImages_(found.row[found.header.images_json])
         : [];
+      const currentReport = found
+        ? parseDailyReportJson_(found.row[found.header.report_json], {})
+        : {};
       const retainedImages = retainDailyReportImages_(
         currentImages,
         requestedExistingIds,
@@ -109,15 +115,27 @@ function writeDailyReport_(body, auth, shouldSubmit) {
       const images = retainedImages.concat(newFiles.map(function (entry) {
         return entry.meta;
       }));
-
-      if (images.length > DAILY_REPORT_MAX_IMAGES) {
-        throw new Error("設備・施設異常の画像は最大5枚です。");
-      }
+      validateDailyReportAttachments_(images);
 
       const currentVersion = found ? Number(found.row[found.header.version] || 0) : 0;
       const nextVersion = currentVersion + 1;
       const now = new Date();
       const actorCode = String(auth.staff_code || "").trim();
+      const attachmentsChanged = currentImages.map(function (image) {
+        return String(image.file_id || "");
+      }).join("|") !== images.map(function (image) {
+        return String(image.file_id || "");
+      }).join("|");
+      const report = applyDailyReportAttribution_(
+        incomingReport,
+        currentReport,
+        auth,
+        now,
+        attachmentsChanged
+      );
+      if (JSON.stringify(report).length > DAILY_REPORT_MAX_JSON_LENGTH) {
+        throw new Error("日報の入力内容が長すぎます。");
+      }
       const row = found
         ? found.row.slice()
         : new Array(Math.max(sheet.getLastColumn(), DAILY_REPORT_HEADERS.length)).fill("");
@@ -330,29 +348,321 @@ function normalizeDailyReportPayload_(value) {
   const report = value && typeof value === "object"
     ? JSON.parse(JSON.stringify(value))
     : {};
-  const rawStaff = Array.isArray(report.staff) ? report.staff : [];
-  const staffMap = {};
+  delete report.staff;
+  delete report.contributors;
+  delete report.cleaning_memo_meta;
+  delete report.other_meta;
+  delete report.reporter;
+  delete report.reporter_code;
 
-  report.staff = rawStaff.map(function (item) {
-    const code = String(item && item.staff_code || "").trim().toUpperCase();
-    const name = String(item && item.staff_name || code).trim();
-    if (!code || staffMap[code]) return null;
-    staffMap[code] = true;
-    return { staff_code: code, staff_name: name || code };
-  }).filter(Boolean);
+  report.cleaning = (Array.isArray(report.cleaning) ? report.cleaning : []).map(function (item) {
+    return {
+      area: String(item && item.area || "").trim(),
+      group: String(item && item.group || "").trim(),
+      item: String(item && item.item || "").trim(),
+      instruction: String(item && item.instruction || "").trim(),
+      status: ["DONE", "NOT_DONE", "NA"].includes(String(item && item.status || "").toUpperCase())
+        ? String(item.status).toUpperCase()
+        : ""
+    };
+  });
 
-  if (!report.staff.length) {
-    throw new Error("担当スタッフを1名以上選択してください。");
-  }
-  if (report.staff.length > 10) {
-    throw new Error("担当スタッフが多すぎます。");
-  }
+  report.inquiries = (Array.isArray(report.inquiries) ? report.inquiries : []).map(function (item) {
+    return {
+      inquiry_id: String(item && item.inquiry_id || "").trim(),
+      channel: String(item && item.channel || "").trim(),
+      time: String(item && item.time || "").trim(),
+      name: String(item && item.name || "").trim(),
+      member_no: String(item && item.member_no || "").trim(),
+      status: String(item && item.status || "").trim(),
+      category: String(item && item.category || "").trim(),
+      detail: String(item && item.detail || "").trim()
+    };
+  });
+
+  report.equipment = normalizeDailyReportSection_(report.equipment, [
+    "has_issue", "category", "memo"
+  ]);
+  report.trouble = normalizeDailyReportSection_(report.trouble, [
+    "has_issue", "category", "status", "memo"
+  ]);
+  report.handover = normalizeDailyReportSection_(report.handover, [
+    "memo", "needs_action"
+  ]);
+  report.cleaning_memo = String(report.cleaning_memo || "").trim();
+  report.other_memo = String(report.other_memo || "").trim();
+  const reservationCount = Number(report.reservation_count || 0);
+  report.reservation_count = Number.isFinite(reservationCount)
+    ? Math.max(0, Math.floor(reservationCount))
+    : 0;
 
   const json = JSON.stringify(report);
   if (json.length > DAILY_REPORT_MAX_JSON_LENGTH) {
     throw new Error("日報の入力内容が長すぎます。");
   }
   return report;
+}
+
+
+function normalizeDailyReportSection_(value, keys) {
+  const source = value && typeof value === "object" ? value : {};
+  const result = {};
+  (keys || []).forEach(function (key) {
+    if (key === "has_issue" || key === "needs_action") {
+      result[key] = source[key] === true;
+    } else {
+      result[key] = String(source[key] || "").trim();
+    }
+  });
+  return result;
+}
+
+
+function applyDailyReportAttribution_(incoming, current, auth, now, attachmentsChanged) {
+  const report = JSON.parse(JSON.stringify(incoming || {}));
+  const previous = current && typeof current === "object" ? current : {};
+  const actor = getDailyReportActor_(auth);
+  const timestamp = formatDailyReportTimestamp_(now);
+
+  report.reporter_code = actor.staff_code;
+  report.reporter = actor.staff_name;
+  report.contributors = mergeDailyReportContributors_(previous, actor, timestamp);
+  report.staff = report.contributors.map(function (item) {
+    return { staff_code: item.staff_code, staff_name: item.staff_name };
+  });
+
+  const previousCleaning = {};
+  (Array.isArray(previous.cleaning) ? previous.cleaning : []).forEach(function (item) {
+    previousCleaning[dailyReportCleaningKey_(item)] = item || {};
+  });
+  report.cleaning = (Array.isArray(report.cleaning) ? report.cleaning : []).map(function (item) {
+    const saved = previousCleaning[dailyReportCleaningKey_(item)] || {};
+    const result = {
+      area: item.area,
+      group: item.group,
+      item: item.item,
+      instruction: item.instruction,
+      status: item.status
+    };
+    copyDailyReportAttribution_(result, saved, "updated");
+    copyDailyReportAttribution_(result, saved, "completed");
+
+    if (String(item.status || "") !== String(saved.status || "")) {
+      stampDailyReportAttribution_(result, actor, timestamp, "updated");
+      if (item.status === "DONE") {
+        stampDailyReportAttribution_(result, actor, timestamp, "completed");
+      } else {
+        clearDailyReportAttribution_(result, "completed");
+      }
+    } else if (item.status === "DONE" && !result.completed_by_code) {
+      stampDailyReportAttribution_(result, actor, timestamp, "completed");
+    } else if (item.status && !result.updated_by_code) {
+      stampDailyReportAttribution_(result, actor, timestamp, "updated");
+    }
+    return result;
+  });
+
+  report.cleaning_memo_meta = attributeDailyReportText_(
+    report.cleaning_memo,
+    previous.cleaning_memo,
+    previous.cleaning_memo_meta,
+    actor,
+    timestamp
+  );
+  report.inquiries = attributeDailyReportInquiries_(
+    report.inquiries,
+    previous.inquiries,
+    actor,
+    timestamp
+  );
+  report.equipment = attributeDailyReportSection_(
+    report.equipment,
+    previous.equipment,
+    actor,
+    timestamp,
+    !!attachmentsChanged
+  );
+  report.trouble = attributeDailyReportSection_(
+    report.trouble,
+    previous.trouble,
+    actor,
+    timestamp,
+    false
+  );
+  report.handover = attributeDailyReportSection_(
+    report.handover,
+    previous.handover,
+    actor,
+    timestamp,
+    false
+  );
+  report.other_meta = attributeDailyReportText_(
+    report.other_memo,
+    previous.other_memo,
+    previous.other_meta,
+    actor,
+    timestamp
+  );
+  return report;
+}
+
+
+function getDailyReportActor_(auth) {
+  const profile = auth && auth.profile || {};
+  const code = String(auth && auth.staff_code || profile.staff_code || "").trim().toUpperCase();
+  const name = String(profile.display_name || profile.staff_name || code).trim() || code;
+  return { staff_code: code, staff_name: name };
+}
+
+
+function mergeDailyReportContributors_(previous, actor, timestamp) {
+  const source = Array.isArray(previous && previous.contributors)
+    ? previous.contributors
+    : (Array.isArray(previous && previous.staff) ? previous.staff : []);
+  const result = [];
+  const seen = {};
+  source.forEach(function (item) {
+    const code = String(item && item.staff_code || "").trim().toUpperCase();
+    if (!code || seen[code]) return;
+    seen[code] = true;
+    result.push({
+      staff_code: code,
+      staff_name: String(item && item.staff_name || code).trim() || code,
+      first_saved_at: String(item && item.first_saved_at || ""),
+      last_saved_at: String(item && item.last_saved_at || "")
+    });
+  });
+
+  let own = null;
+  result.forEach(function (item) {
+    if (item.staff_code === actor.staff_code) own = item;
+  });
+  if (!own) {
+    own = {
+      staff_code: actor.staff_code,
+      staff_name: actor.staff_name,
+      first_saved_at: timestamp,
+      last_saved_at: timestamp
+    };
+    result.push(own);
+  } else {
+    own.staff_name = actor.staff_name;
+    own.first_saved_at = own.first_saved_at || timestamp;
+    own.last_saved_at = timestamp;
+  }
+  if (result.length > 10) throw new Error("日報の記録者が多すぎます。");
+  return result;
+}
+
+
+function dailyReportCleaningKey_(item) {
+  return [item && item.area, item && item.group, item && item.item].map(function (value) {
+    return String(value || "");
+  }).join("|");
+}
+
+
+function copyDailyReportAttribution_(target, source, prefix) {
+  ["by_code", "by_name", "at"].forEach(function (suffix) {
+    const key = prefix + "_" + suffix;
+    if (source && source[key]) target[key] = String(source[key]);
+  });
+}
+
+
+function clearDailyReportAttribution_(target, prefix) {
+  ["by_code", "by_name", "at"].forEach(function (suffix) {
+    delete target[prefix + "_" + suffix];
+  });
+}
+
+
+function stampDailyReportAttribution_(target, actor, timestamp, prefix) {
+  target[prefix + "_by_code"] = actor.staff_code;
+  target[prefix + "_by_name"] = actor.staff_name;
+  target[prefix + "_at"] = timestamp;
+}
+
+
+function attributeDailyReportText_(value, previousValue, previousMeta, actor, timestamp) {
+  const result = {};
+  copyDailyReportAttribution_(result, previousMeta || {}, "updated");
+  if (String(value || "") !== String(previousValue || "")) {
+    stampDailyReportAttribution_(result, actor, timestamp, "updated");
+  }
+  return result;
+}
+
+
+function dailyReportSectionCore_(value) {
+  const result = {};
+  Object.keys(value && typeof value === "object" ? value : {}).sort().forEach(function (key) {
+    if (!/^updated_/.test(key) && !/^completed_/.test(key) && !/^received_/.test(key)) {
+      result[key] = value[key];
+    }
+  });
+  return result;
+}
+
+
+function attributeDailyReportSection_(value, previousValue, actor, timestamp, forceChanged) {
+  const result = dailyReportSectionCore_(value);
+  copyDailyReportAttribution_(result, previousValue || {}, "updated");
+  const changed = JSON.stringify(dailyReportSectionCore_(value)) !==
+    JSON.stringify(dailyReportSectionCore_(previousValue));
+  if (changed || forceChanged) stampDailyReportAttribution_(result, actor, timestamp, "updated");
+  return result;
+}
+
+
+function attributeDailyReportInquiries_(incoming, previousValue, actor, timestamp) {
+  const previous = Array.isArray(previousValue) ? previousValue : [];
+  const byId = {};
+  previous.forEach(function (item) {
+    const id = String(item && item.inquiry_id || "").trim();
+    if (id && !byId[id]) byId[id] = item;
+  });
+  const used = {};
+
+  return (Array.isArray(incoming) ? incoming : []).map(function (item, index) {
+    let id = String(item && item.inquiry_id || "").trim();
+    let saved = id && byId[id] ? byId[id] : (!id ? (previous[index] || null) : null);
+    if (!id || used[id]) id = Utilities.getUuid();
+    used[id] = true;
+
+    const result = {
+      inquiry_id: id,
+      channel: String(item && item.channel || ""),
+      time: String(item && item.time || ""),
+      name: String(item && item.name || ""),
+      member_no: String(item && item.member_no || ""),
+      status: String(item && item.status || ""),
+      category: String(item && item.category || ""),
+      detail: String(item && item.detail || "")
+    };
+    if (saved) {
+      copyDailyReportAttribution_(result, saved, "received");
+      copyDailyReportAttribution_(result, saved, "updated");
+      const changed = JSON.stringify(dailyReportInquiryCore_(result)) !==
+        JSON.stringify(dailyReportInquiryCore_(saved));
+      if (changed) stampDailyReportAttribution_(result, actor, timestamp, "updated");
+    }
+    if (!result.received_by_code) stampDailyReportAttribution_(result, actor, timestamp, "received");
+    return result;
+  });
+}
+
+
+function dailyReportInquiryCore_(item) {
+  return {
+    channel: String(item && item.channel || ""),
+    time: String(item && item.time || ""),
+    name: String(item && item.name || ""),
+    member_no: String(item && item.member_no || ""),
+    status: String(item && item.status || ""),
+    category: String(item && item.category || ""),
+    detail: String(item && item.detail || "")
+  };
 }
 
 
@@ -380,8 +690,8 @@ function normalizeDailyReportIdList_(value) {
 
 function normalizeDailyReportIncomingImages_(value) {
   if (!Array.isArray(value)) return [];
-  if (value.length > DAILY_REPORT_MAX_IMAGES) {
-    throw new Error("設備・施設異常の画像は最大5枚です。");
+  if (value.length > DAILY_REPORT_MAX_ATTACHMENTS) {
+    throw new Error("設備・施設異常の添付は最大5件です。");
   }
 
   let totalBytes = 0;
@@ -389,31 +699,71 @@ function normalizeDailyReportIncomingImages_(value) {
     const mimeType = String(image && image.mime_type || "image/jpeg").trim().toLowerCase();
     const base64 = String(image && image.data_base64 || "").replace(/^data:[^;]+;base64,/, "").trim();
     const fileName = String(image && image.file_name || ("equipment-" + (index + 1) + ".jpg")).trim();
+    const mediaKind = mimeType.indexOf("video/") === 0 ? "VIDEO" : "IMAGE";
+    const attachmentType = String(image && image.attachment_type || "ISSUE_MEDIA").toUpperCase() === "SERIAL"
+      ? "SERIAL"
+      : "ISSUE_MEDIA";
 
-    if (!["image/jpeg", "image/png", "image/webp"].includes(mimeType)) {
-      throw new Error("添付できるのはJPEG・PNG・WebP画像です。");
+    if (!["image/jpeg", "image/png", "image/webp", "video/mp4", "video/quicktime", "video/webm"].includes(mimeType)) {
+      throw new Error("添付できるのはJPEG・PNG・WebP画像、MP4・MOV・WebM動画です。");
     }
     if (!base64) {
-      throw new Error("画像データが空です。");
+      throw new Error("添付データが空です。");
+    }
+    if (attachmentType === "SERIAL" && mediaKind !== "IMAGE") {
+      throw new Error("シリアルナンバーには画像を添付してください。");
     }
 
     const estimatedBytes = Math.floor(base64.length * 3 / 4);
-    if (estimatedBytes > DAILY_REPORT_MAX_IMAGE_BYTES) {
+    if (mediaKind === "IMAGE" && estimatedBytes > DAILY_REPORT_MAX_IMAGE_BYTES) {
       throw new Error("画像1枚の上限は900KBです。");
+    }
+    if (mediaKind === "VIDEO" && estimatedBytes > DAILY_REPORT_MAX_VIDEO_BYTES) {
+      throw new Error("動画1本の上限は8MBです。");
     }
     totalBytes += estimatedBytes;
 
     return {
       mimeType: mimeType,
       base64: base64,
-      fileName: fileName
+      fileName: fileName,
+      mediaKind: mediaKind,
+      attachmentType: attachmentType,
+      estimatedBytes: estimatedBytes
     };
   });
 
-  if (totalBytes > DAILY_REPORT_MAX_TOTAL_IMAGE_BYTES) {
-    throw new Error("画像合計の上限は4MBです。");
+  if (totalBytes > DAILY_REPORT_MAX_TOTAL_ATTACHMENT_BYTES) {
+    throw new Error("添付合計の上限は12MBです。");
   }
   return normalized;
+}
+
+
+function validateDailyReportAttachments_(attachments) {
+  const items = Array.isArray(attachments) ? attachments : [];
+  if (items.length > DAILY_REPORT_MAX_ATTACHMENTS) {
+    throw new Error("設備・施設異常の添付は最大5件です。");
+  }
+
+  let totalBytes = 0;
+  let videoCount = 0;
+  let serialCount = 0;
+  items.forEach(function (item) {
+    const mimeType = String(item && item.mime_type || "").toLowerCase();
+    const mediaKind = String(item && item.media_kind || (mimeType.indexOf("video/") === 0 ? "VIDEO" : "IMAGE")).toUpperCase();
+    const attachmentType = String(item && item.attachment_type || "ISSUE_MEDIA").toUpperCase();
+    const bytes = Math.max(0, Number(item && item.size_bytes || 0));
+    totalBytes += bytes;
+    if (mediaKind === "VIDEO") videoCount += 1;
+    if (attachmentType === "SERIAL") {
+      serialCount += 1;
+      if (mediaKind !== "IMAGE") throw new Error("シリアルナンバーには画像を添付してください。");
+    }
+  });
+  if (videoCount > DAILY_REPORT_MAX_VIDEOS) throw new Error("動画は1本までです。");
+  if (serialCount > DAILY_REPORT_MAX_SERIAL_IMAGES) throw new Error("シリアルナンバー画像は1枚までです。");
+  if (totalBytes > DAILY_REPORT_MAX_TOTAL_ATTACHMENT_BYTES) throw new Error("添付合計の上限は12MBです。");
 }
 
 
@@ -423,16 +773,23 @@ function uploadDailyReportImages_(identity, images) {
 
   return images.map(function (image, index) {
     const bytes = Utilities.base64Decode(image.base64);
-    if (bytes.length > DAILY_REPORT_MAX_IMAGE_BYTES) {
+    if (image.mediaKind === "IMAGE" && bytes.length > DAILY_REPORT_MAX_IMAGE_BYTES) {
       throw new Error("画像1枚の上限は900KBです。");
     }
+    if (image.mediaKind === "VIDEO" && bytes.length > DAILY_REPORT_MAX_VIDEO_BYTES) {
+      throw new Error("動画1本の上限は8MBです。");
+    }
 
-    const extension = image.mimeType === "image/png"
-      ? ".png"
-      : image.mimeType === "image/webp"
-        ? ".webp"
-        : ".jpg";
-    const safeName = identity.date + "_" + identity.storeCode + "_equipment_" +
+    const extensionMap = {
+      "image/jpeg": ".jpg",
+      "image/png": ".png",
+      "image/webp": ".webp",
+      "video/mp4": ".mp4",
+      "video/quicktime": ".mov",
+      "video/webm": ".webm"
+    };
+    const extension = extensionMap[image.mimeType] || "";
+    const safeName = identity.date + "_" + identity.storeCode + "_daily-report_" +
       (index + 1) + "_" + Date.now() + extension;
     const blob = Utilities.newBlob(bytes, image.mimeType, safeName);
     const file = folder.createFile(blob);
@@ -445,7 +802,9 @@ function uploadDailyReportImages_(identity, images) {
         original_name: image.fileName,
         mime_type: image.mimeType,
         size_bytes: bytes.length,
-        url: file.getUrl()
+        url: file.getUrl(),
+        media_kind: image.mediaKind,
+        attachment_type: image.attachmentType
       }
     };
   });
@@ -507,7 +866,7 @@ function sendDailyReportEmail_(record) {
         )
       );
     } catch (_) {
-      // 取得できない画像があっても本文と他画像は送信する。
+      // 取得できない添付があっても本文と他の添付は送信する。
     }
   });
 
@@ -525,7 +884,9 @@ function buildDailyReportEmailBody_(record) {
   const report = record.report || {};
   const cleaning = Array.isArray(report.cleaning) ? report.cleaning : [];
   const inquiries = Array.isArray(report.inquiries) ? report.inquiries : [];
-  const staff = Array.isArray(report.staff) ? report.staff : [];
+  const staff = Array.isArray(report.contributors)
+    ? report.contributors
+    : (Array.isArray(report.staff) ? report.staff : []);
   const equipment = report.equipment || {};
   const trouble = report.trouble || {};
   const handover = report.handover || {};
@@ -544,9 +905,9 @@ function buildDailyReportEmailBody_(record) {
     "",
     "日付：" + formatDailyReportDate_(record.date),
     "店舗：" + String(record.store_code || ""),
-    "担当：" + (staff.map(function (item) {
+    "入力者：" + (staff.map(function (item) {
       return item.staff_name || item.staff_code;
-    }).join("、") || "未選択"),
+    }).join("、") || String(report.reporter || "未記録")),
     "予約実績：" + Number(report.reservation_count || 0) + "件",
     "",
     "【清掃】",
@@ -564,6 +925,9 @@ function buildDailyReportEmailBody_(record) {
     lines.push(
       (index + 1) + ". " + [item.time, item.channel, item.name, item.status].filter(Boolean).join("／")
     );
+    if (item.received_by_name || item.received_by_code) {
+      lines.push("   受付：" + (item.received_by_name || item.received_by_code));
+    }
     if (item.detail) lines.push("   " + item.detail);
   });
 
@@ -577,9 +941,11 @@ function buildDailyReportEmailBody_(record) {
     if (equipment.memo) lines.push("内容：" + equipment.memo);
   }
 
-  lines.push("画像：" + images.length + "枚");
+  lines.push("添付：" + images.length + "件");
   images.forEach(function (image, index) {
-    lines.push((index + 1) + ". " + (image.url || image.file_name || "画像"));
+    const kind = image.media_kind === "VIDEO" ? "動画" : "画像";
+    const purpose = image.attachment_type === "SERIAL" ? "シリアル" : "不具合箇所";
+    lines.push((index + 1) + ". " + purpose + "・" + kind + " " + (image.url || image.file_name || "添付"));
   });
 
   lines.push(
@@ -724,7 +1090,9 @@ function parseDailyReportImages_(value) {
       original_name: String(image && image.original_name || ""),
       mime_type: String(image && image.mime_type || ""),
       size_bytes: Number(image && image.size_bytes || 0),
-      url: String(image && image.url || "")
+      url: String(image && image.url || ""),
+      media_kind: String(image && image.media_kind || (String(image && image.mime_type || "").indexOf("video/") === 0 ? "VIDEO" : "IMAGE")).toUpperCase(),
+      attachment_type: String(image && image.attachment_type || "ISSUE_MEDIA").toUpperCase() === "SERIAL" ? "SERIAL" : "ISSUE_MEDIA"
     };
   }).filter(function (image) {
     return !!image.file_id;
