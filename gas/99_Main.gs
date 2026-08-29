@@ -18,6 +18,18 @@ function requireDirectShiftEditPermission_(params) {
   );
 }
 
+/**
+ * 高速PDF版がGASプロジェクトへ反映済みなら高速版を使い、
+ * 未反映なら既存の安定版へ戻す。
+ */
+function generateTourQuestionnairePdfCompatible_(params) {
+  if (typeof generateTourQuestionnairePdfFast === "function") {
+    return generateTourQuestionnairePdfFast(params || {});
+  }
+
+  return generateTourQuestionnairePdf(params || {});
+}
+
 function doGet(e) {
   try {
     const params =
@@ -132,7 +144,7 @@ function doGet(e) {
             "STAFF"
           ]
         );
-        return generateTourQuestionnairePdfFast(
+        return generateTourQuestionnairePdfCompatible_(
           params
         );
 
