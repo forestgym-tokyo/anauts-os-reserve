@@ -123,6 +123,17 @@ function doGet(e) {
           params
         );
 
+      case "getDailyReport": {
+        const dailyReportAuth = requireAuth_(
+          params,
+          ["ADMIN", "MANAGER", "STAFF"]
+        );
+        return getDailyReport(
+          params,
+          dailyReportAuth
+        );
+      }
+
       case "generateTourQuestionnairePdf":
         requireAuth_(
           params,
@@ -421,6 +432,28 @@ function doPost(e) {
         return deleteServiceHour(
           body
         );
+
+      case "saveDailyReport": {
+        const dailyReportSaveAuth = requireAuth_(
+          body,
+          ["ADMIN", "MANAGER", "STAFF"]
+        );
+        return saveDailyReport(
+          body,
+          dailyReportSaveAuth
+        );
+      }
+
+      case "submitDailyReport": {
+        const dailyReportSubmitAuth = requireAuth_(
+          body,
+          ["ADMIN", "MANAGER", "STAFF"]
+        );
+        return submitDailyReport(
+          body,
+          dailyReportSubmitAuth
+        );
+      }
 
       /*
        * =====================================================
