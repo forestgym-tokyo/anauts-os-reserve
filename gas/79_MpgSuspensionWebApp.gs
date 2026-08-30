@@ -18,13 +18,16 @@ function setupMpgSuspension() {
   PropertiesService.getScriptProperties().setProperties({
     MPG_MEMBER_MASTER_ID: ss.getId(),
     MPG_MEMBER_MASTER_SHEET_NAME: firstSheet ? firstSheet.getName() : "",
-    MPG_SUSPENSION_LOG_SHEET_NAME: "休会申請"
+    MPG_SUSPENSION_LOG_SHEET_NAME: "休会申請",
+    MPG_SUSPENSION_TOKEN_LOG_SHEET_NAME: "休会URL発行",
+    MPG_SUSPENSION_PUBLIC_URL: "https://forestgym-tokyo.github.io/anauts-os-reserve/mpg-suspension/"
   });
 
   return {
     spreadsheetId: ss.getId(),
     memberMasterSheetName: firstSheet ? firstSheet.getName() : "",
-    suspensionLogSheetName: "休会申請"
+    suspensionLogSheetName: "休会申請",
+    tokenLogSheetName: "休会URL発行"
   };
 }
 
@@ -38,7 +41,8 @@ function doGet(e) {
         ok: true,
         data: {
           appName: "A-nauts OS Reserve / MPG休会届",
-          status: "ok"
+          status: "ok",
+          accessMode: "token"
         }
       });
 
@@ -61,11 +65,11 @@ function doPost(e) {
     const action = String(body.action || "").trim();
 
     switch (action) {
-      case "verifyMpgSuspensionMember":
-        return verifyMpgSuspensionMember_(body);
+      case "verifyMpgSuspensionToken":
+        return verifyMpgSuspensionToken_(body);
 
-      case "submitMpgSuspension":
-        return submitMpgSuspension_(body);
+      case "submitMpgSuspensionToken":
+        return submitMpgSuspensionToken_(body);
 
       default:
         return mpgJson_({
