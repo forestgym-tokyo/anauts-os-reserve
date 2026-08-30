@@ -449,7 +449,12 @@ async function deleteRegisteredShift(r){
 }
 
 function csvLine(line){const a=[];let s="",q=false;for(let i=0;i<line.length;i++){const c=line[i];if(c==='"'){if(q&&line[i+1]==='"'){s+='"';i++}else q=!q}else if(c===","&&!q){a.push(s);s=""}else s+=c}a.push(s);return a}
-async function readCsv(f){const lines=(await f.text()).replace(/^\uFEFF/,"").split(/\r?\n/).filter(x=>x.trim());if(lines.length<2)throw new Error("CSVにデータがありません。");const h=csvLine(lines[0]).map(x=>x.trim()),req=["staff_code","date","start_time","end_time"];req.forEach(k=>{if(!h.includes(k))throw new Error(`CSVに ${k} 列がありません。`)});return lines.slice(1).map(l=>{const c=csvLine(l),o={};h.forEach((x,i)=>o[x]=String(c[i]??"").trim());return {staff_code:o.staff_code,date:o.date,start_time:o.start_time,end_time:o.end_time}})}
+function normalizeShiftCsvDate_(value){
+  const raw=String(value||"").trim();
+  const match=/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/.exec(raw);
+  return match?`${match[1]}-${match[2].padStart(2,"0")}-${match[3].padStart(2,"0")}`:raw;
+}
+async function readCsv(f){const lines=(await f.text()).replace(/^\uFEFF/,"").split(/\r?\n/).filter(x=>x.trim());if(lines.length<2)throw new Error("CSVにデータがありません。");const h=csvLine(lines[0]).map(x=>x.trim()),req=["staff_code","date","start_time","end_time"];req.forEach(k=>{if(!h.includes(k))throw new Error(`CSVに ${k} 列がありません。`)});return lines.slice(1).map(l=>{const c=csvLine(l),o={};h.forEach((x,i)=>o[x]=String(c[i]??"").trim());return {staff_code:o.staff_code,date:normalizeShiftCsvDate_(o.date),start_time:o.start_time,end_time:o.end_time}})}
 
 function monthRange(ym){
   const m=/^(\d{4})-(\d{2})$/.exec(String(ym||""));
@@ -491,9 +496,18 @@ async function updateReplaceWarning(){
   }
 }
 
-$("#shiftImportMode")?.addEventListener("change",updateReplaceWarning);
-$("#shiftTargetMonth")?.addEventListener("change",updateReplaceWarning);
-$("#shiftBulkStore")?.addEventListener("change",updateReplaceWarning);
+function invalidateShiftImportPreview_(){
+  state.shiftPreview=null;
+  if($("#shiftImportButton"))$("#shiftImportButton").disabled=true;
+}
+
+["#shiftImportMode","#shiftTargetMonth","#shiftBulkStore"].forEach(selector=>{
+  $(selector)?.addEventListener("change",()=>{
+    invalidateShiftImportPreview_();
+    updateReplaceWarning();
+  });
+});
+$("#shiftCsvFile")?.addEventListener("change",invalidateShiftImportPreview_);
 $("#shiftPreviewButton").onclick=async()=>{
   hideMsg();
   const f=$("#shiftCsvFile").files[0];
@@ -539,6 +553,9 @@ $("#shiftImportButton").onclick=async()=>{
 
   const mode=$("#shiftImportMode").value;
   const month=$("#shiftTargetMonth").value;
+  const storeSelect=$("#shiftBulkStore");
+  const store=storeSelect.value;
+  const storeLabel=storeSelect.options[storeSelect.selectedIndex]?.textContent?.trim()||store;
   const newCount=state.shiftRows.length;
 
   let confirmText="";
@@ -549,12 +566,16 @@ $("#shiftImportButton").onclick=async()=>{
     }
     confirmText=
       `【対象月を全置換】\n\n`+
-      `${month} の既存シフト ${existing}件を削除し、CSV ${newCount}件に置き換えます。\n\n`+
+      `店舗：${storeLabel}\n`+
+      `対象月：${month}\n\n`+
+      `既存シフト ${existing}件を削除し、CSV ${newCount}件に置き換えます。\n\n`+
       `この操作は既存シフトに影響します。実行しますか？`;
   }else{
     confirmText=
       `【追加登録】\n\n`+
-      `${month} にCSV ${newCount}件を追加します。\n`+
+      `店舗：${storeLabel}\n`+
+      `対象月：${month}\n\n`+
+      `CSV ${newCount}件を追加します。\n`+
       `既存シフトは削除しません。\n\n実行しますか？`;
   }
 
@@ -564,15 +585,15 @@ $("#shiftImportButton").onclick=async()=>{
     const j=await apiPost({
       action:"importStaffShifts",
       mode,
-      store_code:$("#shiftBulkStore").value,
+      store_code:store,
       target_month:month,
       rows:state.shiftRows
     });
 
     if(mode==="REPLACE_MONTH"){
-      msg(`全置換完了：登録 ${j.data.inserted_count}件 / 既存無効化 ${j.data.disabled_count}件`);
+      msg(`全置換完了（${storeLabel}）：登録 ${j.data.inserted_count}件 / 既存無効化 ${j.data.disabled_count}件`);
     }else{
-      msg(`追加登録完了：${j.data.inserted_count}件`);
+      msg(`追加登録完了（${storeLabel}）：${j.data.inserted_count}件`);
     }
 
     $("#shiftImportButton").disabled=true;
