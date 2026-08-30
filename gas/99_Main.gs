@@ -279,6 +279,16 @@ function doPost(e) {
 
     switch (action) {
 
+      case "verifyMpgSuspensionMember":
+        return verifyMpgSuspensionMember_(
+          body
+        );
+
+      case "submitMpgSuspension":
+        return submitMpgSuspension_(
+          body
+        );
+
       case "createReservation":
         return createReservationWithTrainerPolicy_(
           body

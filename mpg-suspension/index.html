@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#81d8d0">
+  <title>休会届 | My Private Gym</title>
+  <style>
+    :root{--tiffany:#81d8d0;--black:#0d0f10;--ink:#1f2426;--muted:#697174;--line:#d9e1e2;--bg:#f3f7f7;--white:#fff;--danger:#b3261e}
+    *{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;background:linear-gradient(180deg,#dff7f4 0,#f3f7f7 230px);color:var(--ink)}
+    .wrap{width:min(720px,calc(100% - 28px));margin:0 auto;padding:34px 0 56px}.brand{display:flex;align-items:center;gap:12px;margin-bottom:20px}.mark{width:42px;height:42px;border-radius:14px;background:var(--black);position:relative;box-shadow:0 8px 24px rgba(13,15,16,.16)}.mark:after{content:"M";position:absolute;inset:0;display:grid;place-items:center;color:var(--tiffany);font-weight:900;font-size:22px}.brand strong{font-size:18px;letter-spacing:.03em}.brand span{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+    .hero{background:var(--black);color:#fff;border-radius:24px;padding:28px;margin-bottom:18px;box-shadow:0 18px 50px rgba(13,15,16,.14)}.hero .eyebrow{color:var(--tiffany);font-weight:800;font-size:13px;letter-spacing:.08em;margin:0 0 8px}.hero h1{font-size:30px;margin:0 0 10px;line-height:1.25}.hero p{margin:0;color:#dfe8e8;line-height:1.8;font-size:14px}.deadline{margin-top:18px;background:rgba(129,216,208,.12);border:1px solid rgba(129,216,208,.35);border-radius:14px;padding:12px 14px;color:#eefefe;font-size:13px}.deadline strong{color:var(--tiffany)}
+    .card{background:var(--white);border:1px solid rgba(13,15,16,.07);border-radius:20px;padding:22px;margin-top:16px;box-shadow:0 10px 30px rgba(36,55,55,.07)}.card h2{font-size:19px;margin:0 0 18px}.step{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:9px;background:var(--tiffany);color:var(--black);font-weight:900;margin-right:8px}.field{display:block;margin:16px 0}.field span{display:block;font-size:13px;font-weight:800;margin-bottom:7px}.field small{display:block;color:var(--muted);font-size:12px;margin-top:6px;line-height:1.5}input,select{width:100%;height:48px;border:1px solid var(--line);border-radius:12px;background:#fff;padding:0 14px;font:inherit;color:var(--ink);outline:none}input:focus,select:focus{border-color:#55bcb4;box-shadow:0 0 0 3px rgba(129,216,208,.24)}
+    .btn{width:100%;border:0;border-radius:13px;min-height:50px;padding:12px 18px;font:inherit;font-weight:900;cursor:pointer}.btn-primary{background:var(--black);color:var(--tiffany)}.btn-secondary{background:#edf5f4;color:var(--black)}.btn:disabled{opacity:.48;cursor:not-allowed}.status{margin:14px 0 0;border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.6}.status.error{background:#fff0ef;color:#8f1d17}.status.ok{background:#eaf9f7;color:#174d49}.hidden{display:none!important}
+    .member-box{background:#eef9f8;border:1px solid #ccece9;border-radius:14px;padding:15px;margin-bottom:18px}.member-box strong{font-size:18px}.member-box dl{display:grid;grid-template-columns:110px 1fr;gap:6px 10px;margin:12px 0 0;font-size:13px}.member-box dt{color:var(--muted)}.member-box dd{margin:0;font-weight:700}.summary{border:1px solid var(--line);border-radius:14px;overflow:hidden;margin:16px 0}.summary-row{display:flex;justify-content:space-between;gap:16px;padding:12px 14px;border-bottom:1px solid var(--line);font-size:13px}.summary-row:last-child{border-bottom:0}.summary-row span{color:var(--muted)}.summary-row strong{text-align:right}.fee{font-size:20px;color:var(--black)}
+    .checks{margin:18px 0}.check{display:flex;align-items:flex-start;gap:10px;margin:12px 0;font-size:13px;line-height:1.6}.check input{width:20px;height:20px;flex:0 0 auto;margin-top:1px;accent-color:#55bcb4}.complete{text-align:center;padding:30px 22px}.complete-mark{width:58px;height:58px;border-radius:50%;background:var(--tiffany);display:grid;place-items:center;margin:0 auto 14px;color:var(--black);font-size:28px;font-weight:900}.complete h2{font-size:22px}.application-id{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:#f1f5f5;padding:9px 12px;border-radius:10px;display:inline-block;margin:8px 0 16px;font-size:13px}.note{font-size:12px;color:var(--muted);line-height:1.7;margin-top:16px}.footer{text-align:center;color:var(--muted);font-size:11px;margin-top:24px}@media(max-width:520px){.wrap{width:min(100% - 20px,720px);padding-top:20px}.hero{padding:22px;border-radius:20px}.hero h1{font-size:26px}.card{padding:18px}.summary-row{align-items:flex-start}.member-box dl{grid-template-columns:90px 1fr}}
+  </style>
+</head>
+<body>
+<main class="wrap">
+  <div class="brand"><div class="mark" aria-hidden="true"></div><div><strong>My Private Gym</strong><span>休会届</span></div></div>
+  <section class="hero">
+    <p class="eyebrow">SUSPENSION REQUEST</p><h1>休会のお手続き</h1>
+    <p>会員番号と登録メールアドレスで本人確認後、休会開始月と期間をお選びください。</p>
+    <div class="deadline"><strong>毎月9日 20:00締切</strong><br>締切までの申請は翌月1日から、締切後は翌々月1日から休会可能です。</div>
+  </section>
+
+  <section class="card" id="identityCard">
+    <h2><span class="step">1</span>会員情報の確認</h2>
+    <form id="identityForm" novalidate>
+      <label class="field"><span>会員番号</span><input id="memberNo" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="例：341114" required><small>MPGなどのアルファベットは不要です。6桁の数字のみ入力してください。</small></label>
+      <label class="field"><span>登録メールアドレス</span><input id="email" type="email" autocomplete="email" placeholder="example@gmail.com" required></label>
+      <button class="btn btn-primary" id="verifyButton" type="submit">会員情報を確認する</button>
+      <div class="status error hidden" id="verifyError" role="alert"></div>
+    </form>
+  </section>
+
+  <section class="card hidden" id="requestCard">
+    <h2><span class="step">2</span>休会内容の選択</h2>
+    <div class="member-box"><strong id="memberName"></strong><dl><dt>コース</dt><dd id="course"></dd><dt>現在の月会費</dt><dd id="monthlyFee"></dd></dl></div>
+    <form id="requestForm" novalidate>
+      <label class="field"><span>休会開始月</span><select id="startMonth" required></select></label>
+      <label class="field"><span>休会期間</span><select id="months" required></select><small>1〜6か月で選択してください。</small></label>
+      <div class="summary">
+        <div class="summary-row"><span>休会終了</span><strong id="endMonth">—</strong></div>
+        <div class="summary-row"><span>自動復会日</span><strong id="resumeDate">—</strong></div>
+        <div class="summary-row"><span>休会費</span><strong class="fee" id="fee">—</strong></div>
+      </div>
+      <div class="checks">
+        <label class="check"><input type="checkbox" class="agreement"> <span>休会費は550円／月で、休会期間分をまとめてお支払いいただくことを確認しました。</span></label>
+        <label class="check"><input type="checkbox" class="agreement"> <span>未払いの会費等がある場合は、精算完了後に休会が適用されることを確認しました。</span></label>
+        <label class="check"><input type="checkbox" class="agreement"> <span>休会期間終了後は自動復会となり、延長する場合は改めて手続きが必要であることを確認しました。</span></label>
+      </div>
+      <button class="btn btn-primary" id="submitButton" type="submit">この内容で休会を申請する</button>
+      <button class="btn btn-secondary" id="changeIdentity" type="button" style="margin-top:10px">会員情報を入力し直す</button>
+      <div class="status error hidden" id="submitError" role="alert"></div>
+      <p class="note">休会申請は、会員マスターとの照合および必要な精算確認後に適用されます。</p>
+    </form>
+  </section>
+
+  <section class="card complete hidden" id="completeCard">
+    <div class="complete-mark">✓</div><h2>休会申請を受け付けました</h2><p id="completeText"></p><div class="application-id" id="applicationId"></div><p class="note">受付内容を登録メールアドレスへ送信しました。メールが届かない場合でも、申請番号が表示されていれば受付記録は保存されています。</p>
+  </section>
+  <div class="footer">My Private Gym</div>
+</main>
+<script>
+const API_URL="https://script.google.com/macros/s/AKfycbyvpQRxRpMRfpaQHtBar77dViCqPl-hdFW-2yMdozhN8RHtwcrFiNEM9cvEbny4x9q0/exec";
+const state={memberNo:"",email:"",feeMonthly:550};
+const $=s=>document.querySelector(s);
+const identityForm=$("#identityForm"),requestForm=$("#requestForm"),identityCard=$("#identityCard"),requestCard=$("#requestCard"),completeCard=$("#completeCard");
+const verifyButton=$("#verifyButton"),submitButton=$("#submitButton"),verifyError=$("#verifyError"),submitError=$("#submitError"),startMonth=$("#startMonth"),months=$("#months");
+$("#memberNo").addEventListener("input",e=>{e.target.value=e.target.value.replace(/\D/g,"").slice(0,6)});
+identityForm.addEventListener("submit",async e=>{e.preventDefault();hideError(verifyError);const memberNo=$("#memberNo").value.trim();const email=$("#email").value.trim().toLowerCase();if(!/^\d{6}$/.test(memberNo)){return showError(verifyError,"会員番号は6桁の数字で入力してください。")}if(!email){return showError(verifyError,"登録メールアドレスを入力してください。")}setBusy(verifyButton,true,"確認中…");try{const res=await post({action:"verifyMpgSuspensionMember",memberNo,email});if(!res.ok)throw new Error(res.message||"会員情報を確認できませんでした。");state.memberNo=memberNo;state.email=email;state.feeMonthly=Number(res.data.suspensionFeeMonthly||550);renderMember(res.data);identityCard.classList.add("hidden");requestCard.classList.remove("hidden");requestCard.scrollIntoView({behavior:"smooth",block:"start"})}catch(err){showError(verifyError,err.message)}finally{setBusy(verifyButton,false,"会員情報を確認する")}});
+requestForm.addEventListener("submit",async e=>{e.preventDefault();hideError(submitError);const checks=[...document.querySelectorAll(".agreement")];if(checks.some(c=>!c.checked)){return showError(submitError,"すべての確認事項にチェックしてください。")}setBusy(submitButton,true,"送信中…");try{const res=await post({action:"submitMpgSuspension",memberNo:state.memberNo,email:state.email,startMonth:startMonth.value,months:Number(months.value),agreed:true});if(!res.ok)throw new Error(res.message||"休会申請を受け付けできませんでした。");renderComplete(res.data)}catch(err){showError(submitError,err.message)}finally{setBusy(submitButton,false,"この内容で休会を申請する")}});
+$("#changeIdentity").addEventListener("click",()=>{requestCard.classList.add("hidden");identityCard.classList.remove("hidden");identityCard.scrollIntoView({behavior:"smooth",block:"start"})});startMonth.addEventListener("change",updateSummary);months.addEventListener("change",updateSummary);
+function renderMember(data){$("#memberName").textContent=data.memberName||"";$("#course").textContent=data.course||"—";$("#monthlyFee").textContent=data.monthlyFee||"—";startMonth.innerHTML="";(data.startMonthOptions||[]).forEach(v=>{const o=document.createElement("option");o.value=v;o.textContent=formatMonth(v);startMonth.appendChild(o)});months.innerHTML="";for(let i=Number(data.minMonths||1);i<=Number(data.maxMonths||6);i++){const o=document.createElement("option");o.value=String(i);o.textContent=i+"か月";months.appendChild(o)}updateSummary()}
+function updateSummary(){if(!startMonth.value||!months.value)return;const n=Number(months.value);const end=addMonths(startMonth.value,n-1),resume=addMonths(startMonth.value,n);$("#endMonth").textContent=formatMonth(end)+"末日";$("#resumeDate").textContent=formatMonth(resume)+"1日";$("#fee").textContent=(state.feeMonthly*n).toLocaleString("ja-JP")+"円"}
+function renderComplete(data){requestCard.classList.add("hidden");completeCard.classList.remove("hidden");$("#applicationId").textContent=data.applicationId;$("#completeText").textContent=`${formatMonth(data.startMonth)}から${data.months}か月の休会申請です。休会費は${Number(data.suspensionFee).toLocaleString("ja-JP")}円です。`;completeCard.scrollIntoView({behavior:"smooth",block:"start"})}
+async function post(payload){const r=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload),redirect:"follow"});if(!r.ok)throw new Error("通信に失敗しました。しばらくしてから再度お試しください。");return r.json()}
+function addMonths(v,offset){const [y,m]=v.split("-").map(Number);const total=y*12+(m-1)+offset;const ny=Math.floor(total/12),nm=total%12+1;return `${ny}-${String(nm).padStart(2,"0")}-01`}
+function formatMonth(v){const [y,m]=v.split("-").map(Number);return `${y}年${m}月`}
+function showError(el,msg){el.textContent=msg;el.classList.remove("hidden")}function hideError(el){el.classList.add("hidden");el.textContent=""}function setBusy(btn,busy,label){btn.disabled=busy;btn.textContent=label}
+</script>
+</body>
+</html>
