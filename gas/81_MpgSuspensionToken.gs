@@ -20,10 +20,14 @@ function onOpen() {
 }
 
 function issueMpgSuspensionUrlForActiveRow() {
-  const ss = getMpgMasterSpreadsheet_();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) {
+    throw new Error("MPG会員マスターのスプレッドシートから実行してください。");
+  }
+
   const masterSheet = getMpgMemberMasterSheet_();
-  const activeSheet = ss.getActiveSheet();
-  const activeRange = activeSheet.getActiveRange();
+  const activeSheet = SpreadsheetApp.getActiveSheet();
+  const activeRange = SpreadsheetApp.getActiveRange();
 
   if (!activeRange || activeSheet.getSheetId() !== masterSheet.getSheetId()) {
     throw new Error("MPG会員マスターの対象会員行を選択してから実行してください。");
