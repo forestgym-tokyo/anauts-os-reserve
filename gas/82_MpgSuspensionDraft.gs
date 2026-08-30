@@ -6,79 +6,71 @@
  * ============================================================
  */
 
-const MPG_SUSPENSION_DRAFT_ACCOUNT = "info.myprivategym@gmail.com";
-
 function createMpgSuspensionDraft_(member, url, expiresAt) {
   try {
     if (!member || !member.email) {
       throw new Error("会員のメールアドレスを確認できません。");
     }
 
-    const executingEmail = String(
-      Session.getActiveUser().getEmail() || Session.getEffectiveUser().getEmail() || ""
-    ).trim().toLowerCase();
+    const props = PropertiesService.getScriptProperties();
+    const serviceUrl = String(props.getProperty("MPG_DRAFT_SERVICE_URL") || "").trim();
+    const secret = String(props.getProperty("MPG_DRAFT_SERVICE_SECRET") || "").trim();
 
-    if (executingEmail && executingEmail !== MPG_SUSPENSION_DRAFT_ACCOUNT) {
-      throw new Error(
-        "Gmail下書きは " + MPG_SUSPENSION_DRAFT_ACCOUNT + " で作成してください。現在の実行アカウント: " + executingEmail
-      );
+    if (!serviceUrl || !secret) {
+      throw new Error("MPGメール下書きサービスの接続設定がありません。");
     }
 
-    const subject = "休会手続きのご案内／My Private Gym";
     const expiryText = Utilities.formatDate(
       expiresAt,
       MPG_SUSPENSION_CONFIG.TIMEZONE,
       "yyyy/MM/dd HH:mm"
     );
-    const earliest = getMpgEarliestStartMonth_();
-    const earliestText = earliest.replace(/^(\d{4})-(\d{2})$/, "$1年$2月");
 
-    const body = [
-      member.name + " 様",
-      "",
-      "お世話になっております。",
-      "My Private Gymでございます。",
-      "",
-      "休会のお手続きについてご案内いたします。",
-      "",
-      "下記のURLは、" + member.name + "様専用の休会手続きURLです。",
-      "発行から3日間有効となりますので、期限内にお手続きをお願いいたします。",
-      "",
-      "【休会手続きURL】",
-      url,
-      "",
-      "【URL有効期限】",
-      expiryText,
-      "",
-      "休会開始月は、お手続き時点での最短開始可能月（" + earliestText + "）が表示されます。",
-      "",
-      "休会期間は1か月～6か月の範囲でお選びいただけます。",
-      "休会費は550円／月となり、休会期間分をまとめてお支払いいただきます。",
-      "",
-      "なお、毎月9日20:00までにお手続きいただいた場合は翌月1日から、9日20:00を過ぎた場合は翌々月1日からの休会となります。",
-      "",
-      "また、未払いの会費等がある場合は、精算完了後に休会が適用されます。",
-      "休会期間終了後は自動的に通常会員へ復会となり、延長をご希望の場合は改めてお手続きが必要となります。",
-      "",
-      "ご不明な点がございましたら、お気軽にお問い合わせください。",
-      "",
-      "何卒よろしくお願いいたします。",
-      "",
-      "My Private Gym"
-    ].join("\n");
+    const payload = {
+      action: "createSuspensionDraft",
+      secret: secret,
+      to: member.email,
+      memberName: member.name,
+      url: url,
+      expiresAt: expiryText,
+      earliestStartMonth: getMpgEarliestStartMonth_()
+    };
 
-    const draft = GmailApp.createDraft(member.email, subject, body);
+    const response = UrlFetchApp.fetch(serviceUrl, {
+      method: "post",
+      contentType: "application/json; charset=utf-8",
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true,
+      followRedirects: true
+    });
+
+    const status = response.getResponseCode();
+    const text = response.getContentText();
+    let result;
+    try {
+      result = JSON.parse(text || "{}");
+    } catch (_) {
+      throw new Error("メール下書きサービスから正しい応答を取得できませんでした。HTTP " + status);
+    }
+
+    if (status < 200 || status >= 300 || !result.ok) {
+      throw new Error(
+        result && result.message
+          ? result.message
+          : "メール下書きサービスでエラーが発生しました。HTTP " + status
+      );
+    }
+
     SpreadsheetApp.getActiveSpreadsheet().toast(
-      "会員宛てのGmail下書きを作成しました。",
+      "info.myprivategym@gmail.com に会員宛てのGmail下書きを作成しました。",
       "MPG休会届",
-      5
+      6
     );
 
     return {
       ok: true,
-      draftId: draft.getId(),
-      to: member.email,
-      subject: subject
+      draftId: result.draftId || "",
+      to: member.email
     };
   } catch (error) {
     console.error("createMpgSuspensionDraft_", error);
@@ -92,4 +84,23 @@ function createMpgSuspensionDraft_(member, url, expiresAt) {
       message: error && error.message ? error.message : "Gmail下書きを作成できませんでした。"
     };
   }
+}
+
+function authorizeMpgDraftService() {
+  const serviceUrl = String(
+    PropertiesService.getScriptProperties().getProperty("MPG_DRAFT_SERVICE_URL") || ""
+  ).trim();
+
+  if (!serviceUrl) {
+    throw new Error("MPG_DRAFT_SERVICE_URL が設定されていません。");
+  }
+
+  const response = UrlFetchApp.fetch(serviceUrl, {
+    method: "get",
+    muteHttpExceptions: true,
+    followRedirects: true
+  });
+
+  console.log("HTTP " + response.getResponseCode());
+  console.log(response.getContentText());
 }
