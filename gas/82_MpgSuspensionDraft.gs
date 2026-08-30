@@ -6,10 +6,22 @@
  * ============================================================
  */
 
+const MPG_SUSPENSION_DRAFT_ACCOUNT = "info.myprivategym@gmail.com";
+
 function createMpgSuspensionDraft_(member, url, expiresAt) {
   try {
     if (!member || !member.email) {
       throw new Error("会員のメールアドレスを確認できません。");
+    }
+
+    const executingEmail = String(
+      Session.getActiveUser().getEmail() || Session.getEffectiveUser().getEmail() || ""
+    ).trim().toLowerCase();
+
+    if (executingEmail && executingEmail !== MPG_SUSPENSION_DRAFT_ACCOUNT) {
+      throw new Error(
+        "Gmail下書きは " + MPG_SUSPENSION_DRAFT_ACCOUNT + " で作成してください。現在の実行アカウント: " + executingEmail
+      );
     }
 
     const subject = "休会手続きのご案内／My Private Gym";
