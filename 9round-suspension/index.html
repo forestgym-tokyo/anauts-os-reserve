@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#050505">
+<title>休会届 | 9ROUND アリオ蘇我店</title>
+<style>
+:root{--bg:#050505;--panel:#101010;--line:#303030;--text:#f7f7f7;--muted:#aaa;--red:#e31b23;--red2:#ff3640;--warn:#ffd166;--danger:#ff6b6b}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 50% -160px,rgba(227,27,35,.2),transparent 370px),var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;line-height:1.7}.wrap{width:min(680px,calc(100% - 24px));margin:auto;padding:28px 0 56px}.brand{text-align:center;margin-bottom:22px}.mark{width:70px;height:70px;margin:auto;border:3px solid var(--red);border-radius:50%;display:grid;place-items:center;font-size:28px;font-weight:950}.brand strong{display:block;margin-top:9px;letter-spacing:2px}.brand span{display:block;color:var(--red2);font-size:11px;letter-spacing:2px}.hero,.card{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:22px;margin-top:16px}.hero{border-color:rgba(227,27,35,.45)}.eyebrow{color:var(--red2);font-size:11px;font-weight:900;letter-spacing:1.8px;margin:0 0 6px}.hero h1{font-size:28px;margin:0 0 10px}.hero p{margin:0;color:#ddd;font-size:14px}.deadline{margin-top:16px;padding:13px;border-radius:13px;background:rgba(227,27,35,.08);border:1px solid rgba(227,27,35,.35);font-size:13px}.deadline strong{color:var(--red2)}.loading{text-align:center;padding:34px}.spinner{width:34px;height:34px;border:4px solid #333;border-top-color:var(--red2);border-radius:50%;margin:0 auto 14px;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}.hidden{display:none!important}.status{padding:12px 14px;border-radius:12px;font-size:13px}.status.error{background:#2b1012;color:#ffaaaa}.member-box{background:#090909;border:1px solid #333;border-radius:14px;padding:15px;margin-bottom:18px}.member-box strong{font-size:19px}.member-box dl{display:grid;grid-template-columns:110px 1fr;gap:6px 10px;margin:12px 0 0;font-size:13px}.member-box dt{color:var(--muted)}.member-box dd{margin:0;font-weight:700}.token-note,.note{font-size:12px;color:var(--muted);line-height:1.7}.token-note{margin-top:12px;padding:10px 12px;border-radius:10px;background:#151515}.field{display:block;margin:16px 0}.field span{display:block;font-size:13px;font-weight:800;margin-bottom:7px}select{width:100%;height:48px;border:1px solid #3b3b3b;border-radius:12px;background:#080808;color:#fff;padding:0 14px;font:inherit}.summary{border:1px solid #333;border-radius:14px;overflow:hidden;margin:16px 0}.summary-row{display:flex;justify-content:space-between;gap:16px;padding:12px 14px;border-bottom:1px solid #333;font-size:13px}.summary-row:last-child{border-bottom:0}.summary-row span{color:var(--muted)}.fee{font-size:18px;color:var(--warn)}.billing{color:var(--red2);font-size:12px;text-align:right;margin-top:3px}.check{display:flex;align-items:flex-start;gap:10px;margin:14px 0;font-size:13px}.check input{width:20px;height:20px;flex:0 0 auto;margin-top:2px;accent-color:var(--red)}.btn{width:100%;border:0;border-radius:14px;min-height:52px;padding:12px;background:linear-gradient(135deg,#b30910,var(--red2));color:#fff;font:inherit;font-weight:900;cursor:pointer}.btn:disabled{opacity:.55;background:#555}.complete{text-align:center}.complete-mark{width:58px;height:58px;border-radius:50%;background:var(--red);display:grid;place-items:center;margin:0 auto 14px;font-size:28px;font-weight:900}.application-id{font-family:ui-monospace,monospace;background:#080808;padding:9px 12px;border-radius:10px;display:inline-block;margin:8px 0 16px}.footer{text-align:center;color:#666;font-size:10px;margin-top:24px;letter-spacing:1px}@media(max-width:520px){.wrap{width:min(100% - 18px,680px);padding-top:18px}.hero,.card{padding:18px}.hero h1{font-size:25px}.member-box dl{grid-template-columns:90px 1fr}.summary-row{align-items:flex-start}}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <div class="brand"><div class="mark">9R</div><strong>9ROUND</strong><span>ARIO SOGA</span></div>
+
+  <section class="hero">
+    <p class="eyebrow">SUSPENSION REQUEST</p>
+    <h1>休会のお手続き</h1>
+    <p>店舗からお送りした会員様専用URLから、休会期間をお選びいただけます。</p>
+    <div class="deadline"><strong>毎月20日 21:00締切</strong><br>締切までの申請は翌月1日から、締切後は翌々月1日から休会可能です。専用URLは発行から72時間有効です。</div>
+  </section>
+
+  <section class="card loading" id="loadingCard"><div class="spinner"></div><strong>専用URLを確認しています</strong></section>
+
+  <section class="card hidden" id="invalidCard">
+    <h2>お手続きできません</h2>
+    <div class="status error" id="invalidMessage">専用URLを確認できませんでした。</div>
+    <p class="note">URLの再発行が必要な場合は、9ROUND アリオ蘇我店までお問い合わせください。</p>
+  </section>
+
+  <section class="card hidden" id="requestCard">
+    <h2>休会内容</h2>
+    <div class="member-box">
+      <strong id="memberName"></strong>
+      <dl>
+        <dt>会員種別</dt><dd id="course"></dd>
+        <dt>現在の状態</dt><dd id="contractStatus"></dd>
+        <dt>URL有効期限</dt><dd id="expiresAt"></dd>
+      </dl>
+      <div class="token-note">このURLは会員様専用です。第三者への転送・共有はお控えください。申請完了後、このURLは使用できなくなります。</div>
+    </div>
+
+    <form id="requestForm" novalidate>
+      <label class="field"><span>休会開始月</span><select id="startMonth" required></select></label>
+      <label class="field"><span>休会期間</span><select id="months" required></select><small class="note">1か月から6か月まで選択できます。</small></label>
+
+      <div class="summary">
+        <div class="summary-row"><span>休会終了</span><strong id="endMonth">—</strong></div>
+        <div class="summary-row"><span>自動復会日</span><strong id="resumeDate">—</strong></div>
+        <div class="summary-row"><span>休会費</span><strong class="fee">月額1,100円</strong></div>
+        <div class="billing">※休会期間分をまとめて決済せず、各月ごとに発生します。</div>
+      </div>
+
+      <label class="check"><input type="checkbox" id="confirmFee"><span>休会費は月額1,100円で、休会期間分を一括決済するのではなく、休会期間中の各月に発生することを確認しました。</span></label>
+      <label class="check"><input type="checkbox" id="confirmPeriod"><span>休会期間は1か月から6か月までで、延長する場合は現在の休会期間中に改めて申請が必要であることを確認しました。</span></label>
+      <label class="check"><input type="checkbox" id="confirmDeadline"><span>毎月20日21:00までの申請は翌月1日から、21:00を過ぎた申請は翌々月1日から休会となり、休会終了後は自動復会となることを確認しました。</span></label>
+
+      <button class="btn" id="submitButton" type="submit">この内容で休会を申請する</button>
+      <div class="status error hidden" id="submitError"></div>
+      <p class="note">申請後、受付内容を登録メールアドレスへ送信します。</p>
+    </form>
+  </section>
+
+  <section class="card complete hidden" id="completeCard">
+    <div class="complete-mark">✓</div>
+    <h2>休会申請を受け付けました</h2>
+    <p id="completeText"></p>
+    <div class="application-id" id="applicationId"></div>
+    <p class="note">この専用URLは使用済みとなりました。受付内容は登録メールアドレスへ送信しています。</p>
+  </section>
+
+  <div class="footer">9ROUND ARIO SOGA / A-nauts</div>
+</main>
+<script>
+const API_URL="https://script.google.com/macros/s/AKfycbyT8G6rQ-9LFosbFlzSYj4OM0PrCG_KD7bddVxQ65RLMkfYrjmBZ2ebCvL54ncGJSZ2/exec";
+const token=(new URLSearchParams(location.search).get("token")||"").trim().toLowerCase();
+const state={token};
+const $=s=>document.querySelector(s);
+const loadingCard=$("#loadingCard"),invalidCard=$("#invalidCard"),requestCard=$("#requestCard"),completeCard=$("#completeCard");
+const requestForm=$("#requestForm"),submitButton=$("#submitButton"),submitError=$("#submitError"),startMonth=$("#startMonth"),months=$("#months");
+startMonth.addEventListener("change",updateSummary);months.addEventListener("change",updateSummary);requestForm.addEventListener("submit",submitRequest);boot();
+
+async function boot(){
+  if(!/^[a-f0-9]{64}$/.test(token))return showInvalid("この休会URLは無効です。店舗から送付された専用URLをご利用ください。");
+  try{
+    const res=await post({action:"verify9RoundSuspensionToken",token});
+    if(!res.ok)throw new Error(res.message||"専用URLを確認できませんでした。");
+    renderMember(res.data);loadingCard.classList.add("hidden");requestCard.classList.remove("hidden");
+  }catch(err){showInvalid(err.message)}
+}
+
+async function submitRequest(e){
+  e.preventDefault();hideError();
+  if(!$("#confirmFee").checked||!$("#confirmPeriod").checked||!$("#confirmDeadline").checked){return showError("すべての確認事項にチェックしてください。")}
+  setBusy(true);
+  try{
+    const res=await post({
+      action:"submit9RoundSuspensionToken",
+      token:state.token,
+      startMonth:startMonth.value,
+      months:Number(months.value),
+      confirmFee:true,
+      confirmPeriod:true,
+      confirmDeadline:true
+    });
+    if(!res.ok)throw new Error(res.message||"休会申請を受け付けできませんでした。");
+    renderComplete(res.data);
+  }catch(err){showError(err.message)}finally{setBusy(false)}
+}
+
+function renderMember(data){
+  $("#memberName").textContent=data.memberName||"";
+  $("#course").textContent=data.course||"—";
+  $("#contractStatus").textContent=data.contractStatus||"—";
+  $("#expiresAt").textContent=(data.expiresAt||"—")+"まで";
+  startMonth.innerHTML="";(data.startMonthOptions||[]).forEach(v=>{const o=document.createElement("option");o.value=v;o.textContent=formatMonth(v)+"1日から";startMonth.appendChild(o)});
+  months.innerHTML="";for(let i=Number(data.minMonths||1);i<=Number(data.maxMonths||6);i++){const o=document.createElement("option");o.value=String(i);o.textContent=i+"か月";months.appendChild(o)}
+  updateSummary();
+}
+
+function updateSummary(){if(!startMonth.value||!months.value)return;const n=Number(months.value),end=addMonths(startMonth.value,n-1),resume=addMonths(startMonth.value,n);$("#endMonth").textContent=formatMonth(end)+"末日";$("#resumeDate").textContent=formatMonth(resume)+"1日"}
+function renderComplete(data){requestCard.classList.add("hidden");completeCard.classList.remove("hidden");$("#completeText").textContent=formatMonth(data.startMonth)+"1日から"+data.months+"か月間の休会申請です。休会費は各月1,100円です。";$("#applicationId").textContent=data.applicationId||"";window.scrollTo({top:0,behavior:"smooth"})}
+function formatMonth(v){const m=String(v||"").match(/^(\d{4})-(\d{2})$/);return m?Number(m[1])+"年"+Number(m[2])+"月":v}
+function addMonths(v,n){const m=String(v).match(/^(\d{4})-(\d{2})$/);if(!m)return v;const d=new Date(Date.UTC(Number(m[1]),Number(m[2])-1+n,1));return d.getUTCFullYear()+"-"+String(d.getUTCMonth()+1).padStart(2,"0")}
+async function post(payload){const r=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload)});if(!r.ok)throw new Error("HTTP "+r.status);return r.json()}
+function showInvalid(message){loadingCard.classList.add("hidden");requestCard.classList.add("hidden");invalidCard.classList.remove("hidden");$("#invalidMessage").textContent=message||"専用URLを確認できませんでした。"}
+function showError(message){submitError.textContent=message;submitError.classList.remove("hidden")}
+function hideError(){submitError.classList.add("hidden");submitError.textContent=""}
+function setBusy(active){submitButton.disabled=active;submitButton.textContent=active?"送信中…":"この内容で休会を申請する"}
+</script>
+</body>
+</html>
