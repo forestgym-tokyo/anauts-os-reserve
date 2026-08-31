@@ -188,7 +188,19 @@ function submitMpgWithdrawal_(body) {
       lock.releaseLock();
     }
 
-    let adminMailWarning = "";
+    const mailWarnings = [];
+
+    try {
+      sendMpgWithdrawalMemberMail_(member, {
+        applicationId: applicationId,
+        withdrawalDate: withdrawalDate,
+        reason: reason
+      });
+    } catch (mailError) {
+      console.error("sendMpgWithdrawalMemberMail_", mailError);
+      mailWarnings.push("会員向け受付メールの送信に失敗しました");
+    }
+
     try {
       sendMpgWithdrawalAdminMail_(member, {
         applicationId: applicationId,
@@ -202,7 +214,7 @@ function submitMpgWithdrawal_(body) {
       });
     } catch (mailError) {
       console.error("sendMpgWithdrawalAdminMail_", mailError);
-      adminMailWarning = "管理者通知メールの送信に失敗しました";
+      mailWarnings.push("管理者通知メールの送信に失敗しました");
     }
 
     return mpgJson_({
@@ -211,11 +223,11 @@ function submitMpgWithdrawal_(body) {
         applicationId: applicationId,
         memberName: member.name,
         withdrawalDate: withdrawalDate,
-        mailWarning: adminMailWarning
+        mailWarning: mailWarnings.join("／")
       },
-      message: adminMailWarning
-        ? "退会申請は受け付けましたが、管理者通知メールの送信に失敗しました。スタッフへお申し出ください。"
-        : "退会申請を受け付けました。"
+      message: mailWarnings.length
+        ? "退会申請は受け付けました。メール送信の一部に失敗したため、スタッフへお申し出ください。"
+        : "退会申請を受け付けました。登録メールアドレスへ受付メールを送信しました。"
     });
   } catch (error) {
     try { lock.releaseLock(); } catch (_) {}
@@ -247,7 +259,7 @@ function getMpgEarliestWithdrawalMonth_() {
 }
 
 function mpgWithdrawalMonthEnd_(monthValue) {
-  const match = String(monthValue || "").match(/^(\d{4})-(\d{2})$/);
+  const match = String(monthValue || "").match(/^(\d{4})-(\d{2})/);
   if (!match) throw new Error("退会月の形式が正しくありません。");
   const year = Number(match[1]);
   const month = Number(match[2]);
@@ -288,6 +300,34 @@ function hasDuplicateMpgWithdrawal_(sheet, memberNo, withdrawalDate) {
   });
 }
 
+function sendMpgWithdrawalMemberMail_(member, data) {
+  const subject = "退会申請を受け付けました／My Private Gym";
+  const body = [
+    member.name + " 様",
+    "",
+    "My Private Gymでございます。",
+    "退会申請を受け付けました。",
+    "",
+    "申請番号：" + data.applicationId,
+    "ご申請の退会期日：" + formatMpgWithdrawalDateLabel_(data.withdrawalDate),
+    "退会理由：" + data.reason,
+    "",
+    "継続条件付きキャンペーン等の条件を満たしていない場合は、通常価格との差額等の精算が必要となる場合がございます。",
+    "また、ご申請の退会期日が入会時キャンペーン等で定める退会不可期間に該当する場合は、退会可能な最短期日での退会となります。",
+    "必要な精算金や退会期日の変更がある場合は、別途ご案内いたします。",
+    "",
+    "My Private Gym"
+  ].join("\n");
+
+  MailApp.sendEmail({
+    to: member.email,
+    subject: subject,
+    body: body,
+    name: "My Private Gym",
+    replyTo: MPG_SUSPENSION_CONFIG.REPLY_TO
+  });
+}
+
 function sendMpgWithdrawalAdminMail_(member, data) {
   const recipients = MPG_SUSPENSION_CONFIG.ADMIN_RECIPIENTS.join(",");
   const subject = "【MPG退会申請】" + member.name + " 様／" + formatMpgWithdrawalDateLabel_(data.withdrawalDate);
@@ -308,15 +348,16 @@ function sendMpgWithdrawalAdminMail_(member, data) {
     "退会理由：" + data.reason,
     data.otherReason ? "理由・意見：" + data.otherReason : "",
     "",
-    "※会員本人への受付メールは送信していません。",
+    "※会員本人へ受付メール送信済みです。",
     "※キャンペーン継続条件・精算金・最短退会可能日の確認をお願いします。"
-  ].filter(function(line) { return line !== "" || true; }).join("\n");
+  ].join("\n");
 
   MailApp.sendEmail({
     to: recipients,
     subject: subject,
     body: lines,
-    name: "My Private Gym"
+    name: "My Private Gym",
+    replyTo: MPG_SUSPENSION_CONFIG.REPLY_TO
   });
 }
 
