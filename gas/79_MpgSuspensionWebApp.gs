@@ -2,7 +2,7 @@
  * ============================================================
  * A-nauts OS Reserve
  * 79_MpgSuspensionWebApp.gs
- * My Private Gym 休会届 - standalone bound GAS entry point
+ * My Private Gym 休会・退会申請 - standalone bound GAS entry point
  * ============================================================
  * This file is intended for the Apps Script project bound to the
  * MPG member-master spreadsheet.
@@ -20,14 +20,16 @@ function setupMpgSuspension() {
     MPG_MEMBER_MASTER_SHEET_NAME: firstSheet ? firstSheet.getName() : "",
     MPG_SUSPENSION_LOG_SHEET_NAME: "休会申請",
     MPG_SUSPENSION_TOKEN_LOG_SHEET_NAME: "休会URL発行",
-    MPG_SUSPENSION_PUBLIC_URL: "https://forestgym-tokyo.github.io/anauts-os-reserve/mpg-suspension/"
+    MPG_SUSPENSION_PUBLIC_URL: "https://forestgym-tokyo.github.io/anauts-os-reserve/mpg-suspension/",
+    MPG_WITHDRAWAL_LOG_SHEET_NAME: "退会申請"
   });
 
   return {
     spreadsheetId: ss.getId(),
     memberMasterSheetName: firstSheet ? firstSheet.getName() : "",
     suspensionLogSheetName: "休会申請",
-    tokenLogSheetName: "休会URL発行"
+    tokenLogSheetName: "休会URL発行",
+    withdrawalLogSheetName: "退会申請"
   };
 }
 
@@ -40,9 +42,9 @@ function doGet(e) {
       return mpgJson_({
         ok: true,
         data: {
-          appName: "A-nauts OS Reserve / MPG休会届",
+          appName: "A-nauts OS Reserve / MPG休会・退会申請",
           status: "ok",
-          accessMode: "token"
+          accessMode: "token-and-store-form"
         }
       });
 
@@ -71,6 +73,15 @@ function doPost(e) {
       case "submitMpgSuspensionToken":
         return submitMpgSuspensionToken_(body);
 
+      case "getMpgWithdrawalOptions":
+        return getMpgWithdrawalOptions_();
+
+      case "checkMpgWithdrawalMember":
+        return checkMpgWithdrawalMember_(body);
+
+      case "submitMpgWithdrawal":
+        return submitMpgWithdrawal_(body);
+
       default:
         return mpgJson_({
           ok: false,
@@ -79,13 +90,13 @@ function doPost(e) {
         });
     }
   } catch (error) {
-    console.error("MPG suspension doPost", error);
+    console.error("MPG application doPost", error);
     return mpgJson_({
       ok: false,
       code: "MPG_API_ERROR",
       message: error && error.message
         ? error.message
-        : "休会届APIの処理中にエラーが発生しました。"
+        : "MPG申請APIの処理中にエラーが発生しました。"
     });
   }
 }
