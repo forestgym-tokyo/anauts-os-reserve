@@ -2,12 +2,11 @@
  * ============================================================
  * A-nauts OS Reserve
  * 79_MpgSuspensionWebApp.gs
- * My Private Gym / 9ROUND 各種申請 - standalone GAS entry point
+ * My Private Gym 各種申請 - standalone GAS entry point
  * ============================================================
  * This file is intended for the Apps Script project currently used
- * by the MPG application web app. 9ROUND withdrawal actions are
- * routed from the same deployment and use a separately configured
- * 9ROUND member-master spreadsheet.
+ * by the MPG application web app. 9ROUND withdrawal is operated by
+ * its own spreadsheet-bound Apps Script / Web App.
  */
 
 function setupMpgSuspension() {
@@ -44,7 +43,7 @@ function doGet(e) {
       return mpgJson_({
         ok: true,
         data: {
-          appName: "A-nauts OS Reserve / MPG・9ROUND申請",
+          appName: "A-nauts OS Reserve / MPG申請",
           status: "ok",
           accessMode: "token-and-store-form"
         }
@@ -84,15 +83,6 @@ function doPost(e) {
       case "submitMpgWithdrawal":
         return submitMpgWithdrawal_(body);
 
-      case "get9RoundWithdrawalDate":
-        return get9RoundWithdrawalDate_();
-
-      case "check9RoundWithdrawalMember":
-        return check9RoundWithdrawalMember_(body);
-
-      case "submit9RoundWithdrawal":
-        return submit9RoundWithdrawal_(body);
-
       default:
         return mpgJson_({
           ok: false,
@@ -101,7 +91,7 @@ function doPost(e) {
         });
     }
   } catch (error) {
-    console.error("MPG / 9ROUND application doPost", error);
+    console.error("MPG application doPost", error);
     return mpgJson_({
       ok: false,
       code: "APPLICATION_API_ERROR",
