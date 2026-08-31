@@ -110,7 +110,7 @@ function verifyMpgSuspensionToken_(body) {
     const tokenInfo = resolveMpgSuspensionToken_(body && body.token);
     const member = tokenInfo.member;
     const earliest = getMpgEarliestStartMonth_();
-    const options = buildMpgStartMonthOptions_(earliest, MPG_SUSPENSION_CONFIG.START_MONTH_OPTIONS);
+    const options = [earliest];
 
     return mpgJson_({
       ok: true,
@@ -150,9 +150,9 @@ function submitMpgSuspensionToken_(body) {
 
     const startMonth = normalizeMpgMonth_(body.startMonth);
     const earliest = getMpgEarliestStartMonth_();
-    const allowed = buildMpgStartMonthOptions_(earliest, MPG_SUSPENSION_CONFIG.START_MONTH_OPTIONS);
+    const allowed = [earliest];
     if (allowed.indexOf(startMonth) === -1) {
-      throw new Error("選択された休会開始月は受付対象外です。ページを再読み込みしてお手続きください。");
+      throw new Error("休会開始月は最短開始可能月のみ選択できます。ページを再読み込みしてお手続きください。");
     }
 
     lock.waitLock(10000);
