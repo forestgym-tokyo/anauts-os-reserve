@@ -10,7 +10,7 @@ const MPG_WITHDRAWAL_CONFIG = Object.freeze({
   TIMEZONE: "Asia/Tokyo",
   DEADLINE_DAY: 9,
   DEADLINE_HOUR: 20,
-  OPTION_MONTHS: 6,
+  OPTION_MONTHS: 1,
   LOG_SHEET_DEFAULT: "退会申請",
   ACTIVE_STATUSES: ["契約中", "休会中"]
 });
