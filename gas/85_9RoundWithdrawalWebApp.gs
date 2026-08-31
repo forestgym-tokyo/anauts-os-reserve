@@ -2,12 +2,12 @@
  * ============================================================
  * A-nauts OS Reserve
  * 85_9RoundWithdrawalWebApp.gs
- * 9ROUND アリオ蘇我店 退会申請 - standalone bound GAS entry point
+ * 9ROUND アリオ蘇我店 各種申請 - standalone bound GAS entry point
  * ============================================================
  *
- * このファイルと 84_9RoundWithdrawal.gs を、9ROUND_Member
- * スプレッドシートに紐づいた Apps Script プロジェクトへ配置して使用する。
- * MPG用 Apps Script とは別プロジェクト・別Web Appとして運用する。
+ * 84_9RoundWithdrawal.gs / 86_9RoundSuspension.gs /
+ * 87_9RoundSuspensionToken.gs と同じ、9ROUND_Member
+ * スプレッドシートに紐づいた Apps Script プロジェクトで使用する。
  */
 
 const ROUND9_WITHDRAWAL_BOUND_CONFIG = Object.freeze({
@@ -15,11 +15,6 @@ const ROUND9_WITHDRAWAL_BOUND_CONFIG = Object.freeze({
   LOG_SHEET_NAME: "退会申請"
 });
 
-/**
- * 初回設定。
- * 9ROUND_Member スプレッドシートに紐づいた Apps Script から、
- * 引数なしで一度だけ実行する。
- */
 function setup9RoundWithdrawal() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   if (!ss) {
@@ -30,19 +25,11 @@ function setup9RoundWithdrawal() {
   try {
     masterSheet = ss.getSheetById(ROUND9_WITHDRAWAL_BOUND_CONFIG.MEMBER_MASTER_GID);
   } catch (_) {}
-
-  if (!masterSheet) {
-    masterSheet = ss.getSheets()[0];
-  }
-
-  if (!masterSheet) {
-    throw new Error("9ROUND会員マスターのシートを確認できません。");
-  }
+  if (!masterSheet) masterSheet = ss.getSheets()[0];
+  if (!masterSheet) throw new Error("9ROUND会員マスターのシートを確認できません。");
 
   validate9RoundMemberHeaders_(
-    masterSheet
-      .getRange(1, 1, 1, masterSheet.getLastColumn())
-      .getDisplayValues()[0]
+    masterSheet.getRange(1, 1, 1, masterSheet.getLastColumn()).getDisplayValues()[0]
   );
 
   PropertiesService.getScriptProperties().setProperties({
@@ -70,10 +57,10 @@ function doGet(e) {
       return round9Json_({
         ok: true,
         data: {
-          appName: "A-nauts OS Reserve / 9ROUND退会申請",
+          appName: "A-nauts OS Reserve / 9ROUND申請",
           store: "9ROUND アリオ蘇我店",
           status: "ok",
-          accessMode: "store-form"
+          accessMode: "withdrawal-and-token-suspension"
         }
       });
 
@@ -105,6 +92,12 @@ function doPost(e) {
       case "submit9RoundWithdrawal":
         return submit9RoundWithdrawal_(body);
 
+      case "verify9RoundSuspensionToken":
+        return verify9RoundSuspensionToken_(body);
+
+      case "submit9RoundSuspensionToken":
+        return submit9RoundSuspensionToken_(body);
+
       default:
         return round9Json_({
           ok: false,
@@ -113,13 +106,13 @@ function doPost(e) {
         });
     }
   } catch (error) {
-    console.error("9ROUND withdrawal doPost", error);
+    console.error("9ROUND application doPost", error);
     return round9Json_({
       ok: false,
       code: "ROUND9_API_ERROR",
       message: error && error.message
         ? error.message
-        : "9ROUND退会申請APIの処理中にエラーが発生しました。"
+        : "9ROUND申請APIの処理中にエラーが発生しました。"
     });
   }
 }
