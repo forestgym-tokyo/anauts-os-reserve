@@ -2,8 +2,19 @@
   function boot(){
     if(typeof apiGet!=="function"||typeof apiPost!=="function"||typeof state==="undefined"){setTimeout(boot,100);return;}
 
+    function sogaStaffRestricted_(){
+      return typeof isSogaStaffUser==="function"&&isSogaStaffUser();
+    }
+
     const originalApply=applyPermissionUi;
-    applyPermissionUi=function(){originalApply();if(state.authUser?.staff_code)document.querySelector("#myShiftNav")?.classList.remove("is-hidden");buildMonthly();};
+    applyPermissionUi=function(){
+      originalApply();
+      if(state.authUser?.staff_code)document.querySelector("#myShiftNav")?.classList.remove("is-hidden");
+      buildMonthly();
+      const monthlyNav=document.querySelector('[data-view="monthlySchedule"]');
+      if(monthlyNav)monthlyNav.innerHTML=sogaStaffRestricted_()?"<span>📅</span>9ROUND予定":"<span>📅</span>予定一覧";
+      if(typeof enforceSogaStaffUi_==="function")enforceSogaStaffUi_();
+    };
     canUseMyShift=function(){return !!state.authUser?.staff_code;};
 
     const originalRender=renderMyShiftRows;
@@ -13,7 +24,11 @@
 
     function renderMyShiftCalendar(){
       ensureCalendarCss();const box=document.querySelector("#myShiftList"),rows=(state.myShiftRows||[]).filter(x=>x.active!==false);if(!box)return;
-      const p=document.querySelector("#myShiftView .page-heading p:last-child");if(p)p.textContent=isManagementUser()?"八千代・SOGA両店舗の自分の確定シフトを月間カレンダーで確認できます。日付を押すと直接変更・削除できます。":"八千代・SOGA両店舗の自分の確定シフトを月間カレンダーで確認できます。日付を押すと変更・削除申請ができます。";
+      const p=document.querySelector("#myShiftView .page-heading p:last-child");
+      if(p){
+        if(sogaStaffRestricted_())p.textContent="9ROUND アリオ蘇我店の自分の確定シフトを確認できます。日付を押すと変更・削除申請ができます。";
+        else p.textContent=isManagementUser()?"八千代・SOGA両店舗の自分の確定シフトを月間カレンダーで確認できます。日付を押すと直接変更・削除できます。":"八千代・SOGA両店舗の自分の確定シフトを月間カレンダーで確認できます。日付を押すと変更・削除申請ができます。";
+      }
       const notice=document.querySelector("#myShiftView .page-heading + .card");
       if(notice&&!isManagementUser())notice.innerHTML=`<strong style="color:#ffcf7d">当日・前日のシフト変更について</strong><div style="margin-top:5px;color:#d7ddd8">当日および前日の追加・変更・削除申請はWebでは受付できません。必ず直接 <a href="tel:08035534259" style="color:#79dc8c;font-weight:900;text-decoration:none">080-3553-4259</a> までご連絡ください。</div>`;
       if(isManagementUser())document.querySelector("#myShiftRequestHistory")?.closest("section")?.classList.add("is-hidden");
@@ -73,7 +88,7 @@
       const b=document.createElement("button");
       b.className="nav-button";
       b.dataset.view="monthlySchedule";
-      b.innerHTML="<span>📅</span>予定一覧";
+      b.innerHTML=sogaStaffRestricted_()?"<span>📅</span>9ROUND予定":"<span>📅</span>予定一覧";
       nav.insertBefore(b,nav.querySelector('[data-view="registration"]'));
       const v=document.createElement("section");
       v.id="monthlyScheduleView";
@@ -81,7 +96,7 @@
       v.innerHTML=`<div class="page-heading"><div><p class="eyebrow">MONTHLY SCHEDULE</p><h1>予定一覧</h1><p>月間カレンダーでスタッフ・トレーナーの勤務予定を確認します。</p></div></div><div class="schedule-toolbar card"><div class="toolbar-group"><button id="mPrev" class="icon-button">‹</button><button id="mNow" class="ghost-button">今月</button><button id="mNext" class="icon-button">›</button></div><strong id="mLabel" class="period-title"></strong><div class="monthly-filter-group"><label class="monthly-filter-field"><span>店舗</span><select id="mStore"></select></label><label class="monthly-filter-field"><span>表示</span><select id="mFilter"></select></label></div></div><div id="mBoard" class="card"></div><div id="mDetail" class="mcal-detail is-hidden"></div>`;
       main.insertBefore(v,document.querySelector("#registrationView"));
       state.monthlyMonth=state.monthlyMonth||localYmd().slice(0,7);
-      state.monthlyStore=state.monthlyStore||"ALL";
+      state.monthlyStore=sogaStaffRestricted_()?"SOGA":(state.monthlyStore||"ALL");
       b.onclick=()=>{document.querySelectorAll(".nav-button").forEach(x=>x.classList.toggle("is-active",x===b));document.querySelectorAll(".view").forEach(x=>x.classList.remove("is-active"));v.classList.add("is-active");loadMonth()};
       document.querySelector("#mPrev").onclick=()=>move(-1);
       document.querySelector("#mNext").onclick=()=>move(1);
@@ -99,7 +114,9 @@
       document.querySelector("#mDetail").classList.add("is-hidden");
       try{
         const staffRequest=state.staff.length?Promise.resolve(null):apiGet("getStaff",{include_inactive:"false"});
-        const [j,s]=await Promise.all([apiGet("getStaffShifts",{start_date:r.start,end_date:r.end}),staffRequest]);
+        const shiftParams={start_date:r.start,end_date:r.end};
+        if(sogaStaffRestricted_())shiftParams.store_code="SOGA";
+        const [j,s]=await Promise.all([apiGet("getStaffShifts",shiftParams),staffRequest]);
         if(s)state.staff=Array.isArray(s.data?.staff)?s.data.staff:(Array.isArray(s.data)?s.data:[]);
         state.monthlyRows=(Array.isArray(j.data)?j.data:(j.data?.shifts||[])).filter(x=>x.active!==false);
         storeFilters_();
@@ -117,6 +134,14 @@
     }
     function storeFilters_(){
       const select=document.querySelector("#mStore");
+      if(sogaStaffRestricted_()){
+        select.innerHTML='<option value="SOGA">9ROUND アリオ蘇我店 (SOGA)</option>';
+        select.value="SOGA";
+        select.disabled=true;
+        state.monthlyStore="SOGA";
+        return;
+      }
+      select.disabled=false;
       const codes=new Set();
       (state.stores||[]).filter(x=>x.active!==false).forEach(x=>{if(x.store_code)codes.add(String(x.store_code))});
       (state.staff||[]).filter(x=>x.active!==false).forEach(x=>{if(x.store_code)codes.add(String(x.store_code))});
@@ -128,14 +153,14 @@
       state.monthlyStore=select.value;
     }
     function filters(){
-      const select=document.querySelector("#mFilter"),current=select.value||"ALL",store=document.querySelector("#mStore")?.value||"ALL",me=state.authUser?.staff_code||"";
+      const select=document.querySelector("#mFilter"),current=select.value||"ALL",store=sogaStaffRestricted_()?"SOGA":(document.querySelector("#mStore")?.value||"ALL"),me=state.authUser?.staff_code||"";
       const codes=new Set((state.monthlyRows||[]).filter(x=>store==="ALL"||String(x.store_code)===store).map(x=>String(x.staff_code)));
       const people=state.staff.filter(x=>x.active!==false&&codes.has(String(x.staff_code)));
       select.innerHTML=`<option value="ALL">全員</option><option value="STAFF">スタッフ全員</option><option value="TRAINER">トレーナー全員</option>${me&&codes.has(String(me))?'<option value="ME">自分</option>':''}`+people.map(x=>`<option value="P:${esc(x.staff_code)}">${esc((x.display_name||x.staff_name||x.staff_code)+(String(x.role).toUpperCase()==="TRAINER"?"トレーナー":"さん"))}</option>`).join("");
       if(Array.from(select.options).some(x=>x.value===current))select.value=current;
     }
     function filtered(){
-      const f=document.querySelector("#mFilter").value,store=document.querySelector("#mStore")?.value||"ALL",people=new Map(state.staff.map(x=>[String(x.staff_code),x]));
+      const f=document.querySelector("#mFilter").value,store=sogaStaffRestricted_()?"SOGA":(document.querySelector("#mStore")?.value||"ALL"),people=new Map(state.staff.map(x=>[String(x.staff_code),x]));
       let a=(state.monthlyRows||[]).filter(x=>store==="ALL"||String(x.store_code)===store);
       if(f==="ME")a=a.filter(x=>String(x.staff_code)===String(state.authUser.staff_code));
       else if(f==="STAFF"||f==="TRAINER")a=a.filter(x=>String(people.get(String(x.staff_code))?.role).toUpperCase()===f);
@@ -145,7 +170,7 @@
     function personLabel(x,people){const p=people.get(String(x.staff_code))||{},n=p.display_name||p.staff_name||x.staff_name||x.staff_code;return n+(String(p.role).toUpperCase()==="TRAINER"?"トレーナー":"さん")}
     function staffColor_(x,people){const color=String(people.get(String(x.staff_code))?.color||"");return /^#[0-9a-f]{6}$/i.test(color)?color:"#63d179"}
     function syncMonthlyHeading_(){
-      const store=document.querySelector("#mStore")?.value||"ALL",view=document.querySelector("#monthlyScheduleView");
+      const store=sogaStaffRestricted_()?"SOGA":(document.querySelector("#mStore")?.value||"ALL"),view=document.querySelector("#monthlyScheduleView");
       if(!view)return;
       view.querySelector(".eyebrow").textContent=store==="SOGA"?"9ROUND ARIO SOGA":"MONTHLY SCHEDULE";
       view.querySelector("h1").textContent=store==="SOGA"?"9ROUNDシフト":"予定一覧";

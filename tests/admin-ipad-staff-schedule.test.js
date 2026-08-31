@@ -33,8 +33,8 @@ assert.match(config, /for \(var i = 0; i < addonSources\.length; i \+= 1\)/);
 assert.doesNotMatch(config, /window\.addEventListener\("load", function \(\) \{\s*var monthly/);
 
 assert.match(indexHtml, /rel="preconnect" href="https:\/\/script\.google\.com"/);
-assert.match(indexHtml, /20260830-soga-calendar-v1/);
-assert.match(config, /admin-monthly-v58\.js\?v=20260830-soga-calendar-v1/);
+assert.match(indexHtml, /20260831-soga-staff-access-v1/);
+assert.match(config, /admin-monthly-v58\.js\?v=20260831-soga-staff-access-v1/);
 
 assert.match(auth, /getStaffSchedule\(params\)/);
 assert.match(auth, /CacheService\.getScriptCache\(\)/);

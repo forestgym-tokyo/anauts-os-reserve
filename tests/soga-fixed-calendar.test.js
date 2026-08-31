@@ -16,7 +16,8 @@ test("SOGA fixed shifts reuse the existing monthly endpoint and filter in the br
   assert.match(monthly, /9ROUND ARIO SOGA/);
   assert.match(monthly, /function staffColor_/);
   assert.match(monthly, /\?color:"#63d179"/);
-  assert.match(monthly, /apiGet\("getStaffShifts",\{start_date:r\.start,end_date:r\.end\}\)/);
+  assert.match(monthly, /const shiftParams=\{start_date:r\.start,end_date:r\.end\}/);
+  assert.match(monthly, /apiGet\("getStaffShifts",shiftParams\)/);
   assert.doesNotMatch(monthly, /getCalendarEvents|GoogleCalendar|CalendarApp/);
 });
 
