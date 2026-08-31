@@ -23,16 +23,47 @@ function isSogaStaffUser(){
   const store=String(state.authUser?.store_code||"").trim().toUpperCase();
   return permission==="STAFF"&&store==="SOGA";
 }
+function resetSogaStaffUi_(resetView=false){
+  document.body?.classList.remove("soga-staff-restricted");
+  $$('.topnav .nav-button[data-soga-restricted-hidden="1"]').forEach(button=>{
+    button.classList.remove("is-hidden");
+    delete button.dataset.sogaRestrictedHidden;
+  });
+
+  const storeChip=document.querySelector(".store-chip");
+  if(storeChip)storeChip.textContent=String(state.authUser?.store_code||"YACHIYO").toUpperCase();
+
+  if(!resetView)return;
+
+  $$(".topnav .nav-button").forEach(button=>{
+    button.classList.toggle("is-active",button.dataset.view==="staffSchedule");
+  });
+  $$(".view").forEach(view=>{
+    view.classList.toggle("is-active",view.id==="staffScheduleView");
+  });
+  state.monthlyStore="ALL";
+  state.staff=[];
+  state.staffSchedule=null;
+  state.trainerSchedule=null;
+  state.myShiftRows=[];
+  state.myShiftRequests=[];
+  state.monthlyRows=[];
+}
 function enforceSogaStaffUi_(){
   const restricted=isSogaStaffUser();
-  document.body?.classList.toggle("soga-staff-restricted",restricted);
+  if(!restricted){
+    resetSogaStaffUi_();
+    return;
+  }
 
-  if(!restricted)return;
+  document.body?.classList.add("soga-staff-restricted");
 
   const allowedViews=new Set(["myShift","monthlySchedule"]);
   $$(".topnav .nav-button").forEach(button=>{
     const allowed=allowedViews.has(String(button.dataset.view||""));
-    button.classList.toggle("is-hidden",!allowed);
+    if(allowed)return;
+    if(!button.classList.contains("is-hidden"))button.dataset.sogaRestrictedHidden="1";
+    button.classList.add("is-hidden");
   });
 
   const activeButton=Array.from($$(".topnav .nav-button.is-active"))
@@ -185,9 +216,7 @@ function logout(){
   state.idToken="";
   state.authUser=null;
   sessionStorage.removeItem("anauts_id_token");
-  document.body?.classList.remove("soga-staff-restricted");
-  const storeChip=document.querySelector(".store-chip");
-  if(storeChip)storeChip.textContent="YACHIYO";
+  resetSogaStaffUi_(true);
 
   if(authEnabled()){
     $("#authUserArea")?.classList.add("is-hidden");
