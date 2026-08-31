@@ -28,6 +28,18 @@ test("only ordinary SOGA staff receive the restricted navigation", () => {
   assert.equal(context.result, false);
 });
 
+test("SOGA navigation restrictions are removed before ADMIN or MANAGER use", () => {
+  const admin = read("admin/admin.js");
+
+  assert.match(admin, /function resetSogaStaffUi_\(resetView=false\)/);
+  assert.match(admin, /data-soga-restricted-hidden="1"[\s\S]*?classList\.remove\("is-hidden"\)/);
+  assert.match(admin, /if\(!restricted\)\{[\s\S]*?resetSogaStaffUi_\(\);[\s\S]*?return;/);
+  assert.match(admin, /if\(!button\.classList\.contains\("is-hidden"\)\)button\.dataset\.sogaRestrictedHidden="1"/);
+  assert.match(admin, /function logout\(\)[\s\S]*?resetSogaStaffUi_\(true\)/);
+  assert.match(admin, /button\.dataset\.view==="staffSchedule"/);
+  assert.match(admin, /view\.id==="staffScheduleView"/);
+});
+
 test("SOGA staff UI exposes only personal shifts and the fixed 9ROUND schedule", () => {
   const admin = read("admin/admin.js");
   const monthly = read("admin/admin-monthly-v58.js");
@@ -79,4 +91,3 @@ test("GAS filters SOGA shift data and refuses unrelated admin features", () => {
     [{ staff_code: "OZAWA", store_code: "SOGA" }]
   );
 });
-
