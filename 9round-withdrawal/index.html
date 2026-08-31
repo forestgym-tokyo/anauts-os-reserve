@@ -5,485 +5,72 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
 <title>9ROUND アリオ蘇我店 | 退会申請フォーム</title>
 <style>
-:root{
-  --bg:#050505;
-  --panel:#101010;
-  --panel2:#080808;
-  --line:#2c2c2c;
-  --text:#f7f7f7;
-  --muted:#a7a7a7;
-  --red:#e31b23;
-  --red-bright:#ff3640;
-  --red-dark:#b30910;
-  --danger:#ff6b6b;
-  --warning:#ffd166;
-}
-*{box-sizing:border-box;margin:0;padding:0}
-body{
-  min-height:100vh;
-  background:
-    radial-gradient(circle at 50% -140px,rgba(227,27,35,.19),transparent 350px),
-    var(--bg);
-  color:var(--text);
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",Arial,sans-serif;
-  line-height:1.7;
-  padding:28px 14px 64px;
-}
-.container{max-width:560px;margin:0 auto}
-.brand{text-align:center;margin:2px 0 28px}
-.brand-mark{
-  width:78px;height:78px;margin:0 auto 13px;border:3px solid var(--red);border-radius:50%;
-  display:flex;align-items:center;justify-content:center;color:#fff;font-size:31px;font-weight:950;
-  letter-spacing:-2px;background:#050505;box-shadow:0 0 0 6px rgba(227,27,35,.08);
-}
-.brand-name{font-size:16px;font-weight:900;letter-spacing:2px;color:#fff}
-.brand-store{font-size:11px;letter-spacing:2px;color:var(--red-bright);margin-top:2px}
-h1{text-align:center;font-size:29px;line-height:1.25;margin:10px 0 5px}
-.subtitle{text-align:center;color:#777;font-size:11px;letter-spacing:2.4px;margin-bottom:28px}
-.lead{
-  margin:0 0 18px;padding:14px 16px;border:1px solid rgba(227,27,35,.38);border-radius:14px;
-  background:rgba(227,27,35,.07);color:#eee;font-size:13px;
-}
-.section{
-  background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:21px;margin-bottom:16px;
-  box-shadow:0 8px 30px rgba(0,0,0,.18);
-}
-.section-title{font-size:18px;font-weight:850;margin-bottom:17px}
-.section-title small{display:block;color:var(--red-bright);font-size:10px;letter-spacing:1.5px;margin-top:1px}
-.row{display:flex;gap:10px}
-.field{flex:1;margin-bottom:15px}
-label{display:block;color:#ddd;font-size:13px;margin-bottom:6px}
-input,select,textarea{
-  width:100%;border:1px solid #343434;border-radius:12px;background:var(--panel2);color:#fff;
-  padding:13px 14px;font-size:16px;outline:none;transition:.16s border-color,.16s box-shadow;
-}
-input:focus,select:focus,textarea:focus{
-  border-color:var(--red);box-shadow:0 0 0 3px rgba(227,27,35,.14)
-}
-textarea{min-height:118px;resize:vertical}
-select{appearance:auto}
-.notice{font-size:12px;color:var(--muted);margin-top:8px}
-.notice strong{color:#fff}
-.deadline-box{
-  border:1px solid rgba(227,27,35,.48);
-  background:linear-gradient(145deg,rgba(227,27,35,.12),rgba(227,27,35,.035));
-  border-radius:15px;padding:17px;text-align:center;
-}
-.deadline-label{font-size:11px;color:#aaa;letter-spacing:1.3px}
-.deadline-value{font-size:22px;font-weight:900;color:#fff;margin:4px 0}
-.deadline-rule{font-size:12px;color:#d7d7d7}
-.deadline-rule strong{color:var(--red-bright)}
-#memberStatus{min-height:23px;font-size:13px;margin:-4px 0 12px}
-.member-ok{color:#ff6269}
-.member-error{color:var(--danger)}
-.checkbox-group{display:flex;flex-direction:column;gap:18px}
-.checkbox-item{display:flex;align-items:flex-start;gap:12px}
-.checkbox-item input{
-  width:22px;height:22px;min-width:22px;margin-top:2px;accent-color:var(--red)
-}
-.checkbox-item label{margin:0;font-size:14px;line-height:1.75}
-.highlight{color:var(--warning);font-weight:700}
-.hidden{display:none!important}
-.submit-btn{
-  width:100%;border:0;border-radius:16px;padding:17px 16px;margin-top:4px;cursor:pointer;
-  background:linear-gradient(135deg,var(--red-dark),var(--red-bright));color:#fff;font-size:18px;font-weight:900;
-  box-shadow:0 10px 28px rgba(227,27,35,.2);
-}
-.submit-btn:disabled{cursor:not-allowed;opacity:.55;background:#555;color:#ddd;box-shadow:none}
-.submit-sub{display:block;font-size:10px;letter-spacing:1.4px;margin-top:3px}
-.result{
-  display:none;margin-top:18px;padding:18px;border-radius:16px;border:1px solid rgba(227,27,35,.55);
-  background:rgba(227,27,35,.08);text-align:center;
-}
-.result.show{display:block}
-.result h2{font-size:20px;color:var(--red-bright);margin-bottom:8px}
-.result p{font-size:13px;color:#ddd}
-.footer{text-align:center;color:#626262;font-size:10px;margin-top:26px;letter-spacing:.5px}
-@media(max-width:480px){
-  body{padding:22px 11px 48px}
-  .section{padding:18px 15px}
-  .row{gap:8px}
-  h1{font-size:26px}
-  .deadline-value{font-size:20px}
-}
+:root{--bg:#050505;--panel:#101010;--line:#2c2c2c;--text:#f7f7f7;--muted:#a7a7a7;--red:#e31b23;--red2:#ff3640;--warn:#ffd166}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 50% -140px,rgba(227,27,35,.19),transparent 350px),var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",Arial,sans-serif;line-height:1.7;padding:28px 14px 64px}.container{max-width:560px;margin:auto}.brand{text-align:center;margin-bottom:28px}.brand-mark{width:78px;height:78px;margin:0 auto 13px;border:3px solid var(--red);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:31px;font-weight:950;letter-spacing:-2px}.brand-name{font-size:16px;font-weight:900;letter-spacing:2px}.brand-store{font-size:11px;letter-spacing:2px;color:var(--red2)}h1{font-size:29px;line-height:1.25;margin:10px 0 5px}.subtitle{color:#777;font-size:11px;letter-spacing:2.4px}.lead,.section{border:1px solid var(--line);border-radius:16px;background:var(--panel)}.lead{padding:14px 16px;margin-bottom:18px;border-color:rgba(227,27,35,.38);background:rgba(227,27,35,.07);font-size:13px}.section{padding:21px;margin-bottom:16px}.section-title{font-size:18px;font-weight:850;margin-bottom:17px}.section-title small{display:block;color:var(--red2);font-size:10px;letter-spacing:1.5px}.row{display:flex;gap:10px}.field{flex:1;margin-bottom:15px}label{display:block;color:#ddd;font-size:13px;margin-bottom:6px}input,select,textarea{width:100%;border:1px solid #343434;border-radius:12px;background:#080808;color:#fff;padding:13px 14px;font-size:16px;outline:none}input:focus,select:focus,textarea:focus{border-color:var(--red);box-shadow:0 0 0 3px rgba(227,27,35,.14)}textarea{min-height:118px;resize:vertical}.deadline-box{border:1px solid rgba(227,27,35,.48);background:rgba(227,27,35,.08);border-radius:15px;padding:17px;text-align:center}.deadline-label{font-size:11px;color:#aaa;letter-spacing:1.3px}.deadline-value{font-size:22px;font-weight:900;margin:4px 0}.deadline-rule{font-size:12px}.deadline-rule strong,.member-ok{color:var(--red2)}.notice{font-size:12px;color:var(--muted);margin-top:8px}#memberStatus{min-height:23px;font-size:13px;margin:-4px 0 12px}.member-error{color:#ff6b6b}.checkbox-item{display:flex;align-items:flex-start;gap:12px;margin-bottom:18px}.checkbox-item input{width:22px;height:22px;min-width:22px;margin-top:2px;accent-color:var(--red)}.checkbox-item label{margin:0;font-size:14px}.highlight{color:var(--warn);font-weight:700}.hidden{display:none!important}.submit-btn{width:100%;border:0;border-radius:16px;padding:17px 16px;cursor:pointer;background:linear-gradient(135deg,#b30910,var(--red2));color:#fff;font-size:18px;font-weight:900}.submit-btn:disabled{opacity:.55;background:#555}.submit-sub{display:block;font-size:10px;letter-spacing:1.4px}.result{display:none;margin-top:18px;padding:18px;border-radius:16px;border:1px solid rgba(227,27,35,.55);background:rgba(227,27,35,.08);text-align:center}.result.show{display:block}.result h2{font-size:20px;color:var(--red2)}.footer{text-align:center;color:#626262;font-size:10px;margin-top:26px}@media(max-width:480px){body{padding:22px 11px 48px}.section{padding:18px 15px}.row{gap:8px}h1{font-size:26px}}
 </style>
 </head>
 <body>
 <div class="container">
   <div class="brand">
-    <div class="brand-mark">9R</div>
-    <div class="brand-name">9ROUND</div>
-    <div class="brand-store">ARIO SOGA</div>
-    <h1>退会申請フォーム</h1>
-    <div class="subtitle">WITHDRAWAL REQUEST</div>
+    <div class="brand-mark">9R</div><div class="brand-name">9ROUND</div><div class="brand-store">ARIO SOGA</div>
+    <h1>退会申請フォーム</h1><div class="subtitle">WITHDRAWAL REQUEST</div>
   </div>
-
-  <div class="lead">
-    店頭でスタッフの案内に従ってご入力ください。申請完了後、登録メールアドレスへ受付メールを送信します。
-  </div>
-
+  <div class="lead">店頭でスタッフの案内に従ってご入力ください。申請完了後、登録メールアドレスへ受付メールを送信します。</div>
   <form id="withdrawalForm">
     <div class="section">
       <div class="section-title">会員情報<small>MEMBER INFORMATION</small></div>
-
       <div class="row">
-        <div class="field">
-          <label for="lastName">姓</label>
-          <input id="lastName" type="text" autocomplete="family-name" required>
-        </div>
-        <div class="field">
-          <label for="firstName">名</label>
-          <input id="firstName" type="text" autocomplete="given-name" required>
-        </div>
+        <div class="field"><label for="lastName">姓</label><input id="lastName" autocomplete="family-name" required></div>
+        <div class="field"><label for="firstName">名</label><input id="firstName" autocomplete="given-name" required></div>
       </div>
-
       <div class="row">
-        <div class="field">
-          <label for="lastKana">姓（フリガナ）</label>
-          <input id="lastKana" type="text" placeholder="ヤマダ" required>
-        </div>
-        <div class="field">
-          <label for="firstKana">名（フリガナ）</label>
-          <input id="firstKana" type="text" placeholder="タロウ" required>
-        </div>
+        <div class="field"><label for="lastKana">姓（フリガナ）</label><input id="lastKana" placeholder="ヤマダ" required></div>
+        <div class="field"><label for="firstKana">名（フリガナ）</label><input id="firstKana" placeholder="タロウ" required></div>
       </div>
-
-      <div class="field">
-        <label for="memberNo">会員番号（7桁の数字）</label>
-        <input id="memberNo" type="text" inputmode="numeric" maxlength="7" placeholder="1234567" required>
-      </div>
-
-      <div class="field">
-        <label for="email">登録メールアドレス</label>
-        <input id="email" type="email" autocomplete="email" required>
-      </div>
-
+      <div class="field"><label for="memberNo">会員番号（7桁の数字）</label><input id="memberNo" inputmode="numeric" maxlength="7" placeholder="1234567" required></div>
+      <div class="field"><label for="email">登録メールアドレス</label><input id="email" type="email" autocomplete="email" required></div>
       <div id="memberStatus"></div>
-
-      <div class="field">
-        <label for="phone">電話番号</label>
-        <input id="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="09012345678" required>
-      </div>
+      <div class="field"><label for="phone">電話番号</label><input id="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="09012345678" required></div>
     </div>
-
     <div class="section">
       <div class="section-title">退会期日<small>WITHDRAWAL DATE</small></div>
-
       <div class="deadline-box">
-        <div class="deadline-label">最短退会期日</div>
-        <div class="deadline-value" id="withdrawalDateDisplay">読み込み中...</div>
-        <div class="deadline-rule">
-          毎月<strong>20日21:00まで</strong>のお手続きは当月末退会、
-          以降は翌月末退会となります。
-        </div>
+        <div class="deadline-label">最短退会期日</div><div class="deadline-value" id="withdrawalDateDisplay">読み込み中...</div>
+        <div class="deadline-rule">毎月<strong>20日21:00まで</strong>のお手続きは当月末退会、以降は翌月末退会となります。</div>
       </div>
-
-      <div class="notice">
-        ※ 退会期日は選択できません。申請時点の最短退会期日が自動的に適用されます。
-      </div>
+      <div class="notice">※ 退会期日は選択できません。申請時点の最短退会期日が自動的に適用されます。</div>
     </div>
-
     <div class="section">
       <div class="section-title">退会理由<small>REASON FOR WITHDRAWAL</small></div>
-
-      <div class="field">
-        <select id="reasonSelect" required>
-          <option value="転居（予定含む）のため">転居（予定含む）のため</option>
-          <option value="利用機会が少ないため">利用機会が少ないため</option>
-          <option value="目標達成したため">目標達成したため</option>
-          <option value="その他">その他</option>
-        </select>
-      </div>
-
-      <div class="field hidden" id="otherField">
-        <label for="otherReason">理由、ご意見等自由にご記載ください。</label>
-        <textarea id="otherReason" placeholder="ご自由にご記載ください"></textarea>
-      </div>
+      <div class="field"><select id="reasonSelect" required><option value="転居（予定含む）のため">転居（予定含む）のため</option><option value="利用機会が少ないため">利用機会が少ないため</option><option value="目標達成したため">目標達成したため</option><option value="その他">その他</option></select></div>
+      <div class="field hidden" id="otherField"><label for="otherReason">理由、ご意見等自由にご記載ください。</label><textarea id="otherReason"></textarea></div>
     </div>
-
     <div class="section">
       <div class="section-title">確認事項<small>CONFIRMATION</small></div>
-
-      <div class="checkbox-group">
-        <div class="checkbox-item">
-          <input type="checkbox" id="confirm1" required>
-          <label for="confirm1">
-            継続条件付きキャンペーン等で条件を満たしていない場合、
-            <span class="highlight">キャンペーン価格は適用されず、通常価格との差額等の精算が必要</span>
-            となる場合があることを確認しました。
-          </label>
-        </div>
-
-        <div class="checkbox-item">
-          <input type="checkbox" id="confirm2" required>
-          <label for="confirm2">
-            表示された退会期日が入会時キャンペーン等で定める退会不可期間に該当する場合、
-            <span class="highlight">退会可能な最短期日へ変更</span>
-            となることを確認しました。
-          </label>
-        </div>
-
-        <div class="checkbox-item">
-          <input type="checkbox" id="confirm3" required>
-          <label for="confirm3">
-            退会申請後も、退会期日までは会員としての契約および利用規約が継続し、
-            必要な会費・精算金等の支払い義務があることを確認しました。
-          </label>
-        </div>
-      </div>
+      <div class="checkbox-item"><input type="checkbox" id="confirm1" required><label for="confirm1">継続条件付きキャンペーン等で条件を満たしていない場合、<span class="highlight">キャンペーン価格は適用されず、通常価格との差額等の精算が必要</span>となる場合があることを確認しました。</label></div>
+      <div class="checkbox-item"><input type="checkbox" id="confirm2" required><label for="confirm2">表示された退会期日が入会時キャンペーン等で定める退会不可期間に該当する場合、<span class="highlight">退会可能な最短期日へ変更</span>となることを確認しました。</label></div>
+      <div class="checkbox-item"><input type="checkbox" id="confirm3" required><label for="confirm3">退会申請後も、退会期日までは会員としての契約および利用規約が継続し、必要な会費・精算金等の支払い義務があることを確認しました。</label></div>
     </div>
-
-    <button type="submit" class="submit-btn" id="submitBtn">
-      退会申請を送信する
-      <span class="submit-sub">SUBMIT WITHDRAWAL REQUEST</span>
-    </button>
+    <button type="submit" class="submit-btn" id="submitBtn">退会申請を送信する<span class="submit-sub">SUBMIT WITHDRAWAL REQUEST</span></button>
   </form>
-
-  <div class="result" id="resultBox">
-    <h2>退会申請を受け付けました</h2>
-    <p id="resultMessage">登録メールアドレスへ受付メールを送信しました。</p>
-  </div>
-
+  <div class="result" id="resultBox"><h2>退会申請を受け付けました</h2><p id="resultMessage"></p></div>
   <div class="footer">9ROUND ARIO SOGA / A-nauts</div>
 </div>
-
 <script>
-const GAS_URL = "https://script.google.com/macros/s/AKfycbylxnpDjxfd_Vxli7seBb0MB-02JUvGCrV-Ay-00pyC14Va7CXvfcFBzVxaTE54BB4rqA/exec";
-
-const form = document.getElementById("withdrawalForm");
-const submitBtn = document.getElementById("submitBtn");
-const memberNoInput = document.getElementById("memberNo");
-const emailInput = document.getElementById("email");
-const memberStatus = document.getElementById("memberStatus");
-const withdrawalDateDisplay = document.getElementById("withdrawalDateDisplay");
-const reasonSelect = document.getElementById("reasonSelect");
-const otherField = document.getElementById("otherField");
-const otherReason = document.getElementById("otherReason");
-const resultBox = document.getElementById("resultBox");
-const resultMessage = document.getElementById("resultMessage");
-
-let memberVerified = false;
-let currentWithdrawalDate = "";
-
-reasonSelect.addEventListener("change", () => {
-  const isOther = reasonSelect.value === "その他";
-  otherField.classList.toggle("hidden", !isOther);
-  otherReason.required = isOther;
-});
-
-memberNoInput.addEventListener("input", () => {
-  memberNoInput.value = memberNoInput.value.replace(/\D/g, "").slice(0, 7);
-  resetMemberVerification();
-});
-
-emailInput.addEventListener("input", resetMemberVerification);
-memberNoInput.addEventListener("blur", checkMember);
-emailInput.addEventListener("blur", checkMember);
-
-function resetMemberVerification() {
-  memberVerified = false;
-  memberStatus.className = "";
-  memberStatus.textContent = "";
-}
-
-function validKana(value) {
-  return /^[ァ-ヶーｦ-ﾟA-Za-zＡ-Ｚａ-ｚ\s]+$/.test(value);
-}
-
-async function postApi(payload) {
-  const response = await fetch(GAS_URL, {
-    method: "POST",
-    headers: {"Content-Type": "text/plain;charset=utf-8"},
-    body: JSON.stringify(payload)
-  });
-
-  if (!response.ok) {
-    throw new Error("HTTP " + response.status);
-  }
-
-  return response.json();
-}
-
-async function loadWithdrawalDate() {
-  withdrawalDateDisplay.textContent = "読み込み中...";
-
-  try {
-    const data = await postApi({action: "get9RoundWithdrawalDate"});
-
-    if (!data.ok || !data.data || !data.data.withdrawalDate) {
-      throw new Error(data.message || "退会期日を取得できませんでした。");
-    }
-
-    currentWithdrawalDate = data.data.withdrawalDate;
-    withdrawalDateDisplay.textContent =
-      data.data.label || formatWithdrawalDate(currentWithdrawalDate);
-  } catch (error) {
-    console.error(error);
-    currentWithdrawalDate = "";
-    withdrawalDateDisplay.textContent = "退会期日を取得できません";
-  }
-}
-
-async function checkMember() {
-  const memberNo = memberNoInput.value.trim();
-  const email = emailInput.value.trim();
-
-  if (memberNo.length !== 7 || !email) {
-    return;
-  }
-
-  memberVerified = false;
-  memberStatus.className = "";
-  memberStatus.textContent = "会員情報を確認しています...";
-
-  try {
-    const data = await postApi({
-      action: "check9RoundWithdrawalMember",
-      memberNo: memberNo,
-      email: email
-    });
-
-    if (data.ok) {
-      memberVerified = true;
-      memberStatus.className = "member-ok";
-      memberStatus.textContent =
-        "会員情報を確認しました" +
-        (data.data && data.data.memberName ? "：" + data.data.memberName + " 様" : "");
-
-      if (data.data && data.data.withdrawalDate) {
-        currentWithdrawalDate = data.data.withdrawalDate;
-        withdrawalDateDisplay.textContent =
-          data.data.withdrawalDateLabel ||
-          formatWithdrawalDate(currentWithdrawalDate);
-      }
-    } else {
-      memberStatus.className = "member-error";
-      memberStatus.textContent =
-        data.message || "会員情報を確認できませんでした。";
-    }
-  } catch (error) {
-    console.error(error);
-    memberStatus.className = "member-error";
-    memberStatus.textContent = "会員情報を確認できませんでした。";
-  }
-}
-
-function formatWithdrawalDate(value) {
-  const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!match) return value;
-
-  return (
-    Number(match[1]) +
-    "年" +
-    Number(match[2]) +
-    "月末（" +
-    Number(match[1]) +
-    "年" +
-    Number(match[2]) +
-    "月" +
-    Number(match[3]) +
-    "日）"
-  );
-}
-
-function setSubmitting(active) {
-  submitBtn.disabled = active;
-  submitBtn.innerHTML = active
-    ? '送信中です...<span class="submit-sub">PLEASE WAIT</span>'
-    : '退会申請を送信する<span class="submit-sub">SUBMIT WITHDRAWAL REQUEST</span>';
-}
-
-form.addEventListener("submit", async (event) => {
-  event.preventDefault();
-
-  const lastName = document.getElementById("lastName").value.trim();
-  const firstName = document.getElementById("firstName").value.trim();
-  const lastKana = document.getElementById("lastKana").value.trim();
-  const firstKana = document.getElementById("firstKana").value.trim();
-  const memberNo = memberNoInput.value.trim();
-  const email = emailInput.value.trim();
-  const phone = document.getElementById("phone").value.trim();
-  const reason = reasonSelect.value;
-  const reasonDetail = otherReason.value.trim();
-
-  if (!validKana(lastKana) || !validKana(firstKana)) {
-    alert("フリガナはカタカナまたはアルファベットで入力してください。");
-    return;
-  }
-
-  if (memberNo.length !== 7) {
-    alert("会員番号は7桁の数字で入力してください。");
-    memberNoInput.focus();
-    return;
-  }
-
-  if (!currentWithdrawalDate) {
-    alert("退会期日を取得できていません。ページを再読み込みしてください。");
-    return;
-  }
-
-  if (!memberVerified) {
-    await checkMember();
-    if (!memberVerified) {
-      alert("会員番号と登録メールアドレスをご確認ください。");
-      return;
-    }
-  }
-
-  if (reason === "その他" && !reasonDetail) {
-    alert("退会理由をご記載ください。");
-    otherReason.focus();
-    return;
-  }
-
-  setSubmitting(true);
-
-  try {
-    const data = await postApi({
-      action: "submit9RoundWithdrawal",
-      lastName: lastName,
-      firstName: firstName,
-      lastKana: lastKana,
-      firstKana: firstKana,
-      memberNo: memberNo,
-      email: email,
-      phone: phone,
-      reason: reason,
-      otherReason: reasonDetail,
-      confirm1: document.getElementById("confirm1").checked,
-      confirm2: document.getElementById("confirm2").checked,
-      confirm3: document.getElementById("confirm3").checked
-    });
-
-    if (!data.ok) {
-      throw new Error(data.message || "退会申請を送信できませんでした。");
-    }
-
-    const label =
-      data.data && data.data.withdrawalDateLabel
-        ? data.data.withdrawalDateLabel
-        : formatWithdrawalDate(
-            data.data && data.data.withdrawalDate
-              ? data.data.withdrawalDate
-              : currentWithdrawalDate
-          );
-
-    resultMessage.textContent =
-      (data.message || "登録メールアドレスへ受付メールを送信しました。") +
-      " 退会期日：" +
-      label;
-
-    form.classList.add("hidden");
-    resultBox.classList.add("show");
-    window.scrollTo({top: 0, behavior: "smooth"});
-  } catch (error) {
-    console.error(error);
-    alert(error.message || "退会申請の送信中にエラーが発生しました。");
-  } finally {
-    setSubmitting(false);
-  }
-});
-
+const GAS_URL="https://script.google.com/macros/s/AKfycbyT8G6rQ-9LFosbFlzSYj4OM0PrCG_KD7bddVxQ65RLMkfYrjmBZ2ebCvL54ncGJSZ2/exec";
+const $=id=>document.getElementById(id),form=$("withdrawalForm"),submitBtn=$("submitBtn"),memberNoInput=$("memberNo"),emailInput=$("email"),memberStatus=$("memberStatus"),withdrawalDateDisplay=$("withdrawalDateDisplay"),reasonSelect=$("reasonSelect"),otherField=$("otherField"),otherReason=$("otherReason"),resultBox=$("resultBox"),resultMessage=$("resultMessage");
+let memberVerified=false,currentWithdrawalDate="";
+reasonSelect.addEventListener("change",()=>{const other=reasonSelect.value==="その他";otherField.classList.toggle("hidden",!other);otherReason.required=other});
+memberNoInput.addEventListener("input",()=>{memberNoInput.value=memberNoInput.value.replace(/\D/g,"").slice(0,7);resetMemberVerification()});
+emailInput.addEventListener("input",resetMemberVerification);memberNoInput.addEventListener("blur",checkMember);emailInput.addEventListener("blur",checkMember);
+function resetMemberVerification(){memberVerified=false;memberStatus.className="";memberStatus.textContent=""}
+function validKana(v){return /^[ァ-ヶーｦ-ﾟA-Za-zＡ-Ｚａ-ｚ\s]+$/.test(v)}
+async function postApi(payload){const r=await fetch(GAS_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload)});if(!r.ok)throw new Error("HTTP "+r.status);return r.json()}
+function formatWithdrawalDate(v){const m=String(v||"").match(/^(\d{4})-(\d{2})-(\d{2})$/);return m?Number(m[1])+"年"+Number(m[2])+"月末（"+Number(m[1])+"年"+Number(m[2])+"月"+Number(m[3])+"日）":v}
+async function loadWithdrawalDate(){withdrawalDateDisplay.textContent="読み込み中...";try{const d=await postApi({action:"get9RoundWithdrawalDate"});if(!d.ok||!d.data||!d.data.withdrawalDate)throw new Error(d.message||"退会期日を取得できませんでした。");currentWithdrawalDate=d.data.withdrawalDate;withdrawalDateDisplay.textContent=d.data.label||formatWithdrawalDate(currentWithdrawalDate)}catch(e){console.error(e);currentWithdrawalDate="";withdrawalDateDisplay.textContent="退会期日を取得できません"}}
+async function checkMember(){const memberNo=memberNoInput.value.trim(),email=emailInput.value.trim();if(memberNo.length!==7||!email)return;memberVerified=false;memberStatus.className="";memberStatus.textContent="会員情報を確認しています...";try{const d=await postApi({action:"check9RoundWithdrawalMember",memberNo,email});if(d.ok){memberVerified=true;memberStatus.className="member-ok";memberStatus.textContent="会員情報を確認しました"+(d.data&&d.data.memberName?"："+d.data.memberName+" 様":"");if(d.data&&d.data.withdrawalDate){currentWithdrawalDate=d.data.withdrawalDate;withdrawalDateDisplay.textContent=d.data.withdrawalDateLabel||formatWithdrawalDate(currentWithdrawalDate)}}else{memberStatus.className="member-error";memberStatus.textContent=d.message||"会員情報を確認できませんでした。"}}catch(e){console.error(e);memberStatus.className="member-error";memberStatus.textContent="会員情報を確認できませんでした。"}}
+function setSubmitting(active){submitBtn.disabled=active;submitBtn.innerHTML=active?'送信中です...<span class="submit-sub">PLEASE WAIT</span>':'退会申請を送信する<span class="submit-sub">SUBMIT WITHDRAWAL REQUEST</span>'}
+form.addEventListener("submit",async e=>{e.preventDefault();const lastName=$("lastName").value.trim(),firstName=$("firstName").value.trim(),lastKana=$("lastKana").value.trim(),firstKana=$("firstKana").value.trim(),memberNo=memberNoInput.value.trim(),email=emailInput.value.trim(),phone=$("phone").value.trim(),reason=reasonSelect.value,reasonDetail=otherReason.value.trim();if(!validKana(lastKana)||!validKana(firstKana)){alert("フリガナはカタカナまたはアルファベットで入力してください。");return}if(memberNo.length!==7){alert("会員番号は7桁の数字で入力してください。");return}if(!currentWithdrawalDate){alert("退会期日を取得できていません。ページを再読み込みしてください。");return}if(!memberVerified){await checkMember();if(!memberVerified){alert("会員番号と登録メールアドレスをご確認ください。");return}}if(reason==="その他"&&!reasonDetail){alert("退会理由をご記載ください。");return}setSubmitting(true);try{const d=await postApi({action:"submit9RoundWithdrawal",lastName,firstName,lastKana,firstKana,memberNo,email,phone,reason,otherReason:reasonDetail,confirm1:$("confirm1").checked,confirm2:$("confirm2").checked,confirm3:$("confirm3").checked});if(!d.ok)throw new Error(d.message||"退会申請を送信できませんでした。");const label=d.data&&d.data.withdrawalDateLabel?d.data.withdrawalDateLabel:formatWithdrawalDate(d.data&&d.data.withdrawalDate?d.data.withdrawalDate:currentWithdrawalDate);resultMessage.textContent=(d.message||"登録メールアドレスへ受付メールを送信しました。")+" 退会期日："+label;form.classList.add("hidden");resultBox.classList.add("show");window.scrollTo({top:0,behavior:"smooth"})}catch(err){console.error(err);alert(err.message||"退会申請の送信中にエラーが発生しました。")}finally{setSubmitting(false)}});
 loadWithdrawalDate();
 </script>
 </body>
