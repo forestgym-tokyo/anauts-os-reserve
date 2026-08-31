@@ -18,6 +18,110 @@ function requireDirectShiftEditPermission_(params) {
   );
 }
 
+/**
+ * SOGA所属の一般スタッフは「自分のシフト」と「9ROUND予定」だけを使う。
+ * 画面を隠すだけでなく、対象外の管理APIもここで拒否する。
+ */
+function requireNonRestrictedAdminFeature_(params, allowedPermissions) {
+  const auth = requireAuth_(
+    params || {},
+    allowedPermissions || ["ADMIN", "MANAGER", "STAFF"]
+  );
+
+  if (isRestrictedSogaStaff_(auth)) {
+    throw new Error(
+      "9ROUNDスタッフは、自分のシフトと9ROUND予定だけ利用できます。"
+    );
+  }
+
+  return auth;
+}
+
+function isActiveSogaDirectoryRow_(row) {
+  const value = row && row.active;
+  if (value === false) return false;
+  const normalized = String(value == null ? "TRUE" : value).trim().toUpperCase();
+  return !["FALSE", "0", "NO", "OFF"].includes(normalized);
+}
+
+function sanitizeSogaDirectoryRow_(row) {
+  row = row || {};
+  return {
+    staff_code: row.staff_code,
+    staff_name: row.staff_name,
+    display_name: row.display_name,
+    role: row.role,
+    store_code: row.store_code,
+    color: row.color,
+    active: row.active
+  };
+}
+
+function getStaffForSignedInUser_(params, auth) {
+  if (!isRestrictedSogaStaff_(auth)) return getStaff(params);
+
+  const response = getStaff(
+    Object.assign({}, params || {}, { include_inactive: "false" })
+  );
+
+  const payload = parseAuthJsonResponse_(response);
+  if (!payload || payload.ok !== true) return response;
+
+  const data = payload.data;
+  if (Array.isArray(data)) {
+    return successResponse(
+      data.filter(isActiveSogaDirectoryRow_).map(sanitizeSogaDirectoryRow_)
+    );
+  }
+
+  const rows = data && Array.isArray(data.staff) ? data.staff : [];
+  return successResponse(
+    Object.assign({}, data || {}, {
+      staff: rows
+        .filter(isActiveSogaDirectoryRow_)
+        .map(sanitizeSogaDirectoryRow_)
+    })
+  );
+}
+
+function filterSogaShiftRows_(rows, requestedStaffCode, auth) {
+  const selfCode = String(auth && auth.staff_code || "").trim().toUpperCase();
+  const requested = String(requestedStaffCode || "").trim().toUpperCase();
+
+  if (requested && requested !== selfCode) {
+    throw new Error("他のスタッフを指定してシフトを取得することはできません。");
+  }
+
+  return (Array.isArray(rows) ? rows : []).filter(function (row) {
+    const storeCode = String(row && row.store_code || "").trim().toUpperCase();
+    const staffCode = String(row && row.staff_code || "").trim().toUpperCase();
+    return storeCode === "SOGA" && (!requested || staffCode === selfCode);
+  });
+}
+
+function getStaffShiftsForSignedInUser_(params, auth) {
+  if (!isRestrictedSogaStaff_(auth)) return getStaffShifts(params);
+
+  const safeParams = Object.assign({}, params || {}, { store_code: "SOGA" });
+  const response = getStaffShifts(safeParams);
+  const payload = parseAuthJsonResponse_(response);
+  if (!payload || payload.ok !== true) return response;
+
+  const data = payload.data;
+  if (Array.isArray(data)) {
+    return successResponse(
+      filterSogaShiftRows_(data, params && params.staff_code, auth)
+    );
+  }
+
+  const rows = data && Array.isArray(data.shifts) ? data.shifts : [];
+  return successResponse(
+    Object.assign({}, data || {}, {
+      shifts: filterSogaShiftRows_(rows, params && params.staff_code, auth)
+    })
+  );
+}
+
 function doGet(e) {
   try {
     const params =
@@ -78,26 +182,36 @@ function doGet(e) {
         );
 
       case "getStaffPresenceHours":
+        requireNonRestrictedAdminFeature_(
+          params,
+          ["ADMIN", "MANAGER", "STAFF"]
+        );
         return getStaffPresenceHours(
           params
         );
 
       case "getResolvedStaffPresenceHours":
+        requireNonRestrictedAdminFeature_(
+          params,
+          ["ADMIN", "MANAGER", "STAFF"]
+        );
         return getResolvedStaffPresenceHours(
           params
         );
 
-      case "getStaff":
-        requireAuth_(
+      case "getStaff": {
+        const staffAuth = requireAuth_(
           params,
           ["ADMIN", "MANAGER", "STAFF"]
         );
-        return getStaff(
-          params
+        return getStaffForSignedInUser_(
+          params,
+          staffAuth
         );
+      }
 
       case "getStaffByCode":
-        requireAuth_(
+        requireNonRestrictedAdminFeature_(
           params,
           ["ADMIN", "MANAGER", "STAFF"]
         );
@@ -105,17 +219,19 @@ function doGet(e) {
           params
         );
 
-      case "getStaffShifts":
-        requireAuth_(
+      case "getStaffShifts": {
+        const shiftAuth = requireAuth_(
           params,
           ["ADMIN", "MANAGER", "STAFF"]
         );
-        return getStaffShifts(
-          params
+        return getStaffShiftsForSignedInUser_(
+          params,
+          shiftAuth
         );
+      }
 
       case "getStaffSchedule":
-        requireAuth_(
+        requireNonRestrictedAdminFeature_(
           params,
           ["ADMIN", "MANAGER", "STAFF"]
         );
@@ -124,7 +240,7 @@ function doGet(e) {
         );
 
       case "getDailyReport": {
-        const dailyReportAuth = requireAuth_(
+        const dailyReportAuth = requireNonRestrictedAdminFeature_(
           params,
           ["ADMIN", "MANAGER", "STAFF"]
         );
@@ -135,7 +251,7 @@ function doGet(e) {
       }
 
       case "generateTourQuestionnairePdf":
-        requireAuth_(
+        requireNonRestrictedAdminFeature_(
           params,
           [
             "ADMIN",
@@ -148,7 +264,7 @@ function doGet(e) {
         );
 
       case "getAdminReservationManageUrl":
-        requireAuth_(
+        requireNonRestrictedAdminFeature_(
           params,
           [
             "ADMIN",
@@ -161,7 +277,7 @@ function doGet(e) {
         );
 
       case "getTrainerSchedule":
-        requireAuth_(
+        requireNonRestrictedAdminFeature_(
           params,
           ["ADMIN", "MANAGER", "STAFF"]
         );
@@ -184,7 +300,7 @@ function doGet(e) {
         return getMailAccounts();
 
       case "getCalendarEvents":
-        requireAuth_(
+        requireNonRestrictedAdminFeature_(
           params,
           ["ADMIN", "MANAGER", "STAFF"]
         );
@@ -316,7 +432,7 @@ function doPost(e) {
        * =====================================================
        */
       case "sendReservationRescheduleRequest":
-        requireAuth_(
+        requireNonRestrictedAdminFeature_(
           body,
           [
             "ADMIN",
@@ -338,10 +454,19 @@ function doPost(e) {
           body
         );
 
-      case "createShiftChangeRequest":
+      case "createShiftChangeRequest": {
+        const shiftRequestAuth = requireAuth_(
+          body,
+          ["ADMIN", "MANAGER", "STAFF"]
+        );
+        if (isRestrictedSogaStaff_(shiftRequestAuth)) {
+          body.staff_code = shiftRequestAuth.staff_code;
+          body.store_code = "SOGA";
+        }
         return createShiftChangeRequest(
           body
         );
+      }
 
       case "provisionStaffLogin":
         return provisionStaffLogin(
@@ -444,7 +569,7 @@ function doPost(e) {
         );
 
       case "saveDailyReport": {
-        const dailyReportSaveAuth = requireAuth_(
+        const dailyReportSaveAuth = requireNonRestrictedAdminFeature_(
           body,
           ["ADMIN", "MANAGER", "STAFF"]
         );
@@ -455,7 +580,7 @@ function doPost(e) {
       }
 
       case "submitDailyReport": {
-        const dailyReportSubmitAuth = requireAuth_(
+        const dailyReportSubmitAuth = requireNonRestrictedAdminFeature_(
           body,
           ["ADMIN", "MANAGER", "STAFF"]
         );
@@ -471,7 +596,7 @@ function doPost(e) {
        * =====================================================
        */
       case "createTourSameDayEnrollment":
-        requireAuth_(
+        requireNonRestrictedAdminFeature_(
           body,
           [
             "ADMIN",
@@ -484,7 +609,7 @@ function doPost(e) {
         );
 
       case "updateTourCustomerAddress":
-        requireAuth_(
+        requireNonRestrictedAdminFeature_(
           body,
           [
             "ADMIN",
@@ -498,7 +623,7 @@ function doPost(e) {
         );
 
       case "sendTourCustomerReply":
-        requireAuth_(
+        requireNonRestrictedAdminFeature_(
           body,
           [
             "ADMIN",
@@ -511,7 +636,7 @@ function doPost(e) {
         );
 
       case "setTourInquiryStatus":
-        requireAuth_(
+        requireNonRestrictedAdminFeature_(
           body,
           [
             "ADMIN",

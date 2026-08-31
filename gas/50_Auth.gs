@@ -18,10 +18,30 @@ const AUTH_SHEET_NAME = "auth_users";
 const FIREBASE_USER_CACHE_PREFIX = "firebase-user-v1:";
 const FIREBASE_USER_CACHE_MAX_SECONDS = 3300;
 
+/**
+ * 9ROUND（SOGA）所属の一般スタッフだけに限定画面を適用する。
+ * ADMIN / MANAGER は店舗にかかわらず従来の管理権限を維持する。
+ */
+function isRestrictedSogaStaff_(auth) {
+  const permission = String(
+    auth && auth.permission || auth && auth.profile && auth.profile.permission || ""
+  ).trim().toUpperCase();
+  const storeCode = String(
+    auth && auth.profile && auth.profile.store_code || ""
+  ).trim().toUpperCase();
+
+  return permission === "STAFF" && storeCode === "SOGA";
+}
+
 function getCurrentUser(params) {
   try {
     params = params || {};
     const auth = requireAuth_(params, ["ADMIN", "MANAGER", "STAFF"]);
+
+    // SOGA一般スタッフはログイン時に他店舗のスタッフ予定を先読みしない。
+    if (isRestrictedSogaStaff_(auth)) {
+      return successResponse(auth.profile);
+    }
 
     if (!normalizeAuthBoolean_(params.include_staff_schedule)) {
       return successResponse(auth.profile);

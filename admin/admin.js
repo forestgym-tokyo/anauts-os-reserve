@@ -17,6 +17,38 @@ function hasPermission(...levels){
   const p=String(state.authUser?.permission||"STAFF").toUpperCase();
   return levels.includes(p);
 }
+function isSogaStaffUser(){
+  if(!authEnabled())return false;
+  const permission=String(state.authUser?.permission||"STAFF").trim().toUpperCase();
+  const store=String(state.authUser?.store_code||"").trim().toUpperCase();
+  return permission==="STAFF"&&store==="SOGA";
+}
+function enforceSogaStaffUi_(){
+  const restricted=isSogaStaffUser();
+  document.body?.classList.toggle("soga-staff-restricted",restricted);
+
+  if(!restricted)return;
+
+  const allowedViews=new Set(["myShift","monthlySchedule"]);
+  $$(".topnav .nav-button").forEach(button=>{
+    const allowed=allowedViews.has(String(button.dataset.view||""));
+    button.classList.toggle("is-hidden",!allowed);
+  });
+
+  const activeButton=Array.from($$(".topnav .nav-button.is-active"))
+    .find(button=>allowedViews.has(String(button.dataset.view||"")));
+  const targetView=activeButton?.dataset.view||"myShift";
+
+  $$(".topnav .nav-button").forEach(button=>{
+    button.classList.toggle("is-active",button.dataset.view===targetView);
+  });
+  $$(".view").forEach(view=>{
+    view.classList.toggle("is-active",view.id===`${targetView}View`);
+  });
+
+  const storeChip=document.querySelector(".store-chip");
+  if(storeChip)storeChip.textContent="9ROUND / SOGA";
+}
 function applyPermissionUi(){
   if(!authEnabled())return;
   const permission=String(state.authUser?.permission||"STAFF").toUpperCase();
@@ -26,6 +58,7 @@ function applyPermissionUi(){
   $("#authUserArea")?.classList.remove("is-hidden");
   if($("#authUserName"))$("#authUserName").textContent=roleHonorific(state.authUser);
   if($("#authUserPermission"))$("#authUserPermission").textContent=permission;
+  enforceSogaStaffUi_();
 }
 
 function applyAuthBootstrap_(data){
@@ -152,6 +185,9 @@ function logout(){
   state.idToken="";
   state.authUser=null;
   sessionStorage.removeItem("anauts_id_token");
+  document.body?.classList.remove("soga-staff-restricted");
+  const storeChip=document.querySelector(".store-chip");
+  if(storeChip)storeChip.textContent="YACHIYO";
 
   if(authEnabled()){
     $("#authUserArea")?.classList.add("is-hidden");
@@ -1009,11 +1045,13 @@ async function loadMyShiftView(){
   $("#myShiftRequestHistory").innerHTML='<div class="registered-shift-empty">申請履歴を読み込んでいます…</div>';
 
   try{
-    const shiftRes=await apiGet("getStaffShifts",{
+    const shiftParams={
       staff_code:state.authUser.staff_code,
       start_date:range.start,
       end_date:range.end
-    });
+    };
+    if(isSogaStaffUser())shiftParams.store_code="SOGA";
+    const shiftRes=await apiGet("getStaffShifts",shiftParams);
 
     state.myShiftRows=(Array.isArray(shiftRes.data)?shiftRes.data:Array.isArray(shiftRes.data?.shifts)?shiftRes.data.shifts:[])
       .filter(r=>r.active!==false)
@@ -1314,7 +1352,7 @@ $("#myShiftRequestForm")?.addEventListener("submit",async e=>{
   try{
     const role=String(state.authUser?.role||"STAFF").toUpperCase();
 
-    if(role==="STAFF"){
+    if(role==="STAFF"&&!isSogaStaffUser()){
       const store=state.authUser.store_code||"YACHIYO";
       const presence=await getResolvedPresence_(state.myShiftDate,store);
 

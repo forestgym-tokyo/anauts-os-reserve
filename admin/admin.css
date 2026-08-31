@@ -1124,3 +1124,8 @@ input::placeholder,textarea::placeholder{color:#647067}
     width:100%;
   }
 }
+
+/* 9ROUNDの一般スタッフは、自分のシフトとSOGA予定だけを表示する。 */
+.soga-staff-restricted .topnav .nav-button:not([data-view="myShift"]):not([data-view="monthlySchedule"]){
+  display:none!important;
+}
