@@ -25,7 +25,7 @@ function getMpgWithdrawalOptions_() {
       const date = mpgWithdrawalMonthEnd_(month);
       options.push({
         value: date,
-        label: month.replace(/^(\d{4})-(\d{2})$/, "$1年$2月末")
+        label: formatMpgWithdrawalDateLabel_(date)
       });
     }
 
@@ -348,7 +348,6 @@ function sendMpgWithdrawalAdminMail_(member, data) {
     "退会理由：" + data.reason,
     data.otherReason ? "理由・意見：" + data.otherReason : "",
     "",
-    "※会員本人へ受付メール送信済みです。",
     "※キャンペーン継続条件・精算金・最短退会可能日の確認をお願いします。"
   ].join("\n");
 
