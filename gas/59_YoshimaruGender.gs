@@ -66,38 +66,48 @@ function getAvailableSlotsRange(params) {
   const cached = getYoshimaruRangeCache_(cacheKey);
   if (cached) return successResponse(cached);
 
-  const results = [];
-  let allSucceeded = true;
+  const calculation = runYoshimaruRangeWithLocalSheetCache_(function() {
+    const dayResults = [];
+    let succeeded = true;
 
-  for (let index = 0; index < days; index += 1) {
-    const dayParams = {};
-    Object.keys(params).forEach(function(key) {
-      dayParams[key] = params[key];
-    });
-    dayParams.action = "getAvailableSlots";
-    dayParams.date = addYoshimaruUtcDays_(startDate, index);
+    for (let index = 0; index < days; index += 1) {
+      const dayParams = {};
+      Object.keys(params).forEach(function(key) {
+        dayParams[key] = params[key];
+      });
+      dayParams.action = "getAvailableSlots";
+      dayParams.date = addYoshimaruUtcDays_(startDate, index);
 
-    try {
-      const result = parseYoshimaruApiResponse_(getAvailableSlots(dayParams));
-      if (!result || result.ok !== true) allSucceeded = false;
-      results.push(result || {
-        ok: false,
-        message: "空き状況を取得できませんでした。",
-        code: "AVAILABLE_SLOTS_EMPTY_RESPONSE",
-        data: { date: dayParams.date, slots: [] }
-      });
-    } catch (error) {
-      allSucceeded = false;
-      results.push({
-        ok: false,
-        message: error && error.message
-          ? error.message
-          : "空き状況を取得できませんでした。",
-        code: "AVAILABLE_SLOTS_RANGE_ERROR",
-        data: { date: dayParams.date, slots: [] }
-      });
+      try {
+        const result = parseYoshimaruApiResponse_(getAvailableSlots(dayParams));
+        if (!result || result.ok !== true) succeeded = false;
+        dayResults.push(result || {
+          ok: false,
+          message: "空き状況を取得できませんでした。",
+          code: "AVAILABLE_SLOTS_EMPTY_RESPONSE",
+          data: { date: dayParams.date, slots: [] }
+        });
+      } catch (error) {
+        succeeded = false;
+        dayResults.push({
+          ok: false,
+          message: error && error.message
+            ? error.message
+            : "空き状況を取得できませんでした。",
+          code: "AVAILABLE_SLOTS_RANGE_ERROR",
+          data: { date: dayParams.date, slots: [] }
+        });
+      }
     }
-  }
+
+    return {
+      results: dayResults,
+      all_succeeded: succeeded
+    };
+  });
+
+  const results = calculation.results;
+  const allSucceeded = calculation.all_succeeded;
 
   const data = {
     start_date: startDate,
@@ -115,6 +125,32 @@ function getAvailableSlotsRange(params) {
   }
 
   return successResponse(data);
+}
+
+
+/**
+ * 週次取得の同一実行内だけ、同じマスターシートの読込結果を再利用する。
+ * 予約確定処理や別リクエストには影響させず、処理終了時に必ず元へ戻す。
+ */
+function runYoshimaruRangeWithLocalSheetCache_(callback) {
+  if (typeof getSheetData !== "function") return callback();
+
+  const originalGetSheetData = getSheetData;
+  const localCache = Object.create(null);
+
+  try {
+    getSheetData = function(sheetName) {
+      const key = String(sheetName || "");
+      if (!Object.prototype.hasOwnProperty.call(localCache, key)) {
+        localCache[key] = originalGetSheetData(sheetName);
+      }
+      return localCache[key];
+    };
+
+    return callback();
+  } finally {
+    getSheetData = originalGetSheetData;
+  }
 }
 
 
