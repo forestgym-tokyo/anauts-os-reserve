@@ -862,11 +862,7 @@ function renderWeek(results) {
     el.weekList.append(row);
   });
 
-  const end = new Date(weekStart);
-  end.setDate(end.getDate() + 6);
-  el.weekRange.textContent =
-    `${weekStart.getMonth() + 1}月${weekStart.getDate()}日〜` +
-    `${end.getMonth() + 1}月${end.getDate()}日`;
+  updateWeekRange_();
 }
 
 function selectSlot(slot, button) {
@@ -892,7 +888,31 @@ function changeWeek(days) {
   if (next < today) weekStart = new Date(today);
   else if (next <= max) weekStart = next;
 
+  renderLoadingWeek_();
+  el.weekStatus.textContent = "選択した週の空き時間を確認しています…";
+  updateNav();
   loadWeek();
+}
+
+function renderLoadingWeek_() {
+  const pending = Array.from({ length: DAYS }, (_, index) => {
+    const date = new Date(weekStart);
+    date.setDate(date.getDate() + index);
+    return {
+      ok: true,
+      pending: true,
+      data: { date: apiDate(date), slots: [] }
+    };
+  });
+  renderWeek(pending);
+}
+
+function updateWeekRange_() {
+  const end = new Date(weekStart);
+  end.setDate(end.getDate() + 6);
+  el.weekRange.textContent =
+    `${weekStart.getMonth() + 1}月${weekStart.getDate()}日〜` +
+    `${end.getMonth() + 1}月${end.getDate()}日`;
 }
 
 function updateNav() {
@@ -902,8 +922,10 @@ function updateNav() {
   const next = new Date(weekStart);
   next.setDate(next.getDate() + 7);
 
-  el.prevWeekButton.disabled = loading || weekStart <= today;
-  el.nextWeekButton.disabled = loading || next > max;
+  // 週の取得中でも移動先は選べる。進行中の取得結果は version で破棄し、
+  // 選択された最新の週を pendingWeekReload で続けて取得する。
+  el.prevWeekButton.disabled = weekStart <= today;
+  el.nextWeekButton.disabled = next > max;
   el.reloadButton.disabled = loading;
 }
 
