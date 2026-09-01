@@ -46,6 +46,26 @@ assert.match(
 assert.match(storeAwareGas, /STORE_AWARE_STATIC_CACHE_SECONDS_ = 300/);
 assert.match(storeAwareGas, /STORE_AWARE_DYNAMIC_CACHE_SECONDS_ = 20/);
 assert.match(storeAwareGas, /if \(!allowCache\) return buildStoreAwareSnapshot_\(\)/);
+assert.match(
+  reserve,
+  /el\.prevWeekButton\.disabled = weekStart <= today;/,
+  "読込中でも前週ボタンを操作できる"
+);
+assert.match(
+  reserve,
+  /el\.nextWeekButton\.disabled = next > max;/,
+  "読込中でも次週ボタンを操作できる"
+);
+assert.match(
+  reserve,
+  /el\.reloadButton\.disabled = loading;/,
+  "同一週の再読込だけは重複実行しない"
+);
+assert.match(
+  reserve,
+  /renderLoadingWeek_\(\);[\s\S]*選択した週の空き時間を確認しています/,
+  "次週を押した直後に選択週の読込表示へ切り替える"
+);
 
 const pages = [
   "tour",
@@ -62,8 +82,8 @@ for (const page of pages) {
   const html = fs.readFileSync(path.join(root, page, "index.html"), "utf8");
   assert.match(
     html,
-    /reserve\.js\?v=20260902-range1/,
-    `${page} は高速化後の reserve.js を読み込む`
+    /reserve\.js\?v=20260902-range2/,
+    `${page} は次週操作修正後の reserve.js を読み込む`
   );
 }
 
