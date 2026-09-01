@@ -14,6 +14,9 @@ const YOSHIMARU_POLICY_ = Object.freeze({
   MASTER_FEMALE: "F"
 });
 
+const AVAILABLE_SLOTS_RANGE_CACHE_VERSION_ = "available-range-v2";
+const AVAILABLE_SLOTS_RANGE_CACHE_SECONDS_ = 30;
+
 
 /**
  * 7日分の空き枠を1回のHTTP通信で返す。
@@ -36,7 +39,7 @@ function getAvailableSlotsRange(params) {
     );
   }
 
-  if (!staffCode) {
+  if (!staffCode && /^PT(?:_|\d|$)/.test(serviceCode)) {
     return errorResponse(
       "担当トレーナーを指定してください。",
       "STAFF_CODE_REQUIRED",
@@ -53,7 +56,7 @@ function getAvailableSlotsRange(params) {
   }
 
   const cacheKey = [
-    "available-range-v1",
+    AVAILABLE_SLOTS_RANGE_CACHE_VERSION_,
     serviceCode,
     staffCode,
     startDate,
@@ -103,7 +106,13 @@ function getAvailableSlotsRange(params) {
   };
 
   // 予約確定時に再検証されるため、短時間だけ同一結果を再利用する。
-  if (allSucceeded) putYoshimaruRangeCache_(cacheKey, data, 20);
+  if (allSucceeded) {
+    putYoshimaruRangeCache_(
+      cacheKey,
+      data,
+      AVAILABLE_SLOTS_RANGE_CACHE_SECONDS_
+    );
+  }
 
   return successResponse(data);
 }

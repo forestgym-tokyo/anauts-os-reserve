@@ -83,6 +83,28 @@ const cached = context.getAvailableSlotsRange({
 assert.equal(cached.ok, true);
 assert.equal(calls.length, callCount);
 
+const tourCallStart = calls.length;
+const tour = context.getAvailableSlotsRange({
+  service_code: "TOUR",
+  start_date: "2026-09-02",
+  days: "2"
+});
+assert.equal(tour.ok, true);
+assert.equal(tour.data.results.length, 2);
+assert.equal(calls.length, tourCallStart + 2);
+assert.ok(
+  calls.slice(tourCallStart).every((call) => !call.staff_code),
+  "一般サービスの一括取得では担当者指定を必須にしない"
+);
+
+const personalWithoutTrainer = context.getAvailableSlotsRange({
+  service_code: "PT_DIET60",
+  start_date: "2026-09-02",
+  days: "2"
+});
+assert.equal(personalWithoutTrainer.ok, false);
+assert.equal(personalWithoutTrainer.code, "STAFF_CODE_REQUIRED");
+
 const invalid = context.getAvailableSlotsRange({
   service_code: "PT_DIET60",
   staff_code: "SHINDO",
