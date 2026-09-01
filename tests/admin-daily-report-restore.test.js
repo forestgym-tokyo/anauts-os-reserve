@@ -12,7 +12,7 @@ test("admin pages load the restored daily report without changing other addons",
     "./admin-monthly-v58.js?v=20260831-soga-staff-access-v1",
     "./admin-tour-enrollment.js?v=20260828-master-draft-v1",
     "./admin-tour-ui-polish.js?v=20260828-event-driven-v1",
-    "./admin-auto-reassign-enforce.js?v=20260828-lightweight-v1",
+    "./admin-auto-reassign-enforce.js?v=20260901-store-aware-v1",
     "./admin-daily-report.js?v=20260830-daily-cleaning-v3"
   ];
 
