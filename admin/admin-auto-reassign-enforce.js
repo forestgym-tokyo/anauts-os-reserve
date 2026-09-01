@@ -41,6 +41,8 @@
 
   function shiftCoversReservation(shift,reservation){
     if(code(shift?.staff_code)!==code(reservation?.staff_code))return false;
+    const reservationStore=code(reservation?.store_code||"YACHIYO");
+    if(code(shift?.store_code)!==reservationStore)return false;
     const shiftStart=minutes(shift?.start_time);
     const shiftEnd=minutes(shift?.end_time);
     const reservationStart=minutes(reservation?.start_time);
@@ -74,6 +76,7 @@
   function attemptKey(reservation,shifts){
     const shiftSignature=shifts.map(shift=>[
       code(shift?.staff_code),
+      code(shift?.store_code),
       hhmm(shift?.start_time),
       hhmm(shift?.end_time)
     ].join("/")).sort().join(",");
@@ -81,6 +84,7 @@
       reservation?.reservation_id||"",
       code(reservation?.service_code),
       code(reservation?.staff_code),
+      code(reservation?.store_code||"YACHIYO"),
       hhmm(reservation?.start_time),
       hhmm(reservation?.end_time),
       shiftSignature

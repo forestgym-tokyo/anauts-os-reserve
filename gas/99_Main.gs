@@ -328,12 +328,12 @@ function doGet(e) {
         );
 
       case "getAvailableSlots":
-        return getAvailableSlots(
+        return getAvailableSlotsStoreAware_(
           params
         );
 
       case "getAvailableSlotsRange":
-        return getAvailableSlotsRange(
+        return getAvailableSlotsRangeStoreAware_(
           params
         );
 
@@ -411,7 +411,7 @@ function doPost(e) {
         );
 
       case "createReservation":
-        return createReservationWithTrainerPolicy_(
+        return createReservationStoreAware_(
           body
         );
 
