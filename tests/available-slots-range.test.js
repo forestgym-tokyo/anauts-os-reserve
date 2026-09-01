@@ -10,6 +10,7 @@ const source = fs.readFileSync(
 
 const cache = new Map();
 const calls = [];
+let sheetReads = 0;
 const context = {
   console,
   CacheService: {
@@ -30,7 +31,13 @@ const context = {
   errorResponse(message, code, detail) {
     return { ok: false, message, code, detail };
   },
+  getSheetData(sheetName) {
+    sheetReads += 1;
+    return [{ sheet_name: sheetName }];
+  },
   getAvailableSlots(params) {
+    context.getSheetData("services");
+    context.getSheetData("services");
     calls.push({ ...params });
     return {
       getContent() {
@@ -46,6 +53,8 @@ const context = {
     };
   }
 };
+
+const originalGetSheetData = context.getSheetData;
 
 vm.createContext(context);
 vm.runInContext(source, context);
@@ -72,6 +81,12 @@ assert.deepEqual(
   ]
 );
 assert.ok(calls.every((call) => call.staff_code === "SHINDO"));
+assert.equal(sheetReads, 1, "7日分でも同じシートは1回だけ読み込む");
+assert.equal(
+  context.getSheetData,
+  originalGetSheetData,
+  "一括取得の終了後は通常のシート読込へ必ず戻す"
+);
 
 const callCount = calls.length;
 const cached = context.getAvailableSlotsRange({
