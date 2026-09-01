@@ -1,5 +1,7 @@
 const API_URL = "https://script.google.com/macros/s/AKfycbyvpQRxRpMRfpaQHtBar77dViCqPl-hdFW-2yMdozhN8RHtwcrFiNEM9cvEbny4x9q0/exec";
 const DAYS = 7;
+const SERVICES_SESSION_CACHE_KEY = "anauts-reserve-services-v1";
+const SERVICES_SESSION_CACHE_MS = 5 * 60 * 1000;
 
 const ROUTES = {
   personal: {
@@ -170,6 +172,9 @@ async function init() {
 }
 
 async function fetchServices() {
+  const cached = readServicesSessionCache_();
+  if (cached) return cached;
+
   const url = new URL(API_URL);
   url.searchParams.set("action", "getServices");
   url.searchParams.set("_", Date.now().toString());
@@ -181,10 +186,43 @@ async function fetchServices() {
     throw new Error(result.message || "サービス情報を取得できませんでした。");
   }
 
-  if (Array.isArray(result.data)) return result.data;
-  if (result.data && Array.isArray(result.data.services)) return result.data.services;
+  const list = Array.isArray(result.data)
+    ? result.data
+    : (result.data && Array.isArray(result.data.services) ? result.data.services : null);
+
+  if (list) {
+    writeServicesSessionCache_(list);
+    return list;
+  }
 
   throw new Error("getServicesのレスポンス形式を確認してください。");
+}
+
+function readServicesSessionCache_() {
+  try {
+    const raw = sessionStorage.getItem(SERVICES_SESSION_CACHE_KEY);
+    if (!raw) return null;
+    const cached = JSON.parse(raw);
+    if (!cached || !Array.isArray(cached.data)) return null;
+    if (Date.now() - Number(cached.saved_at || 0) > SERVICES_SESSION_CACHE_MS) {
+      sessionStorage.removeItem(SERVICES_SESSION_CACHE_KEY);
+      return null;
+    }
+    return cached.data;
+  } catch (_) {
+    return null;
+  }
+}
+
+function writeServicesSessionCache_(servicesValue) {
+  try {
+    sessionStorage.setItem(
+      SERVICES_SESSION_CACHE_KEY,
+      JSON.stringify({ saved_at: Date.now(), data: servicesValue })
+    );
+  } catch (_) {
+    // Safariのプライベートモード等ではキャッシュなしで継続する。
+  }
 }
 
 function isEnabled(service) {
@@ -661,6 +699,8 @@ async function loadWeek() {
 
     if (typeof window.ANAUTS_FETCH_WEEK_SLOTS === "function") {
       results = await window.ANAUTS_FETCH_WEEK_SLOTS(dates.slice());
+    } else {
+      results = await fetchWeekSlotsRange_(dates);
     }
 
     if (requestVersion !== weekLoadVersion) return;
@@ -701,6 +741,33 @@ async function loadWeek() {
       pendingWeekReload = false;
       loadWeek();
     }
+  }
+}
+
+async function fetchWeekSlotsRange_(dates) {
+  if (!selectedService || !Array.isArray(dates) || !dates.length) return null;
+
+  const url = new URL(API_URL);
+  url.searchParams.set("action", "getAvailableSlotsRange");
+  url.searchParams.set("service_code", selectedService.service_code);
+  url.searchParams.set("start_date", dates[0]);
+  url.searchParams.set("days", String(dates.length));
+  url.searchParams.set("_", Date.now().toString());
+
+  try {
+    const response = await fetch(url.toString(), { cache: "no-store" });
+    const result = await response.json();
+    const rangeResults = result && result.ok === true && result.data &&
+      Array.isArray(result.data.results)
+      ? result.data.results
+      : null;
+
+    return rangeResults && rangeResults.length === dates.length
+      ? rangeResults
+      : null;
+  } catch (_) {
+    // 一括APIが利用できない間も、従来の日別取得へ自動で戻す。
+    return null;
   }
 }
 

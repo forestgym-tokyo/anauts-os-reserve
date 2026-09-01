@@ -8,8 +8,11 @@
  * staff_shifts.store_code だけを予約可能枠・担当候補として使用する。
  */
 
-const STORE_AWARE_SNAPSHOT_CACHE_KEY_ = "store-aware-assignment-v1";
-const STORE_AWARE_SNAPSHOT_CACHE_SECONDS_ = 15;
+const STORE_AWARE_LEGACY_CACHE_KEY_ = "store-aware-assignment-v1";
+const STORE_AWARE_STATIC_CACHE_KEY_ = "store-aware-static-v2";
+const STORE_AWARE_DYNAMIC_CACHE_KEY_ = "store-aware-dynamic-v2";
+const STORE_AWARE_STATIC_CACHE_SECONDS_ = 300;
+const STORE_AWARE_DYNAMIC_CACHE_SECONDS_ = 20;
 const STORE_AWARE_INACTIVE_RESERVATION_STATUSES_ = Object.freeze([
   "CANCELLED",
   "CANCELED",
@@ -315,43 +318,73 @@ function isStoreAwareServiceAllowed_(staff, service) {
 
 
 function loadStoreAwareSnapshot_(allowCache) {
+  if (!allowCache) return buildStoreAwareSnapshot_();
+
   const cache = CacheService.getScriptCache();
+  const staticPart = loadStoreAwareSnapshotPart_(
+    cache,
+    STORE_AWARE_STATIC_CACHE_KEY_,
+    ["services", "staff"],
+    STORE_AWARE_STATIC_CACHE_SECONDS_
+  );
+  const dynamicPart = loadStoreAwareSnapshotPart_(
+    cache,
+    STORE_AWARE_DYNAMIC_CACHE_KEY_,
+    ["staff_shifts", "reservations"],
+    STORE_AWARE_DYNAMIC_CACHE_SECONDS_
+  );
 
-  if (allowCache) {
-    try {
-      const cached = cache.get(STORE_AWARE_SNAPSHOT_CACHE_KEY_);
-      if (cached) return JSON.parse(cached);
-    } catch (_) {
-      // キャッシュ不可でもシートから読み込む。
-    }
-  }
+  return {
+    services: staticPart.services || [],
+    staff: staticPart.staff || [],
+    shifts: dynamicPart.shifts || [],
+    reservations: dynamicPart.reservations || []
+  };
+}
 
-  const snapshot = {
+
+function buildStoreAwareSnapshot_() {
+  return {
     services: readStoreAwareSheet_("services"),
     staff: readStoreAwareSheet_("staff"),
     shifts: readStoreAwareSheet_("staff_shifts"),
     reservations: readStoreAwareSheet_("reservations")
   };
+}
 
-  if (allowCache) {
-    try {
-      cache.put(
-        STORE_AWARE_SNAPSHOT_CACHE_KEY_,
-        JSON.stringify(snapshot),
-        STORE_AWARE_SNAPSHOT_CACHE_SECONDS_
-      );
-    } catch (_) {
-      // データ量が上限を超えても判定自体は継続する。
+
+function loadStoreAwareSnapshotPart_(cache, cacheKey, sheetNames, seconds) {
+  try {
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (parsed && typeof parsed === "object") return parsed;
     }
+  } catch (_) {
+    // キャッシュ不可でもシートから読み込む。
   }
 
-  return snapshot;
+  const part = {};
+  (sheetNames || []).forEach(function(sheetName) {
+    const propertyName = sheetName === "staff_shifts" ? "shifts" : sheetName;
+    part[propertyName] = readStoreAwareSheet_(sheetName);
+  });
+
+  try {
+    cache.put(cacheKey, JSON.stringify(part), seconds);
+  } catch (_) {
+    // データ量が上限を超えても判定自体は継続する。
+  }
+
+  return part;
 }
 
 
 function clearStoreAwareSnapshotCache_() {
   try {
-    CacheService.getScriptCache().remove(STORE_AWARE_SNAPSHOT_CACHE_KEY_);
+    const cache = CacheService.getScriptCache();
+    cache.remove(STORE_AWARE_LEGACY_CACHE_KEY_);
+    cache.remove(STORE_AWARE_DYNAMIC_CACHE_KEY_);
   } catch (_) {
     // キャッシュ削除失敗は予約結果へ影響させない。
   }
@@ -368,13 +401,66 @@ function readStoreAwareSheet_(sheetName) {
     return normalizeStoreAwareText_(value);
   });
 
-  return values.slice(1).map(function(row) {
+  const rows = values.slice(1).map(function(row) {
     const record = {};
     headers.forEach(function(header, index) {
       if (header) record[header] = row[index];
     });
     return record;
   });
+
+  return compactStoreAwareRows_(sheetName, rows);
+}
+
+
+function compactStoreAwareRows_(sheetName, rows) {
+  const columnsBySheet = {
+    services: [
+      "service_code", "store_code", "duration", "provider_role", "category"
+    ],
+    staff: [
+      "staff_code", "role", "active", "can_personal", "can_tour",
+      "can_counsel", "can_meal_planning", "can_procedure",
+      "can_unsubscribe", "can_training_support", "can_9round"
+    ],
+    staff_shifts: [
+      "staff_code", "store_code", "date", "start_time", "end_time", "active"
+    ],
+    reservations: [
+      "reservation_id", "store_code", "staff_code", "reservation_date", "date",
+      "start_time", "end_time", "status"
+    ]
+  };
+  const columns = columnsBySheet[sheetName];
+  if (!columns) return rows || [];
+
+  const compacted = (rows || []).map(function(row) {
+    const record = {};
+    columns.forEach(function(column) {
+      if (Object.prototype.hasOwnProperty.call(row || {}, column)) {
+        record[column] = row[column];
+      }
+    });
+
+    if (sheetName === "staff_shifts") {
+      record.date = normalizeStoreAwareDate_(record.date);
+      record.start_time = normalizeStoreAwareTime_(record.start_time);
+      record.end_time = normalizeStoreAwareTime_(record.end_time);
+    } else if (sheetName === "reservations") {
+      record.reservation_date = normalizeStoreAwareDate_(record.reservation_date);
+      record.date = normalizeStoreAwareDate_(record.date);
+      record.start_time = normalizeStoreAwareTime_(record.start_time);
+      record.end_time = normalizeStoreAwareTime_(record.end_time);
+    }
+
+    return record;
+  });
+
+  if (sheetName === "reservations") {
+    return compacted.filter(isStoreAwareActiveReservation_);
+  }
+
+  return compacted;
 }
 
 

@@ -31,22 +31,40 @@ const tables = {
   staff_shifts: [
     ["staff_code", "store_code", "date", "start_time", "end_time", "active"],
     ["KAWAKAMI", "SOGA", "2026-09-02", "10:15", "14:00", true],
-    ["KAWAKAMI", "YACHIYO", "2026-09-02", "17:00", "21:00", true]
+    [
+      "KAWAKAMI",
+      "YACHIYO",
+      new Date("2026-09-02T00:00:00Z"),
+      new Date("1899-12-30T17:00:00Z"),
+      new Date("1899-12-30T21:00:00Z"),
+      true
+    ]
   ],
   reservations: [
-    ["reservation_id", "store_code", "staff_code", "reservation_date", "start_time", "end_time", "status"]
+    ["reservation_id", "store_code", "staff_code", "reservation_date", "start_time", "end_time", "status"],
+    ["R0", "YACHIYO", "KAWAKAMI", "2026-09-02", "08:00", "09:00", "CANCELLED"]
   ]
 };
 
-function sheet(values) {
+const sheetReads = {};
+
+function sheet(name, values) {
   return {
     getLastRow() { return values.length; },
     getLastColumn() { return values[0].length; },
-    getDataRange() { return { getValues() { return values; } }; }
+    getDataRange() {
+      return {
+        getValues() {
+          sheetReads[name] = (sheetReads[name] || 0) + 1;
+          return values;
+        }
+      };
+    }
   };
 }
 
 const cache = new Map();
+const cacheSeconds = new Map();
 const created = [];
 const context = {
   console,
@@ -63,7 +81,7 @@ const context = {
     getActiveSpreadsheet() {
       return {
         getSheetByName(name) {
-          return tables[name] ? sheet(tables[name]) : null;
+          return tables[name] ? sheet(name, tables[name]) : null;
         }
       };
     }
@@ -72,7 +90,10 @@ const context = {
     getScriptCache() {
       return {
         get(key) { return cache.get(key) || null; },
-        put(key, value) { cache.set(key, value); },
+        put(key, value, seconds) {
+          cache.set(key, value);
+          cacheSeconds.set(key, seconds);
+        },
         remove(key) { cache.delete(key); }
       };
     }
@@ -136,6 +157,14 @@ assert.deepEqual(
   [{ date: "2026-09-02", start_time: "17:30", end_time: "18:30" }],
   "SOGA勤務はYACHIYOの予約可能枠にしてはいけない"
 );
+assert.deepEqual(sheetReads, {
+  services: 1,
+  staff: 1,
+  staff_shifts: 1,
+  reservations: 1
+});
+assert.equal(cacheSeconds.get("store-aware-static-v2"), 300);
+assert.equal(cacheSeconds.get("store-aware-dynamic-v2"), 20);
 
 const availableRange = context.getAvailableSlotsRangeStoreAware_({
   service_code: "TOUR",
@@ -146,6 +175,11 @@ assert.deepEqual(
   JSON.parse(JSON.stringify(availableRange.data.results[0].data.slots)),
   [{ date: "2026-09-02", start_time: "17:30", end_time: "18:30" }],
   "7日分一括取得でもSOGA勤務をYACHIYO枠にしてはいけない"
+);
+assert.deepEqual(
+  sheetReads,
+  { services: 1, staff: 1, staff_shifts: 1, reservations: 1 },
+  "一覧用の静的・動的データは短時間キャッシュを再利用する"
 );
 
 const blocked = context.createReservationStoreAware_({
@@ -166,5 +200,7 @@ assert.equal(accepted.ok, true);
 assert.equal(created.length, 1);
 assert.equal(created[0].staff_code, "KAWAKAMI");
 assert.equal(created[0].store_code, "YACHIYO");
+assert.equal(cache.has("store-aware-static-v2"), true);
+assert.equal(cache.has("store-aware-dynamic-v2"), false);
 
 console.log("store-aware assignment tests passed");
