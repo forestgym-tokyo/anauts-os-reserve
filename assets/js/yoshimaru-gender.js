@@ -194,16 +194,19 @@
     }
 
     try {
-      const response = await previousFetch(API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({
-          action: "createReservation",
-          policy_check_only: true,
-          staff_code: YOSHIMARU_CODE,
-          member_no: memberNo,
-          customer_email: email
-        })
+      const url = new URL(API_URL);
+      url.searchParams.set("action", "getPersonalBookingEligibility");
+      url.searchParams.set("staff_code", YOSHIMARU_CODE);
+      url.searchParams.set("member_no", memberNo);
+      url.searchParams.set("customer_email", email);
+      url.searchParams.set("_", Date.now().toString());
+
+      // Apps ScriptのPOST応答は別ドメインへリダイレクトされるため、
+      // 一部のモバイルブラウザではCORS扱いとなりFailed to fetchになる。
+      // 会員確認は読み取り専用なので、既に安定しているGET経路を使用する。
+      const response = await previousFetch(url.toString(), {
+        cache: "no-store",
+        credentials: "omit"
       });
 
       const result = await response.json();
@@ -216,7 +219,8 @@
       verifiedEmail = email;
       setReadyEligibility(result.data && result.data.yoshimaru_eligible === true);
     } catch (error) {
-      showGateError((error && error.message) || "会員情報を確認できませんでした。再度お試しください。");
+      console.error("getPersonalBookingEligibility failed", error);
+      showGateError("通信に失敗しました。画面を再読み込みして、もう一度お試しください。");
     } finally {
       if (button) {
         button.disabled = false;

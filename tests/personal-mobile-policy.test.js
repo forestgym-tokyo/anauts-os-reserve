@@ -39,6 +39,9 @@ assert.doesNotMatch(reserve, /Promise\.all\(dates\.map\(fetchSlots\)\)/);
 assert.doesNotMatch(personalHtml, /personal-trainer-confirm\.js/);
 assert.match(personalHtml, /script\.google\.com/);
 assert.match(mainGas, /case "getAvailableSlotsRange"/);
+assert.match(mainGas, /case "getPersonalBookingEligibility"/);
+assert.match(gender, /action", "getPersonalBookingEligibility"/);
+assert.doesNotMatch(gender, /policy_check_only:\s*true/);
 assert.match(policyGas, /function getAvailableSlotsRange\(params\)/);
 
 [personal, reserve, gender].forEach((source) => {

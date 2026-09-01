@@ -317,6 +317,11 @@ function doGet(e) {
       case "getServices":
         return getServices();
 
+      case "getPersonalBookingEligibility":
+        return getYoshimaruBookingEligibilityResponse_(
+          params
+        );
+
       case "getPublicTrainers":
         return getPublicTrainers(
           params

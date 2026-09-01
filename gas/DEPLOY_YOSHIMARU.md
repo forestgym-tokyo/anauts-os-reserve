@@ -39,6 +39,7 @@
 ### API
 
 - `health` が正常に応答する。
+- `getPersonalBookingEligibility` に会員番号と登録メールを指定すると、予約を作成せずに `yoshimaru_eligible=true/false` が返る。
 - `getAvailableSlotsRange` に `service_code`、`staff_code`、`start_date`、`days=7` を指定すると、`data.results` に7日分が返る。
 - `policy_check_only=true` で予約が作成されず、`yoshimaru_eligible=true/false` が返る。
 - 無料体験で会員マスターにない会員番号を指定すると `MEMBER_NOT_FOUND` になる。
