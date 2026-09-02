@@ -240,6 +240,7 @@
       .dr-clean-item select,.dr-field select,.dr-field input,.dr-field textarea{width:100%;box-sizing:border-box;border:1px solid #466553;border-radius:9px;background:#24362b;color:#fff;padding:9px 10px;font:inherit}
       .dr-field{display:grid;gap:6px}
       .dr-field>span{color:#bac7c0;font-size:11px;font-weight:800}
+      .dr-label-white{color:#fff!important}
       .dr-field small,.dr-help{color:#9aaba1;font-size:11px;line-height:1.55}
       .dr-inquiry .dr-field>span{color:#aab8b1}
       .dr-inquiry .dr-field small{color:#91a198}
@@ -266,6 +267,7 @@
       .dr-review h3{margin:0 0 8px;font-size:16px;color:#fff}
       .dr-review pre{margin:0;white-space:pre-wrap;font:inherit;color:#dce6e1}
       .dr-required-note{color:#ffcf7d;font-size:11px}
+      .dr-inquiry input[data-i="name"][aria-invalid="true"]{border-color:#d96875;box-shadow:0 0 0 2px rgba(217,104,117,.18)}
       @media(max-width:900px){.dr-summary-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.dr-inquiry-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.dr-inquiry .dr-field.detail{grid-column:1/-1}}
       @media(max-width:600px){#dailyReportView{padding-bottom:172px}.dr-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.dr-clean-item{grid-template-columns:1fr}.dr-clean-item select{min-height:44px}.dr-inquiry-grid{grid-template-columns:1fr}.dr-inquiry .dr-field.detail{grid-column:auto}.dr-date-field{width:100%}.dr-meta{width:100%;margin-left:0}.dr-footer{left:12px;right:12px;display:grid;grid-template-columns:1fr 1fr}.dr-footer #drReviewButton{grid-column:1/-1}.dr-footer button{width:100%;min-height:44px}}
     `;
@@ -295,7 +297,7 @@
       <section class="card dr-section">
         <div class="dr-section-head"><div><h2>清掃チェック</h2><p>各項目を「完了／未完了／対象外」で確認します。</p></div><button id="drAllClean" class="ghost-button" type="button">すべて完了</button></div>
         <div id="drCleaning" class="dr-clean-list"></div>
-        <div class="dr-field" style="margin-top:12px"><span>清掃メモ（任意）</span><textarea id="drCleaningMemo" rows="2" placeholder="未完了箇所や補足があれば入力"></textarea><small id="drCleaningMemoAttribution" class="dr-section-attribution"></small></div>
+        <div class="dr-field" style="margin-top:12px"><span class="dr-label-white">清掃メモ（任意）</span><textarea id="drCleaningMemo" rows="2" placeholder="未完了箇所や補足があれば入力"></textarea><small id="drCleaningMemoAttribution" class="dr-section-attribution"></small></div>
       </section>
 
       <section class="card dr-section">
@@ -326,19 +328,19 @@
 
       <section class="card dr-section">
         <div class="dr-section-head"><div><h2>引継ぎ事項</h2><p>次のスタッフに伝える必要があることだけ入力します。</p></div></div>
-        <div class="dr-field"><span>引継ぎ内容</span><textarea id="drHandover" rows="4" placeholder="例：○○様へ明日電話／ラック2の部品確認"></textarea></div>
+        <div class="dr-field"><span class="dr-label-white">引継ぎ内容</span><textarea id="drHandover" rows="4" placeholder="例：○○様へ明日電話／ラック2の部品確認"></textarea></div>
         <label class="dr-radio" style="margin-top:10px"><input id="drHandoverAction" type="checkbox">次のスタッフによる対応が必要</label>
         <p class="dr-help">チェックあり＝次のスタッフが対応する必要があります。チェックなし＝情報共有のみで、追加対応は不要です。</p>
         <small id="drHandoverAttribution" class="dr-section-attribution"></small>
       </section>
 
       <section class="card dr-section">
-        <div class="dr-section-head"><div><h2>その他メモ</h2><p>上記に含まれない事項がある場合のみ入力します。</p></div></div>
+        <div class="dr-section-head"><div><h2 class="dr-label-white">その他メモ</h2><p>上記に含まれない事項がある場合のみ入力します。</p></div></div>
         <div class="dr-field"><textarea id="drOtherMemo" rows="3" placeholder="任意"></textarea></div>
         <small id="drOtherAttribution" class="dr-section-attribution"></small>
       </section>
 
-      <div class="dr-footer"><button id="drReviewButton" class="ghost-button" type="button">入力内容を確認</button><button id="drSaveButton" class="ghost-button" type="button" disabled>引継ぎ保存</button><button id="drSubmitButton" class="primary-button" type="button" disabled>最終提出・メール送信</button></div>
+      <div class="dr-footer"><button id="drReviewButton" class="ghost-button" type="button">入力内容を確認</button><button id="drSaveButton" class="ghost-button" type="button" disabled>保存</button><button id="drSubmitButton" class="primary-button" type="button" disabled>最終提出・メール送信</button></div>
       <div id="drReview" class="dr-review is-hidden"></div>
     `;
 
@@ -648,11 +650,11 @@
     row.innerHTML=`<div class="dr-inquiry-grid">
       <label class="dr-field"><span>受付経路</span><select data-i="channel"><option>来店（直接）</option><option>電話</option><option>LINE</option><option>メール</option></select></label>
       <label class="dr-field"><span>時刻</span><input data-i="time" type="time"></label>
-      <label class="dr-field"><span>氏名</span><input data-i="name" type="text" placeholder="任意"></label>
-      <label class="dr-field"><span>会員番号</span><input data-i="member" type="text" inputmode="numeric" maxlength="6" placeholder="任意"></label>
+      <label class="dr-field"><span class="dr-label-white">氏名（必須）</span><input data-i="name" type="text" placeholder="必須" required aria-required="true"></label>
+      <label class="dr-field"><span class="dr-label-white">会員番号</span><input data-i="member" type="text" inputmode="numeric" maxlength="6" placeholder="任意"></label>
       <label class="dr-field"><span>対応状況</span><select data-i="status"><option>未対応</option><option>対応中</option><option>引継ぎ</option><option>対応済み</option></select></label>
       <label class="dr-field"><span>分類</span><select data-i="category"><option>見学・入会</option><option>退会・休会</option><option>料金・契約</option><option>トレーニング</option><option>設備・利用方法</option><option>その他</option></select></label>
-      <label class="dr-field detail"><span>問い合わせ内容・対応内容</span><textarea data-i="detail" rows="2" placeholder="要点だけ入力"></textarea></label>
+      <label class="dr-field detail"><span class="dr-label-white">問い合わせ内容・対応内容</span><textarea data-i="detail" rows="2" placeholder="要点だけ入力"></textarea></label>
     </div><div class="dr-inline-actions" style="justify-content:space-between;margin-top:8px"><small class="dr-attribution" data-i-attribution></small><button class="danger-ghost" data-i-remove type="button">削除</button></div>`;
     const set=(key,value)=>{const element=row.querySelector(`[data-i="${key}"]`);if(element&&value!=null)element.value=value;};
     set("channel",data.channel||"来店（直接）");
@@ -710,7 +712,20 @@
     };
   }
 
+  function validateInquiryNames(){
+    const nameFields=[...qa('#drInquiryList .dr-inquiry [data-i="name"]')];
+    nameFields.forEach(field=>field.removeAttribute("aria-invalid"));
+    const missing=nameFields.find(field=>!String(field.value||"").trim());
+    if(!missing)return true;
+    missing.setAttribute("aria-invalid","true");
+    showMessage("問い合わせの氏名を入力してください。",true);
+    missing.focus();
+    missing.scrollIntoView({behavior:"smooth",block:"center"});
+    return false;
+  }
+
   function review(){
+    if(!validateInquiryNames())return;
     const data=serialize();
     const missing=data.cleaning.filter(item=>!item.status);
     const notDone=data.cleaning.filter(item=>item.status==="NOT_DONE");
@@ -735,6 +750,7 @@
 
   async function writeReport(shouldSubmit){
     if(REPORT_STATE.busy||REPORT_STATE.imageProcessing||!REPORT_STATE.serverAvailable)return;
+    if(!validateInquiryNames())return;
     const report=serialize();
     if(shouldSubmit&&!window.confirm("この日報を確定し、管理用メール2宛先へ送信します。提出後は編集できません。よろしいですか？"))return;
 
