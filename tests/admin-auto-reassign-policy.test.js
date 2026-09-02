@@ -24,7 +24,7 @@ const adminHtml = fs.readFileSync(
 assert.match(config, /admin-auto-reassign-enforce\.js\?v=20260901-store-aware-v1/);
 for (const html of [indexHtml, adminHtml]) {
   assert.match(html, /admin\.css\?v=20260831-soga-staff-access-v1/);
-  assert.match(html, /firebase-config\.js\?v=20260831-soga-staff-access-v1/);
+  assert.match(html, /firebase-config\.js\?v=20260903-daily-green-submit-v1/);
 }
 assert.doesNotMatch(controller, /reassignInvalidReservations/);
 assert.doesNotMatch(controller, /action:\s*["']updateReservation["']/);
