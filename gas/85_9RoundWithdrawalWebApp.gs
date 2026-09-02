@@ -90,6 +90,18 @@ function doPost(e) {
         return check9RoundWithdrawalMember_(body);
 
       case "submit9RoundWithdrawal":
+        if (
+          body.confirm1 !== true ||
+          body.confirm2 !== true ||
+          body.confirm3 !== true ||
+          body.confirm4 !== true
+        ) {
+          return round9Json_({
+            ok: false,
+            code: "CONFIRMATION_REQUIRED",
+            message: "確認事項4項目すべてへの同意が必要です。"
+          });
+        }
         return submit9RoundWithdrawal_(body);
 
       case "verify9RoundSuspensionToken":
