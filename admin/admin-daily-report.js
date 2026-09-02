@@ -109,6 +109,7 @@
     dirty:false,
     applying:false,
     busy:false,
+    busyAction:"",
     imageProcessing:false,
     serverAvailable:false,
     daySequence:0,
@@ -205,45 +206,45 @@
     const style=document.createElement("style");
     style.id="dailyReportStyle";
     style.textContent=`
-      #dailyReportView{padding-bottom:118px}
-      #dailyReportView .card{border-color:#c5d0c9;background:#e3e9e5;color:#17211c;box-shadow:0 9px 24px rgba(0,0,0,.14)}
+      #dailyReportView{padding-bottom:118px;background:#101a14;color:#f1f5f2}
+      #dailyReportView .card{border-color:#35513f;background:#1b2a21;color:#f1f5f2;box-shadow:0 9px 24px rgba(0,0,0,.24)}
       .dr-toolbar{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:12px}
       .dr-date-field{display:grid;gap:4px;min-width:210px}
-      .dr-date-field>span{color:#46544c;font-size:11px;font-weight:900}
-      .dr-toolbar .dr-date{width:100%;min-width:180px;box-sizing:border-box;border:1px solid #345047;border-radius:9px;background:#0b1713;color:#fff;padding:9px 10px;font:inherit}
+      .dr-date-field>span{color:#b6c5bc;font-size:11px;font-weight:900}
+      .dr-toolbar .dr-date{width:100%;min-width:180px;box-sizing:border-box;border:1px solid #466553;border-radius:9px;background:#24362b;color:#fff;padding:9px 10px;font:inherit}
       .dr-meta{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}
       .dr-chip{display:inline-flex;align-items:center;min-height:34px;padding:6px 10px;border:1px solid #294037;border-radius:999px;background:#10231d;color:#cbd8d1;font-size:12px;font-weight:800}
       .dr-message{margin-bottom:16px;padding:11px 13px;border:1px solid #356246;border-radius:10px;background:#10231d;color:#d9f4df;font-size:12px;font-weight:800;line-height:1.6}
       .dr-message.is-error{border-color:#8a3e48;background:#2a1519;color:#ffd6db}
       .dr-section{margin-bottom:16px;padding:18px}
       .dr-section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
-      #dailyReportView .page-heading h1,.dr-section-head h2{color:#151716}
+      #dailyReportView .page-heading h1,.dr-section-head h2{color:#f1f5f2}
       .dr-section-head h2{margin:0;font-size:18px}
-      .dr-section-head p{margin:4px 0 0;color:#55635b;font-size:12px;line-height:1.55}
+      .dr-section-head p{margin:4px 0 0;color:#a7b6ae;font-size:12px;line-height:1.55}
       .dr-summary-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
       .dr-summary-card{min-width:0;padding:12px;border:1px solid #294037;border-radius:12px;background:#0d1e18}
       .dr-summary-card strong{display:block;font-size:22px;color:#fff}
       .dr-summary-card span{display:block;margin-top:2px;color:#9caea5;font-size:11px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
       .dr-clean-list{display:grid;gap:14px}
-      .dr-clean-area{overflow:hidden;border:1px solid #294037;border-radius:14px;background:#0d1e18}
+      .dr-clean-area{overflow:hidden;border:1px solid #35513f;border-radius:14px;background:#14231b}
       .dr-clean-area-head{display:flex;align-items:center;gap:10px;padding:13px 15px;border-bottom:1px solid #294037;background:#10231d}
       .dr-clean-area-head h3{margin:0;color:#79dc8c;font-size:16px}
       .dr-clean-group{display:grid;gap:9px;padding:13px}
       .dr-clean-group+.dr-clean-group{border-top:1px solid #294037}
       .dr-clean-group h4{margin:0 0 2px;color:#79dc8c;font-size:13px}
-      .dr-clean-item{display:grid;grid-template-columns:minmax(0,1fr) 170px;gap:12px;align-items:center;padding:11px 12px;border:1px solid #263b33;border-radius:10px;background:#0a1712}
+      .dr-clean-item{display:grid;grid-template-columns:minmax(0,1fr) 170px;gap:12px;align-items:center;padding:11px 12px;border:1px solid #35513f;border-radius:10px;background:#18291f}
       .dr-clean-copy{display:grid;gap:4px;min-width:0}
       .dr-clean-status{display:grid;gap:5px;min-width:0}
       .dr-clean-target{color:#fff;font-size:13px;font-weight:900}
       .dr-clean-instruction{color:#b5c2bb;font-size:12px;line-height:1.65}
-      .dr-clean-item select,.dr-field select,.dr-field input,.dr-field textarea{width:100%;box-sizing:border-box;border:1px solid #345047;border-radius:9px;background:#0b1713;color:#fff;padding:9px 10px;font:inherit}
+      .dr-clean-item select,.dr-field select,.dr-field input,.dr-field textarea{width:100%;box-sizing:border-box;border:1px solid #466553;border-radius:9px;background:#24362b;color:#fff;padding:9px 10px;font:inherit}
       .dr-field{display:grid;gap:6px}
-      .dr-field>span{color:#34443b;font-size:11px;font-weight:800}
-      .dr-field small,.dr-help{color:#59675f;font-size:11px;line-height:1.55}
+      .dr-field>span{color:#bac7c0;font-size:11px;font-weight:800}
+      .dr-field small,.dr-help{color:#9aaba1;font-size:11px;line-height:1.55}
       .dr-inquiry .dr-field>span{color:#aab8b1}
       .dr-inquiry .dr-field small{color:#91a198}
       .dr-attribution{display:block;min-height:16px;color:#8fa69a;font-size:10px;font-weight:800;line-height:1.45}
-      .dr-section-attribution{margin:0;color:#526159;font-size:11px;font-weight:800;line-height:1.55}
+      .dr-section-attribution{margin:0;color:#9fb0a6;font-size:11px;font-weight:800;line-height:1.55}
       .dr-inquiry-list{display:grid;gap:10px}
       .dr-inquiry{padding:12px;border:1px solid #294037;border-radius:12px;background:#0d1e18}
       .dr-inquiry-grid{display:grid;grid-template-columns:120px 110px minmax(130px,1fr) 130px 150px;gap:9px;align-items:end}
@@ -738,6 +739,7 @@
     if(shouldSubmit&&!window.confirm("この日報を確定し、管理用メール2宛先へ送信します。提出後は編集できません。よろしいですか？"))return;
 
     REPORT_STATE.busy=true;
+    REPORT_STATE.busyAction=shouldSubmit?"SUBMIT":"SAVE";
     setActionState();
     showMessage(shouldSubmit?"日報を提出しています…":"下書きを保存しています…",false);
     try{
@@ -757,12 +759,13 @@
       REPORT_STATE.dirty=false;
       q("#drEquipmentMedia").value="";
       q("#drSerialImage").value="";
-      showMessage(json.data?.message||(shouldSubmit?"日報を提出しました。":"下書きを保存しました。"),false);
+      showMessage(shouldSubmit?"送信完了しました。本日もお疲れ様でした。":(json.data?.message||"下書きを保存しました。"),false);
     }catch(error){
       const message=String(error?.message||"保存に失敗しました。");
       showMessage(`${message}${message.includes("更新")?" 入力内容を控えてから日付を再読込してください。":""}`,true);
     }finally{
       REPORT_STATE.busy=false;
+      REPORT_STATE.busyAction="";
       setActionState();
     }
   }
@@ -952,7 +955,10 @@
     const locked=REPORT_STATE.status==="SUBMITTED"||REPORT_STATE.status==="SUBMITTING";
     const disabled=!REPORT_STATE.serverAvailable||REPORT_STATE.busy||REPORT_STATE.imageProcessing||locked;
     if(q("#drSaveButton"))q("#drSaveButton").disabled=disabled;
-    if(q("#drSubmitButton"))q("#drSubmitButton").disabled=disabled;
+    if(q("#drSubmitButton")){
+      q("#drSubmitButton").disabled=disabled;
+      q("#drSubmitButton").textContent=REPORT_STATE.busyAction==="SUBMIT"?"送信中…":"最終提出・メール送信";
+    }
     if(q("#drEquipmentMedia"))q("#drEquipmentMedia").disabled=disabled;
     if(q("#drSerialImage"))q("#drSerialImage").disabled=disabled;
   }
