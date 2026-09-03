@@ -19,9 +19,9 @@ const STORE_AWARE_STATIC_CACHE_SECONDS_ = 300;
 const STORE_AWARE_DYNAMIC_CACHE_SECONDS_ = 300;
 const STORE_AWARE_GENERATION_CACHE_SECONDS_ = 21600;
 const STORE_AWARE_MAX_SCOPE_DAYS_ = 31;
-const TOUR_WEEK_BULK_ENABLED_ = false;
+const TOUR_WEEK_BULK_ENABLED_ = true;
 const TOUR_WEEK_BULK_SERVICE_CODE_ = "TOUR";
-const TOUR_WEEK_BULK_CACHE_VERSION_ = "tour-week-bulk-v1";
+const TOUR_WEEK_BULK_CACHE_VERSION_ = "tour-week-bulk-v2";
 const TOUR_WEEK_BULK_CACHE_SECONDS_ = 120;
 const STORE_AWARE_INACTIVE_RESERVATION_STATUSES_ = Object.freeze([
   "CANCELLED",
@@ -199,8 +199,10 @@ function getTourAvailableSlotsRangeBulk_(params) {
   const publicLastDate = addStoreAwareUtcDays_(todayText, publicDays);
 
   const results = dates.map(function(date) {
-    return successResponse(
-      buildTourWeekDay_(
+    return {
+      ok: true,
+      message: "",
+      data: buildTourWeekDay_(
         date,
         service,
         serviceHours,
@@ -218,8 +220,9 @@ function getTourAvailableSlotsRangeBulk_(params) {
           providerRoles: providerRoles,
           storeCode: storeCode
         }
-      )
-    );
+      ),
+      timestamp: new Date().toISOString()
+    };
   });
 
   const data = {
