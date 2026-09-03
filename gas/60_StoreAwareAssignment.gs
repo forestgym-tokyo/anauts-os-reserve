@@ -9,10 +9,16 @@
  */
 
 const STORE_AWARE_LEGACY_CACHE_KEY_ = "store-aware-assignment-v1";
-const STORE_AWARE_STATIC_CACHE_KEY_ = "store-aware-static-v2";
-const STORE_AWARE_DYNAMIC_CACHE_KEY_ = "store-aware-dynamic-v2";
+const STORE_AWARE_STATIC_CACHE_KEY_ = "store-aware-static-v3";
+const STORE_AWARE_OLD_STATIC_CACHE_KEY_ = "store-aware-static-v2";
+const STORE_AWARE_OLD_DYNAMIC_CACHE_KEY_ = "store-aware-dynamic-v2";
+const STORE_AWARE_DYNAMIC_CACHE_PREFIX_ = "store-aware-dynamic-v3";
+const STORE_AWARE_GENERATION_CACHE_KEY_ = "store-aware-generation-v3";
+const STORE_AWARE_GENERATION_PROPERTY_ = "store-aware-generation-v3";
 const STORE_AWARE_STATIC_CACHE_SECONDS_ = 300;
-const STORE_AWARE_DYNAMIC_CACHE_SECONDS_ = 20;
+const STORE_AWARE_DYNAMIC_CACHE_SECONDS_ = 300;
+const STORE_AWARE_GENERATION_CACHE_SECONDS_ = 21600;
+const STORE_AWARE_MAX_SCOPE_DAYS_ = 31;
 const STORE_AWARE_INACTIVE_RESERVATION_STATUSES_ = Object.freeze([
   "CANCELLED",
   "CANCELED",
@@ -27,11 +33,19 @@ const STORE_AWARE_INACTIVE_RESERVATION_STATUSES_ = Object.freeze([
 function getAvailableSlotsStoreAware_(params) {
   params = params || {};
 
+  return runStoreAwareWithRequestSheetCache_(function() {
+    return getAvailableSlotsStoreAwareImpl_(params);
+  });
+}
+
+
+function getAvailableSlotsStoreAwareImpl_(params) {
+
   const response = getAvailableSlots(params);
   const payload = parseStoreAwareResponse_(response);
   if (!payload || payload.ok !== true) return response;
 
-  const snapshot = loadStoreAwareSnapshot_(true);
+  const snapshot = loadStoreAwareSnapshot_(true, params);
   const service = findStoreAwareService_(snapshot, params.service_code);
   if (!service) {
     return errorResponse(
@@ -53,11 +67,19 @@ function getAvailableSlotsStoreAware_(params) {
 function getAvailableSlotsRangeStoreAware_(params) {
   params = params || {};
 
+  return runStoreAwareWithRequestSheetCache_(function() {
+    return getAvailableSlotsRangeStoreAwareImpl_(params);
+  });
+}
+
+
+function getAvailableSlotsRangeStoreAwareImpl_(params) {
+
   const response = getAvailableSlotsRange(params);
   const payload = parseStoreAwareResponse_(response);
   if (!payload || payload.ok !== true) return response;
 
-  const snapshot = loadStoreAwareSnapshot_(true);
+  const snapshot = loadStoreAwareSnapshot_(true, params);
   const service = findStoreAwareService_(snapshot, params.service_code);
   if (!service) {
     return errorResponse(
@@ -128,7 +150,15 @@ function filterStoreAwareSlotData_(data, params, snapshot, service) {
 function createReservationStoreAware_(params) {
   params = params || {};
 
-  const snapshot = loadStoreAwareSnapshot_(false);
+  return runStoreAwareWithRequestSheetCache_(function() {
+    return createReservationStoreAwareImpl_(params);
+  });
+}
+
+
+function createReservationStoreAwareImpl_(params) {
+
+  const snapshot = loadStoreAwareSnapshot_(false, params);
   const service = findStoreAwareService_(snapshot, params.service_code);
   if (!service) {
     return errorResponse(
@@ -317,21 +347,45 @@ function isStoreAwareServiceAllowed_(staff, service) {
 }
 
 
-function loadStoreAwareSnapshot_(allowCache) {
-  if (!allowCache) return buildStoreAwareSnapshot_();
+function loadStoreAwareSnapshot_(allowCache, params) {
+  try {
+    return loadStoreAwareSnapshotScoped_(allowCache, params || {});
+  } catch (_) {
+    // 新しい分割キャッシュが利用できない場合も予約可否判定は継続する。
+    return buildStoreAwareSnapshot_();
+  }
+}
 
-  const cache = CacheService.getScriptCache();
-  const staticPart = loadStoreAwareSnapshotPart_(
-    cache,
-    STORE_AWARE_STATIC_CACHE_KEY_,
-    ["services", "staff"],
-    STORE_AWARE_STATIC_CACHE_SECONDS_
+
+function loadStoreAwareSnapshotScoped_(allowCache, params) {
+  const cache = allowCache ? CacheService.getScriptCache() : null;
+  const staticPart = allowCache
+    ? loadStoreAwareSnapshotPart_(
+      cache,
+      STORE_AWARE_STATIC_CACHE_KEY_,
+      ["services", "staff"],
+      STORE_AWARE_STATIC_CACHE_SECONDS_
+    )
+    : {
+      services: readStoreAwareSheet_("services"),
+      staff: readStoreAwareSheet_("staff")
+    };
+  const service = findStoreAwareService_(
+    { services: staticPart.services || [] },
+    params && params.service_code
   );
-  const dynamicPart = loadStoreAwareSnapshotPart_(
+  const storeCode = normalizeStoreAwareCode_(service && service.store_code);
+  const dates = getStoreAwareScopeDates_(params);
+
+  if (!storeCode || !dates.length) {
+    return buildStoreAwareSnapshot_();
+  }
+
+  const dynamicPart = loadStoreAwareScopedDynamicPart_(
     cache,
-    STORE_AWARE_DYNAMIC_CACHE_KEY_,
-    ["staff_shifts", "reservations"],
-    STORE_AWARE_DYNAMIC_CACHE_SECONDS_
+    storeCode,
+    dates,
+    allowCache
   );
 
   return {
@@ -350,6 +404,147 @@ function buildStoreAwareSnapshot_() {
     shifts: readStoreAwareSheet_("staff_shifts"),
     reservations: readStoreAwareSheet_("reservations")
   };
+}
+
+
+function loadStoreAwareScopedDynamicPart_(cache, storeCode, dates, allowCache) {
+  const generation = allowCache ? getStoreAwareCacheGeneration_() : "fresh";
+  const days = {};
+  const missingDates = [];
+
+  (dates || []).forEach(function(date) {
+    const key = buildStoreAwareDynamicCacheKey_(generation, storeCode, date);
+    if (allowCache && cache) {
+      try {
+        const cached = cache.get(key);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (
+            parsed &&
+            Array.isArray(parsed.shifts) &&
+            Array.isArray(parsed.reservations)
+          ) {
+            days[date] = parsed;
+            return;
+          }
+        }
+      } catch (_) {
+        // 破損・容量超過時は対象日だけシートから再構築する。
+      }
+    }
+    missingDates.push(date);
+  });
+
+  if (missingDates.length) {
+    const builtDays = buildStoreAwareScopedDynamicDays_(storeCode, missingDates);
+    missingDates.forEach(function(date) {
+      const day = builtDays[date] || { shifts: [], reservations: [] };
+      days[date] = day;
+      if (!allowCache || !cache) return;
+      try {
+        cache.put(
+          buildStoreAwareDynamicCacheKey_(generation, storeCode, date),
+          JSON.stringify(day),
+          STORE_AWARE_DYNAMIC_CACHE_SECONDS_
+        );
+      } catch (_) {
+        // 日別キャッシュが使えなくても、そのリクエストの判定は継続する。
+      }
+    });
+  }
+
+  const shifts = [];
+  const reservations = [];
+  (dates || []).forEach(function(date) {
+    const day = days[date] || {};
+    Array.prototype.push.apply(shifts, day.shifts || []);
+    Array.prototype.push.apply(reservations, day.reservations || []);
+  });
+
+  return { shifts: shifts, reservations: reservations };
+}
+
+
+function buildStoreAwareScopedDynamicDays_(storeCode, dates) {
+  const wantedDates = {};
+  const days = {};
+  (dates || []).forEach(function(date) {
+    wantedDates[date] = true;
+    days[date] = { shifts: [], reservations: [] };
+  });
+
+  const shifts = readStoreAwareSheet_("staff_shifts").filter(function(shift) {
+    const date = normalizeStoreAwareDate_(shift && shift.date);
+    return wantedDates[date] === true &&
+      normalizeStoreAwareCode_(shift && shift.store_code) === storeCode;
+  });
+  const staffByDate = {};
+
+  shifts.forEach(function(shift) {
+    const date = normalizeStoreAwareDate_(shift && shift.date);
+    const staffCode = normalizeStoreAwareCode_(shift && shift.staff_code);
+    if (!days[date]) return;
+    days[date].shifts.push(shift);
+    if (!staffByDate[date]) staffByDate[date] = {};
+    if (staffCode) staffByDate[date][staffCode] = true;
+  });
+
+  readStoreAwareSheet_("reservations").forEach(function(reservation) {
+    const date = normalizeStoreAwareDate_(
+      reservation && (reservation.reservation_date || reservation.date)
+    );
+    const staffCode = normalizeStoreAwareCode_(reservation && reservation.staff_code);
+    if (
+      days[date] &&
+      staffCode &&
+      staffByDate[date] &&
+      staffByDate[date][staffCode] === true
+    ) {
+      // YACHIYO勤務者の他店舗予約も二重割当防止のため保持する。
+      days[date].reservations.push(reservation);
+    }
+  });
+
+  return days;
+}
+
+
+function buildStoreAwareDynamicCacheKey_(generation, storeCode, date) {
+  return [
+    STORE_AWARE_DYNAMIC_CACHE_PREFIX_,
+    normalizeStoreAwareText_(generation) || "0",
+    normalizeStoreAwareCode_(storeCode),
+    normalizeStoreAwareDate_(date)
+  ].join(":");
+}
+
+
+function getStoreAwareScopeDates_(params) {
+  params = params || {};
+  const start = normalizeStoreAwareDate_(
+    params.start_date || params.date || params.reservation_date
+  );
+  if (!start) return [];
+
+  const requestedDays = params.start_date ? Number(params.days || 7) : 1;
+  const days = Math.max(
+    1,
+    Math.min(STORE_AWARE_MAX_SCOPE_DAYS_, Math.floor(requestedDays || 1))
+  );
+  return Array.from({ length: days }, function(_, index) {
+    return addStoreAwareUtcDays_(start, index);
+  });
+}
+
+
+function addStoreAwareUtcDays_(dateText, offset) {
+  const parts = String(dateText).split("-").map(Number);
+  const date = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2] + Number(offset || 0)));
+  return [
+    date.getUTCFullYear(),
+    String(date.getUTCMonth() + 1).padStart(2, "0"),
+    String(date.getUTCDate()).padStart(2, "0")
+  ].join("-");
 }
 
 
@@ -380,18 +575,129 @@ function loadStoreAwareSnapshotPart_(cache, cacheKey, sheetNames, seconds) {
 }
 
 
-function clearStoreAwareSnapshotCache_() {
+function getStoreAwareCacheGeneration_() {
+  try {
+    const cache = CacheService.getScriptCache();
+    const cached = cache.get(STORE_AWARE_GENERATION_CACHE_KEY_);
+    if (cached) return normalizeStoreAwareText_(cached);
+  } catch (_) {
+    // CacheServiceが利用できない場合はScriptPropertiesを確認する。
+  }
+
+  let generation = "0";
+  try {
+    generation = normalizeStoreAwareText_(
+      PropertiesService.getScriptProperties().getProperty(
+        STORE_AWARE_GENERATION_PROPERTY_
+      )
+    ) || "0";
+  } catch (_) {
+    // PropertiesServiceが利用できない環境では短期キャッシュだけを使う。
+  }
+
+  try {
+    CacheService.getScriptCache().put(
+      STORE_AWARE_GENERATION_CACHE_KEY_,
+      generation,
+      STORE_AWARE_GENERATION_CACHE_SECONDS_
+    );
+  } catch (_) {
+    // 世代番号の短期キャッシュ失敗は予約判定へ影響させない。
+  }
+  return generation;
+}
+
+
+function bumpStoreAwareCacheGeneration_() {
+  const generation = [
+    new Date().getTime().toString(36),
+    Math.random().toString(36).slice(2, 8)
+  ].join("-");
+
+  try {
+    PropertiesService.getScriptProperties().setProperty(
+      STORE_AWARE_GENERATION_PROPERTY_,
+      generation
+    );
+  } catch (_) {
+    // CacheService側の世代番号だけでも旧キャッシュを参照しない。
+  }
+
+  try {
+    CacheService.getScriptCache().put(
+      STORE_AWARE_GENERATION_CACHE_KEY_,
+      generation,
+      STORE_AWARE_GENERATION_CACHE_SECONDS_
+    );
+  } catch (_) {
+    // キャッシュ不能時は従来どおりシートから読み込む。
+  }
+  return generation;
+}
+
+
+function clearStoreAwareSnapshotCache_(clearStatic) {
+  bumpStoreAwareCacheGeneration_();
   try {
     const cache = CacheService.getScriptCache();
     cache.remove(STORE_AWARE_LEGACY_CACHE_KEY_);
-    cache.remove(STORE_AWARE_DYNAMIC_CACHE_KEY_);
+    cache.remove(STORE_AWARE_OLD_DYNAMIC_CACHE_KEY_);
+    if (clearStatic === true) {
+      cache.remove(STORE_AWARE_OLD_STATIC_CACHE_KEY_);
+      cache.remove(STORE_AWARE_STATIC_CACHE_KEY_);
+    }
   } catch (_) {
     // キャッシュ削除失敗は予約結果へ影響させない。
   }
 }
 
 
+function invalidateStoreAwareAfterMutation_(response, clearStatic) {
+  clearStoreAwareSnapshotCache_(clearStatic === true);
+  return response;
+}
+
+
+function runStoreAwareWithRequestSheetCache_(callback) {
+  if (typeof getSheetData !== "function") return callback();
+
+  const originalGetSheetData = getSheetData;
+  const localCache = Object.create(null);
+
+  try {
+    getSheetData = function(sheetName) {
+      const key = String(sheetName || "");
+      if (!Object.prototype.hasOwnProperty.call(localCache, key)) {
+        localCache[key] = originalGetSheetData(sheetName);
+      }
+      return localCache[key];
+    };
+    return callback();
+  } finally {
+    getSheetData = originalGetSheetData;
+  }
+}
+
+
 function readStoreAwareSheet_(sheetName) {
+  if (typeof getSheetData === "function") {
+    try {
+      const sharedRows = getSheetData(sheetName);
+      if (
+        Array.isArray(sharedRows) &&
+        (!sharedRows.length || (
+          sharedRows[0] &&
+          typeof sharedRows[0] === "object" &&
+          !Array.isArray(sharedRows[0])
+        ))
+      ) {
+        return compactStoreAwareRows_(sheetName, sharedRows);
+      }
+    } catch (_) {
+      // 既存getSheetDataの形式が異なる場合は従来の直接読込へ戻す。
+    }
+  }
+
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = spreadsheet && spreadsheet.getSheetByName(sheetName);
   if (!sheet || sheet.getLastRow() < 2 || sheet.getLastColumn() < 1) return [];

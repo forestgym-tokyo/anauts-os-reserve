@@ -14,8 +14,8 @@ const YOSHIMARU_POLICY_ = Object.freeze({
   MASTER_FEMALE: "F"
 });
 
-const AVAILABLE_SLOTS_RANGE_CACHE_VERSION_ = "available-range-v2";
-const AVAILABLE_SLOTS_RANGE_CACHE_SECONDS_ = 30;
+const AVAILABLE_SLOTS_RANGE_CACHE_VERSION_ = "available-range-v3";
+const AVAILABLE_SLOTS_RANGE_CACHE_SECONDS_ = 120;
 
 
 /**
@@ -57,6 +57,9 @@ function getAvailableSlotsRange(params) {
 
   const cacheKey = [
     AVAILABLE_SLOTS_RANGE_CACHE_VERSION_,
+    typeof getStoreAwareCacheGeneration_ === "function"
+      ? getStoreAwareCacheGeneration_()
+      : "0",
     serviceCode,
     staffCode,
     startDate,

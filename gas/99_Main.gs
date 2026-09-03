@@ -416,18 +416,18 @@ function doPost(e) {
         );
 
       case "updateReservation":
-        return updateReservation(
-          body
+        return invalidateStoreAwareAfterMutation_(
+          updateReservation(body)
         );
 
       case "reassignReservationStaff":
-        return reassignReservationStaff(
-          body
+        return invalidateStoreAwareAfterMutation_(
+          reassignReservationStaff(body)
         );
 
       case "reassignInvalidReservations":
-        return reassignInvalidReservations(
-          body
+        return invalidateStoreAwareAfterMutation_(
+          reassignInvalidReservations(body)
         );
 
       /*
@@ -450,13 +450,13 @@ function doPost(e) {
         );
 
       case "cancelReservation":
-        return cancelReservation(
-          body
+        return invalidateStoreAwareAfterMutation_(
+          cancelReservation(body)
         );
 
       case "restoreConsumedReservation":
-        return restoreConsumedReservation(
-          body
+        return invalidateStoreAwareAfterMutation_(
+          restoreConsumedReservation(body)
         );
 
       case "createShiftChangeRequest": {
@@ -479,66 +479,70 @@ function doPost(e) {
         );
 
       case "saveStaffPresenceWeekdays":
-        return saveStaffPresenceWeekdays(
-          body
+        return invalidateStoreAwareAfterMutation_(
+          saveStaffPresenceWeekdays(body)
         );
 
       case "saveStaffPresenceSpecial":
-        return saveStaffPresenceSpecial(
-          body
+        return invalidateStoreAwareAfterMutation_(
+          saveStaffPresenceSpecial(body)
         );
 
       case "deleteStaffPresenceSpecial":
-        return deleteStaffPresenceSpecial(
-          body
+        return invalidateStoreAwareAfterMutation_(
+          deleteStaffPresenceSpecial(body)
         );
 
       case "saveStaff":
         requireStaffManagementPermission_(
           body
         );
-        return saveStaff(
-          body
+        return invalidateStoreAwareAfterMutation_(
+          saveStaff(body),
+          true
         );
 
       case "setStaffActive":
         requireStaffManagementPermission_(
           body
         );
-        return setStaffActive(
-          body
+        return invalidateStoreAwareAfterMutation_(
+          setStaffActive(body),
+          true
         );
 
       case "saveService":
         requireServiceManagementPermission_(
           body
         );
-        return saveService(
-          body
+        return invalidateStoreAwareAfterMutation_(
+          saveService(body),
+          true
         );
 
       case "setServiceActive":
         requireServiceManagementPermission_(
           body
         );
-        return setServiceActive(
-          body
+        return invalidateStoreAwareAfterMutation_(
+          setServiceActive(body),
+          true
         );
 
       case "saveStaffShift":
         requireDirectShiftEditPermission_(
           body
         );
-        return saveStaffShift(
-          body
+        return invalidateStoreAwareAfterMutation_(
+          saveStaffShift(body)
         );
 
       case "deleteStaffShift":
         requireDirectShiftEditPermission_(
           body
         );
-        return deleteStaffShift(
-          body
+        return invalidateStoreAwareAfterMutation_(
+          deleteStaffShift(body)
         );
 
       case "previewStaffShiftImport":
@@ -553,24 +557,24 @@ function doPost(e) {
         requireDirectShiftEditPermission_(
           body
         );
-        return importStaffShifts(
-          body
+        return invalidateStoreAwareAfterMutation_(
+          importStaffShifts(body)
         );
 
       case "saveServiceHour":
         requireServiceManagementPermission_(
           body
         );
-        return saveServiceHour(
-          body
+        return invalidateStoreAwareAfterMutation_(
+          saveServiceHour(body)
         );
 
       case "deleteServiceHour":
         requireServiceManagementPermission_(
           body
         );
-        return deleteServiceHour(
-          body
+        return invalidateStoreAwareAfterMutation_(
+          deleteServiceHour(body)
         );
 
       case "saveDailyReport": {
