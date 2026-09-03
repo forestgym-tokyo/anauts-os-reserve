@@ -34,6 +34,21 @@ assert.match(
   "サービス一覧は同一タブ内で5分間再利用する"
 );
 assert.match(
+  reserve,
+  /tour:\s*\{[\s\S]*?serviceCode:\s*"TOUR"[\s\S]*?embeddedService:\s*\{[\s\S]*?service_code:\s*"TOUR"[\s\S]*?form_type:\s*"VISITOR"/,
+  "店内見学は必要なサービス情報を画面側に持つ"
+);
+assert.match(
+  reserve,
+  /selectedService = getEmbeddedRouteService_\(route\);\s*if \(!selectedService\) \{\s*services = await fetchServices\(\);\s*\}/,
+  "固定情報を持つ店内見学では全サービス一覧を取得しない"
+);
+assert.match(
+  reserve,
+  /if \(!selectedService\) \{\s*selectedService = services\.find/,
+  "店内見学以外の固定サービスは従来どおりサービス一覧を使う"
+);
+assert.match(
   rangeGas,
   /AVAILABLE_SLOTS_RANGE_CACHE_SECONDS_ = 30/,
   "週次空き枠結果は30秒だけ再利用する"
@@ -67,8 +82,7 @@ assert.match(
   "次週を押した直後に選択週の読込表示へ切り替える"
 );
 
-const pages = [
-  "tour",
+const unchangedPages = [
   "counsel",
   "procedure",
   "meal-planning",
@@ -78,12 +92,19 @@ const pages = [
   "trial"
 ];
 
-for (const page of pages) {
+const tourHtml = fs.readFileSync(path.join(root, "tour", "index.html"), "utf8");
+assert.match(
+  tourHtml,
+  /reserve\.js\?v=20260903-tour-fast1/,
+  "店内見学は高速化後の reserve.js を読み込む"
+);
+
+for (const page of unchangedPages) {
   const html = fs.readFileSync(path.join(root, page, "index.html"), "utf8");
   assert.match(
     html,
     /reserve\.js\?v=20260902-range2/,
-    `${page} は次週操作修正後の reserve.js を読み込む`
+    `${page} の読込バージョンは変更しない`
   );
 }
 
