@@ -11,6 +11,7 @@ const source = fs.readFileSync(
 const cache = new Map();
 const calls = [];
 let sheetReads = 0;
+let cacheGeneration = "g1";
 const context = {
   console,
   CacheService: {
@@ -30,6 +31,9 @@ const context = {
   },
   errorResponse(message, code, detail) {
     return { ok: false, message, code, detail };
+  },
+  getStoreAwareCacheGeneration_() {
+    return cacheGeneration;
   },
   getSheetData(sheetName) {
     sheetReads += 1;
@@ -97,6 +101,20 @@ const cached = context.getAvailableSlotsRange({
 });
 assert.equal(cached.ok, true);
 assert.equal(calls.length, callCount);
+
+cacheGeneration = "g2";
+const refreshed = context.getAvailableSlotsRange({
+  service_code: "PT_DIET60",
+  staff_code: "SHINDO",
+  start_date: "2026-08-28",
+  days: "7"
+});
+assert.equal(refreshed.ok, true);
+assert.equal(
+  calls.length,
+  callCount + 7,
+  "予約・シフト更新後の世代では古い週次キャッシュを再利用しない"
+);
 
 const tourCallStart = calls.length;
 const tour = context.getAvailableSlotsRange({

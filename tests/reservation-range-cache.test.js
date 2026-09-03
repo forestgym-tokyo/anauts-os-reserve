@@ -50,8 +50,13 @@ assert.match(
 );
 assert.match(
   rangeGas,
-  /AVAILABLE_SLOTS_RANGE_CACHE_SECONDS_ = 30/,
-  "週次空き枠結果は30秒だけ再利用する"
+  /AVAILABLE_SLOTS_RANGE_CACHE_SECONDS_ = 120/,
+  "週次空き枠結果は世代管理付きで120秒再利用する"
+);
+assert.match(
+  rangeGas,
+  /typeof getStoreAwareCacheGeneration_ === "function"/,
+  "予約・シフト更新後は古い週次キャッシュを参照しない"
 );
 assert.match(
   rangeGas,
@@ -59,8 +64,18 @@ assert.match(
   "担当者必須はパーソナルだけに限定する"
 );
 assert.match(storeAwareGas, /STORE_AWARE_STATIC_CACHE_SECONDS_ = 300/);
-assert.match(storeAwareGas, /STORE_AWARE_DYNAMIC_CACHE_SECONDS_ = 20/);
-assert.match(storeAwareGas, /if \(!allowCache\) return buildStoreAwareSnapshot_\(\)/);
+assert.match(storeAwareGas, /STORE_AWARE_DYNAMIC_CACHE_SECONDS_ = 300/);
+assert.match(storeAwareGas, /STORE_AWARE_DYNAMIC_CACHE_PREFIX_ = "store-aware-dynamic-v3"/);
+assert.match(
+  storeAwareGas,
+  /buildStoreAwareDynamicCacheKey_\(generation, storeCode, date\)/,
+  "動的データは店舗・日付単位で分割する"
+);
+assert.match(
+  storeAwareGas,
+  /return buildStoreAwareSnapshot_\(\);/,
+  "分割キャッシュ失敗時は従来の全件取得へ戻す"
+);
 assert.match(
   reserve,
   /el\.prevWeekButton\.disabled = weekStart <= today;/,
