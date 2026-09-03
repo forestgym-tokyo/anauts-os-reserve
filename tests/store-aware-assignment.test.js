@@ -196,7 +196,8 @@ assert.deepEqual(
 const availableRange = context.getAvailableSlotsRangeStoreAware_({
   service_code: "TOUR",
   start_date: "2026-09-02",
-  days: 1
+  days: 1,
+  tour_week_bulk: "0"
 });
 assert.deepEqual(
   JSON.parse(JSON.stringify(availableRange.data.results[0].data.slots)),
@@ -282,7 +283,8 @@ context.SpreadsheetApp.getActiveSpreadsheet = function() {
 const sharedRange = context.getAvailableSlotsRangeStoreAware_({
   service_code: "TOUR",
   start_date: "2026-09-02",
-  days: 1
+  days: 1,
+  tour_week_bulk: "0"
 });
 assert.equal(sharedRange.ok, true);
 assert.deepEqual(
