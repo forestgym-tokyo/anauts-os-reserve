@@ -230,6 +230,11 @@ const first = context.getAvailableSlotsRangeStoreAware_({
 
 assert.equal(first.ok, true);
 assert.equal(first.data.results.length, 7);
+assert.equal(
+  plain(first).data.results.filter((result) => result.data?.date).length,
+  7,
+  "日別レスポンスは外側のJSONへ埋め込んでも空オブジェクトにならない"
+);
 assert.equal(legacyCalls, 0, "週次一括計算が成功した場合は日別計算を呼ばない");
 assert.deepEqual(
   sheetReads,
@@ -281,7 +286,7 @@ const cached = context.getAvailableSlotsRangeStoreAware_({
 assert.equal(cached.ok, true);
 assert.deepEqual(sheetReads, readsAfterFirst, "再表示は週次キャッシュを使う");
 assert.equal(calendarCalls.length, 1, "再表示ではカレンダーも再取得しない");
-const bulkCacheKey = `tour-week-bulk-v1:0:TOUR:${startDate}:7`;
+const bulkCacheKey = `tour-week-bulk-v2:0:TOUR:${startDate}:7`;
 assert.equal(cacheSeconds.get(bulkCacheKey), 120);
 
 const legacy = context.getAvailableSlotsRangeStoreAware_({
