@@ -21,7 +21,15 @@ const ROUTES = {
     title: "店内見学",
     lead: "7日分の空き時間からご希望の日時をお選びください。",
     mode: "FIXED",
-    serviceCode: "TOUR"
+    serviceCode: "TOUR",
+    // 店内見学は固定サービスのため、表示前の全サービス一覧取得を省く。
+    // 空き枠取得・予約確定時はGAS側の最新services設定で再検証される。
+    embeddedService: {
+      service_code: "TOUR",
+      service_name: "店内見学",
+      form_type: "VISITOR",
+      public_days: 30
+    }
   },
   counsel: {
     title: "ダイエットカウンセリング",
@@ -129,7 +137,10 @@ async function init() {
   el.pageLead.textContent = route.lead;
 
   try {
-    services = await fetchServices();
+    selectedService = getEmbeddedRouteService_(route);
+    if (!selectedService) {
+      services = await fetchServices();
+    }
 
     if (route.mode === "GROUP") {
       const candidates = services.filter((service) => {
@@ -150,10 +161,12 @@ async function init() {
       el.availabilityStep.textContent = "2";
       el.customerStep.textContent = "3";
     } else {
-      selectedService = services.find((service) =>
-        String(service.service_code || "") === route.serviceCode &&
-        isEnabled(service)
-      );
+      if (!selectedService) {
+        selectedService = services.find((service) =>
+          String(service.service_code || "") === route.serviceCode &&
+          isEnabled(service)
+        );
+      }
 
       if (!selectedService) {
         showFatal(`サービス ${route.serviceCode} が未登録または非公開です。`);
@@ -162,6 +175,7 @@ async function init() {
 
       el.availabilityStep.textContent = "1";
       el.customerStep.textContent = "2";
+      publicDays = Number(selectedService.public_days) || 30;
       configureCustomerForm();
       el.availabilitySection.classList.remove("is-hidden");
       loadWeek();
@@ -169,6 +183,11 @@ async function init() {
   } catch (error) {
     showFatal(error.message || "サービス情報を取得できませんでした。");
   }
+}
+
+function getEmbeddedRouteService_(routeValue) {
+  const service = routeValue && routeValue.embeddedService;
+  return service ? Object.assign({}, service) : null;
 }
 
 async function fetchServices() {
