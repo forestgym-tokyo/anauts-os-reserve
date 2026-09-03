@@ -19,6 +19,10 @@ const STORE_AWARE_STATIC_CACHE_SECONDS_ = 300;
 const STORE_AWARE_DYNAMIC_CACHE_SECONDS_ = 300;
 const STORE_AWARE_GENERATION_CACHE_SECONDS_ = 21600;
 const STORE_AWARE_MAX_SCOPE_DAYS_ = 31;
+const TOUR_WEEK_BULK_ENABLED_ = false;
+const TOUR_WEEK_BULK_SERVICE_CODE_ = "TOUR";
+const TOUR_WEEK_BULK_CACHE_VERSION_ = "tour-week-bulk-v1";
+const TOUR_WEEK_BULK_CACHE_SECONDS_ = 120;
 const STORE_AWARE_INACTIVE_RESERVATION_STATUSES_ = Object.freeze([
   "CANCELLED",
   "CANCELED",
@@ -68,8 +72,519 @@ function getAvailableSlotsRangeStoreAware_(params) {
   params = params || {};
 
   return runStoreAwareWithRequestSheetCache_(function() {
+    if (shouldUseTourWeekBulk_(params)) {
+      try {
+        return getTourAvailableSlotsRangeBulk_(params);
+      } catch (error) {
+        if (typeof console !== "undefined" && console.warn) {
+          console.warn(
+            "TOUR週次一括計算を従来処理へ切り替えます: " +
+            normalizeStoreAwareText_(error && error.message)
+          );
+        }
+      }
+    }
     return getAvailableSlotsRangeStoreAwareImpl_(params);
   });
+}
+
+
+/**
+ * 店内見学の7日分を、シート各1回・カレンダー1回で計算する。
+ * tour_week_bulk=1 の比較リクエストだけで先行利用し、検証後に定数を有効化する。
+ */
+function shouldUseTourWeekBulk_(params) {
+  params = params || {};
+  if (
+    normalizeStoreAwareCode_(params.service_code) !==
+    TOUR_WEEK_BULK_SERVICE_CODE_
+  ) {
+    return false;
+  }
+  if (normalizeStoreAwareCode_(params.staff_code)) return false;
+
+  const override = normalizeStoreAwareCode_(params.tour_week_bulk);
+  if (["0", "FALSE", "NO", "OFF"].indexOf(override) >= 0) return false;
+  if (["1", "TRUE", "YES", "ON"].indexOf(override) >= 0) return true;
+  return TOUR_WEEK_BULK_ENABLED_ === true;
+}
+
+
+function getTourAvailableSlotsRangeBulk_(params) {
+  params = params || {};
+
+  const startDate = normalizeStoreAwareDate_(params.start_date || params.date);
+  const requestedDays = Number(params.days || 7);
+  const days = Math.max(1, Math.min(7, Math.floor(requestedDays || 7)));
+
+  if (!startDate) {
+    return errorResponse(
+      "開始日をYYYY-MM-DD形式で指定してください。",
+      "START_DATE_REQUIRED",
+      { start_date: normalizeStoreAwareText_(params.start_date || params.date) }
+    );
+  }
+
+  const cacheKey = buildTourWeekCacheKey_(startDate, days);
+  const cached = getTourWeekCache_(cacheKey);
+  if (cached) return successResponse(cached);
+
+  const services = readTourWeekRows_("services");
+  const service = services.find(function(row) {
+    return normalizeStoreAwareCode_(row && row.service_code) ===
+      TOUR_WEEK_BULK_SERVICE_CODE_;
+  });
+
+  if (!service || !isStoreAwareActive_(service.active)) {
+    return errorResponse(
+      "サービス情報を確認できませんでした。",
+      "SERVICE_NOT_FOUND",
+      { service_code: TOUR_WEEK_BULK_SERVICE_CODE_ }
+    );
+  }
+
+  const storeCode = normalizeStoreAwareCode_(service.store_code);
+  const duration = Math.max(1, Number(service.duration || 60));
+  const interval = Math.max(1, Number(service.slot_interval_minutes || 30));
+  const bookingMinHours = Math.max(0, Number(service.booking_min_hours || 0));
+  const publicDays = Math.max(1, Number(service.public_days || 30));
+  const providerRoles = normalizeStoreAwareText_(service.provider_role)
+    .split(",")
+    .map(function(value) { return normalizeStoreAwareCode_(value); })
+    .filter(Boolean);
+
+  const dates = Array.from({ length: days }, function(_, index) {
+    return addStoreAwareUtcDays_(startDate, index);
+  });
+  const wantedDates = {};
+  dates.forEach(function(date) { wantedDates[date] = true; });
+
+  const serviceHours = readTourWeekRows_("service_hours").filter(function(row) {
+    return normalizeStoreAwareCode_(row && row.service_code) ===
+      TOUR_WEEK_BULK_SERVICE_CODE_ &&
+      isStoreAwareActive_(row && row.active);
+  });
+  const staffRows = readTourWeekRows_("staff").filter(function(row) {
+    if (!isStoreAwareActive_(row && row.active)) return false;
+    if (!isStoreAwareRoleAllowed_(row, service)) return false;
+    return isStoreAwareServiceAllowed_(row, service);
+  });
+  const staffByCode = {};
+  staffRows.forEach(function(staff) {
+    const code = normalizeStoreAwareCode_(staff && staff.staff_code);
+    if (code) staffByCode[code] = staff;
+  });
+
+  const shifts = readTourWeekRows_("staff_shifts").filter(function(row) {
+    const date = normalizeStoreAwareDate_(row && row.date);
+    const staffCode = normalizeStoreAwareCode_(row && row.staff_code);
+    return wantedDates[date] === true &&
+      normalizeStoreAwareCode_(row && row.store_code) === storeCode &&
+      isStoreAwareActive_(row && row.active) &&
+      !!staffByCode[staffCode];
+  });
+  const reservations = readTourWeekRows_("reservations").filter(function(row) {
+    const date = normalizeStoreAwareDate_(
+      row && (row.reservation_date || row.date)
+    );
+    return wantedDates[date] === true && isStoreAwareActiveReservation_(row);
+  });
+
+  const calendarState = loadTourWeekCalendar_(service, dates);
+  const now = new Date();
+  const bookingOpenAt = new Date(
+    now.getTime() + bookingMinHours * 60 * 60 * 1000
+  );
+  const todayText = formatTourWeekDate_(now);
+  const publicLastDate = addStoreAwareUtcDays_(todayText, publicDays);
+
+  const results = dates.map(function(date) {
+    return successResponse(
+      buildTourWeekDay_(
+        date,
+        service,
+        serviceHours,
+        shifts,
+        reservations,
+        staffByCode,
+        calendarState,
+        {
+          duration: duration,
+          interval: interval,
+          bookingMinHours: bookingMinHours,
+          bookingOpenAt: bookingOpenAt,
+          publicDays: publicDays,
+          publicLastDate: publicLastDate,
+          providerRoles: providerRoles,
+          storeCode: storeCode
+        }
+      )
+    );
+  });
+
+  const data = {
+    start_date: startDate,
+    days: days,
+    results: results
+  };
+  putTourWeekCache_(cacheKey, data);
+  return successResponse(data);
+}
+
+
+function buildTourWeekDay_(
+  date,
+  service,
+  serviceHours,
+  shifts,
+  reservations,
+  staffByCode,
+  calendarState,
+  options
+) {
+  const dayCode = getTourWeekDayCode_(date);
+  const dayHours = (serviceHours || []).filter(function(row) {
+    const code = normalizeStoreAwareCode_(row && row.day_of_week);
+    return code === "ALL" || code === dayCode;
+  });
+  const dayShifts = (shifts || []).filter(function(row) {
+    return normalizeStoreAwareDate_(row && row.date) === date;
+  });
+  const dayReservations = (reservations || []).filter(function(row) {
+    return normalizeStoreAwareDate_(
+      row && (row.reservation_date || row.date)
+    ) === date;
+  });
+  const dayStart = makeTourWeekDateTime_(date, "00:00");
+  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+  const dayEvents = (calendarState.events || []).filter(function(event) {
+    return tourWeekDateRangesOverlap_(
+      getTourWeekEventStart_(event),
+      getTourWeekEventEnd_(event),
+      dayStart,
+      dayEnd
+    );
+  });
+
+  const slots = [];
+  if (date <= options.publicLastDate) {
+    dayHours.forEach(function(hours) {
+      const hoursStart = normalizeStoreAwareTime_(hours && hours.start_time);
+      const hoursEnd = normalizeStoreAwareTime_(hours && hours.end_time);
+      let cursor = tourWeekTimeToMinutes_(hoursStart);
+      const limit = tourWeekTimeToMinutes_(hoursEnd);
+
+      if (!isFinite(cursor) || !isFinite(limit) || cursor >= limit) return;
+
+      while (cursor + options.duration <= limit) {
+        const start = tourWeekMinutesToTime_(cursor);
+        const end = tourWeekMinutesToTime_(cursor + options.duration);
+        const startAt = makeTourWeekDateTime_(date, start);
+        const endAt = makeTourWeekDateTime_(date, end);
+
+        if (startAt >= options.bookingOpenAt) {
+          const shiftStaff = getTourWeekShiftStaff_(
+            dayShifts,
+            staffByCode,
+            start,
+            end
+          );
+          const availableStaff = filterTourWeekReservedStaff_(
+            shiftStaff,
+            dayReservations,
+            start,
+            end
+          );
+          const busyEvents = dayEvents.filter(function(event) {
+            return tourWeekDateRangesOverlap_(
+              getTourWeekEventStart_(event),
+              getTourWeekEventEnd_(event),
+              startAt,
+              endAt
+            );
+          });
+          const availableCapacity = Math.min(
+            availableStaff.length,
+            Math.max(0, shiftStaff.length - busyEvents.length)
+          );
+
+          if (availableStaff.length && availableCapacity > 0) {
+            slots.push({
+              date: date,
+              start_time: start,
+              end_time: end,
+              start_at: date + " " + start,
+              end_at: date + " " + end,
+              capacity: availableCapacity,
+              working_staff_count: shiftStaff.length,
+              busy_event_count: busyEvents.length,
+              staff_candidates: availableStaff.map(function(staff) {
+                return {
+                  staff_code: normalizeStoreAwareCode_(staff && staff.staff_code),
+                  staff_name: normalizeStoreAwareText_(
+                    staff && (staff.staff_name || staff.name)
+                  ),
+                  role: normalizeStoreAwareCode_(staff && staff.role)
+                };
+              })
+            });
+          }
+        }
+
+        cursor += options.interval;
+      }
+    });
+  }
+
+  return {
+    service_code: normalizeStoreAwareCode_(service && service.service_code),
+    service_name: normalizeStoreAwareText_(service && service.service_name),
+    date: date,
+    duration_minutes: options.duration,
+    interval_minutes: options.interval,
+    booking_min_hours: options.bookingMinHours,
+    public_days: options.publicDays,
+    booking_open_at: formatTourWeekDateTime_(options.bookingOpenAt),
+    provider_roles: options.providerRoles,
+    calendar_code: normalizeStoreAwareCode_(service && service.calendar_code),
+    calendar_id: calendarState.calendarId,
+    calendar_name: calendarState.calendarName,
+    staff_code: null,
+    raw_shift_count: dayShifts.length,
+    service_hour_count: dayHours.length,
+    shift_count: dayShifts.length,
+    calendar_event_count: dayEvents.length,
+    available_slot_count: slots.length,
+    slots: slots
+  };
+}
+
+
+function getTourWeekShiftStaff_(
+  dayShifts,
+  staffByCode,
+  start,
+  end
+) {
+  const found = {};
+
+  (dayShifts || []).forEach(function(shift) {
+    const staffCode = normalizeStoreAwareCode_(shift && shift.staff_code);
+    if (!staffCode || found[staffCode] || !staffByCode[staffCode]) return;
+    if (!storeAwareCovers_(
+      normalizeStoreAwareTime_(shift && shift.start_time),
+      normalizeStoreAwareTime_(shift && shift.end_time),
+      start,
+      end
+    )) return;
+
+    found[staffCode] = staffByCode[staffCode];
+  });
+
+  return Object.keys(found).map(function(code) { return found[code]; });
+}
+
+
+function filterTourWeekReservedStaff_(staffRows, dayReservations, start, end) {
+  return (staffRows || []).filter(function(staff) {
+    const staffCode = normalizeStoreAwareCode_(staff && staff.staff_code);
+    return !(dayReservations || []).some(function(reservation) {
+      return normalizeStoreAwareCode_(reservation && reservation.staff_code) ===
+        staffCode &&
+        storeAwareOverlaps_(
+          normalizeStoreAwareTime_(reservation && reservation.start_time),
+          normalizeStoreAwareTime_(reservation && reservation.end_time),
+          start,
+          end
+        );
+    });
+  });
+}
+
+
+function loadTourWeekCalendar_(service, dates) {
+  const calendarCode = normalizeStoreAwareCode_(service && service.calendar_code);
+  const calendarRows = readTourWeekRows_("calendars");
+  const row = calendarRows.find(function(item) {
+    return normalizeStoreAwareCode_(item && item.calendar_code) === calendarCode;
+  }) || {};
+  const calendarId = normalizeStoreAwareText_(
+    row.calendar_id || row.google_calendar_id || row.id || "primary"
+  );
+  let calendar = null;
+
+  if (calendarId.toLowerCase() === "primary") {
+    calendar = CalendarApp.getDefaultCalendar();
+  } else {
+    calendar = CalendarApp.getCalendarById(calendarId);
+  }
+  if (!calendar) throw new Error("カレンダーを確認できませんでした。");
+
+  const rangeStart = makeTourWeekDateTime_(dates[0], "00:00");
+  const rangeEnd = makeTourWeekDateTime_(
+    addStoreAwareUtcDays_(dates[dates.length - 1], 1),
+    "00:00"
+  );
+  const events = calendar.getEvents(rangeStart, rangeEnd) || [];
+
+  return {
+    calendarId: calendarId,
+    calendarName: normalizeStoreAwareText_(
+      row.calendar_name || row.name ||
+      (calendar.getName ? calendar.getName() : "") || calendarId
+    ),
+    events: events
+  };
+}
+
+
+function readTourWeekRows_(sheetName) {
+  if (typeof getSheetData === "function") {
+    const rows = getSheetData(sheetName);
+    if (
+      Array.isArray(rows) &&
+      (!rows.length || (
+        rows[0] && typeof rows[0] === "object" && !Array.isArray(rows[0])
+      ))
+    ) {
+      return rows;
+    }
+  }
+
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = spreadsheet && spreadsheet.getSheetByName(sheetName);
+  if (!sheet || sheet.getLastRow() < 2 || sheet.getLastColumn() < 1) return [];
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0].map(function(value) {
+    return normalizeStoreAwareText_(value);
+  });
+  return values.slice(1).map(function(row) {
+    const record = {};
+    headers.forEach(function(header, index) {
+      if (header) record[header] = row[index];
+    });
+    return record;
+  });
+}
+
+
+function getTourWeekDayCode_(dateText) {
+  const parts = String(dateText).split("-").map(Number);
+  const index = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2])).getUTCDay();
+  return ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"][index];
+}
+
+
+function makeTourWeekDateTime_(dateText, timeText) {
+  const timezone = Session.getScriptTimeZone() || "Asia/Tokyo";
+  if (Utilities && typeof Utilities.parseDate === "function") {
+    return Utilities.parseDate(
+      String(dateText) + " " + String(timeText),
+      timezone,
+      "yyyy-MM-dd HH:mm"
+    );
+  }
+
+  const dateParts = String(dateText).split("-").map(Number);
+  const timeParts = String(timeText).split(":").map(Number);
+  return new Date(
+    dateParts[0],
+    dateParts[1] - 1,
+    dateParts[2],
+    timeParts[0] || 0,
+    timeParts[1] || 0,
+    0,
+    0
+  );
+}
+
+
+function buildTourWeekCacheKey_(startDate, days) {
+  return [
+    TOUR_WEEK_BULK_CACHE_VERSION_,
+    typeof getStoreAwareCacheGeneration_ === "function"
+      ? getStoreAwareCacheGeneration_()
+      : "0",
+    TOUR_WEEK_BULK_SERVICE_CODE_,
+    normalizeStoreAwareDate_(startDate),
+    Number(days || 7)
+  ].join(":");
+}
+
+
+function getTourWeekCache_(key) {
+  try {
+    const raw = CacheService.getScriptCache().get(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+
+function putTourWeekCache_(key, data) {
+  try {
+    CacheService.getScriptCache().put(
+      key,
+      JSON.stringify(data),
+      TOUR_WEEK_BULK_CACHE_SECONDS_
+    );
+  } catch (_) {
+    // キャッシュ不可でも週次の空き枠は返す。
+  }
+}
+
+
+function formatTourWeekDate_(value) {
+  return Utilities.formatDate(
+    value,
+    Session.getScriptTimeZone() || "Asia/Tokyo",
+    "yyyy-MM-dd"
+  );
+}
+
+
+function formatTourWeekDateTime_(value) {
+  return Utilities.formatDate(
+    value,
+    Session.getScriptTimeZone() || "Asia/Tokyo",
+    "yyyy-MM-dd HH:mm"
+  );
+}
+
+
+function tourWeekTimeToMinutes_(value) {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(normalizeStoreAwareText_(value));
+  return match ? Number(match[1]) * 60 + Number(match[2]) : NaN;
+}
+
+
+function tourWeekMinutesToTime_(minutes) {
+  return String(Math.floor(minutes / 60)).padStart(2, "0") + ":" +
+    String(minutes % 60).padStart(2, "0");
+}
+
+
+function getTourWeekEventStart_(event) {
+  return event && typeof event.getStartTime === "function"
+    ? event.getStartTime()
+    : new Date(event && event.start);
+}
+
+
+function getTourWeekEventEnd_(event) {
+  return event && typeof event.getEndTime === "function"
+    ? event.getEndTime()
+    : new Date(event && event.end);
+}
+
+
+function tourWeekDateRangesOverlap_(leftStart, leftEnd, rightStart, rightEnd) {
+  if (
+    !(leftStart instanceof Date) || isNaN(leftStart.getTime()) ||
+    !(leftEnd instanceof Date) || isNaN(leftEnd.getTime())
+  ) return false;
+  return leftStart < rightEnd && leftEnd > rightStart;
 }
 
 
