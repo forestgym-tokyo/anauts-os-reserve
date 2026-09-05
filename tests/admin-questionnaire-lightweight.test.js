@@ -36,9 +36,16 @@ assert.match(questionnaire, /action:"updateTourCustomerAddress"/);
 assert.match(questionnaire, /toUpperCase\(\)!=="CANCELLED"/);
 assert.doesNotMatch(questionnaire, /loadStaffSchedule\s*\(/);
 assert.doesNotMatch(polish, /tour-reply-inside|openReplyForRow|wireModal/);
+assert.match(questionnaire, /const REPLY_ACTION = "sendTourCustomerReplyV2"/);
+assert.match(questionnaire, /const REPLY_HISTORY_ACTION = "getTourReplyHistory"/);
+assert.match(questionnaire, /question\.onclick=e=>/);
+assert.match(questionnaire, /question\.onkeydown=e=>/);
+assert.match(questionnaire, /role","button"/);
+assert.match(questionnaire, /id="tourReplyHistory"/);
+assert.doesNotMatch(polish, /MutationObserver|openReplyForRow|wireModal/);
 
 for (const html of [indexHtml, adminHtml]) {
-  assert.match(html, /admin-questionnaire\.js\?v=20260828-questionnaire-light-v1/);
+  assert.match(html, /admin-questionnaire\.js\?v=20260906-tour-reply-history-v1/);
   assert.match(html, /firebase-config\.js\?v=20260903-daily-save-required-v2/);
 }
 
