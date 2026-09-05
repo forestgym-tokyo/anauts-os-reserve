@@ -263,6 +263,19 @@ function doGet(e) {
           params
         );
 
+      case "getTourReplyHistory":
+        requireNonRestrictedAdminFeature_(
+          params,
+          [
+            "ADMIN",
+            "MANAGER",
+            "STAFF"
+          ]
+        );
+        return getTourReplyHistoryV2(
+          params
+        );
+
       case "getAdminReservationManageUrl":
         requireNonRestrictedAdminFeature_(
           params,
@@ -643,6 +656,21 @@ function doPost(e) {
         return sendTourCustomerReply(
           body
         );
+
+      case "sendTourCustomerReplyV2": {
+        const tourReplyAuth = requireNonRestrictedAdminFeature_(
+          body,
+          [
+            "ADMIN",
+            "MANAGER",
+            "STAFF"
+          ]
+        );
+        return sendTourCustomerReplyV2(
+          body,
+          tourReplyAuth
+        );
+      }
 
       case "setTourInquiryStatus":
         requireNonRestrictedAdminFeature_(

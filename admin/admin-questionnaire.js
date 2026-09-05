@@ -12,7 +12,8 @@
   "use strict";
 
   const PRINT_ACTION = "generateTourQuestionnairePdf";
-  const REPLY_ACTION = "sendTourCustomerReply";
+  const REPLY_ACTION = "sendTourCustomerReplyV2";
+  const REPLY_HISTORY_ACTION = "getTourReplyHistory";
 
   function serviceCodeOf_(r){
     return String(r?.service_code||"").toUpperCase();
@@ -91,6 +92,9 @@
       .tour-row-actions{display:inline-flex;gap:7px;align-items:center;margin-left:10px;flex-wrap:wrap}
       .tour-mail-button{width:38px;height:38px;min-width:38px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;font-size:18px;line-height:1;padding:0}
       .tour-question-inline{width:100%;margin-top:8px;padding:9px 11px;border-left:3px solid #98a2b3;background:#f8fafc;border-radius:0 8px 8px 0;font-size:12px;line-height:1.55;color:#344054}
+      .tour-question-inline[role="button"]{cursor:pointer}
+      .tour-question-inline[role="button"]:hover{background:#eef3f1;border-left-color:#067647}
+      .tour-question-inline[role="button"]:focus-visible{outline:3px solid rgba(6,118,71,.28);outline-offset:2px}
       .tour-question-inline strong{color:#101828}
       .tour-inquiry-status{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;font-size:12px}
       .tour-status-badge{display:inline-flex;align-items:center;border-radius:999px;padding:4px 9px;font-weight:800}
@@ -101,6 +105,20 @@
       .tour-reply-textarea{width:100%;min-height:170px;resize:vertical;padding:12px;border:1px solid #d0d5dd;border-radius:10px;font:inherit;line-height:1.65}
       .tour-reply-subject{width:100%;padding:11px 12px;border:1px solid #d0d5dd;border-radius:10px;font:inherit}
       .tour-reply-label{display:block;margin:14px 0 6px;font-size:13px;font-weight:700}
+      .tour-reply-modal{width:min(680px,100%)}
+      .tour-thread{margin-top:12px;border:1px solid #d0d5dd;border-radius:12px;overflow:hidden;background:#f8fafc}
+      .tour-thread-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 13px;border-bottom:1px solid #e3e8ef;background:#eef3f1}
+      .tour-thread-head strong{font-size:14px;color:#101828}
+      .tour-thread-head span{font-size:11px;color:#667085}
+      .tour-thread-list{display:grid;gap:10px;max-height:300px;overflow:auto;padding:12px}
+      .tour-thread-item{padding:11px 12px;border:1px solid #d9e1de;border-radius:10px;background:#fff}
+      .tour-thread-item.is-question{border-left:4px solid #98a2b3}
+      .tour-thread-item.is-sent{border-left:4px solid #067647}
+      .tour-thread-meta{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px;color:#667085;font-size:11px;font-weight:700}
+      .tour-thread-subject{display:block;margin-bottom:5px;color:#101828;font-size:13px}
+      .tour-thread-body{white-space:pre-wrap;overflow-wrap:anywhere;color:#344054;font-size:13px;line-height:1.6}
+      .tour-thread-empty,.tour-thread-loading,.tour-thread-error{padding:7px 2px;color:#667085;font-size:12px;line-height:1.55}
+      .tour-thread-error{color:#b42318}
       .tour-save-result{margin-top:12px;padding:12px 14px;border-radius:10px;background:#f0fdf4;border:1px solid #bbf7d0;font-size:13px;line-height:1.65}
       .tour-save-result strong{display:block;margin-bottom:4px}
       .tour-save-result a{display:inline-block;margin-right:12px;font-weight:700;text-decoration:underline}
@@ -357,14 +375,86 @@
     return `${name ? name+" 様" : "お客様"}\n\nお問い合わせありがとうございます。\n\n\nThe Forest Gym 八千代緑が丘店`;
   }
 
-  function openReplyModal(r){
+  function makeReplyRequestId_(){
+    return "tour-reply-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,10);
+  }
+
+  function formatReplyTimestamp_(value,fallback){
+    const raw=String(value||"").trim();
+    if(!raw)return fallback||"";
+    const parsed=new Date(raw);
+    if(Number.isNaN(parsed.getTime()))return raw;
+    try{
+      return new Intl.DateTimeFormat("ja-JP",{
+        timeZone:"Asia/Tokyo",
+        year:"numeric",
+        month:"2-digit",
+        day:"2-digit",
+        hour:"2-digit",
+        minute:"2-digit"
+      }).format(parsed);
+    }catch(_){
+      return raw;
+    }
+  }
+
+  function reservationCreatedAt_(r){
+    return r?.created_at||r?.createdAt||r?.reserved_at||r?.reservation_created_at||"";
+  }
+
+  function renderReplyHistory_(container,r,replies,errorMessage){
+    if(!container)return;
+    const rows=(Array.isArray(replies)?replies:[]).slice().sort((a,b)=>
+      String(a?.sent_at||"").localeCompare(String(b?.sent_at||""))
+    );
+    const original=`
+      <article class="tour-thread-item is-question">
+        <div class="tour-thread-meta">
+          <span>お客様・質問／ご要望</span>
+          <span>${escapeHtml(formatReplyTimestamp_(reservationCreatedAt_(r),"予約時"))}</span>
+        </div>
+        <div class="tour-thread-body">${escapeHtml(r?.note||"なし")}</div>
+      </article>`;
+    const sent=rows.map(item=>{
+      const handler=String(item?.handler_name||item?.handler_code||"スタッフ").trim();
+      return `
+        <article class="tour-thread-item is-sent">
+          <div class="tour-thread-meta">
+            <span>送信・${escapeHtml(handler)}</span>
+            <span>${escapeHtml(formatReplyTimestamp_(item?.sent_at,"日時不明"))}</span>
+          </div>
+          <strong class="tour-thread-subject">${escapeHtml(item?.subject||"件名なし")}</strong>
+          <div class="tour-thread-body">${escapeHtml(item?.body||"")}</div>
+        </article>`;
+    }).join("");
+    const tail=errorMessage
+      ? `<div class="tour-thread-error">送信履歴を読み込めませんでした：${escapeHtml(errorMessage)}</div>`
+      : (!rows.length?`<div class="tour-thread-empty">対応メールはまだ送信されていません。</div>`:``);
+    container.innerHTML=original+sent+tail;
+    container.scrollTop=container.scrollHeight;
+  }
+
+  async function loadReplyHistory_(r,container){
+    renderReplyHistory_(container,r,[]);
+    try{
+      if(typeof apiGet!=="function")throw new Error("管理画面APIを利用できません。");
+      const result=await apiGet(REPLY_HISTORY_ACTION,{
+        reservation_id:r.reservation_id
+      });
+      renderReplyHistory_(container,r,result?.data?.replies||[]);
+    }catch(err){
+      renderReplyHistory_(container,r,[],err?.message||"取得に失敗しました。");
+    }
+  }
+
+  function openReplyModal(r,inquiryContainer){
     closeModal();
     injectStyles();
 
     const overlay=document.createElement("div");
     overlay.className="tour-print-overlay";
     overlay.innerHTML=`
-      <div class="tour-print-modal" role="dialog" aria-modal="true" aria-label="見学者へメール返信">
+      <div class="tour-print-modal tour-reply-modal" role="dialog" aria-modal="true" aria-label="見学者への対応履歴とメール返信">
         <button type="button" class="tour-modal-x" aria-label="閉じる">×</button>
         <div class="tour-print-head">
           <h2>見学者へメール返信</h2>
@@ -375,9 +465,14 @@
             <strong>${escapeHtml(r.customer_name||"見学者")}</strong><br>
             ${escapeHtml(r.customer_email||"メールアドレス未登録")}
           </div>
-          <div class="tour-info-box">
-            <strong>見学フォームの質問・ご要望</strong>
-            ${escapeHtml(r.note||"なし").replace(/\n/g,"<br>")}
+          <div class="tour-thread">
+            <div class="tour-thread-head">
+              <strong>対応履歴</strong>
+              <span>古い順</span>
+            </div>
+            <div class="tour-thread-list" id="tourReplyHistory" aria-live="polite">
+              <div class="tour-thread-loading">履歴を読み込んでいます…</div>
+            </div>
           </div>
           <label class="tour-reply-label" for="tourReplySubject">件名</label>
           <input id="tourReplySubject" class="tour-reply-subject" type="text" value="${escapeHtml(defaultReplySubject())}">
@@ -392,15 +487,26 @@
       </div>`;
 
     document.body.appendChild(overlay);
-    overlay.addEventListener("click",e=>{if(e.target===overlay)closeModal()});
-    overlay.querySelector(".tour-modal-x").onclick=closeModal;
-    overlay.querySelector("#tourReplyCancel").onclick=closeModal;
+    const history=overlay.querySelector("#tourReplyHistory");
+    renderReplyHistory_(history,r,[]);
+    loadReplyHistory_(r,history);
+
+    let sending=false;
+    const closeReply=()=>{if(!sending)closeModal()};
+    overlay.addEventListener("click",e=>{if(e.target===overlay)closeReply()});
+    overlay.querySelector(".tour-modal-x").onclick=closeReply;
+    overlay.querySelector("#tourReplyCancel").onclick=closeReply;
 
     overlay.querySelector("#tourReplySend").onclick=async()=>{
       const btn=overlay.querySelector("#tourReplySend");
+      const closeButtons=[
+        overlay.querySelector(".tour-modal-x"),
+        overlay.querySelector("#tourReplyCancel")
+      ].filter(Boolean);
       const msg=overlay.querySelector("#tourReplyMessage");
       const subject=overlay.querySelector("#tourReplySubject").value.trim();
-      const body=overlay.querySelector("#tourReplyBody").value.trim();
+      const bodyInput=overlay.querySelector("#tourReplyBody");
+      const body=bodyInput.value.trim();
 
       if(!r.customer_email){
         msg.textContent="見学者のメールアドレスがありません。";
@@ -415,31 +521,44 @@
         return;
       }
 
+      sending=true;
       btn.disabled=true;
+      closeButtons.forEach(button=>{button.disabled=true});
       btn.textContent="送信中…";
       msg.style.color="#475467";
       msg.textContent="メールを送信しています…";
 
       try{
         if(typeof apiPost!=="function")throw new Error("管理画面APIを利用できません。");
-        await apiPost({
+        const result=await apiPost({
           action:REPLY_ACTION,
           reservation_id:r.reservation_id,
+          request_id:makeReplyRequestId_(),
+          customer_email:r.customer_email,
           subject,
           body,
           handler_code:currentHandler().code,
           handler_name:currentHandler().name,
           handler_email:currentHandler().email
         });
-        msg.style.color="#067647";
-        msg.textContent="送信完了しました。";
-        btn.textContent="送信完了";
-        setTimeout(closeModal,900);
+        const warning=String(result?.data?.warning||"").trim();
+        msg.style.color=warning?"#b54708":"#067647";
+        msg.textContent=warning||"送信完了しました。対応履歴へ追加しました。";
+        bodyInput.value="";
+        r.inquiry_status="DONE";
+        r.inquiry_handled_by_name=currentHandler().name;
+        r.inquiry_handled_by=currentHandler().code;
+        if(inquiryContainer)renderInquiryStatus(r,inquiryContainer);
+        await loadReplyHistory_(r,history);
+        btn.textContent="送信する";
       }catch(err){
         msg.style.color="#b42318";
         msg.textContent=err.message||"メール送信に失敗しました。";
-        btn.disabled=false;
         btn.textContent="送信する";
+      }finally{
+        sending=false;
+        btn.disabled=false;
+        closeButtons.forEach(button=>{button.disabled=false});
       }
     };
   }
@@ -521,7 +640,7 @@
       mail.onclick=e=>{
         e.preventDefault();
         e.stopPropagation();
-        openReplyModal(r);
+        openReplyModal(r,row.querySelector(".tour-inquiry-status"));
       };
 
       actions.appendChild(button);
@@ -533,15 +652,30 @@
       row.appendChild(actions);
 
       if(isTour_(r)){
-        const question=document.createElement("div");
-        question.className="tour-question-inline";
-        question.innerHTML=
-          `<strong>質問・ご要望：</strong> ${escapeHtml(r.note||"なし").replace(/\n/g,"<br>")}`;
-        row.appendChild(question);
-
         const inquiry=document.createElement("div");
         inquiry.className="tour-inquiry-status";
         renderInquiryStatus(r,inquiry);
+
+        const question=document.createElement("div");
+        question.className="tour-question-inline";
+        question.setAttribute("role","button");
+        question.setAttribute("tabindex","0");
+        question.setAttribute("aria-label","質問・ご要望の対応履歴を開いて返信する");
+        question.title="タップして対応履歴を確認・返信";
+        question.innerHTML=
+          `<strong>質問・ご要望：</strong> ${escapeHtml(r.note||"なし").replace(/\n/g,"<br>")}`;
+        question.onclick=e=>{
+          e.preventDefault();
+          e.stopPropagation();
+          openReplyModal(r,inquiry);
+        };
+        question.onkeydown=e=>{
+          if(e.key!=="Enter"&&e.key!==" ")return;
+          e.preventDefault();
+          e.stopPropagation();
+          openReplyModal(r,inquiry);
+        };
+        row.appendChild(question);
         row.appendChild(inquiry);
       }
     });
