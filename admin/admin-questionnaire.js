@@ -263,10 +263,21 @@
         </div>
       </div>`;
 
+    let generationInFlight=false;
+    let generatedPdf=null;
+    const generationRequestId=
+      "tour-pdf-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,10);
+
     document.body.appendChild(overlay);
-    overlay.addEventListener("click",e=>{if(e.target===overlay)closeModal()});
-    overlay.querySelector(".tour-modal-x").onclick=closeModal;
-    overlay.querySelector("#tourPrintCancel").onclick=closeModal;
+    overlay.addEventListener("click",e=>{
+      if(e.target===overlay&&!generationInFlight)closeModal();
+    });
+    overlay.querySelector(".tour-modal-x").onclick=()=>{
+      if(!generationInFlight)closeModal();
+    };
+    overlay.querySelector("#tourPrintCancel").onclick=()=>{
+      if(!generationInFlight)closeModal();
+    };
     showCurrentAddress_(overlay.querySelector(".tour-print-modal"),r);
     if(isTour_(r)){
       overlay.querySelector("#tourAddressCorrect").onclick=()=>
@@ -276,41 +287,44 @@
     overlay.querySelector("#tourPrintGenerate").onclick=async()=>{
       const btn=overlay.querySelector("#tourPrintGenerate");
       const msg=overlay.querySelector("#tourPrintMessage");
-      const mode=overlay.querySelector('input[name="tourPrintMode"]:checked')?.value||"FULL";
 
-      // 先に空タブを開き、非同期処理後もポップアップブロックされないようにする。
-      const preview=window.open("about:blank","_blank");
-      if(preview){
-        preview.document.write('<p style="font-family:sans-serif;padding:24px">PDFを作成しています…</p>');
+      if(generatedPdf?.file_url){
+        window.open(String(generatedPdf.file_url),"_blank","noopener");
+        return;
       }
+      if(generationInFlight)return;
 
+      const mode=overlay.querySelector('input[name="tourPrintMode"]:checked')?.value||"FULL";
+      const modeInputs=[...overlay.querySelectorAll('input[name="tourPrintMode"]')];
+      const addressButton=overlay.querySelector("#tourAddressCorrect");
+
+      generationInFlight=true;
       btn.disabled=true;
       btn.textContent="PDF作成中…";
-      msg.textContent="";
+      modeInputs.forEach(input=>{input.disabled=true});
+      if(addressButton)addressButton.disabled=true;
+      msg.style.color="#475467";
+      msg.textContent="PDFを作成しています。この画面のままお待ちください。";
 
       try{
         if(typeof apiGet!=="function")throw new Error("管理画面APIを利用できません。");
         const j=await apiGet(PRINT_ACTION,{
           reservation_id:r.reservation_id,
-          print_mode:mode
+          print_mode:mode,
+          request_id:generationRequestId
         });
         const data=j.data||{};
         const fileUrl=String(data.file_url||"").trim();
         if(!fileUrl)throw new Error("保存済みPDFのURLを取得できませんでした。");
-
-        if(preview){
-          preview.location.replace(fileUrl);
-        }else{
-          window.open(fileUrl,"_blank","noopener");
-        }
+        generatedPdf=data;
 
         const folderUrl=String(data.folder_url||"").trim();
-        const driveFolder=String(data.drive_folder||"A-nauts OS Reserve / TourQuestionnaireTemp").trim();
+        const driveFolder=String(data.drive_folder||"A-nauts OS Reserve/TourQuestionnaireTemp").trim();
 
         msg.style.color="#067647";
         msg.innerHTML=
           `<div class="tour-save-result">`+
-          `<strong>PDFをGoogle Driveへ保存しました。</strong>`+
+          `<strong>PDFの作成が完了しました。</strong>`+
           `保存先：${escapeHtml(driveFolder)}<br>`+
           `<a href="${escapeHtml(fileUrl)}" target="_blank" rel="noopener">PDFを開く</a>`+
           (folderUrl
@@ -319,12 +333,16 @@
           `<br>印刷時は「両面・長辺とじ」を選択してください。`+
           `</div>`;
       }catch(err){
-        if(preview)preview.close();
         msg.style.color="#b42318";
         msg.textContent=err.message||"PDFの生成に失敗しました。";
       }finally{
+        generationInFlight=false;
         btn.disabled=false;
-        btn.textContent="PDFを作成して閲覧・印刷";
+        btn.textContent=generatedPdf?"作成済みPDFを開く":"PDFを作成して閲覧・印刷";
+        if(!generatedPdf){
+          modeInputs.forEach(input=>{input.disabled=false});
+          if(addressButton)addressButton.disabled=false;
+        }
       }
     };
   }

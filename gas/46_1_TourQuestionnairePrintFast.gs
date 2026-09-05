@@ -3,15 +3,15 @@ const TOUR_FAST_PRINT_EXPORT_VERSION_PROPERTY = "TOUR_FAST_PRINT_EXPORT_TEMPLATE
 const TOUR_FAST_PRINT_EXPORT_TEMPLATE_VERSION = "20260829-fast-2p-v1";
 const TOUR_FAST_PRINT_PAGE1_SHEET = "アンケート_1";
 const TOUR_FAST_PRINT_PAGE2_SHEET = "アンケート_2";
-const TOUR_QUESTIONNAIRE_SAVE_FOLDER_ID = "1ceuC0FqgK8uuNL8IcJASMb6qqIxEDm66";
-const TOUR_QUESTIONNAIRE_SAVE_FOLDER_NAME = "アンケート";
+const TOUR_QUESTIONNAIRE_SAVE_FOLDER_NAME = "A-nauts OS Reserve/TourQuestionnaireTemp";
+const TOUR_QUESTIONNAIRE_REQUEST_CACHE_SECONDS = 21600;
 
 function generateTourQuestionnairePdfFast(params) {
-  const lock = LockService.getScriptLock();
+  const lock = LockService.getDocumentLock();
   let page1 = null;
 
   try {
-    lock.waitLock(10000);
+    lock.waitLock(30000);
     params = params || {};
 
     const reservationId = String(params.reservation_id || "").trim();
@@ -23,6 +23,28 @@ function generateTourQuestionnairePdfFast(params) {
 
     if (!["FULL", "ADDRESS_ONLY", "BLANK"].includes(printMode)) {
       return errorResponse("印刷モードが正しくありません。", "INVALID_PRINT_MODE", { print_mode: printMode });
+    }
+
+    const requestId = String(params.request_id || "")
+      .trim()
+      .replace(/[^A-Za-z0-9_-]/g, "")
+      .slice(0, 80);
+    const requestCacheKey = requestId
+      ? ["tour_pdf_v1", requestId, reservationId, printMode].join("_").slice(0, 240)
+      : "";
+    const requestCache = CacheService.getScriptCache();
+
+    if (requestCacheKey) {
+      const cached = requestCache.get(requestCacheKey);
+      if (cached) {
+        try {
+          const cachedData = JSON.parse(cached);
+          const cachedFile = DriveApp.getFileById(String(cachedData.file_id || ""));
+          if (cachedData.file_url && !cachedFile.isTrashed()) {
+            return successResponse(cachedData);
+          }
+        } catch (ignore) {}
+      }
     }
 
     const reservationInfo = findReservationRowById_(reservationId);
@@ -111,12 +133,9 @@ function generateTourQuestionnairePdfFast(params) {
     const fileName = buildTourPrintFileName_(reservation, printMode);
     pdfBlob.setName(fileName);
 
-    const saveFolder = DriveApp.getFolderById(TOUR_QUESTIONNAIRE_SAVE_FOLDER_ID);
+    const saveFolder = getOrCreateTourPrintFolder_();
     if (saveFolder.isTrashed()) {
-      throw new Error("指定されたアンケート保存フォルダがゴミ箱にあります。");
-    }
-    if (saveFolder.getId() !== TOUR_QUESTIONNAIRE_SAVE_FOLDER_ID) {
-      throw new Error("アンケート保存フォルダIDが一致しません。");
+      throw new Error("アンケート保存フォルダがゴミ箱にあります。");
     }
 
     const pdfFile = saveFolder.createFile(pdfBlob);
@@ -125,18 +144,7 @@ function generateTourQuestionnairePdfFast(params) {
     const fileId = pdfFile.getId();
     const fileUrl = "https://drive.google.com/file/d/" + encodeURIComponent(fileId) + "/view";
 
-    logInfo("generateTourQuestionnairePdf", "店内見学アンケートPDF高速生成・Drive保存成功", {
-      reservation_id: reservationId,
-      print_mode: printMode,
-      filename: fileName,
-      file_id: fileId,
-      export_spreadsheet_id: exportSpreadsheet.getId(),
-      drive_folder: TOUR_QUESTIONNAIRE_SAVE_FOLDER_NAME,
-      drive_folder_id: saveFolder.getId(),
-      pages: 2
-    });
-
-    return successResponse({
+    const resultData = {
       reservation_id: reservationId,
       print_mode: printMode,
       filename: fileName,
@@ -149,7 +157,31 @@ function generateTourQuestionnairePdfFast(params) {
       pages: 2,
       duplex: true,
       duplex_instruction: "両面印刷・長辺とじ"
+    };
+
+    if (requestCacheKey) {
+      try {
+        requestCache.put(
+          requestCacheKey,
+          JSON.stringify(resultData),
+          TOUR_QUESTIONNAIRE_REQUEST_CACHE_SECONDS
+        );
+      } catch (ignore) {}
+    }
+
+    logInfo("generateTourQuestionnairePdf", "店内見学アンケートPDF高速生成・Drive保存成功", {
+      reservation_id: reservationId,
+      print_mode: printMode,
+      request_id: requestId,
+      filename: fileName,
+      file_id: fileId,
+      export_spreadsheet_id: exportSpreadsheet.getId(),
+      drive_folder: TOUR_QUESTIONNAIRE_SAVE_FOLDER_NAME,
+      drive_folder_id: saveFolder.getId(),
+      pages: 2
     });
+
+    return successResponse(resultData);
   } catch (error) {
     logError("generateTourQuestionnairePdf", error.message, { stack: error.stack });
     return errorResponse(
