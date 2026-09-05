@@ -243,6 +243,9 @@ function rebuildTourFastPrintExportSpreadsheet_(templateSheet, previousId) {
     if (page1.getMaxRows() > 41) {
       page1.deleteRows(42, page1.getMaxRows() - 41);
     }
+    if (page2.getMaxRows() > 68) {
+      page2.deleteRows(69, page2.getMaxRows() - 68);
+    }
     if (page2.getMaxRows() >= 41) {
       page2.deleteRows(1, 41);
     }
