@@ -179,7 +179,11 @@ async function init() {
       publicDays = Number(selectedService.public_days) || 30;
       configureCustomerForm();
       el.availabilitySection.classList.remove("is-hidden");
-      loadWeek();
+      // 無料体験は会員確認後に専用の週次一括処理を開始する。
+      // 初期化中の不要な空き枠リクエストを送らない。
+      if (String(selectedService.service_code || "").toUpperCase() !== "PT_TRIAL60") {
+        loadWeek();
+      }
     }
   } catch (error) {
     showFatal(error.message || "サービス情報を取得できませんでした。");

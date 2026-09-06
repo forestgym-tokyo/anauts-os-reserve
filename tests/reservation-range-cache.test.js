@@ -118,8 +118,7 @@ const unchangedPages = [
   "meal-planning",
   "training-support",
   "unsubscribe",
-  "personal",
-  "trial"
+  "personal"
 ];
 
 const tourHtml = fs.readFileSync(path.join(root, "tour", "index.html"), "utf8");
@@ -137,5 +136,12 @@ for (const page of unchangedPages) {
     `${page} の読込バージョンは変更しない`
   );
 }
+
+const trialHtml = fs.readFileSync(path.join(root, "trial", "index.html"), "utf8");
+assert.match(
+  trialHtml,
+  /reserve\.js\?v=20260906-trial-gate1/,
+  "無料体験は会員確認前の不要通信を止めた reserve.js を読み込む"
+);
 
 console.log("reservation range/cache tests passed");

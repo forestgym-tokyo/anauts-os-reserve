@@ -28,12 +28,14 @@ const policyGas = fs.readFileSync(
 );
 
 assert.match(personal, /trainerSelectionRequired_\(\) && !selectedTrainerCode/);
-assert.match(personal, /function trainerSelectionRequired_\(\)\s*{\s*return bookingEligibilityReady_\(\);/);
+assert.match(personal, /function trainerSelectionRequired_\(\)\s*{\s*return routeKey === "personal" && bookingEligibilityReady_\(\);/);
 assert.doesNotMatch(personal, /すべてのトレーナー/);
 assert.doesNotMatch(personal, /trainers\.map\(\(trainer\) => fetchSlotsForTrainer_/);
 assert.match(personal, /action", "getAvailableSlotsRange"/);
 assert.match(personal, /Math\.ceil\(dates\.length \/ 2\)/);
 assert.match(personal, /Promise\.all\(chunks\.map/);
+assert.match(personal, /if \(routeKey === "trial"\) \{\s*return fetchTrialSlotsRange_\(dates\);/);
+assert.match(personal, /"yoshimaru_allowed"/);
 assert.match(reserve, /Math\.min\(2, dates\.length\)/);
 assert.doesNotMatch(reserve, /Promise\.all\(dates\.map\(fetchSlots\)\)/);
 assert.doesNotMatch(personalHtml, /personal-trainer-confirm\.js/);

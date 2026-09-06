@@ -1,4 +1,4 @@
-/* A-nauts OS Reserve - Personal booking enhancements v58 */
+/* A-nauts OS Reserve - Personal booking enhancements v59 */
 (() => {
   const routeKey = location.pathname.split("/").filter(Boolean).pop() || "personal";
   if (!["personal", "trial"].includes(routeKey)) return;
@@ -23,7 +23,7 @@
   }
 
   function trainerSelectionRequired_() {
-    return bookingEligibilityReady_();
+    return routeKey === "personal" && bookingEligibilityReady_();
   }
 
   function trainerAllowed_(code) {
@@ -43,6 +43,7 @@
   }
 
   function ensureTrainerFilter() {
+    if (routeKey !== "personal") return;
     if (document.querySelector("#personalTrainerFilter")) return;
 
     const availability = document.querySelector("#availabilitySection");
@@ -62,6 +63,7 @@
   }
 
   function renderTrainerChoices() {
+    if (routeKey !== "personal") return;
     ensureTrainerFilter();
     const area = document.querySelector("#personalTrainerChoices");
     if (!area) return;
@@ -163,6 +165,7 @@
   }
 
   async function loadPublicTrainers_(preloadOnly) {
+    if (routeKey !== "personal") return;
     ensureTrainerFilter();
 
     if (!bookingEligibilityReady_() && preloadOnly !== true) {
@@ -264,6 +267,7 @@
   }
 
   function updateTrainerStatus_() {
+    if (routeKey !== "personal") return;
     const status = document.querySelector("#personalTrainerStatus");
     if (!status) return;
 
@@ -326,9 +330,49 @@
     ).trim().toUpperCase();
   }
 
+  async function fetchTrialSlotsRange_(dates) {
+    if (!Array.isArray(dates) || !dates.length) return null;
+
+    const url = new URL(API_URL);
+    url.searchParams.set("action", "getAvailableSlotsRange");
+    url.searchParams.set("service_code", selectedService.service_code);
+    url.searchParams.set("start_date", dates[0]);
+    url.searchParams.set("days", String(dates.length));
+    url.searchParams.set("trial_auto", "1");
+    url.searchParams.set(
+      "yoshimaru_allowed",
+      womenOnlyTrainerAllowed_() ? "true" : "false"
+    );
+    url.searchParams.set("_", Date.now().toString());
+
+    const response = await fetchJsonWithTimeout_(url, 90000);
+    if (!response || response.ok !== true) {
+      if (apiResultCode_(response) === "ACTION_NOT_FOUND") {
+        weeklyRangeSupported = false;
+        return null;
+      }
+      throw new Error((response && response.message) || "予約可能時間を取得できませんでした。");
+    }
+
+    const results = response.data && Array.isArray(response.data.results)
+      ? response.data.results
+      : null;
+    if (!results || results.length !== dates.length) {
+      throw new Error("予約可能時間の応答形式を確認してください。");
+    }
+    return results;
+  }
+
   async function fetchWeekSlots_(dates) {
-    if (!bookingEligibilityReady_() || !selectedTrainerCode) return null;
+    if (!bookingEligibilityReady_()) return null;
     if (!weeklyRangeSupported) return null;
+
+    // 無料体験は固定候補をサーバー側で一括計算し、7日分を1回で取得する。
+    if (routeKey === "trial") {
+      return fetchTrialSlotsRange_(dates);
+    }
+
+    if (!selectedTrainerCode) return null;
 
     const splitIndex = Math.ceil(dates.length / 2);
     const chunks = [
@@ -379,6 +423,13 @@
   fetchSlots = async function(date) {
     if (!bookingEligibilityReady_()) {
       return { ok: true, data: { date, slots: [] } };
+    }
+
+    if (routeKey === "trial") {
+      const trialResults = await fetchTrialSlotsRange_([date]);
+      return trialResults && trialResults[0]
+        ? trialResults[0]
+        : { ok: false, message: "空き状況を取得できませんでした。", data: { date, slots: [] } };
     }
 
     if (trainerSelectionRequired_() && !selectedTrainerCode) {
@@ -442,14 +493,14 @@
     selectedSlot = null;
     const customerSection = document.querySelector("#customerSection");
     if (customerSection) customerSection.classList.add("is-hidden");
-    await loadPublicTrainers_();
+    if (routeKey === "personal") await loadPublicTrainers_();
     loadWeek();
   });
 
   document.addEventListener("anauts:booking-eligibility-invalidated", () => {
     selectedTrainerCode = "";
     selectedSlot = null;
-    renderTrainerChoices();
+    if (routeKey === "personal") renderTrainerChoices();
     const list = document.querySelector("#weekList");
     if (list) list.textContent = "";
     const status = document.querySelector("#weekStatus");
@@ -464,7 +515,7 @@
         ? input
         : String((input && input.url) || input || "");
 
-      if (selectedTrainerCode && method === "POST" && target === API_URL && init && typeof init.body === "string") {
+      if (routeKey === "personal" && selectedTrainerCode && method === "POST" && target === API_URL && init && typeof init.body === "string") {
         const body = JSON.parse(init.body);
         if (body && body.action === "createReservation") {
           body.staff_code = selectedTrainerCode;
@@ -477,6 +528,8 @@
     return nativeFetch(input, init);
   };
 
-  ensureTrainerFilter();
-  loadPublicTrainers_(true);
+  if (routeKey === "personal") {
+    ensureTrainerFilter();
+    loadPublicTrainers_(true);
+  }
 })();
