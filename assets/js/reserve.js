@@ -2,7 +2,7 @@ const API_URL = "https://script.google.com/macros/s/AKfycbyvpQRxRpMRfpaQHtBar77d
 const DAYS = 7;
 const SERVICES_SESSION_CACHE_KEY = "anauts-reserve-services-v1";
 const SERVICES_SESSION_CACHE_MS = 5 * 60 * 1000;
-const TOUR_RANGE_TIMEOUT_MS = 30000;
+const TOUR_RANGE_TIMEOUT_MS = 45000;
 
 const ROUTES = {
   personal: {

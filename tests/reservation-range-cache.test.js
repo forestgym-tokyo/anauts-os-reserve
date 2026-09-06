@@ -30,8 +30,8 @@ assert.match(
 );
 assert.match(
   reserve,
-  /const TOUR_RANGE_TIMEOUT_MS = 30000/,
-  "店内見学の一括取得は30秒で打ち切る"
+  /const TOUR_RANGE_TIMEOUT_MS = 45000/,
+  "店内見学の一括取得は45秒で打ち切る"
 );
 assert.match(
   reserve,
@@ -125,7 +125,7 @@ const unchangedPages = [
 const tourHtml = fs.readFileSync(path.join(root, "tour", "index.html"), "utf8");
 assert.match(
   tourHtml,
-  /reserve\.js\?v=20260906-tour-queue1/,
+  /reserve\.js\?v=20260906-tour-queue2/,
   "店内見学は同時実行抑止後の reserve.js を読み込む"
 );
 
