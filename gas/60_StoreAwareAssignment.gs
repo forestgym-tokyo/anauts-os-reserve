@@ -75,6 +75,12 @@ function getAvailableSlotsRangeStoreAware_(params) {
   params = params || {};
 
   return runStoreAwareWithRequestSheetCache_(function() {
+    if (
+      typeof shouldUseTrialAutoTrainerRange_ === "function" &&
+      shouldUseTrialAutoTrainerRange_(params)
+    ) {
+      return getTrialAvailableSlotsRangeFast_(params);
+    }
     if (shouldUseTourWeekBulk_(params)) {
       try {
         return getTourAvailableSlotsRangeBulk_(params);
@@ -758,6 +764,17 @@ function createReservationStoreAware_(params) {
 
 
 function createReservationStoreAwareImpl_(params) {
+
+  const directServiceCode = normalizeStoreAwareCode_(params && params.service_code);
+  if (
+    directServiceCode === "PT_TRIAL60" &&
+    typeof createTrialAutoTrainerReservation_ === "function"
+  ) {
+    const trialResult = createTrialAutoTrainerReservation_(params);
+    const trialCreated = parseStoreAwareResponse_(trialResult);
+    if (trialCreated && trialCreated.ok === true) clearStoreAwareSnapshotCache_();
+    return trialResult;
+  }
 
   const snapshot = loadStoreAwareSnapshot_(false, params);
   const service = findStoreAwareService_(snapshot, params.service_code);
