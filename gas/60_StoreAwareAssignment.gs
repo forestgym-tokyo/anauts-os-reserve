@@ -21,8 +21,11 @@ const STORE_AWARE_GENERATION_CACHE_SECONDS_ = 21600;
 const STORE_AWARE_MAX_SCOPE_DAYS_ = 31;
 const TOUR_WEEK_BULK_ENABLED_ = true;
 const TOUR_WEEK_BULK_SERVICE_CODE_ = "TOUR";
-const TOUR_WEEK_BULK_CACHE_VERSION_ = "tour-week-bulk-v2";
-const TOUR_WEEK_BULK_CACHE_SECONDS_ = 120;
+const TOUR_WEEK_BULK_CACHE_VERSION_ = "tour-week-bulk-v3";
+const TOUR_WEEK_BULK_CACHE_SECONDS_ = 300;
+const TOUR_WEEK_BULK_STALE_CACHE_SECONDS_ = 21600;
+const TOUR_WEEK_BULK_INFLIGHT_SECONDS_ = 420;
+const TOUR_WEEK_BULK_LOCK_WAIT_MILLISECONDS_ = 500;
 const STORE_AWARE_INACTIVE_RESERVATION_STATUSES_ = Object.freeze([
   "CANCELLED",
   "CANCELED",
@@ -129,19 +132,48 @@ function getTourAvailableSlotsRangeBulk_(params) {
   const cached = getTourWeekCache_(cacheKey);
   if (cached) return successResponse(cached);
 
-  const services = readTourWeekRows_("services");
-  const service = services.find(function(row) {
-    return normalizeStoreAwareCode_(row && row.service_code) ===
-      TOUR_WEEK_BULK_SERVICE_CODE_;
-  });
+  // CacheServiceには原子的な「未設定なら追加」がないため、短時間だけ
+  // ScriptLockを使って同じ週の計算権を1実行だけに限定する。
+  // 重いシート・カレンダー取得中はロックを保持せず、他機能を塞がない。
+  if (!claimTourWeekCalculation_(cacheKey)) {
+    const completed = getTourWeekCache_(cacheKey);
+    if (completed) return successResponse(completed);
 
-  if (!service || !isStoreAwareActive_(service.active)) {
+    // 予約確定時には最新状態を再検証するため、計算中だけ直近の正常結果を
+    // 表示用に返し、同じ重い計算が並列に増えることを防ぐ。
+    const stale = getTourWeekCache_(buildTourWeekStaleCacheKey_(cacheKey));
+    if (stale) {
+      return successResponse(Object.assign({}, stale, {
+        cache_status: "stale",
+        refreshing: true
+      }));
+    }
+
     return errorResponse(
-      "サービス情報を確認できませんでした。",
-      "SERVICE_NOT_FOUND",
-      { service_code: TOUR_WEEK_BULK_SERVICE_CODE_ }
+      "空き時間を更新しています。数秒後にもう一度お試しください。",
+      "TOUR_AVAILABILITY_BUSY",
+      { retry_after_seconds: 5 }
     );
   }
+
+  try {
+    // 計算権の取得直前に別実行が完了している可能性があるため再確認する。
+    const completed = getTourWeekCache_(cacheKey);
+    if (completed) return successResponse(completed);
+
+    const services = readTourWeekRows_("services");
+    const service = services.find(function(row) {
+      return normalizeStoreAwareCode_(row && row.service_code) ===
+        TOUR_WEEK_BULK_SERVICE_CODE_;
+    });
+
+    if (!service || !isStoreAwareActive_(service.active)) {
+      return errorResponse(
+        "サービス情報を確認できませんでした。",
+        "SERVICE_NOT_FOUND",
+        { service_code: TOUR_WEEK_BULK_SERVICE_CODE_ }
+      );
+    }
 
   const storeCode = normalizeStoreAwareCode_(service.store_code);
   const duration = Math.max(1, Number(service.duration || 60));
@@ -225,13 +257,21 @@ function getTourAvailableSlotsRangeBulk_(params) {
     };
   });
 
-  const data = {
-    start_date: startDate,
-    days: days,
-    results: results
-  };
-  putTourWeekCache_(cacheKey, data);
-  return successResponse(data);
+    const data = {
+      start_date: startDate,
+      days: days,
+      results: results
+    };
+    putTourWeekCache_(cacheKey, data, TOUR_WEEK_BULK_CACHE_SECONDS_);
+    putTourWeekCache_(
+      buildTourWeekStaleCacheKey_(cacheKey),
+      data,
+      TOUR_WEEK_BULK_STALE_CACHE_SECONDS_
+    );
+    return successResponse(data);
+  } finally {
+    releaseTourWeekCalculation_(cacheKey);
+  }
 }
 
 
@@ -525,15 +565,58 @@ function getTourWeekCache_(key) {
 }
 
 
-function putTourWeekCache_(key, data) {
+function putTourWeekCache_(key, data, seconds) {
   try {
     CacheService.getScriptCache().put(
       key,
       JSON.stringify(data),
-      TOUR_WEEK_BULK_CACHE_SECONDS_
+      Number(seconds || TOUR_WEEK_BULK_CACHE_SECONDS_)
     );
   } catch (_) {
     // キャッシュ不可でも週次の空き枠は返す。
+  }
+}
+
+
+function buildTourWeekStaleCacheKey_(cacheKey) {
+  return String(cacheKey) + ":stale";
+}
+
+
+function buildTourWeekInflightCacheKey_(cacheKey) {
+  return String(cacheKey) + ":inflight";
+}
+
+
+function claimTourWeekCalculation_(cacheKey) {
+  if (typeof LockService === "undefined" || !LockService.getScriptLock) {
+    return true;
+  }
+
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(TOUR_WEEK_BULK_LOCK_WAIT_MILLISECONDS_)) return false;
+
+  try {
+    if (getTourWeekCache_(cacheKey)) return false;
+
+    const inflightKey = buildTourWeekInflightCacheKey_(cacheKey);
+    if (getTourWeekCache_(inflightKey)) return false;
+
+    putTourWeekCache_(inflightKey, true, TOUR_WEEK_BULK_INFLIGHT_SECONDS_);
+    return true;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+
+function releaseTourWeekCalculation_(cacheKey) {
+  try {
+    CacheService.getScriptCache().remove(
+      buildTourWeekInflightCacheKey_(cacheKey)
+    );
+  } catch (_) {
+    // 実行中印は有効期限でも自動解除される。
   }
 }
 

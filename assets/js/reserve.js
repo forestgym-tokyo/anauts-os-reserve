@@ -2,6 +2,7 @@ const API_URL = "https://script.google.com/macros/s/AKfycbyvpQRxRpMRfpaQHtBar77d
 const DAYS = 7;
 const SERVICES_SESSION_CACHE_KEY = "anauts-reserve-services-v1";
 const SERVICES_SESSION_CACHE_MS = 5 * 60 * 1000;
+const TOUR_RANGE_TIMEOUT_MS = 30000;
 
 const ROUTES = {
   personal: {
@@ -766,6 +767,8 @@ async function loadWeek() {
 async function fetchWeekSlotsRange_(dates) {
   if (!selectedService || !Array.isArray(dates) || !dates.length) return null;
 
+  const isTour = String(selectedService.service_code || "").toUpperCase() === "TOUR";
+
   const url = new URL(API_URL);
   url.searchParams.set("action", "getAvailableSlotsRange");
   url.searchParams.set("service_code", selectedService.service_code);
@@ -773,20 +776,48 @@ async function fetchWeekSlotsRange_(dates) {
   url.searchParams.set("days", String(dates.length));
   url.searchParams.set("_", Date.now().toString());
 
+  const controller = isTour && typeof AbortController === "function"
+    ? new AbortController()
+    : null;
+  const timeoutId = controller
+    ? setTimeout(() => controller.abort(), TOUR_RANGE_TIMEOUT_MS)
+    : null;
+
   try {
-    const response = await fetch(url.toString(), { cache: "no-store" });
+    const response = await fetch(url.toString(), {
+      cache: "no-store",
+      ...(controller ? { signal: controller.signal } : {})
+    });
     const result = await response.json();
     const rangeResults = result && result.ok === true && result.data &&
       Array.isArray(result.data.results)
       ? result.data.results
       : null;
 
-    return rangeResults && rangeResults.length === dates.length
-      ? rangeResults
-      : null;
-  } catch (_) {
+    if (rangeResults && rangeResults.length === dates.length) {
+      return rangeResults;
+    }
+
+    if (isTour) {
+      throw new Error(
+        result && result.message
+          ? result.message
+          : "空き時間を取得できませんでした。再読み込みしてください。"
+      );
+    }
+    return null;
+  } catch (error) {
+    if (isTour) {
+      throw new Error(
+        error && error.name === "AbortError"
+          ? "空き時間の取得に時間がかかっています。再読み込みしてください。"
+          : (error.message || "空き時間を取得できませんでした。再読み込みしてください。")
+      );
+    }
     // 一括APIが利用できない間も、従来の日別取得へ自動で戻す。
     return null;
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
   }
 }
 
@@ -813,7 +844,8 @@ async function fetchSlotsWithLimit_(dates, requestVersion) {
     }
   }
 
-  const workerCount = typeof window.ANAUTS_FETCH_WEEK_SLOTS === "function"
+  const isTour = String(selectedService && selectedService.service_code || "").toUpperCase() === "TOUR";
+  const workerCount = isTour || typeof window.ANAUTS_FETCH_WEEK_SLOTS === "function"
     ? Math.min(2, dates.length)
     : dates.length;
   await Promise.all(Array.from({ length: workerCount }, () => worker_()));

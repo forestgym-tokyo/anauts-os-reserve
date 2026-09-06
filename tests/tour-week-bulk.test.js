@@ -119,6 +119,7 @@ const properties = new Map();
 const calendarCalls = [];
 let calendarThrows = false;
 let legacyCalls = 0;
+let scriptLockHeld = false;
 
 const events = [
   calendarEvent(startDate, "10:30", "11:00"),
@@ -169,6 +170,18 @@ const context = {
           cacheSeconds.set(key, seconds);
         },
         remove(key) { cache.delete(key); }
+      };
+    }
+  },
+  LockService: {
+    getScriptLock() {
+      return {
+        tryLock() {
+          if (scriptLockHeld) return false;
+          scriptLockHeld = true;
+          return true;
+        },
+        releaseLock() { scriptLockHeld = false; }
       };
     }
   },
@@ -286,8 +299,49 @@ const cached = context.getAvailableSlotsRangeStoreAware_({
 assert.equal(cached.ok, true);
 assert.deepEqual(sheetReads, readsAfterFirst, "再表示は週次キャッシュを使う");
 assert.equal(calendarCalls.length, 1, "再表示ではカレンダーも再取得しない");
-const bulkCacheKey = `tour-week-bulk-v2:0:TOUR:${startDate}:7`;
-assert.equal(cacheSeconds.get(bulkCacheKey), 120);
+const bulkCacheKey = `tour-week-bulk-v3:0:TOUR:${startDate}:7`;
+assert.equal(cacheSeconds.get(bulkCacheKey), 300);
+assert.equal(
+  cacheSeconds.get(`${bulkCacheKey}:stale`),
+  21600,
+  "直近の正常結果は計算重複を避ける退避キャッシュとして保持する"
+);
+
+cache.delete(bulkCacheKey);
+cache.set(`${bulkCacheKey}:inflight`, JSON.stringify(true));
+const readsBeforeFollower = { ...sheetReads };
+const follower = context.getAvailableSlotsRangeStoreAware_({
+  service_code: "TOUR",
+  start_date: startDate,
+  days: 7,
+  tour_week_bulk: "1"
+});
+assert.equal(follower.ok, true);
+assert.equal(follower.data.cache_status, "stale");
+assert.deepEqual(
+  sheetReads,
+  readsBeforeFollower,
+  "同じ週を計算中の後続リクエストはシートを重複取得しない"
+);
+
+cache.clear();
+const busyDate = "2099-03-01";
+const busyCacheKey = `tour-week-bulk-v3:0:TOUR:${busyDate}:7`;
+cache.set(`${busyCacheKey}:inflight`, JSON.stringify(true));
+const legacyCallsBeforeBusy = legacyCalls;
+const busy = context.getAvailableSlotsRangeStoreAware_({
+  service_code: "TOUR",
+  start_date: busyDate,
+  days: 7,
+  tour_week_bulk: "1"
+});
+assert.equal(busy.ok, false);
+assert.equal(busy.code, "TOUR_AVAILABILITY_BUSY");
+assert.equal(
+  legacyCalls,
+  legacyCallsBeforeBusy,
+  "退避キャッシュがなくても日別計算を7回起動しない"
+);
 
 const legacy = context.getAvailableSlotsRangeStoreAware_({
   service_code: "TOUR",

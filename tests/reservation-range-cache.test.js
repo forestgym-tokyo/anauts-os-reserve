@@ -30,6 +30,21 @@ assert.match(
 );
 assert.match(
   reserve,
+  /const TOUR_RANGE_TIMEOUT_MS = 30000/,
+  "店内見学の一括取得は30秒で打ち切る"
+);
+assert.match(
+  reserve,
+  /if \(isTour\) \{\s*throw new Error/,
+  "店内見学の一括取得失敗時は日別APIを連続起動しない"
+);
+assert.match(
+  reserve,
+  /const workerCount = isTour \|\| typeof window\.ANAUTS_FETCH_WEEK_SLOTS === "function"\s*\? Math\.min\(2, dates\.length\)/,
+  "店内見学の日別フォールバックが必要でも同時実行は2本までにする"
+);
+assert.match(
+  reserve,
   /sessionStorage\.getItem\(SERVICES_SESSION_CACHE_KEY\)/,
   "サービス一覧は同一タブ内で5分間再利用する"
 );
@@ -110,8 +125,8 @@ const unchangedPages = [
 const tourHtml = fs.readFileSync(path.join(root, "tour", "index.html"), "utf8");
 assert.match(
   tourHtml,
-  /reserve\.js\?v=20260903-tour-fast1/,
-  "店内見学は高速化後の reserve.js を読み込む"
+  /reserve\.js\?v=20260906-tour-queue1/,
+  "店内見学は同時実行抑止後の reserve.js を読み込む"
 );
 
 for (const page of unchangedPages) {
