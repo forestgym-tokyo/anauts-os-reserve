@@ -140,7 +140,7 @@ for (const page of unchangedPages) {
 const trialHtml = fs.readFileSync(path.join(root, "trial", "index.html"), "utf8");
 assert.match(
   trialHtml,
-  /reserve\.js\?v=20260906-trial-gate1/,
+  /reserve\.js\?v=20260906-trial-copy1/,
   "無料体験は会員確認前の不要通信を止めた reserve.js を読み込む"
 );
 

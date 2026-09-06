@@ -315,6 +315,15 @@ assert.match(
   "会員確認前の不要な空き枠通信を送らない"
 );
 assert.doesNotMatch(trialHtml, /personalTrainerChoices|トレーナーで絞り込む/);
-assert.match(trialHtml, /担当トレーナーは施設側で決定します/);
+assert.doesNotMatch(
+  trialHtml,
+  /trialTrainerAssignmentNotice|担当トレーナーは施設側で決定します|トレーナーを選ぶ必要はありません/,
+  "無料体験画面に担当トレーナーの案内を表示しない"
+);
+assert.match(
+  reserveSource,
+  /lead: "対象会員さま専用の予約ページです。"/,
+  "無料体験画面では対象会員さま向けの案内を表示する"
+);
 
 console.log("trial auto trainer tests passed");

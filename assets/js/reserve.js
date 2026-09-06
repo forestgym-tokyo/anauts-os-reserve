@@ -14,7 +14,7 @@ const ROUTES = {
   },
   trial: {
     title: "パーソナル無料体験",
-    lead: "対象会員専用の予約ページです。",
+    lead: "対象会員さま専用の予約ページです。",
     mode: "FIXED",
     serviceCode: "PT_TRIAL60"
   },
