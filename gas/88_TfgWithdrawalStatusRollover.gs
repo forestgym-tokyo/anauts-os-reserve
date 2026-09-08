@@ -3,7 +3,7 @@ const TFG_WITHDRAWAL_STATUS = Object.freeze({
   TZ: "Asia/Tokyo",
   MASTER_ID: "1kLK6Dbe05Uqd0pxnoKX8MbHpQH9AgDnVygwzDPzyXvw",
   MASTER_SHEET: "master",
-  LOG_SHEET: "退会申請",
+  LOG_SHEET: "withdrawal_requests",
   REFLECTED_HEADER: "マスター反映",
   CANCELLED: ["取消", "却下", "キャンセル", "CANCELLED", "CANCELED"]
 });
