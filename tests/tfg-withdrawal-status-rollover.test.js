@@ -8,6 +8,7 @@ const source = fs.readFileSync(
   "utf8"
 );
 
+assert.match(source, /LOG_SHEET:\s*"withdrawal_requests"/);
 assert.match(source, /withdrawalDate >= today/);
 assert.match(source, /setValue\(""\)/);
 assert.match(source, /REFLECTED_HEADER:\s*"マスター反映"/);
