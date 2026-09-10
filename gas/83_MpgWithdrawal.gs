@@ -67,6 +67,14 @@ function checkMpgWithdrawalMember_(body) {
       });
     }
 
+    if (hasMpgOutstandingBalance_(member)) {
+      return mpgJson_({
+        ok: false,
+        code: "OUTSTANDING_BALANCE",
+        message: MPG_OUTSTANDING_BALANCE_MESSAGE
+      });
+    }
+
     if (MPG_WITHDRAWAL_CONFIG.ACTIVE_STATUSES.indexOf(member.contractStatus) === -1) {
       return mpgJson_({
         ok: false,
@@ -146,6 +154,11 @@ function submitMpgWithdrawal_(body) {
       const memberError = new Error("会員番号またはメールアドレスが一致しません。入力内容をご確認ください。");
       memberError.code = "MEMBER_NOT_FOUND";
       throw memberError;
+    }
+    if (hasMpgOutstandingBalance_(member)) {
+      const balanceError = new Error(MPG_OUTSTANDING_BALANCE_MESSAGE);
+      balanceError.code = "OUTSTANDING_BALANCE";
+      throw balanceError;
     }
     if (MPG_WITHDRAWAL_CONFIG.ACTIVE_STATUSES.indexOf(member.contractStatus) === -1) {
       throw new Error("現在の契約状況では退会申請を受け付けできません。スタッフへお申し出ください。");

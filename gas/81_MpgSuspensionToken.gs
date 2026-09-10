@@ -60,6 +60,9 @@ function issueMpgSuspensionUrlForActiveRow() {
   if (!member) {
     throw new Error("選択行の会員情報を会員マスターで確認できません。");
   }
+  if (hasMpgOutstandingBalance_(member)) {
+    throw new Error(MPG_OUTSTANDING_BALANCE_MESSAGE);
+  }
   if (MPG_SUSPENSION_CONFIG.ACTIVE_STATUSES.indexOf(member.contractStatus) === -1) {
     throw new Error("現在の契約ステータスでは休会URLを発行できません。");
   }
@@ -305,6 +308,11 @@ function resolveMpgSuspensionToken_(rawToken) {
       const memberError = new Error("会員情報を確認できませんでした。店舗へお問い合わせください。");
       memberError.code = "MEMBER_NOT_FOUND";
       throw memberError;
+    }
+    if (hasMpgOutstandingBalance_(member)) {
+      const balanceError = new Error(MPG_OUTSTANDING_BALANCE_MESSAGE);
+      balanceError.code = "OUTSTANDING_BALANCE";
+      throw balanceError;
     }
     if (MPG_SUSPENSION_CONFIG.ACTIVE_STATUSES.indexOf(member.contractStatus) === -1) {
       const statusError = new Error("現在の契約状況ではオンラインで休会申請を受け付けできません。店舗までお問い合わせください。");

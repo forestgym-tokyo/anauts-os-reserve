@@ -29,6 +29,12 @@ const MPG_SUSPENSION_CONFIG = Object.freeze({
   LOG_SHEET_DEFAULT: "休会申請"
 });
 
+const MPG_OUTSTANDING_BALANCE_MESSAGE = "未払金の会費があるため申請できません。";
+
+function hasMpgOutstandingBalance_(member) {
+  return !!(member && member.hasOutstandingBalance);
+}
+
 function verifyMpgSuspensionMember_(body) {
   try {
     const input = validateMpgIdentityInput_(body);
@@ -39,6 +45,14 @@ function verifyMpgSuspensionMember_(body) {
         ok: false,
         code: "MEMBER_NOT_FOUND",
         message: "会員番号またはメールアドレスが一致しません。入力内容をご確認ください。"
+      });
+    }
+
+    if (hasMpgOutstandingBalance_(member)) {
+      return mpgJson_({
+        ok: false,
+        code: "OUTSTANDING_BALANCE",
+        message: MPG_OUTSTANDING_BALANCE_MESSAGE
       });
     }
 
@@ -86,6 +100,14 @@ function submitMpgSuspension_(body) {
         ok: false,
         code: "MEMBER_NOT_FOUND",
         message: "会員番号またはメールアドレスが一致しません。最初からやり直してください。"
+      });
+    }
+
+    if (hasMpgOutstandingBalance_(member)) {
+      return mpgJson_({
+        ok: false,
+        code: "OUTSTANDING_BALANCE",
+        message: MPG_OUTSTANDING_BALANCE_MESSAGE
       });
     }
 
@@ -250,7 +272,9 @@ function findMpgMember_(memberNo, email) {
         name: (String(row[index["氏名（姓）"]] || "").trim() + " " + String(row[index["氏名（名）"]] || "").trim()).trim(),
         contractStatus: String(row[index["契約ステータス"]] || "").trim(),
         course: String(row[index["コース"]] || "").trim(),
-        monthlyFee: String(row[index["継続課金(月次)"]] || "").trim()
+        monthlyFee: String(row[index["継続課金(月次)"]] || "").trim(),
+        hasOutstandingBalance: typeof index["未払金"] === "number" &&
+          normalizeMpgCheckbox_(row[index["未払金"]])
       };
     }
   }
@@ -346,6 +370,13 @@ function normalizeMpgMemberNo_(value) {
 
 function normalizeMpgEmail_(value) {
   return String(value || "").trim().toLowerCase();
+}
+
+function normalizeMpgCheckbox_(value) {
+  if (value === true) return true;
+  return ["TRUE", "1", "YES", "ON", "CHECKED", "✓", "✔"].indexOf(
+    String(value || "").trim().toUpperCase()
+  ) !== -1;
 }
 
 function normalizeMpgMonth_(value) {
