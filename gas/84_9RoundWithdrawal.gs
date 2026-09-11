@@ -156,7 +156,8 @@ function submit9RoundWithdrawal_(body) {
       otherReason: otherReason,
       confirm1: body && body.confirm1,
       confirm2: body && body.confirm2,
-      confirm3: body && body.confirm3
+      confirm3: body && body.confirm3,
+      confirm4: body && body.confirm4
     });
 
     const member = find9RoundMember_(memberNo, email);
@@ -310,8 +311,13 @@ function validate9RoundWithdrawalForm_(data) {
     throw new Error("退会理由をご記載ください。");
   }
 
-  if (data.confirm1 !== true || data.confirm2 !== true || data.confirm3 !== true) {
-    throw new Error("確認事項すべてへの同意が必要です。");
+  if (
+    data.confirm1 !== true ||
+    data.confirm2 !== true ||
+    data.confirm3 !== true ||
+    data.confirm4 !== true
+  ) {
+    throw new Error("確認事項4項目すべてへの同意が必要です。");
   }
 }
 
@@ -571,6 +577,12 @@ function send9RoundWithdrawalMemberMail_(member, data) {
     "退会期日：" + format9RoundWithdrawalDateLabel_(data.withdrawalDate),
     "退会理由：" + data.reason,
     "",
+    "【同意事項】",
+    "同意済み：私は、継続条件付きキャンペーンで入会し、その継続条件を満たさずに退会する場合、キャンペーン価格の適用対象外となり、通常価格との差額を最終決済時までに精算することに同意します。",
+    "同意済み：私は、記載された退会期日が、入会時に説明を受けた退会できない期間に該当する場合、退会可能な最短期日をもって退会となることに同意します。",
+    "同意済み：私は、在籍期間中の未納会費または精算金等がある場合、退会日までに指定口座へ速やかに支払い、未払金の精算が完了した時点から最短の退会可能日をもって退会となることに同意します。",
+    "同意済み：私は、私とペア・ファミリープランで入会しているすべての対象者について、私の退会後はレギュラープランへ変更となることを説明し、あらかじめ本人の同意を得ています。",
+    "",
     "継続条件付きキャンペーン等の条件を満たしていない場合は、通常価格との差額等の精算が必要となる場合がございます。",
     "また、入会時キャンペーン等で定める退会不可期間に該当する場合は、退会可能な最短期日へ変更となります。",
     "必要な精算金や退会期日の変更がある場合は、別途ご案内いたします。",
@@ -610,6 +622,12 @@ function send9RoundWithdrawalAdminMail_(member, data) {
     "理由・意見：" + (data.otherReason || "なし"),
     "キャンペーン名：" + (member.campaignName || "なし"),
     "キャンペーン縛り満了日：" + (member.campaignBindingEnd || "なし"),
+    "",
+    "【同意事項】",
+    "同意済み：私は、継続条件付きキャンペーンで入会し、その継続条件を満たさずに退会する場合、キャンペーン価格の適用対象外となり、通常価格との差額を最終決済時までに精算することに同意します。",
+    "同意済み：私は、記載された退会期日が、入会時に説明を受けた退会できない期間に該当する場合、退会可能な最短期日をもって退会となることに同意します。",
+    "同意済み：私は、在籍期間中の未納会費または精算金等がある場合、退会日までに指定口座へ速やかに支払い、未払金の精算が完了した時点から最短の退会可能日をもって退会となることに同意します。",
+    "同意済み：私は、私とペア・ファミリープランで入会しているすべての対象者について、私の退会後はレギュラープランへ変更となることを説明し、あらかじめ本人の同意を得ています。",
     "",
     "※キャンペーン継続条件・精算金の有無を確認してください。"
   ].join("\n");
