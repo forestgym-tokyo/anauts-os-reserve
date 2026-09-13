@@ -341,12 +341,14 @@ function doGet(e) {
         );
 
       case "getAvailableSlots":
-        return getAvailableSlotsStoreAware_(
+        return applyPersonalPreviousDayCutoffToAvailability_(
+          getAvailableSlotsStoreAware_(params),
           params
         );
 
       case "getAvailableSlotsRange":
-        return getAvailableSlotsRangeStoreAware_(
+        return applyPersonalPreviousDayCutoffToAvailability_(
+          getAvailableSlotsRangeStoreAware_(params),
           params
         );
 
@@ -423,10 +425,13 @@ function doPost(e) {
           body
         );
 
-      case "createReservation":
+      case "createReservation": {
+        const personalCutoffError = validatePersonalPreviousDayBookingCutoff_(body);
+        if (personalCutoffError) return personalCutoffError;
         return createReservationStoreAware_(
           body
         );
+      }
 
       case "updateReservation":
         return invalidateStoreAwareAfterMutation_(
