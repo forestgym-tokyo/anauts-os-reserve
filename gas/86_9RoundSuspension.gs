@@ -220,8 +220,7 @@ function send9RoundSuspensionMemberMail_(member, data) {
     "自動復会日：" + format9RoundSuspensionMonth_(data.resumeDate.substring(0, 7)) + "1日",
     "休会費：月額1,100円",
     "",
-    "休会費は休会期間分をまとめて決済するのではなく、休会期間中の各月に1,100円ずつ発生します。",
-    "休会期間は1か月から6か月までです。延長を希望される場合は、現在の休会期間中に改めて休会申請をお願いいたします。",
+    "休会期間の延長を希望される場合は、現在の休会期間中に改めて休会申請をお願いいたします。",
     "",
     "9ROUND アリオ蘇我店"
   ].join("\n");
@@ -251,10 +250,7 @@ function send9RoundSuspensionAdminMail_(member, data) {
     "休会期間：" + data.months + "か月",
     "休会終了：" + format9RoundSuspensionMonth_(data.endMonth) + "末日",
     "自動復会日：" + format9RoundSuspensionMonth_(data.resumeDate.substring(0, 7)) + "1日",
-    "休会費：月額1,100円",
-    "決済方法：各月決済（まとめて決済しない）",
-    "",
-    "※休会中の再申請の場合は延長申請として確認してください。"
+    "休会費：月額1,100円"
   ].join("\n");
 
   MailApp.sendEmail({

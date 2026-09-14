@@ -46,7 +46,6 @@ h1{font-size:29px;line-height:1.25;margin:10px 0 5px}.subtitle{color:#777;font-s
         <strong id="memberName"></strong>
         <dl>
           <dt>会員種別</dt><dd id="course"></dd>
-          <dt>現在の状態</dt><dd id="contractStatus"></dd>
           <dt>URL有効期限</dt><dd id="expiresAt"></dd>
         </dl>
         <div class="token-note">このURLは会員様専用です。第三者への転送・共有はお控えください。申請完了後、このURLは使用できなくなります。</div>
@@ -57,7 +56,7 @@ h1{font-size:29px;line-height:1.25;margin:10px 0 5px}.subtitle{color:#777;font-s
 
       <div class="summary">
         <div class="summary-row"><span>休会終了予定</span><strong id="endMonth">—</strong></div>
-        <div class="summary-row"><span>通常会費再開月</span><strong id="resumeDate">—</strong></div>
+        <div class="summary-row"><span>通常会費再開日</span><strong id="resumeDate">—</strong></div>
         <div class="summary-row"><span>休会費</span><strong class="fee">月額1,100円（税込）</strong></div>
       </div>
     </section>
@@ -218,9 +217,8 @@ async function submitRequest(e){
 }
 
 function renderMember(data){
-  $("memberName").textContent=data.memberName||"";
+  $("memberName").textContent=(data.memberName||"")+"様";
   $("course").textContent=data.course||"—";
-  $("contractStatus").textContent=data.contractStatus||"—";
   $("expiresAt").textContent=(data.expiresAt||"—")+"まで";
 
   startMonth.innerHTML="";
@@ -247,7 +245,7 @@ function updateSummary(){
   const end=addMonths(startMonth.value,n-1);
   const resume=addMonths(startMonth.value,n);
   $("endMonth").textContent=formatMonth(end)+"末日";
-  $("resumeDate").textContent=formatMonth(resume)+"1日から";
+  $("resumeDate").textContent=formatMonth(resume)+"1日";
 }
 
 function formatMonth(v){

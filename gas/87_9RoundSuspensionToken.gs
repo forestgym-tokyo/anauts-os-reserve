@@ -124,11 +124,6 @@ function send9RoundSuspensionUrlMail_(member, url, expiresAt) {
     "",
     "URL有効期限：" + expiryText,
     "",
-    "【休会について】",
-    "・休会費：月額1,100円（税込）",
-    "・休会期間：1か月から6か月",
-    "・毎月20日21:00までの申請は翌月1日から、以降は翌々月1日から休会開始となります。",
-    "",
     "※このURLは会員様専用です。第三者への転送・共有はお控えください。",
     "※申請完了後、このURLは使用できなくなります。",
     "※有効期限を過ぎた場合は、新しいURLの発行が必要です。",
@@ -145,7 +140,6 @@ function send9RoundSuspensionUrlMail_(member, url, expiresAt) {
     '<p>9ROUND アリオ蘇我店でございます。<br>休会申請用の会員様専用URLをお送りします。<br>以下のボタンより、有効期限までにお手続きください。</p>' +
     '<p style="margin:24px 0"><a href="' + safeUrl + '" style="display:inline-block;padding:13px 22px;background:#e31b23;color:#fff;text-decoration:none;border-radius:8px;font-weight:700">休会申請を行う</a></p>' +
     '<p><strong>URL有効期限：</strong>' + safeExpiry + '</p>' +
-    '<p><strong>【休会について】</strong><br>・休会費：月額1,100円（税込）<br>・休会期間：1か月から6か月<br>・毎月20日21:00までの申請は翌月1日から、以降は翌々月1日から休会開始となります。</p>' +
     '<p style="font-size:12px;color:#666">※このURLは会員様専用です。第三者への転送・共有はお控えください。<br>※申請完了後、このURLは使用できなくなります。<br>※有効期限を過ぎた場合は、新しいURLの発行が必要です。</p>' +
     '<p>9ROUND アリオ蘇我店</p>' +
     '</div>';
