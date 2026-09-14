@@ -15,7 +15,7 @@ const ROUND9_SUSPENSION_TOKEN_CONFIG = Object.freeze({
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu("9ROUND休会届")
-    .addItem("選択会員の休会URLを発行", "issue9RoundSuspensionUrlForActiveRow")
+    .addItem("選択会員へ休会URLをメール送信", "issue9RoundSuspensionUrlForActiveRow")
     .addToUi();
 }
 
@@ -56,6 +56,7 @@ function issue9RoundSuspensionUrlForActiveRow() {
 
   let rawToken;
   let expiresAt;
+  let addedRow = 0;
   try {
     invalidateExisting9RoundSuspensionTokens_(tokenSheet, member.memberNo);
     rawToken = create9RoundSuspensionToken_();
@@ -79,7 +80,7 @@ function issue9RoundSuspensionUrlForActiveRow() {
       "",
       ""
     ]);
-    const addedRow = tokenSheet.getLastRow();
+    addedRow = tokenSheet.getLastRow();
     tokenSheet.getRange(addedRow, 2, 1, 2).setNumberFormat("yyyy/mm/dd hh:mm:ss");
   } finally {
     lock.releaseLock();
@@ -87,8 +88,83 @@ function issue9RoundSuspensionUrlForActiveRow() {
 
   const publicUrl = ROUND9_SUSPENSION_TOKEN_CONFIG.PUBLIC_URL_DEFAULT;
   const url = publicUrl + "?token=" + encodeURIComponent(rawToken);
-  show9RoundSuspensionUrlDialog_(url, member, expiresAt);
+  let mailSent = false;
+  let mailError = "";
+
+  try {
+    send9RoundSuspensionUrlMail_(member, url, expiresAt);
+    mailSent = true;
+    set9RoundSuspensionTokenIssueNote_(tokenSheet, addedRow, "会員へ専用URLメール送信済");
+  } catch (error) {
+    console.error("send9RoundSuspensionUrlMail_", error);
+    mailError = error && error.message ? error.message : "メール送信に失敗しました。";
+    set9RoundSuspensionTokenIssueNote_(tokenSheet, addedRow, "専用URLメール送信失敗: " + mailError);
+  }
+
+  show9RoundSuspensionUrlDialog_(url, member, expiresAt, mailSent, mailError);
   return url;
+}
+
+function send9RoundSuspensionUrlMail_(member, url, expiresAt) {
+  const expiryText = Utilities.formatDate(
+    expiresAt,
+    ROUND9_SUSPENSION_CONFIG.TIMEZONE,
+    "yyyy/MM/dd HH:mm"
+  );
+  const subject = "【9ROUND アリオ蘇我店】休会申請のお手続き";
+  const body = [
+    member.name + " 様",
+    "",
+    "9ROUND アリオ蘇我店でございます。",
+    "休会申請用の会員様専用URLをお送りします。",
+    "以下のURLより、有効期限までにお手続きください。",
+    "",
+    "▼休会申請URL",
+    url,
+    "",
+    "URL有効期限：" + expiryText,
+    "",
+    "【休会について】",
+    "・休会費：月額1,100円（税込）",
+    "・休会期間：1か月から6か月",
+    "・毎月20日21:00までの申請は翌月1日から、以降は翌々月1日から休会開始となります。",
+    "",
+    "※このURLは会員様専用です。第三者への転送・共有はお控えください。",
+    "※申請完了後、このURLは使用できなくなります。",
+    "※有効期限を過ぎた場合は、新しいURLの発行が必要です。",
+    "",
+    "9ROUND アリオ蘇我店"
+  ].join("\n");
+
+  const safeName = escape9RoundSuspensionHtml_(member.name);
+  const safeUrl = escape9RoundSuspensionHtml_(url);
+  const safeExpiry = escape9RoundSuspensionHtml_(expiryText);
+  const htmlBody =
+    '<div style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Noto Sans JP,sans-serif;line-height:1.8;color:#111">' +
+    '<p>' + safeName + ' 様</p>' +
+    '<p>9ROUND アリオ蘇我店でございます。<br>休会申請用の会員様専用URLをお送りします。<br>以下のボタンより、有効期限までにお手続きください。</p>' +
+    '<p style="margin:24px 0"><a href="' + safeUrl + '" style="display:inline-block;padding:13px 22px;background:#e31b23;color:#fff;text-decoration:none;border-radius:8px;font-weight:700">休会申請を行う</a></p>' +
+    '<p><strong>URL有効期限：</strong>' + safeExpiry + '</p>' +
+    '<p><strong>【休会について】</strong><br>・休会費：月額1,100円（税込）<br>・休会期間：1か月から6か月<br>・毎月20日21:00までの申請は翌月1日から、以降は翌々月1日から休会開始となります。</p>' +
+    '<p style="font-size:12px;color:#666">※このURLは会員様専用です。第三者への転送・共有はお控えください。<br>※申請完了後、このURLは使用できなくなります。<br>※有効期限を過ぎた場合は、新しいURLの発行が必要です。</p>' +
+    '<p>9ROUND アリオ蘇我店</p>' +
+    '</div>';
+
+  MailApp.sendEmail({
+    to: member.email,
+    subject: subject,
+    body: body,
+    htmlBody: htmlBody,
+    name: "9ROUND アリオ蘇我店",
+    replyTo: ROUND9_SUSPENSION_CONFIG.REPLY_TO
+  });
+}
+
+function set9RoundSuspensionTokenIssueNote_(sheet, rowNumber, note) {
+  if (!sheet || !rowNumber) return;
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+  const noteColumn = headers.indexOf("備考") + 1;
+  if (noteColumn > 0) sheet.getRange(rowNumber, noteColumn).setValue(note);
 }
 
 function verify9RoundSuspensionToken_(body) {
@@ -328,20 +404,24 @@ function parse9RoundSuspensionTokenDate_(value) {
   );
 }
 
-function show9RoundSuspensionUrlDialog_(url, member, expiresAt) {
+function show9RoundSuspensionUrlDialog_(url, member, expiresAt, mailSent, mailError) {
   const expiryText = Utilities.formatDate(expiresAt, ROUND9_SUSPENSION_CONFIG.TIMEZONE, "yyyy/MM/dd HH:mm");
   const safeUrl = escape9RoundSuspensionHtml_(url);
   const safeName = escape9RoundSuspensionHtml_(member.name);
+  const mailStatus = mailSent
+    ? '<div style="margin:0 0 12px;padding:10px;border-radius:8px;background:#e8f5e9;color:#1b5e20;font-size:13px">登録メールアドレスへ休会URLを送信しました。</div>'
+    : '<div style="margin:0 0 12px;padding:10px;border-radius:8px;background:#ffebee;color:#b71c1c;font-size:13px">メール送信に失敗しました。下記URLをコピーして送信してください。' + escape9RoundSuspensionHtml_(mailError || "") + '</div>';
   const html = HtmlService.createHtmlOutput(
     '<div style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;padding:18px;color:#111">' +
     '<h3 style="margin:0 0 8px">休会URLを発行しました</h3>' +
     '<p style="margin:0 0 12px;font-size:13px">' + safeName + ' 様／有効期限 ' + expiryText + '</p>' +
+    mailStatus +
     '<textarea id="url" readonly style="width:100%;height:110px;box-sizing:border-box;padding:10px">' + safeUrl + '</textarea>' +
     '<button onclick="copyUrl()" style="margin-top:12px;width:100%;padding:12px;border:0;border-radius:10px;background:#111;color:#ff3640;font-weight:700;cursor:pointer">URLをコピー</button>' +
     '<div id="msg" style="margin-top:8px;font-size:12px;color:#555"></div>' +
     '<script>function copyUrl(){var e=document.getElementById("url");e.focus();e.select();var done=false;try{done=document.execCommand("copy");}catch(_){done=false;}if(navigator.clipboard){navigator.clipboard.writeText(e.value).then(function(){document.getElementById("msg").textContent="コピーしました";});}else{document.getElementById("msg").textContent=done?"コピーしました":"選択したURLをコピーしてください";}}</script>' +
     '</div>'
-  ).setWidth(560).setHeight(330);
+  ).setWidth(560).setHeight(390);
   SpreadsheetApp.getUi().showModalDialog(html, "9ROUND休会届");
 }
 
