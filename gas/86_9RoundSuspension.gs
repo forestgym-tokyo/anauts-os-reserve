@@ -205,6 +205,16 @@ function create9RoundSuspensionApplication_(member, startMonth, months) {
   };
 }
 
+function get9RoundSuspensionAgreementLines_() {
+  return [
+    "【同意済み事項】",
+    "1. 休会期間中、月額1,100円（税込）の休会費が発生すること。",
+    "2. 休会期間は継続条件付き入会キャンペーンにおける継続月数に含まれず、当初の継続期間満了日から休会期間分、継続満了日が延長されること。",
+    "3. 休会終了予定日以降は通常会費が発生すること。延長を希望する場合は終了予定日までに再度休会届を提出すること。休会期間の短縮を希望する場合は9round.ariosoga@gmail.comへ再開希望月を連絡すること。未消化の休会費は返金されないこと。",
+    "4. 毎月20日21:00までの申請は翌月1日から、以降の申請は翌々月1日から休会開始となること。"
+  ];
+}
+
 function send9RoundSuspensionMemberMail_(member, data) {
   const subject = "休会申請を受け付けました／9ROUND アリオ蘇我店";
   const body = [
@@ -217,11 +227,14 @@ function send9RoundSuspensionMemberMail_(member, data) {
     "休会開始：" + format9RoundSuspensionMonth_(data.startMonth) + "1日",
     "休会期間：" + data.months + "か月",
     "休会終了：" + format9RoundSuspensionMonth_(data.endMonth) + "末日",
-    "自動復会日：" + format9RoundSuspensionMonth_(data.resumeDate.substring(0, 7)) + "1日",
-    "休会費：月額1,100円",
+    "通常会費再開：" + format9RoundSuspensionMonth_(data.resumeDate.substring(0, 7)) + "1日から",
+    "休会費：月額1,100円（税込）",
     "",
-    "休会費は休会期間分をまとめて決済するのではなく、休会期間中の各月に1,100円ずつ発生します。",
-    "休会期間は1か月から6か月までです。延長を希望される場合は、現在の休会期間中に改めて休会申請をお願いいたします。",
+    "休会費は休会期間中の各月に1,100円（税込）ずつ発生します。",
+    "",
+    get9RoundSuspensionAgreementLines_().join("\n"),
+    "",
+    "上記4項目は休会申請時に同意済みとして受け付けています。",
     "",
     "9ROUND アリオ蘇我店"
   ].join("\n");
@@ -245,14 +258,19 @@ function send9RoundSuspensionAdminMail_(member, data) {
     "会員番号：" + member.memberNo,
     "氏名：" + member.name,
     "登録メールアドレス：" + member.email,
+    "本人確認：会員番号＋登録メールアドレス一致",
     "会員ステータス：" + member.contractStatus,
     "会員種別：" + member.course,
     "休会開始：" + format9RoundSuspensionMonth_(data.startMonth) + "1日",
     "休会期間：" + data.months + "か月",
     "休会終了：" + format9RoundSuspensionMonth_(data.endMonth) + "末日",
-    "自動復会日：" + format9RoundSuspensionMonth_(data.resumeDate.substring(0, 7)) + "1日",
-    "休会費：月額1,100円",
+    "通常会費再開：" + format9RoundSuspensionMonth_(data.resumeDate.substring(0, 7)) + "1日から",
+    "休会費：月額1,100円（税込）",
     "決済方法：各月決済（まとめて決済しない）",
+    "",
+    get9RoundSuspensionAgreementLines_().join("\n"),
+    "",
+    "同意状況：上記4項目すべて同意済み",
     "",
     "※休会中の再申請の場合は延長申請として確認してください。"
   ].join("\n");
