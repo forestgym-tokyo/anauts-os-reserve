@@ -4,130 +4,175 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#050505">
-<title>休会届 | 9ROUND アリオ蘇我店</title>
+<title>9ROUND アリオ蘇我店 | 休会申請フォーム</title>
 <style>
-:root{--bg:#050505;--panel:#101010;--line:#303030;--text:#f7f7f7;--muted:#aaa;--red:#e31b23;--red2:#ff3640;--warn:#ffd166;--danger:#ff6b6b}
-*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 50% -160px,rgba(227,27,35,.2),transparent 370px),var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;line-height:1.7}.wrap{width:min(680px,calc(100% - 24px));margin:auto;padding:28px 0 56px}.brand{text-align:center;margin-bottom:22px}.mark{width:70px;height:70px;margin:auto;border:3px solid var(--red);border-radius:50%;display:grid;place-items:center;font-size:28px;font-weight:950}.brand strong{display:block;margin-top:9px;letter-spacing:2px}.brand span{display:block;color:var(--red2);font-size:11px;letter-spacing:2px}.hero,.card{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:22px;margin-top:16px}.hero{border-color:rgba(227,27,35,.45)}.eyebrow{color:var(--red2);font-size:11px;font-weight:900;letter-spacing:1.8px;margin:0 0 6px}.hero h1{font-size:28px;margin:0 0 10px}.hero p{margin:0;color:#ddd;font-size:14px}.deadline{margin-top:16px;padding:13px;border-radius:13px;background:rgba(227,27,35,.08);border:1px solid rgba(227,27,35,.35);font-size:13px}.deadline strong{color:var(--red2)}.loading{text-align:center;padding:34px}.spinner{width:34px;height:34px;border:4px solid #333;border-top-color:var(--red2);border-radius:50%;margin:0 auto 14px;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}.hidden{display:none!important}.status{padding:12px 14px;border-radius:12px;font-size:13px}.status.error{background:#2b1012;color:#ffaaaa}.member-box{background:#090909;border:1px solid #333;border-radius:14px;padding:15px;margin-bottom:18px}.member-box strong{font-size:19px}.member-box dl{display:grid;grid-template-columns:110px 1fr;gap:6px 10px;margin:12px 0 0;font-size:13px}.member-box dt{color:var(--muted)}.member-box dd{margin:0;font-weight:700}.token-note,.note{font-size:12px;color:var(--muted);line-height:1.7}.token-note{margin-top:12px;padding:10px 12px;border-radius:10px;background:#151515}.field{display:block;margin:16px 0}.field span{display:block;font-size:13px;font-weight:800;margin-bottom:7px}select{width:100%;height:48px;border:1px solid #3b3b3b;border-radius:12px;background:#080808;color:#fff;padding:0 14px;font:inherit}.summary{border:1px solid #333;border-radius:14px;overflow:hidden;margin:16px 0}.summary-row{display:flex;justify-content:space-between;gap:16px;padding:12px 14px;border-bottom:1px solid #333;font-size:13px}.summary-row:last-child{border-bottom:0}.summary-row span{color:var(--muted)}.fee{font-size:18px;color:var(--warn)}.billing{color:var(--red2);font-size:12px;text-align:right;margin-top:3px}.check{display:flex;align-items:flex-start;gap:10px;margin:14px 0;font-size:13px}.check input{width:20px;height:20px;flex:0 0 auto;margin-top:2px;accent-color:var(--red)}.btn{width:100%;border:0;border-radius:14px;min-height:52px;padding:12px;background:linear-gradient(135deg,#b30910,var(--red2));color:#fff;font:inherit;font-weight:900;cursor:pointer}.btn:disabled{opacity:.55;background:#555}.complete{text-align:center}.complete-mark{width:58px;height:58px;border-radius:50%;background:var(--red);display:grid;place-items:center;margin:0 auto 14px;font-size:28px;font-weight:900}.application-id{font-family:ui-monospace,monospace;background:#080808;padding:9px 12px;border-radius:10px;display:inline-block;margin:8px 0 16px}.footer{text-align:center;color:#666;font-size:10px;margin-top:24px;letter-spacing:1px}@media(max-width:520px){.wrap{width:min(100% - 18px,680px);padding-top:18px}.hero,.card{padding:18px}.hero h1{font-size:25px}.member-box dl{grid-template-columns:90px 1fr}.summary-row{align-items:flex-start}}
+:root{--bg:#050505;--panel:#101010;--line:#2c2c2c;--text:#f7f7f7;--muted:#a7a7a7;--red:#e31b23;--red2:#ff3640;--warn:#ffd166;--danger:#ff6b6b;--ok:#ff6670}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:radial-gradient(circle at 50% -140px,rgba(227,27,35,.19),transparent 350px),var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;line-height:1.7;padding:28px 14px 64px}
+.container{max-width:560px;margin:auto}.brand{text-align:center;margin-bottom:28px}.brand-mark{width:78px;height:78px;margin:0 auto 13px;border:3px solid var(--red);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:31px;font-weight:950;letter-spacing:-2px}.brand-name{font-size:16px;font-weight:900;letter-spacing:2px}.brand-store{font-size:11px;letter-spacing:2px;color:var(--red2)}
+h1{font-size:29px;line-height:1.25;margin:10px 0 5px}.subtitle{color:#777;font-size:11px;letter-spacing:2.4px}.lead,.section{border:1px solid var(--line);border-radius:16px;background:var(--panel)}.lead{padding:14px 16px;margin-bottom:18px;border-color:rgba(227,27,35,.38);background:rgba(227,27,35,.07);font-size:13px}.lead strong{color:var(--red2)}.section{padding:21px;margin-bottom:16px}.section-title{font-size:18px;font-weight:850;margin-bottom:17px}.section-title small{display:block;color:var(--red2);font-size:10px;letter-spacing:1.5px}.field{margin-bottom:15px}label{display:block;color:#ddd;font-size:13px;margin-bottom:6px}input,select{width:100%;border:1px solid #343434;border-radius:12px;background:#080808;color:#fff;padding:13px 14px;font-size:16px;outline:none}input:focus,select:focus{border-color:var(--red);box-shadow:0 0 0 3px rgba(227,27,35,.14)}
+.status{min-height:23px;font-size:13px;margin:4px 0 12px}.member-ok{color:var(--ok)}.member-error{color:var(--danger)}.hidden{display:none!important}.member-box{background:#090909;border:1px solid #333;border-radius:14px;padding:15px;margin-bottom:18px}.member-box strong{font-size:19px}.member-box dl{display:grid;grid-template-columns:110px 1fr;gap:6px 10px;margin:12px 0 0;font-size:13px}.member-box dt{color:var(--muted)}.member-box dd{margin:0;font-weight:700}.token-note,.note{font-size:12px;color:var(--muted);line-height:1.7}.token-note{margin-top:12px;padding:10px 12px;border-radius:10px;background:#151515}.summary{border:1px solid #333;border-radius:14px;overflow:hidden;margin:16px 0}.summary-row{display:flex;justify-content:space-between;gap:16px;padding:12px 14px;border-bottom:1px solid #333;font-size:13px}.summary-row:last-child{border-bottom:0}.summary-row span{color:var(--muted)}.fee{font-size:18px;color:var(--warn)}.checkbox-item{display:flex;align-items:flex-start;gap:12px;margin-bottom:18px}.checkbox-item input{width:22px;height:22px;min-width:22px;margin-top:2px;accent-color:var(--red)}.checkbox-item label{margin:0;font-size:14px}.highlight{color:var(--warn);font-weight:700}.btn{width:100%;border:0;border-radius:16px;padding:17px 16px;cursor:pointer;background:linear-gradient(135deg,#b30910,var(--red2));color:#fff;font-size:17px;font-weight:900}.btn.secondary{background:#242424;border:1px solid #444}.btn:disabled{opacity:.55;background:#555}.submit-sub{display:block;font-size:10px;letter-spacing:1.4px}.result{display:none;margin-top:18px;padding:18px;border-radius:16px;border:1px solid rgba(227,27,35,.55);background:rgba(227,27,35,.08);text-align:center}.result.show{display:block}.result h2{font-size:20px;color:var(--red2)}.application-id{font-family:ui-monospace,monospace;background:#080808;padding:9px 12px;border-radius:10px;display:inline-block;margin:8px 0 16px}.footer{text-align:center;color:#626262;font-size:10px;margin-top:26px}.error-box{padding:12px 14px;border-radius:12px;background:#2b1012;color:#ffaaaa;font-size:13px;margin-top:12px}
+@media(max-width:480px){body{padding:22px 11px 48px}.section{padding:18px 15px}h1{font-size:26px}.member-box dl{grid-template-columns:90px 1fr}.summary-row{align-items:flex-start}}
 </style>
 </head>
 <body>
-<main class="wrap">
-  <div class="brand"><div class="mark">9R</div><strong>9ROUND</strong><span>ARIO SOGA</span></div>
+<div class="container">
+  <div class="brand">
+    <div class="brand-mark">9R</div><div class="brand-name">9ROUND</div><div class="brand-store">ARIO SOGA</div>
+    <h1>休会申請フォーム</h1><div class="subtitle">SUSPENSION REQUEST</div>
+  </div>
 
-  <section class="hero">
-    <p class="eyebrow">SUSPENSION REQUEST</p>
-    <h1>休会のお手続き</h1>
-    <p>店舗からお送りした会員様専用URLから、休会期間をお選びいただけます。</p>
-    <div class="deadline"><strong>毎月20日 21:00締切</strong><br>締切までの申請は翌月1日から、締切後は翌々月1日から休会可能です。専用URLは発行から72時間有効です。</div>
-  </section>
+  <div class="lead"><strong>毎月20日21:00締切</strong><br>20日21:00までの申請は翌月1日から、以降は翌々月1日から休会開始となります。専用URLは発行から72時間有効です。</div>
 
-  <section class="card loading" id="loadingCard"><div class="spinner"></div><strong>専用URLを確認しています</strong></section>
-
-  <section class="card hidden" id="invalidCard">
-    <h2>お手続きできません</h2>
-    <div class="status error" id="invalidMessage">専用URLを確認できませんでした。</div>
+  <section class="section hidden" id="invalidCard">
+    <div class="section-title">お手続きできません<small>INVALID REQUEST</small></div>
+    <div class="error-box" id="invalidMessage">この休会URLは無効です。</div>
     <p class="note">URLの再発行が必要な場合は、9ROUND アリオ蘇我店までお問い合わせください。</p>
   </section>
 
-  <section class="card hidden" id="requestCard">
-    <h2>休会内容</h2>
-    <div class="member-box">
-      <strong id="memberName"></strong>
-      <dl>
-        <dt>会員種別</dt><dd id="course"></dd>
-        <dt>現在の状態</dt><dd id="contractStatus"></dd>
-        <dt>URL有効期限</dt><dd id="expiresAt"></dd>
-      </dl>
-      <div class="token-note">このURLは会員様専用です。第三者への転送・共有はお控えください。申請完了後、このURLは使用できなくなります。</div>
-    </div>
+  <form id="requestForm" novalidate>
+    <section class="section" id="identitySection">
+      <div class="section-title">本人確認<small>MEMBER VERIFICATION</small></div>
+      <div class="field"><label for="memberNo">会員番号（7桁の数字）</label><input id="memberNo" inputmode="numeric" maxlength="7" autocomplete="off" placeholder="1234567" required></div>
+      <div class="field"><label for="email">登録メールアドレス</label><input id="email" type="email" autocomplete="email" required></div>
+      <div class="status" id="memberStatus"></div>
+      <button class="btn secondary" id="verifyButton" type="button">会員情報を確認する<span class="submit-sub">VERIFY MEMBER</span></button>
+      <p class="note">会員番号と、会員マスターに登録されているメールアドレスが一致した場合のみ申請できます。</p>
+    </section>
 
-    <form id="requestForm" novalidate>
-      <label class="field"><span>休会開始月</span><select id="startMonth" required></select></label>
-      <label class="field"><span>休会期間</span><select id="months" required></select><small class="note">1か月から6か月まで選択できます。</small></label>
-
-      <div class="summary">
-        <div class="summary-row"><span>休会終了</span><strong id="endMonth">—</strong></div>
-        <div class="summary-row"><span>自動復会日</span><strong id="resumeDate">—</strong></div>
-        <div class="summary-row"><span>休会費</span><strong class="fee">月額1,100円</strong></div>
-        <div class="billing">※休会期間分をまとめて決済せず、各月ごとに発生します。</div>
+    <section class="section hidden" id="requestSection">
+      <div class="section-title">休会内容<small>SUSPENSION DETAILS</small></div>
+      <div class="member-box">
+        <strong id="memberName"></strong>
+        <dl>
+          <dt>会員種別</dt><dd id="course"></dd>
+          <dt>現在の状態</dt><dd id="contractStatus"></dd>
+          <dt>URL有効期限</dt><dd id="expiresAt"></dd>
+        </dl>
+        <div class="token-note">このURLは会員様専用です。申請完了後、このURLは使用できなくなります。</div>
       </div>
 
-      <label class="check"><input type="checkbox" id="confirmFee"><span>休会費は月額1,100円で、休会期間分を一括決済するのではなく、休会期間中の各月に発生することを確認しました。</span></label>
-      <label class="check"><input type="checkbox" id="confirmPeriod"><span>休会期間は1か月から6か月までで、延長する場合は現在の休会期間中に改めて申請が必要であることを確認しました。</span></label>
-      <label class="check"><input type="checkbox" id="confirmDeadline"><span>毎月20日21:00までの申請は翌月1日から、21:00を過ぎた申請は翌々月1日から休会となり、休会終了後は自動復会となることを確認しました。</span></label>
+      <div class="field"><label for="startMonth">休会開始月</label><select id="startMonth" required></select></div>
+      <div class="field"><label for="months">休会期間</label><select id="months" required></select><div class="note">1か月から6か月まで選択できます。</div></div>
 
-      <button class="btn" id="submitButton" type="submit">この内容で休会を申請する</button>
-      <div class="status error hidden" id="submitError"></div>
-      <p class="note">申請後、受付内容を登録メールアドレスへ送信します。</p>
-    </form>
-  </section>
+      <div class="summary">
+        <div class="summary-row"><span>休会終了予定</span><strong id="endMonth">—</strong></div>
+        <div class="summary-row"><span>通常会費再開月</span><strong id="resumeDate">—</strong></div>
+        <div class="summary-row"><span>休会費</span><strong class="fee">月額1,100円（税込）</strong></div>
+      </div>
+    </section>
 
-  <section class="card complete hidden" id="completeCard">
-    <div class="complete-mark">✓</div>
-    <h2>休会申請を受け付けました</h2>
-    <p id="completeText"></p>
-    <div class="application-id" id="applicationId"></div>
-    <p class="note">この専用URLは使用済みとなりました。受付内容は登録メールアドレスへ送信しています。</p>
-  </section>
+    <section class="section hidden" id="agreementSection">
+      <div class="section-title">同意事項<small>AGREEMENT</small></div>
 
+      <div class="checkbox-item"><input type="checkbox" id="confirmFee"><label for="confirmFee">休会期間中、<span class="highlight">月額1,100円（税込）の休会費が発生すること</span>に同意します。</label></div>
+
+      <div class="checkbox-item"><input type="checkbox" id="confirmCommitment"><label for="confirmCommitment">休会期間は、継続条件付き入会キャンペーンにおける<span class="highlight">継続月数には含まれず、当初の継続期間満了日から休会期間分、継続満了日が延長されること</span>を理解し、同意します。</label></div>
+
+      <div class="checkbox-item"><input type="checkbox" id="confirmResume"><label for="confirmResume">休会終了予定日以降は通常会費が発生することを理解しています。延長を希望する場合は<span class="highlight">終了予定日までに再度休会届を提出</span>します。休会期間の短縮を希望する場合は、<span class="highlight">9round.ariosoga@gmail.com へ再開希望月を連絡</span>します。また、未消化の休会費は返金できないことに同意します。</label></div>
+
+      <div class="checkbox-item"><input type="checkbox" id="confirmDeadline"><label for="confirmDeadline">休会開始月は、<span class="highlight">毎月20日21:00までの申請で翌月1日から、以降の申請は翌々月1日から</span>となることを確認しました。</label></div>
+
+      <button class="btn" id="submitButton" type="submit">この内容で休会を申請する<span class="submit-sub">SUBMIT SUSPENSION REQUEST</span></button>
+      <div class="error-box hidden" id="submitError"></div>
+      <p class="note">申請後、受付内容を登録メールアドレスへ送信し、管理者にも通知します。</p>
+    </section>
+  </form>
+
+  <div class="result" id="resultBox"><h2>休会申請を受け付けました</h2><p id="resultMessage"></p><div class="application-id" id="applicationId"></div><p class="note">この専用URLは使用済みとなりました。受付内容は登録メールアドレスへ送信しています。</p></div>
   <div class="footer">9ROUND ARIO SOGA / A-nauts</div>
-</main>
+</div>
+
 <script>
 const API_URL="https://script.google.com/macros/s/AKfycbyT8G6rQ-9LFosbFlzSYj4OM0PrCG_KD7bddVxQ65RLMkfYrjmBZ2ebCvL54ncGJSZ2/exec";
 const token=(new URLSearchParams(location.search).get("token")||"").trim().toLowerCase();
-const state={token};
-const $=s=>document.querySelector(s);
-const loadingCard=$("#loadingCard"),invalidCard=$("#invalidCard"),requestCard=$("#requestCard"),completeCard=$("#completeCard");
-const requestForm=$("#requestForm"),submitButton=$("#submitButton"),submitError=$("#submitError"),startMonth=$("#startMonth"),months=$("#months");
-startMonth.addEventListener("change",updateSummary);months.addEventListener("change",updateSummary);requestForm.addEventListener("submit",submitRequest);boot();
+const $=id=>document.getElementById(id);
+const form=$("requestForm"),memberNoInput=$("memberNo"),emailInput=$("email"),memberStatus=$("memberStatus"),verifyButton=$("verifyButton"),requestSection=$("requestSection"),agreementSection=$("agreementSection"),startMonth=$("startMonth"),months=$("months"),submitButton=$("submitButton"),submitError=$("submitError"),resultBox=$("resultBox"),resultMessage=$("resultMessage"),applicationId=$("applicationId"),identitySection=$("identitySection"),invalidCard=$("invalidCard"),invalidMessage=$("invalidMessage");
+let memberVerified=false;
 
-async function boot(){
+boot();
+memberNoInput.addEventListener("input",()=>{memberNoInput.value=memberNoInput.value.replace(/\D/g,"").slice(0,7);resetVerification()});
+emailInput.addEventListener("input",resetVerification);
+verifyButton.addEventListener("click",verifyMember);
+startMonth.addEventListener("change",updateSummary);
+months.addEventListener("change",updateSummary);
+form.addEventListener("submit",submitRequest);
+
+function boot(){
+  if(!/^[a-f0-9]{64}$/.test(token))showInvalid("この休会URLは無効です。店舗から送付された専用URLをご利用ください。");
+}
+
+function resetVerification(){
+  memberVerified=false;
+  memberStatus.className="status";
+  memberStatus.textContent="";
+  requestSection.classList.add("hidden");
+  agreementSection.classList.add("hidden");
+}
+
+async function verifyMember(){
   if(!/^[a-f0-9]{64}$/.test(token))return showInvalid("この休会URLは無効です。店舗から送付された専用URLをご利用ください。");
+  const memberNo=memberNoInput.value.trim(),email=emailInput.value.trim();
+  if(memberNo.length!==7){memberStatus.className="status member-error";memberStatus.textContent="会員番号は7桁の数字で入力してください。";return}
+  if(!email||!email.includes("@")){memberStatus.className="status member-error";memberStatus.textContent="登録メールアドレスを正しく入力してください。";return}
+  setVerifyBusy(true);memberStatus.className="status";memberStatus.textContent="会員情報を確認しています...";
   try{
-    const res=await post({action:"verify9RoundSuspensionToken",token});
-    if(!res.ok)throw new Error(res.message||"専用URLを確認できませんでした。");
-    renderMember(res.data);loadingCard.classList.add("hidden");requestCard.classList.remove("hidden");
-  }catch(err){showInvalid(err.message)}
+    const res=await post({action:"verify9RoundSuspensionIdentity",token,memberNo,email});
+    if(!res.ok)throw new Error(res.message||"会員情報を確認できませんでした。");
+    memberVerified=true;
+    memberStatus.className="status member-ok";
+    memberStatus.textContent="会員情報を確認しました："+(res.data.memberName||"")+" 様";
+    renderMember(res.data);
+    requestSection.classList.remove("hidden");agreementSection.classList.remove("hidden");
+  }catch(err){memberVerified=false;memberStatus.className="status member-error";memberStatus.textContent=err.message||"会員情報を確認できませんでした。";requestSection.classList.add("hidden");agreementSection.classList.add("hidden")}
+  finally{setVerifyBusy(false)}
 }
 
 async function submitRequest(e){
-  e.preventDefault();hideError();
-  if(!$("#confirmFee").checked||!$("#confirmPeriod").checked||!$("#confirmDeadline").checked){return showError("すべての確認事項にチェックしてください。")}
-  setBusy(true);
+  e.preventDefault();hideSubmitError();
+  if(!memberVerified){await verifyMember();if(!memberVerified)return}
+  const confirmations={
+    confirmFee:$("confirmFee").checked,
+    confirmCommitment:$("confirmCommitment").checked,
+    confirmResume:$("confirmResume").checked,
+    confirmDeadline:$("confirmDeadline").checked
+  };
+  if(!Object.values(confirmations).every(Boolean)){return showSubmitError("同意事項4項目すべてにチェックしてください。")}
+  setSubmitBusy(true);
   try{
     const res=await post({
-      action:"submit9RoundSuspensionToken",
-      token:state.token,
+      action:"submit9RoundSuspensionIdentity",
+      token,
+      memberNo:memberNoInput.value.trim(),
+      email:emailInput.value.trim(),
       startMonth:startMonth.value,
       months:Number(months.value),
-      confirmFee:true,
-      confirmPeriod:true,
-      confirmDeadline:true
+      ...confirmations
     });
     if(!res.ok)throw new Error(res.message||"休会申請を受け付けできませんでした。");
-    renderComplete(res.data);
-  }catch(err){showError(err.message)}finally{setBusy(false)}
+    identitySection.classList.add("hidden");requestSection.classList.add("hidden");agreementSection.classList.add("hidden");
+    resultMessage.textContent=formatMonth(res.data.startMonth)+"1日から"+res.data.months+"か月間の休会申請です。休会費は月額1,100円（税込）です。";
+    applicationId.textContent=res.data.applicationId||"";
+    resultBox.classList.add("show");window.scrollTo({top:0,behavior:"smooth"});
+  }catch(err){showSubmitError(err.message||"休会申請を受け付けできませんでした。")}
+  finally{setSubmitBusy(false)}
 }
 
 function renderMember(data){
-  $("#memberName").textContent=data.memberName||"";
-  $("#course").textContent=data.course||"—";
-  $("#contractStatus").textContent=data.contractStatus||"—";
-  $("#expiresAt").textContent=(data.expiresAt||"—")+"まで";
+  $("memberName").textContent=data.memberName||"";$("course").textContent=data.course||"—";$("contractStatus").textContent=data.contractStatus||"—";$("expiresAt").textContent=(data.expiresAt||"—")+"まで";
   startMonth.innerHTML="";(data.startMonthOptions||[]).forEach(v=>{const o=document.createElement("option");o.value=v;o.textContent=formatMonth(v)+"1日から";startMonth.appendChild(o)});
   months.innerHTML="";for(let i=Number(data.minMonths||1);i<=Number(data.maxMonths||6);i++){const o=document.createElement("option");o.value=String(i);o.textContent=i+"か月";months.appendChild(o)}
   updateSummary();
 }
-
-function updateSummary(){if(!startMonth.value||!months.value)return;const n=Number(months.value),end=addMonths(startMonth.value,n-1),resume=addMonths(startMonth.value,n);$("#endMonth").textContent=formatMonth(end)+"末日";$("#resumeDate").textContent=formatMonth(resume)+"1日"}
-function renderComplete(data){requestCard.classList.add("hidden");completeCard.classList.remove("hidden");$("#completeText").textContent=formatMonth(data.startMonth)+"1日から"+data.months+"か月間の休会申請です。休会費は各月1,100円です。";$("#applicationId").textContent=data.applicationId||"";window.scrollTo({top:0,behavior:"smooth"})}
-function formatMonth(v){const m=String(v||"").match(/^(\d{4})-(\d{2})$/);return m?Number(m[1])+"年"+Number(m[2])+"月":v}
-function addMonths(v,n){const m=String(v).match(/^(\d{4})-(\d{2})$/);if(!m)return v;const d=new Date(Date.UTC(Number(m[1]),Number(m[2])-1+n,1));return d.getUTCFullYear()+"-"+String(d.getUTCMonth()+1).padStart(2,"0")}
+function updateSummary(){if(!startMonth.value||!months.value)return;const n=Number(months.value),end=addMonths(startMonth.value,n-1),resume=addMonths(startMonth.value,n);$("endMonth").textContent=formatMonth(end)+"末日";$("resumeDate").textContent=formatMonth(resume)+"1日から"}
+function formatMonth(v){const m=String(v||"").match(/^(\d{4})-(\d{2})/);return m?Number(m[1])+"年"+Number(m[2])+"月":v}
+function addMonths(v,n){const m=String(v||"").match(/^(\d{4})-(\d{2})$/);if(!m)return v;const d=new Date(Date.UTC(Number(m[1]),Number(m[2])-1+n,1));return d.getUTCFullYear()+"-"+String(d.getUTCMonth()+1).padStart(2,"0")}
 async function post(payload){const r=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload)});if(!r.ok)throw new Error("HTTP "+r.status);return r.json()}
-function showInvalid(message){loadingCard.classList.add("hidden");requestCard.classList.add("hidden");invalidCard.classList.remove("hidden");$("#invalidMessage").textContent=message||"専用URLを確認できませんでした。"}
-function showError(message){submitError.textContent=message;submitError.classList.remove("hidden")}
-function hideError(){submitError.classList.add("hidden");submitError.textContent=""}
-function setBusy(active){submitButton.disabled=active;submitButton.textContent=active?"送信中…":"この内容で休会を申請する"}
+function setVerifyBusy(active){verifyButton.disabled=active;verifyButton.innerHTML=active?'確認中です...<span class="submit-sub">PLEASE WAIT</span>':'会員情報を確認する<span class="submit-sub">VERIFY MEMBER</span>'}
+function setSubmitBusy(active){submitButton.disabled=active;submitButton.innerHTML=active?'送信中です...<span class="submit-sub">PLEASE WAIT</span>':'この内容で休会を申請する<span class="submit-sub">SUBMIT SUSPENSION REQUEST</span>'}
+function showSubmitError(message){submitError.textContent=message;submitError.classList.remove("hidden")}
+function hideSubmitError(){submitError.classList.add("hidden");submitError.textContent=""}
+function showInvalid(message){form.classList.add("hidden");invalidCard.classList.remove("hidden");invalidMessage.textContent=message}
 </script>
 </body>
 </html>
