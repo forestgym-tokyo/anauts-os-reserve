@@ -6,8 +6,8 @@
  * ============================================================
  *
  * 84_9RoundWithdrawal.gs / 86_9RoundSuspension.gs /
- * 87_9RoundSuspensionToken.gs と同じ、9ROUND_Member
- * スプレッドシートに紐づいた Apps Script プロジェクトで使用する。
+ * 87_9RoundSuspensionToken.gs / 88_9RoundSuspensionIdentity.gs と同じ、
+ * 9ROUND_Member スプレッドシートに紐づいた Apps Script プロジェクトで使用する。
  */
 
 const ROUND9_WITHDRAWAL_BOUND_CONFIG = Object.freeze({
@@ -109,6 +109,12 @@ function doPost(e) {
 
       case "submit9RoundSuspensionToken":
         return submit9RoundSuspensionToken_(body);
+
+      case "verify9RoundSuspensionIdentity":
+        return verify9RoundSuspensionIdentity_(body);
+
+      case "submit9RoundSuspensionIdentity":
+        return submit9RoundSuspensionIdentity_(body);
 
       default:
         return round9Json_({
