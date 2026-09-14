@@ -37,7 +37,7 @@ h1{font-size:29px;line-height:1.25;margin:10px 0 5px}.subtitle{color:#777;font-s
       <div class="field"><label for="email">登録メールアドレス</label><input id="email" type="email" autocomplete="email" required></div>
       <div class="status" id="memberStatus"></div>
       <button class="btn secondary" id="verifyButton" type="button">会員情報を確認する<span class="submit-sub">VERIFY MEMBER</span></button>
-      <p class="note">会員番号と、会員マスターに登録されているメールアドレスが一致した場合のみ申請できます。</p>
+      <p class="note">会員番号と会員マスターに登録されているメールアドレスが一致し、かつこの専用URLの会員情報と一致した場合のみ申請できます。</p>
     </section>
 
     <section class="section hidden" id="requestSection">
@@ -49,7 +49,7 @@ h1{font-size:29px;line-height:1.25;margin:10px 0 5px}.subtitle{color:#777;font-s
           <dt>現在の状態</dt><dd id="contractStatus"></dd>
           <dt>URL有効期限</dt><dd id="expiresAt"></dd>
         </dl>
-        <div class="token-note">このURLは会員様専用です。申請完了後、このURLは使用できなくなります。</div>
+        <div class="token-note">このURLは会員様専用です。第三者への転送・共有はお控えください。申請完了後、このURLは使用できなくなります。</div>
       </div>
 
       <div class="field"><label for="startMonth">休会開始月</label><select id="startMonth" required></select></div>
@@ -89,6 +89,7 @@ const token=(new URLSearchParams(location.search).get("token")||"").trim().toLow
 const $=id=>document.getElementById(id);
 const form=$("requestForm"),memberNoInput=$("memberNo"),emailInput=$("email"),memberStatus=$("memberStatus"),verifyButton=$("verifyButton"),requestSection=$("requestSection"),agreementSection=$("agreementSection"),startMonth=$("startMonth"),months=$("months"),submitButton=$("submitButton"),submitError=$("submitError"),resultBox=$("resultBox"),resultMessage=$("resultMessage"),applicationId=$("applicationId"),identitySection=$("identitySection"),invalidCard=$("invalidCard"),invalidMessage=$("invalidMessage");
 let memberVerified=false;
+let verifiedKey="";
 
 boot();
 memberNoInput.addEventListener("input",()=>{memberNoInput.value=memberNoInput.value.replace(/\D/g,"").slice(0,7);resetVerification()});
@@ -104,10 +105,19 @@ function boot(){
 
 function resetVerification(){
   memberVerified=false;
+  verifiedKey="";
   memberStatus.className="status";
   memberStatus.textContent="";
   requestSection.classList.add("hidden");
   agreementSection.classList.add("hidden");
+}
+
+function currentIdentityKey(){
+  return memberNoInput.value.trim()+"|"+emailInput.value.trim().toLowerCase();
+}
+
+function normalizeCompare(value){
+  return String(value||"").replace(/[\s　]+/g,"").toLowerCase();
 }
 
 async function verifyMember(){
@@ -115,61 +125,159 @@ async function verifyMember(){
   const memberNo=memberNoInput.value.trim(),email=emailInput.value.trim();
   if(memberNo.length!==7){memberStatus.className="status member-error";memberStatus.textContent="会員番号は7桁の数字で入力してください。";return}
   if(!email||!email.includes("@")){memberStatus.className="status member-error";memberStatus.textContent="登録メールアドレスを正しく入力してください。";return}
-  setVerifyBusy(true);memberStatus.className="status";memberStatus.textContent="会員情報を確認しています...";
+
+  setVerifyBusy(true);
+  memberStatus.className="status";
+  memberStatus.textContent="会員情報を確認しています...";
+
   try{
-    const res=await post({action:"verify9RoundSuspensionIdentity",token,memberNo,email});
-    if(!res.ok)throw new Error(res.message||"会員情報を確認できませんでした。");
+    const [tokenRes,memberRes]=await Promise.all([
+      post({action:"verify9RoundSuspensionToken",token}),
+      post({action:"check9RoundWithdrawalMember",memberNo,email})
+    ]);
+
+    if(!tokenRes.ok)throw new Error(tokenRes.message||"この休会URLを確認できませんでした。");
+    if(!memberRes.ok)throw new Error(memberRes.message||"会員番号または登録メールアドレスが一致しません。");
+
+    const tokenName=normalizeCompare(tokenRes.data&&tokenRes.data.memberName);
+    const inputName=normalizeCompare(memberRes.data&&memberRes.data.memberName);
+    const tokenCourse=normalizeCompare(tokenRes.data&&tokenRes.data.course);
+    const inputCourse=normalizeCompare(memberRes.data&&memberRes.data.course);
+
+    if(!tokenName||!inputName||tokenName!==inputName||(tokenCourse&&inputCourse&&tokenCourse!==inputCourse)){
+      throw new Error("この専用URLの会員情報と、入力された会員番号・登録メールアドレスの会員情報が一致しません。");
+    }
+
     memberVerified=true;
+    verifiedKey=currentIdentityKey();
     memberStatus.className="status member-ok";
-    memberStatus.textContent="会員情報を確認しました："+(res.data.memberName||"")+" 様";
-    renderMember(res.data);
-    requestSection.classList.remove("hidden");agreementSection.classList.remove("hidden");
-  }catch(err){memberVerified=false;memberStatus.className="status member-error";memberStatus.textContent=err.message||"会員情報を確認できませんでした。";requestSection.classList.add("hidden");agreementSection.classList.add("hidden")}
-  finally{setVerifyBusy(false)}
+    memberStatus.textContent="会員情報を確認しました："+(tokenRes.data.memberName||"")+" 様";
+    renderMember(tokenRes.data);
+    requestSection.classList.remove("hidden");
+    agreementSection.classList.remove("hidden");
+  }catch(err){
+    memberVerified=false;
+    verifiedKey="";
+    memberStatus.className="status member-error";
+    memberStatus.textContent=err.message||"会員情報を確認できませんでした。";
+    requestSection.classList.add("hidden");
+    agreementSection.classList.add("hidden");
+  }finally{
+    setVerifyBusy(false);
+  }
 }
 
 async function submitRequest(e){
-  e.preventDefault();hideSubmitError();
-  if(!memberVerified){await verifyMember();if(!memberVerified)return}
-  const confirmations={
-    confirmFee:$("confirmFee").checked,
-    confirmCommitment:$("confirmCommitment").checked,
-    confirmResume:$("confirmResume").checked,
-    confirmDeadline:$("confirmDeadline").checked
-  };
-  if(!Object.values(confirmations).every(Boolean)){return showSubmitError("同意事項4項目すべてにチェックしてください。")}
+  e.preventDefault();
+  hideSubmitError();
+
+  if(!memberVerified||verifiedKey!==currentIdentityKey()){
+    await verifyMember();
+    if(!memberVerified)return;
+  }
+
+  const confirmFee=$("confirmFee").checked;
+  const confirmCommitment=$("confirmCommitment").checked;
+  const confirmResume=$("confirmResume").checked;
+  const confirmDeadline=$("confirmDeadline").checked;
+
+  if(!confirmFee||!confirmCommitment||!confirmResume||!confirmDeadline){
+    return showSubmitError("同意事項4項目すべてにチェックしてください。");
+  }
+
   setSubmitBusy(true);
   try{
     const res=await post({
-      action:"submit9RoundSuspensionIdentity",
+      action:"submit9RoundSuspensionToken",
       token,
       memberNo:memberNoInput.value.trim(),
       email:emailInput.value.trim(),
       startMonth:startMonth.value,
       months:Number(months.value),
-      ...confirmations
+      confirmFee:true,
+      confirmPeriod:true,
+      confirmDeadline:true,
+      confirmCommitment:true,
+      confirmResume:true
     });
+
     if(!res.ok)throw new Error(res.message||"休会申請を受け付けできませんでした。");
-    identitySection.classList.add("hidden");requestSection.classList.add("hidden");agreementSection.classList.add("hidden");
+
+    identitySection.classList.add("hidden");
+    requestSection.classList.add("hidden");
+    agreementSection.classList.add("hidden");
     resultMessage.textContent=formatMonth(res.data.startMonth)+"1日から"+res.data.months+"か月間の休会申請です。休会費は月額1,100円（税込）です。";
     applicationId.textContent=res.data.applicationId||"";
-    resultBox.classList.add("show");window.scrollTo({top:0,behavior:"smooth"});
-  }catch(err){showSubmitError(err.message||"休会申請を受け付けできませんでした。")}
-  finally{setSubmitBusy(false)}
+    resultBox.classList.add("show");
+    window.scrollTo({top:0,behavior:"smooth"});
+  }catch(err){
+    showSubmitError(err.message||"休会申請を受け付けできませんでした。");
+  }finally{
+    setSubmitBusy(false);
+  }
 }
 
 function renderMember(data){
-  $("memberName").textContent=data.memberName||"";$("course").textContent=data.course||"—";$("contractStatus").textContent=data.contractStatus||"—";$("expiresAt").textContent=(data.expiresAt||"—")+"まで";
-  startMonth.innerHTML="";(data.startMonthOptions||[]).forEach(v=>{const o=document.createElement("option");o.value=v;o.textContent=formatMonth(v)+"1日から";startMonth.appendChild(o)});
-  months.innerHTML="";for(let i=Number(data.minMonths||1);i<=Number(data.maxMonths||6);i++){const o=document.createElement("option");o.value=String(i);o.textContent=i+"か月";months.appendChild(o)}
+  $("memberName").textContent=data.memberName||"";
+  $("course").textContent=data.course||"—";
+  $("contractStatus").textContent=data.contractStatus||"—";
+  $("expiresAt").textContent=(data.expiresAt||"—")+"まで";
+
+  startMonth.innerHTML="";
+  (data.startMonthOptions||[]).forEach(v=>{
+    const o=document.createElement("option");
+    o.value=v;
+    o.textContent=formatMonth(v)+"1日から";
+    startMonth.appendChild(o);
+  });
+
+  months.innerHTML="";
+  for(let i=Number(data.minMonths||1);i<=Number(data.maxMonths||6);i++){
+    const o=document.createElement("option");
+    o.value=String(i);
+    o.textContent=i+"か月";
+    months.appendChild(o);
+  }
   updateSummary();
 }
-function updateSummary(){if(!startMonth.value||!months.value)return;const n=Number(months.value),end=addMonths(startMonth.value,n-1),resume=addMonths(startMonth.value,n);$("endMonth").textContent=formatMonth(end)+"末日";$("resumeDate").textContent=formatMonth(resume)+"1日から"}
-function formatMonth(v){const m=String(v||"").match(/^(\d{4})-(\d{2})/);return m?Number(m[1])+"年"+Number(m[2])+"月":v}
-function addMonths(v,n){const m=String(v||"").match(/^(\d{4})-(\d{2})$/);if(!m)return v;const d=new Date(Date.UTC(Number(m[1]),Number(m[2])-1+n,1));return d.getUTCFullYear()+"-"+String(d.getUTCMonth()+1).padStart(2,"0")}
-async function post(payload){const r=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload)});if(!r.ok)throw new Error("HTTP "+r.status);return r.json()}
-function setVerifyBusy(active){verifyButton.disabled=active;verifyButton.innerHTML=active?'確認中です...<span class="submit-sub">PLEASE WAIT</span>':'会員情報を確認する<span class="submit-sub">VERIFY MEMBER</span>'}
-function setSubmitBusy(active){submitButton.disabled=active;submitButton.innerHTML=active?'送信中です...<span class="submit-sub">PLEASE WAIT</span>':'この内容で休会を申請する<span class="submit-sub">SUBMIT SUSPENSION REQUEST</span>'}
+
+function updateSummary(){
+  if(!startMonth.value||!months.value)return;
+  const n=Number(months.value);
+  const end=addMonths(startMonth.value,n-1);
+  const resume=addMonths(startMonth.value,n);
+  $("endMonth").textContent=formatMonth(end)+"末日";
+  $("resumeDate").textContent=formatMonth(resume)+"1日から";
+}
+
+function formatMonth(v){
+  const m=String(v||"").match(/^(\d{4})-(\d{2})/);
+  return m?Number(m[1])+"年"+Number(m[2])+"月":v;
+}
+
+function addMonths(v,n){
+  const m=String(v||"").match(/^(\d{4})-(\d{2})$/);
+  if(!m)return v;
+  const d=new Date(Date.UTC(Number(m[1]),Number(m[2])-1+n,1));
+  return d.getUTCFullYear()+"-"+String(d.getUTCMonth()+1).padStart(2,"0");
+}
+
+async function post(payload){
+  const r=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload)});
+  if(!r.ok)throw new Error("HTTP "+r.status);
+  return r.json();
+}
+
+function setVerifyBusy(active){
+  verifyButton.disabled=active;
+  verifyButton.innerHTML=active?'確認中です...<span class="submit-sub">PLEASE WAIT</span>':'会員情報を確認する<span class="submit-sub">VERIFY MEMBER</span>';
+}
+
+function setSubmitBusy(active){
+  submitButton.disabled=active;
+  submitButton.innerHTML=active?'送信中です...<span class="submit-sub">PLEASE WAIT</span>':'この内容で休会を申請する<span class="submit-sub">SUBMIT SUSPENSION REQUEST</span>';
+}
+
 function showSubmitError(message){submitError.textContent=message;submitError.classList.remove("hidden")}
 function hideSubmitError(){submitError.classList.add("hidden");submitError.textContent=""}
 function showInvalid(message){form.classList.add("hidden");invalidCard.classList.remove("hidden");invalidMessage.textContent=message}
