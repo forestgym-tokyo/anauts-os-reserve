@@ -15,7 +15,7 @@ const ROUND9_SUSPENSION_TOKEN_CONFIG = Object.freeze({
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu("9ROUND休会届")
-    .addItem("選択会員へ休会URLをメール送信", "issue9RoundSuspensionUrlForActiveRow")
+    .addItem("休会申請案内メールを送信・予約", "show9RoundSuspensionGuideDialog")
     .addToUi();
 }
 
@@ -50,6 +50,26 @@ function issue9RoundSuspensionUrlForActiveRow() {
     throw new Error("現在の会員ステータスでは休会URLを発行できません。");
   }
 
+  const result = issue9RoundSuspensionUrlForMember_(member);
+  show9RoundSuspensionUrlDialog_(
+    result.url,
+    member,
+    result.expiresAt,
+    result.mailSent,
+    result.mailError
+  );
+  return result.url;
+}
+
+function issue9RoundSuspensionUrlForMember_(member) {
+  if (!member || !member.memberNo || !member.email) {
+    throw new Error("休会URLを発行する会員情報を確認できません。");
+  }
+  if (!is9RoundSuspensionStatusActive_(member.contractStatus)) {
+    throw new Error("現在の会員ステータスでは休会URLを発行できません。");
+  }
+
+  const ss = get9RoundMasterSpreadsheet_();
   const tokenSheet = getOrCreate9RoundSuspensionTokenSheet_(ss);
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
@@ -101,8 +121,12 @@ function issue9RoundSuspensionUrlForActiveRow() {
     set9RoundSuspensionTokenIssueNote_(tokenSheet, addedRow, "専用URLメール送信失敗: " + mailError);
   }
 
-  show9RoundSuspensionUrlDialog_(url, member, expiresAt, mailSent, mailError);
-  return url;
+  return {
+    url: url,
+    expiresAt: expiresAt,
+    mailSent: mailSent,
+    mailError: mailError
+  };
 }
 
 function send9RoundSuspensionUrlMail_(member, url, expiresAt) {
@@ -426,4 +450,376 @@ function escape9RoundSuspensionHtml_(value) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+const ROUND9_SUSPENSION_GUIDE_CONFIG = Object.freeze({
+  TIMEZONE: "Asia/Tokyo",
+  SCHEDULE_SHEET_NAME: "休会案内送信予約",
+  TRIGGER_FUNCTION: "process9RoundSuspensionGuideSchedule",
+  MIN_SCHEDULE_LEAD_MINUTES: 2,
+  STATUS_PENDING: "予約済",
+  STATUS_PROCESSING: "送信処理中",
+  STATUS_SENT: "送信済",
+  STATUS_FAILED: "送信失敗"
+});
+
+function show9RoundSuspensionGuideDialog() {
+  const initialEmail = getSelected9RoundSuspensionGuideEmail_();
+  const minSchedule = Utilities.formatDate(
+    new Date(Date.now() + ROUND9_SUSPENSION_GUIDE_CONFIG.MIN_SCHEDULE_LEAD_MINUTES * 60 * 1000),
+    ROUND9_SUSPENSION_GUIDE_CONFIG.TIMEZONE,
+    "yyyy-MM-dd'T'HH:mm"
+  );
+  const defaultSchedule = Utilities.formatDate(
+    new Date(Date.now() + 10 * 60 * 1000),
+    ROUND9_SUSPENSION_GUIDE_CONFIG.TIMEZONE,
+    "yyyy-MM-dd'T'HH:mm"
+  );
+  const html = [
+    '<!doctype html><html lang="ja"><head><meta charset="utf-8">',
+    '<style>',
+    ':root{--bg:#070707;--panel:#141414;--line:#343434;--text:#f7f7f7;--muted:#aaa;--red:#e31b23;--red2:#ff3640}',
+    '*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Noto Sans JP,sans-serif;padding:22px}',
+    'h1{font-size:21px;margin:0 0 5px}.sub{font-size:11px;color:var(--red2);letter-spacing:1.4px;margin-bottom:20px}',
+    '.panel{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:17px;margin-bottom:14px}',
+    'label{display:block;font-size:13px;margin-bottom:7px;color:#ddd}.field{margin-bottom:16px}',
+    'input[type=email],input[type=datetime-local]{width:100%;border:1px solid #3a3a3a;border-radius:10px;background:#080808;color:#fff;padding:12px;font-size:15px}',
+    '.choice{display:flex;gap:10px}.choice label{flex:1;border:1px solid #3a3a3a;border-radius:10px;padding:11px;margin:0;cursor:pointer}.choice input{accent-color:var(--red);margin-right:7px}',
+    '.hint{font-size:11px;color:var(--muted);margin-top:6px}.hidden{display:none!important}',
+    'button{width:100%;border:0;border-radius:11px;padding:13px;font-size:15px;font-weight:800;cursor:pointer}',
+    '#confirmBtn{background:#f2f2f2;color:#111}#sendBtn{background:linear-gradient(135deg,#b30910,var(--red2));color:#fff;margin-top:14px}',
+    'button:disabled{opacity:.55;cursor:default}.confirm-title{font-size:12px;color:var(--red2);font-weight:800;margin-bottom:10px}',
+    '.confirm-row{display:grid;grid-template-columns:120px 1fr;gap:8px;font-size:14px;padding:7px 0;border-bottom:1px solid #2b2b2b}.confirm-row:last-of-type{border-bottom:0}',
+    '.confirm-row span{color:var(--muted)}#message{min-height:20px;font-size:13px;margin-top:10px}.error{color:#ff7777}.success{color:#80d889}',
+    '</style></head><body>',
+    '<h1>休会申請案内メール</h1><div class="sub">SUSPENSION GUIDE MAIL</div>',
+    '<div class="panel" id="inputPanel">',
+    '<div class="field"><label for="email">会員登録メールアドレス</label>',
+    '<input id="email" type="email" value="' + escape9RoundSuspensionHtml_(initialEmail) + '" autocomplete="off" required>',
+    '<div class="hint">選択中の会員行にメールアドレスがある場合は自動入力されます。</div></div>',
+    '<div class="field"><label>送信タイミング</label><div class="choice">',
+    '<label><input type="radio" name="timing" value="now" checked>即時送信</label>',
+    '<label><input type="radio" name="timing" value="scheduled">日時指定</label>',
+    '</div></div>',
+    '<div class="field hidden" id="scheduleField"><label for="scheduledAt">送信予定日時（日本時間）</label>',
+    '<input id="scheduledAt" type="datetime-local" min="' + minSchedule + '" value="' + defaultSchedule + '" step="60">',
+    '<div class="hint">Google側の実行状況により、指定時刻から数分遅れる場合があります。</div></div>',
+    '<button id="confirmBtn" type="button">確認する</button><div id="message"></div></div>',
+    '<div class="panel hidden" id="confirmPanel"><div class="confirm-title">送信内容の確認</div>',
+    '<div class="confirm-row"><span>会員</span><strong id="confirmName"></strong></div>',
+    '<div class="confirm-row"><span>申請種別</span><strong>休会申請</strong></div>',
+    '<div class="confirm-row"><span>送信先</span><strong id="confirmEmail"></strong></div>',
+    '<div class="confirm-row"><span>送信予定時間</span><strong id="confirmTime"></strong></div>',
+    '<button id="sendBtn" type="button">送信する</button></div>',
+    '<script>',
+    'var confirmedPayload=null;',
+    'var email=document.getElementById("email"),scheduleField=document.getElementById("scheduleField"),scheduledAt=document.getElementById("scheduledAt"),confirmPanel=document.getElementById("confirmPanel"),confirmBtn=document.getElementById("confirmBtn"),sendBtn=document.getElementById("sendBtn"),message=document.getElementById("message");',
+    'function timing(){var el=document.querySelector("input[name=timing]:checked");return el?el.value:"now";}',
+    'function payload(){return {email:email.value.trim(),timing:timing(),scheduledAt:scheduledAt.value};}',
+    'function setMessage(text,type){message.textContent=text||"";message.className=type||"";}',
+    'function resetConfirmation(){confirmedPayload=null;confirmPanel.classList.add("hidden");setMessage("","");}',
+    'document.querySelectorAll("input").forEach(function(el){el.addEventListener("input",resetConfirmation);el.addEventListener("change",function(){scheduleField.classList.toggle("hidden",timing()!=="scheduled");resetConfirmation();});});',
+    'confirmBtn.addEventListener("click",function(){var data=payload();if(!data.email){setMessage("会員登録メールアドレスを入力してください。","error");return;}if(data.timing==="scheduled"&&!data.scheduledAt){setMessage("送信予定日時を入力してください。","error");return;}confirmBtn.disabled=true;setMessage("会員情報を確認しています…","");google.script.run.withSuccessHandler(function(result){confirmedPayload=data;document.getElementById("confirmName").textContent=result.memberName+"様";document.getElementById("confirmEmail").textContent=result.email;document.getElementById("confirmTime").textContent=result.sendAtLabel;sendBtn.textContent=result.timing==="now"?"送信する":"送信予約を確定する";confirmPanel.classList.remove("hidden");setMessage("内容を確認し、送信ボタンを押してください。","");confirmBtn.disabled=false;}).withFailureHandler(function(error){setMessage(error&&error.message?error.message:"会員情報を確認できませんでした。","error");confirmBtn.disabled=false;}).preview9RoundSuspensionGuide(data);});',
+    'sendBtn.addEventListener("click",function(){if(!confirmedPayload)return;sendBtn.disabled=true;confirmBtn.disabled=true;setMessage(confirmedPayload.timing==="now"?"送信しています…":"送信予約を登録しています…","");google.script.run.withSuccessHandler(function(result){setMessage(result.message,"success");sendBtn.textContent=result.timing==="now"?"送信済み":"予約済み";email.disabled=true;scheduledAt.disabled=true;document.querySelectorAll("input[name=timing]").forEach(function(el){el.disabled=true;});}).withFailureHandler(function(error){setMessage(error&&error.message?error.message:"処理に失敗しました。","error");sendBtn.disabled=false;confirmBtn.disabled=false;}).send9RoundSuspensionGuide(confirmedPayload);});',
+    '</script></body></html>'
+  ].join("");
+
+  SpreadsheetApp.getUi().showModalDialog(
+    HtmlService.createHtmlOutput(html).setWidth(620).setHeight(680),
+    "9ROUND休会届"
+  );
+}
+
+function preview9RoundSuspensionGuide(input) {
+  const request = normalize9RoundSuspensionGuideRequest_(input);
+  const member = find9RoundSuspensionGuideMemberByEmail_(request.email);
+  validate9RoundSuspensionGuideMember_(member);
+  return {
+    memberName: member.name,
+    email: member.email,
+    timing: request.timing,
+    sendAtLabel: request.timing === "now"
+      ? "即時（" + format9RoundSuspensionGuideDate_(new Date()) + "頃）"
+      : format9RoundSuspensionGuideDate_(request.sendAt)
+  };
+}
+
+function send9RoundSuspensionGuide(input) {
+  const request = normalize9RoundSuspensionGuideRequest_(input);
+  const member = find9RoundSuspensionGuideMemberByEmail_(request.email);
+  validate9RoundSuspensionGuideMember_(member);
+
+  if (request.timing === "scheduled") {
+    const reservation = reserve9RoundSuspensionGuide_(member, request.sendAt);
+    return {
+      ok: true,
+      timing: "scheduled",
+      reservationId: reservation.reservationId,
+      message: member.name + "様への休会申請案内メールを" +
+        format9RoundSuspensionGuideDate_(request.sendAt) + "に予約しました。"
+    };
+  }
+
+  send9RoundSuspensionGuideNow_(member);
+  return {
+    ok: true,
+    timing: "now",
+    message: member.name + "様の登録メールアドレスへ休会申請案内メールを送信しました。"
+  };
+}
+
+function normalize9RoundSuspensionGuideRequest_(input) {
+  const email = normalize9RoundEmail_(input && input.email);
+  const timing = String((input && input.timing) || "now").trim();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error("有効な会員登録メールアドレスを入力してください。");
+  }
+  if (timing !== "now" && timing !== "scheduled") {
+    throw new Error("送信タイミングを選択してください。");
+  }
+
+  let sendAt = new Date();
+  if (timing === "scheduled") {
+    const value = String((input && input.scheduledAt) || "").trim();
+    try {
+      sendAt = Utilities.parseDate(
+        value,
+        ROUND9_SUSPENSION_GUIDE_CONFIG.TIMEZONE,
+        "yyyy-MM-dd'T'HH:mm"
+      );
+    } catch (_) {
+      sendAt = null;
+    }
+    if (!sendAt || isNaN(sendAt.getTime())) {
+      throw new Error("送信予定日時を正しく入力してください。");
+    }
+    if (sendAt.getTime() <= Date.now()) {
+      throw new Error("日時指定は現在より後の時刻を指定してください。");
+    }
+  }
+
+  return {email: email, timing: timing, sendAt: sendAt};
+}
+
+function find9RoundSuspensionGuideMemberByEmail_(email) {
+  const sheet = get9RoundMemberMasterSheet_();
+  const values = sheet.getDataRange().getDisplayValues();
+  if (values.length < 2) throw new Error("9ROUND会員マスターに会員データがありません。");
+
+  const headers = values[0].map(normalize9RoundHeader_);
+  const columns = validate9RoundMemberHeaders_(headers);
+  const memberNumbers = {};
+
+  for (let i = 1; i < values.length; i++) {
+    const rowEmail = normalize9RoundEmail_(values[i][columns.email]);
+    if (rowEmail !== email) continue;
+    const memberNo = normalize9RoundMemberNo_(values[i][columns.memberNo]);
+    if (memberNo) memberNumbers[memberNo] = true;
+  }
+
+  const matches = Object.keys(memberNumbers);
+  if (!matches.length) {
+    throw new Error("登録メールアドレスに一致する会員を確認できませんでした。");
+  }
+  if (matches.length > 1) {
+    throw new Error("同じメールアドレスに複数の会員番号が登録されています。対象会員を特定できないため送信できません。");
+  }
+
+  const member = find9RoundMember_(matches[0], email);
+  if (!member) throw new Error("会員情報を確認できませんでした。");
+  return member;
+}
+
+function validate9RoundSuspensionGuideMember_(member) {
+  if (!member || !is9RoundSuspensionStatusActive_(member.contractStatus)) {
+    throw new Error("現在の会員ステータスでは休会申請案内を送信できません。");
+  }
+}
+
+function send9RoundSuspensionGuideNow_(member) {
+  validate9RoundSuspensionGuideMember_(member);
+  const result = issue9RoundSuspensionUrlForMember_(member);
+  if (!result.mailSent) {
+    throw new Error(result.mailError || "休会申請案内メールの送信に失敗しました。");
+  }
+  return result;
+}
+
+function reserve9RoundSuspensionGuide_(member, sendAt) {
+  const ss = get9RoundMasterSpreadsheet_();
+  const sheet = getOrCreate9RoundSuspensionGuideScheduleSheet_(ss);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+
+  const createdAt = new Date();
+  const reservationId =
+    "9RS-" +
+    Utilities.formatDate(createdAt, ROUND9_SUSPENSION_GUIDE_CONFIG.TIMEZONE, "yyyyMMdd-HHmmss") +
+    "-" + String(Math.floor(Math.random() * 10000)).padStart(4, "0");
+  let rowNumber = 0;
+  let trigger = null;
+
+  try {
+    sheet.appendRow([
+      reservationId,
+      createdAt,
+      sendAt,
+      member.memberNo,
+      member.name,
+      member.email,
+      "登録中",
+      "",
+      "",
+      ""
+    ]);
+    rowNumber = sheet.getLastRow();
+    sheet.getRange(rowNumber, 2, 1, 2).setNumberFormat("yyyy/mm/dd hh:mm:ss");
+
+    trigger = ScriptApp.newTrigger(ROUND9_SUSPENSION_GUIDE_CONFIG.TRIGGER_FUNCTION)
+      .timeBased()
+      .at(sendAt)
+      .create();
+
+    sheet.getRange(rowNumber, 7).setValue(ROUND9_SUSPENSION_GUIDE_CONFIG.STATUS_PENDING);
+    sheet.getRange(rowNumber, 9).setNumberFormat("@").setValue(trigger.getUniqueId());
+  } catch (error) {
+    if (rowNumber) {
+      sheet.getRange(rowNumber, 7).setValue(ROUND9_SUSPENSION_GUIDE_CONFIG.STATUS_FAILED);
+      sheet.getRange(rowNumber, 10).setValue(
+        "予約登録失敗: " + (error && error.message ? error.message : error)
+      );
+    }
+    if (trigger) {
+      try { ScriptApp.deleteTrigger(trigger); } catch (_) {}
+    }
+    throw error;
+  } finally {
+    lock.releaseLock();
+  }
+
+  return {reservationId: reservationId, triggerId: trigger.getUniqueId(), rowNumber: rowNumber};
+}
+
+function process9RoundSuspensionGuideSchedule(e) {
+  const triggerId = String((e && e.triggerUid) || "").trim();
+  if (!triggerId) throw new Error("送信予約のトリガーIDを確認できません。");
+
+  const ss = get9RoundMasterSpreadsheet_();
+  const sheet = getOrCreate9RoundSuspensionGuideScheduleSheet_(ss);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+
+  let rowNumber = 0;
+  let row = null;
+  try {
+    const values = sheet.getDataRange().getDisplayValues();
+    for (let i = 1; i < values.length; i++) {
+      if (
+        String(values[i][8] || "").trim() === triggerId &&
+        String(values[i][6] || "").trim() === ROUND9_SUSPENSION_GUIDE_CONFIG.STATUS_PENDING
+      ) {
+        rowNumber = i + 1;
+        row = values[i];
+        break;
+      }
+    }
+    if (rowNumber) {
+      sheet.getRange(rowNumber, 7).setValue(ROUND9_SUSPENSION_GUIDE_CONFIG.STATUS_PROCESSING);
+    }
+  } finally {
+    lock.releaseLock();
+  }
+
+  if (!rowNumber) {
+    delete9RoundSuspensionGuideTrigger_(triggerId);
+    return;
+  }
+
+  try {
+    const memberNo = normalize9RoundMemberNo_(row[3]);
+    const email = normalize9RoundEmail_(row[5]);
+    const member = find9RoundMember_(memberNo, email);
+    if (!member) throw new Error("予約時の会員情報と現在の会員マスターが一致しません。");
+    send9RoundSuspensionGuideNow_(member);
+    sheet.getRange(rowNumber, 7).setValue(ROUND9_SUSPENSION_GUIDE_CONFIG.STATUS_SENT);
+    sheet.getRange(rowNumber, 8).setValue(new Date()).setNumberFormat("yyyy/mm/dd hh:mm:ss");
+    sheet.getRange(rowNumber, 10).setValue("休会申請案内メール送信済");
+  } catch (error) {
+    sheet.getRange(rowNumber, 7).setValue(ROUND9_SUSPENSION_GUIDE_CONFIG.STATUS_FAILED);
+    sheet.getRange(rowNumber, 10).setValue(
+      "送信失敗: " + (error && error.message ? error.message : error)
+    );
+    console.error("process9RoundSuspensionGuideSchedule", error);
+  } finally {
+    delete9RoundSuspensionGuideTrigger_(triggerId);
+  }
+}
+
+function getOrCreate9RoundSuspensionGuideScheduleSheet_(ss) {
+  let sheet = ss.getSheetByName(ROUND9_SUSPENSION_GUIDE_CONFIG.SCHEDULE_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(ROUND9_SUSPENSION_GUIDE_CONFIG.SCHEDULE_SHEET_NAME);
+    const headers = [
+      "予約ID", "登録日時", "送信予定日時", "会員番号", "氏名",
+      "メールアドレス", "ステータス", "送信日時", "トリガーID", "備考"
+    ];
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.getRange(1, 1, 1, headers.length)
+      .setFontWeight("bold")
+      .setBackground("#111111")
+      .setFontColor("#ffffff");
+    sheet.setFrozenRows(1);
+    sheet.setColumnWidth(1, 190);
+    sheet.setColumnWidths(2, 2, 145);
+    sheet.setColumnWidth(4, 100);
+    sheet.setColumnWidth(5, 130);
+    sheet.setColumnWidth(6, 230);
+    sheet.setColumnWidth(7, 100);
+    sheet.setColumnWidth(8, 145);
+    sheet.setColumnWidth(9, 220);
+    sheet.setColumnWidth(10, 300);
+  }
+  return sheet;
+}
+
+function delete9RoundSuspensionGuideTrigger_(triggerId) {
+  ScriptApp.getProjectTriggers().forEach(function(trigger) {
+    if (trigger.getUniqueId() === triggerId) {
+      ScriptApp.deleteTrigger(trigger);
+    }
+  });
+}
+
+function getSelected9RoundSuspensionGuideEmail_() {
+  try {
+    const masterSheet = get9RoundMemberMasterSheet_();
+    const activeSheet = SpreadsheetApp.getActiveSheet();
+    const activeRange = SpreadsheetApp.getActiveRange();
+    if (
+      !activeRange ||
+      activeRange.getRow() < 2 ||
+      activeSheet.getSheetId() !== masterSheet.getSheetId()
+    ) {
+      return "";
+    }
+    const headers = masterSheet
+      .getRange(1, 1, 1, masterSheet.getLastColumn())
+      .getDisplayValues()[0]
+      .map(normalize9RoundHeader_);
+    const emailIndex = headers.indexOf("メールアドレス");
+    if (emailIndex < 0) return "";
+    return normalize9RoundEmail_(
+      masterSheet.getRange(activeRange.getRow(), emailIndex + 1).getDisplayValue()
+    );
+  } catch (_) {
+    return "";
+  }
+}
+
+function format9RoundSuspensionGuideDate_(date) {
+  return Utilities.formatDate(
+    date,
+    ROUND9_SUSPENSION_GUIDE_CONFIG.TIMEZONE,
+    "yyyy/MM/dd HH:mm"
+  );
 }
