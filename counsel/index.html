@@ -15,6 +15,24 @@
     <p id="pageLead" class="lead"></p>
   </header>
 
+  <section id="consultationMethodSection" class="card counsel-method-card is-hidden">
+    <div class="step">
+      <span class="step-num">1</span>
+      <h2>実施方法を選択</h2>
+    </div>
+    <div class="counsel-method-grid" role="radiogroup" aria-label="実施方法">
+      <label class="counsel-method-option">
+        <input type="radio" name="consultation_method" value="ONLINE" checked>
+        <span><strong>ONLINE希望</strong><small>The Forest Gymまたは本社事務所から対応します</small></span>
+      </label>
+      <label class="counsel-method-option">
+        <input type="radio" name="consultation_method" value="IN_PERSON">
+        <span><strong>対面希望</strong><small>The Forest Gymで実施します</small></span>
+      </label>
+    </div>
+    <p id="consultationMethodNote" class="counsel-method-note">ONLINE対応可能な日程を表示しています。</p>
+  </section>
+
   <section id="serviceSection" class="card is-hidden">
     <div class="step">
       <span class="step-num">1</span>
@@ -120,6 +138,6 @@
   </section>
 </main>
 
-<script src="../assets/js/reserve.js?v=20260902-range2" defer></script>
+<script src="../assets/js/reserve.js?v=20260915-counsel-method-v1" defer></script>
 </body>
 </html>

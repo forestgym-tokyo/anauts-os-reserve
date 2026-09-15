@@ -341,12 +341,18 @@ function doGet(e) {
         );
 
       case "getAvailableSlots":
+        if (isDietCounselingRequest_(params)) {
+          return getDietCounselingAvailableSlots_(params);
+        }
         return applyPersonalPreviousDayCutoffToAvailability_(
           getAvailableSlotsStoreAware_(params),
           params
         );
 
       case "getAvailableSlotsRange":
+        if (isDietCounselingRequest_(params)) {
+          return getDietCounselingAvailableSlotsRange_(params);
+        }
         return applyPersonalPreviousDayCutoffToAvailability_(
           getAvailableSlotsRangeStoreAware_(params),
           params
@@ -361,6 +367,13 @@ function doGet(e) {
         return getReservation(
           params
         );
+
+      case "getDietCounselingFormContext":
+        return getDietCounselingFormContext_(params);
+
+      case "getDietCounselingLinkCandidates":
+        requireAuth_(params, ["ADMIN", "MANAGER"]);
+        return getDietCounselingLinkCandidates_(params);
 
       default:
         return errorResponse(
@@ -428,10 +441,20 @@ function doPost(e) {
       case "createReservation": {
         const personalCutoffError = validatePersonalPreviousDayBookingCutoff_(body);
         if (personalCutoffError) return personalCutoffError;
+        if (isDietCounselingRequest_(body)) {
+          return createDietCounselingReservation_(body);
+        }
         return createReservationStoreAware_(
           body
         );
       }
+
+      case "submitDietCounselingResponse":
+        return submitDietCounselingResponse_(body);
+
+      case "sendDietCounselingLinksBulk":
+        requireAuth_(body, ["ADMIN", "MANAGER"]);
+        return sendDietCounselingLinksBulk_(body);
 
       case "updateReservation":
         return invalidateStoreAwareAfterMutation_(

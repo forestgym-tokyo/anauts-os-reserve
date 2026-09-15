@@ -86,3 +86,17 @@ input:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(
   .day-row{grid-template-columns:1fr}
   .selected-summary{display:grid}
 }
+
+
+/* Diet counseling method selector */
+.counsel-method-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.counsel-method-option{position:relative;cursor:pointer}
+.counsel-method-option input{position:absolute;opacity:0;pointer-events:none}
+.counsel-method-option span{min-height:94px;padding:18px;display:flex;flex-direction:column;justify-content:center;border:1px solid var(--line);border-radius:16px;background:#07100c;transition:border-color .2s,box-shadow .2s,background .2s}
+.counsel-method-option strong{color:var(--text);font-size:15px}
+.counsel-method-option small{margin-top:6px;color:var(--muted);font-size:11px;line-height:1.6}
+.counsel-method-option input:checked+span{border-color:var(--accent);background:rgba(215,182,111,.12);box-shadow:0 0 0 3px rgba(215,182,111,.08)}
+.counsel-method-option input:checked+span strong{color:var(--accent2)}
+.counsel-method-option input:focus-visible+span{outline:3px solid rgba(215,182,111,.22);outline-offset:2px}
+.counsel-method-note{margin:14px 0 0;color:var(--muted);font-size:12px;line-height:1.7}
+@media(max-width:620px){.counsel-method-grid{grid-template-columns:1fr}.counsel-method-option span{min-height:82px}}
