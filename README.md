@@ -5,7 +5,8 @@
 - `/personal/`
 - `/trial/`
 - `/tour/`
-- `/counsel/`
+- `/counsel/`（ONLINE／対面を選択、初期値ONLINE）
+- `/diet-counseling/`（予約者専用の事前回答フォーム）
 - `/procedure/`
 - `/meal-planning/`
 - `/unsubscribe/`
