@@ -127,4 +127,47 @@ assert.equal(
 assert.equal(context.calculateDietCounselingSleepHours_("00:30", "06:30"), 6);
 assert.equal(context.calculateDietCounselingSleepHours_("23:30", "06:30"), 7);
 
+function createMockSheet(headers) {
+  const writes = [];
+  return {
+    writes,
+    getLastColumn() { return headers.length; },
+    getLastRow() { return 1; },
+    getRange(row, column, rowCount, columnCount) {
+      return {
+        getDisplayValues() {
+          return [headers.slice(column - 1, column - 1 + columnCount)];
+        },
+        setValues(values) {
+          writes.push({ row, column, rowCount, columnCount, values });
+        }
+      };
+    }
+  };
+}
+
+const reorderedSheet = createMockSheet(["追加列", "氏名", "回答ID"]);
+const reorderedMap = context.getDietCounselingHeaderMap_(
+  reorderedSheet,
+  ["回答ID", "氏名"]
+);
+context.appendDietCounselingRecord_(reorderedSheet, reorderedMap, {
+  "回答ID": "DCA_TEST",
+  "氏名": "テスト 太郎"
+});
+assert.deepEqual(
+  JSON.parse(JSON.stringify(reorderedSheet.writes[0].values[0])),
+  ["", "テスト 太郎", "DCA_TEST"],
+  "追加列や列順変更があっても見出し名で正しい列へ保存する"
+);
+
+assert.throws(
+  () => context.getDietCounselingHeaderMap_(createMockSheet(["氏名", "氏名"]), ["氏名"]),
+  /重複：氏名/
+);
+assert.throws(
+  () => context.getDietCounselingHeaderMap_(createMockSheet(["氏名"]), ["氏名", "回答ID"]),
+  /不足：回答ID/
+);
+
 console.log("diet counseling workflow tests passed");
