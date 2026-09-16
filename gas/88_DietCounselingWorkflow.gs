@@ -43,7 +43,8 @@ const DIET_COUNSELING_ANSWER_HEADERS_ = [
   "運動歴有無", "運動歴詳細", "現在の運動有無", "現在の運動詳細",
   "既往歴有無", "既往歴詳細", "現在の体調", "体調詳細", "ダイエット経験有無",
   "ダイエット期間・方法", "PDF処理状態", "PDFファイルID", "PDF_URL",
-  "PDF作成日時", "エラー内容", "最終更新日時"
+  "PDF作成日時", "エラー内容", "最終更新日時", "ダイエット経験時期",
+  "ダイエット方法", "ダイエット成果"
 ];
 
 function isDietCounselingRequest_(params) {
@@ -661,6 +662,14 @@ function buildDietCounselingAnswerRecord_(answerId, now, tokenRecord, answers) {
   const targetDiff = targetWeight == null ? "" : roundDietCounseling_(targetWeight - weight, 1);
   const reductionRate = targetWeight == null || !weight
     ? "" : roundDietCounseling_((weight - targetWeight) / weight, 4);
+  const dietExperiencePeriod = normalizeDietCounselingText_(answers.diet_experience_period);
+  const dietExperienceMethod = normalizeDietCounselingText_(answers.diet_experience_method);
+  const dietExperienceResult = normalizeDietCounselingText_(answers.diet_experience_result);
+  const dietExperienceDetail = normalizeDietCounselingText_(answers.diet_experience_detail) || [
+    dietExperiencePeriod ? "時期・期間：" + dietExperiencePeriod : "",
+    dietExperienceMethod ? "方法：" + dietExperienceMethod : "",
+    dietExperienceResult ? "成果：" + dietExperienceResult : ""
+  ].filter(function (value) { return !!value; }).join("\n");
 
   return {
     "回答ID": answerId,
@@ -720,13 +729,16 @@ function buildDietCounselingAnswerRecord_(answerId, now, tokenRecord, answers) {
     "現在の体調": normalizeDietCounselingText_(answers.condition),
     "体調詳細": normalizeDietCounselingText_(answers.condition_detail),
     "ダイエット経験有無": normalizeDietCounselingText_(answers.diet_experience),
-    "ダイエット期間・方法": normalizeDietCounselingText_(answers.diet_experience_detail),
+    "ダイエット期間・方法": dietExperienceDetail,
     "PDF処理状態": "未作成",
     "PDFファイルID": "",
     "PDF_URL": "",
     "PDF作成日時": "",
     "エラー内容": "",
-    "最終更新日時": formatDietCounselingStorageDateTime_(now)
+    "最終更新日時": formatDietCounselingStorageDateTime_(now),
+    "ダイエット経験時期": dietExperiencePeriod,
+    "ダイエット方法": dietExperienceMethod,
+    "ダイエット成果": dietExperienceResult
   };
 }
 
@@ -777,7 +789,10 @@ function validateDietCounselingAnswer_(answers) {
   [
     ["exercise_history", "exercise_history_detail", "運動経験の詳細を入力してください。"],
     ["current_exercise", "current_exercise_detail", "現在の運動内容・頻度・時間を入力してください。"],
-    ["medical_history", "medical_history_detail", "既往症の詳細を入力してください。"]
+    ["medical_history", "medical_history_detail", "既往症の詳細を入力してください。"],
+    ["diet_experience", "diet_experience_period", "ダイエット経験の時期・期間を入力してください。"],
+    ["diet_experience", "diet_experience_method", "ダイエット方法を入力してください。"],
+    ["diet_experience", "diet_experience_result", "ダイエットの成果を入力してください。"]
   ].forEach(function (condition) {
     if (normalizeDietCounselingText_(answers[condition[0]]) === "有" &&
         !normalizeDietCounselingText_(answers[condition[1]])) {
