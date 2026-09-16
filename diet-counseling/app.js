@@ -4,8 +4,11 @@
   const API_URL = "https://script.google.com/macros/s/AKfycbyvpQRxRpMRfpaQHtBar77dViCqPl-hdFW-2yMdozhN8RHtwcrFiNEM9cvEbny4x9q0/exec";
   const QUERY = new URLSearchParams(window.location.search);
   const TOKEN = QUERY.get("token") || "";
+  const ADMIN_VIEW_TOKEN = QUERY.get("view_token") || "";
   const IS_SHEET_PREVIEW = QUERY.get("preview") === "sheet";
-  const IS_PREVIEW = QUERY.get("preview") === "1" || !QUERY.has("token");
+  const IS_PRINT_PREVIEW = QUERY.get("preview") === "print";
+  const IS_PREVIEW = QUERY.get("preview") === "1" ||
+    (!TOKEN && !ADMIN_VIEW_TOKEN && !IS_SHEET_PREVIEW && !IS_PRINT_PREVIEW);
   const STORAGE_KEY = `tfg-counseling-draft-v1:${IS_PREVIEW ? "preview" : TOKEN.slice(0, 12) || "invalid"}`;
   const TOTAL_STEPS = 6;
   const stepTitles = ["基本情報", "カラダの目標", "仕事・生活", "食事", "運動・体調", "入力内容の確認"];
@@ -30,6 +33,7 @@
   const completionScreen = document.getElementById("completionScreen");
   const answerId = document.getElementById("answerId");
   const counselingSheetScreen = document.getElementById("counselingSheetScreen");
+  const printPage = document.getElementById("printPage");
   const printSheet = document.getElementById("printSheet");
   const printSheetButton = document.getElementById("printSheetButton");
   const sheetViewMessage = document.getElementById("sheetViewMessage");
@@ -362,39 +366,81 @@
       <footer class="print-sheet-footer">このシートは回答内容から自動作成されています。基礎代謝は改良版ハリス・ベネディクト式による参考値です。</footer>`;
   }
 
-  function showCounselingSheet(data, justSubmitted = false) {
+  function showCounselingSheet(data) {
     formShell.hidden = true;
     document.querySelector(".site-header").hidden = true;
     accessGate.hidden = true;
     completionScreen.hidden = true;
     renderCounselingSheet(data);
-    sheetViewMessage.textContent = justSubmitted
-      ? "回答を送信しました。下のシートはそのままiPadで確認・印刷できます。"
-      : "回答済みのカウンセリングシートです。";
+    sheetViewMessage.textContent = "カウンセリング時のiPad表示・A4縦1枚印刷用";
     counselingSheetScreen.hidden = false;
     document.body.classList.add("is-sheet-view");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function showCompletion(id, sheetData) {
-    if (sheetData) {
-      showCounselingSheet(sheetData, true);
-      return;
-    }
+  function showCompletion(id) {
     formShell.hidden = true;
     document.querySelector(".site-header").hidden = true;
     accessGate.hidden = true;
+    counselingSheetScreen.hidden = true;
     completionScreen.hidden = false;
     answerId.textContent = id ? `回答ID：${id}` : "";
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  function resetPrintLayout() {
+    document.body.classList.remove("is-print-layout");
+    printSheet.style.removeProperty("transform");
+    printSheet.style.removeProperty("width");
+    delete printSheet.dataset.printScale;
+  }
+
+  function preparePrintLayout() {
+    document.body.classList.add("is-print-layout");
+    printSheet.style.removeProperty("transform");
+    printSheet.style.width = "100%";
+    delete printSheet.dataset.printScale;
+    void printSheet.offsetHeight;
+
+    const availableHeight = printPage.clientHeight;
+    const requiredHeight = printSheet.scrollHeight;
+    const scale = availableHeight > 0 && requiredHeight > availableHeight
+      ? availableHeight / requiredHeight
+      : 1;
+    printSheet.style.width = `${100 / scale}%`;
+    printSheet.style.transform = `scale(${scale})`;
+    printSheet.dataset.printScale = scale.toFixed(4);
+  }
+
   async function initializeForm() {
     createTimeOptions();
-    if (IS_SHEET_PREVIEW) {
+    if (IS_SHEET_PREVIEW || IS_PRINT_PREVIEW) {
       document.body.classList.remove("is-loading");
-      showCounselingSheet(samplePrintSheet, false);
-      sheetViewMessage.textContent = "印刷画面の確認用プレビューです。";
+      showCounselingSheet(samplePrintSheet);
+      sheetViewMessage.textContent = IS_PRINT_PREVIEW
+        ? "A4縦1枚の印刷レイアウト確認用"
+        : "管理者用画面の確認用プレビュー";
+      if (IS_PRINT_PREVIEW) {
+        document.body.classList.add("is-print-preview");
+        preparePrintLayout();
+      }
+      return;
+    }
+    if (ADMIN_VIEW_TOKEN) {
+      if (!/^[a-f0-9]{64}$/i.test(ADMIN_VIEW_TOKEN)) {
+        showAccessError("管理者用URLが正しくありません。");
+        return;
+      }
+      try {
+        const result = await apiGet("getDietCounselingStaffSheet", {
+          token: ADMIN_VIEW_TOKEN
+        });
+        if (!result.ok) throw new Error(result.message || "管理者用URLを確認できませんでした。");
+        document.body.classList.remove("is-loading");
+        showCounselingSheet(result.data || {});
+      } catch (error) {
+        showAccessError(error.message);
+      }
       return;
     }
     if (IS_PREVIEW) {
@@ -419,11 +465,7 @@
       reservationContext = result.data || {};
       if (reservationContext.submitted) {
         document.body.classList.remove("is-loading");
-        if (reservationContext.print_sheet) {
-          showCounselingSheet(reservationContext.print_sheet, false);
-        } else {
-          showCompletion(reservationContext.answer_id);
-        }
+        showCompletion(reservationContext.answer_id);
         return;
       }
 
@@ -641,7 +683,7 @@
       });
       if (!result.ok) throw new Error(result.message || "回答を送信できませんでした。");
       localStorage.removeItem(STORAGE_KEY);
-      showCompletion(result.data?.answer_id || "", result.data?.print_sheet || null);
+      showCompletion(result.data?.answer_id || "");
     } catch (error) {
       showToast(error.message || "回答を送信できませんでした。時間をおいて再度お試しください。");
       submitButton.disabled = false;
@@ -649,7 +691,15 @@
     }
   });
 
-  printSheetButton.addEventListener("click", () => window.print());
+  printSheetButton.addEventListener("click", () => {
+    preparePrintLayout();
+    window.setTimeout(() => window.print(), 50);
+  });
+  window.addEventListener("beforeprint", preparePrintLayout);
+  window.addEventListener("afterprint", () => {
+    if (!IS_PRINT_PREVIEW) resetPrintLayout();
+  });
 
   initializeForm();
 })();
+
