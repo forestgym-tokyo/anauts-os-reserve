@@ -99,6 +99,24 @@ assert.deepEqual(
   JSON.parse(JSON.stringify(gymOnline.data.results[0].data.slots[0].available_locations)),
   ["YACHIYO"]
 );
+assert.equal(
+  gymOnline.data.results[0].data.slots[0].online_only,
+  false,
+  "八千代シフト中はONLINE専用ではなく、対面とONLINEの両方に対応する"
+);
+
+const gymInPerson = context.getDietCounselingAvailableSlotsRange_({
+  service_code: "COUNSEL",
+  consultation_method: "IN_PERSON",
+  start_date: "2026-09-20",
+  days: 1
+});
+assert.equal(gymInPerson.data.results[0].data.slots[0].start_time, "10:00");
+assert.deepEqual(
+  JSON.parse(JSON.stringify(gymInPerson.data.results[0].data.slots[0].available_locations)),
+  ["YACHIYO"],
+  "八千代シフト中は同じ時間を対面でも表示する"
+);
 
 const officeOnline = context.getDietCounselingAvailableSlotsRange_({
   service_code: "COUNSEL",
@@ -115,6 +133,10 @@ assert.equal(
   officeOnline.data.results[0].data.slots.find((slot) => slot.start_time === "22:00").end_time,
   "23:00",
   "ONLINE専用枠は22時開始・23時終了まで表示する"
+);
+assert.equal(
+  officeOnline.data.results[0].data.slots.find((slot) => slot.start_time === "22:00").online_only,
+  true
 );
 
 const officeInPerson = context.getDietCounselingAvailableSlotsRange_({
@@ -140,6 +162,10 @@ assert.deepEqual(
   ["10:00", "20:30", "21:00", "21:30", "22:00"],
   "18時シフト終了日は移動2時間30分後の20時30分からONLINE専用枠を出す"
 );
+assert.equal(
+  movedOnline.data.results[0].data.slots.find((slot) => slot.start_time === "20:30").online_only,
+  true
+);
 
 const noEveningOnline = context.getDietCounselingAvailableSlotsRange_({
   service_code: "COUNSEL",
@@ -158,6 +184,7 @@ assert.deepEqual(
   ["YACHIYO"],
   "移動時間後が最終受付を超えるためONLINE専用枠は追加しない"
 );
+assert.equal(noEveningOnline.data.results[0].data.slots[0].online_only, false);
 
 assert.equal(context.calculateDietCounselingBmi_(165, 78), 28.7);
 assert.equal(
