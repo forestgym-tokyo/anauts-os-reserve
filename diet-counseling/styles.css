@@ -712,6 +712,14 @@ select { padding-right: 44px; appearance: none; cursor: pointer; }
 .sheet-data-item dd { margin: 4px 0 0; font-size: 11px; font-weight: 700; line-height: 1.65; word-break: break-word; }
 .sheet-empty { color: #a6aea9; font-weight: 500; }
 
+.sheet-work-meta { padding-bottom: 4px; }
+.sheet-rhythm { padding: 0 15px 12px; display: grid; gap: 8px; }
+.sheet-rhythm-group { overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: #fbfdfb; }
+.sheet-rhythm-group h3 { margin: 0; padding: 6px 9px; color: var(--forest-800); background: #f0f6f2; font-size: 8px; font-weight: 850; letter-spacing: .04em; }
+.sheet-rhythm-grid { margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.sheet-rhythm-grid .sheet-data-item { padding: 7px 9px 8px; border-right: 1px solid var(--line); border-bottom: 0; }
+.sheet-rhythm-grid .sheet-data-item:last-child { border-right: 0; }
+
 .sheet-meal-table { width: calc(100% - 30px); margin: 13px 15px 5px; border-collapse: collapse; table-layout: fixed; font-size: 10px; }
 .sheet-meal-table th, .sheet-meal-table td { padding: 8px 10px; border: 1px solid var(--line); text-align: left; vertical-align: top; line-height: 1.55; word-break: break-word; }
 .sheet-meal-table thead th { color: var(--muted); background: #f4f8f5; font-size: 8px; letter-spacing: .03em; }
@@ -780,6 +788,11 @@ body.is-print-layout .sheet-data-grid { padding: 2px 8px 5px; column-gap: 10px; 
 body.is-print-layout .sheet-data-item { padding: 4px 0; }
 body.is-print-layout .sheet-data-item dt { font-size: 6px; }
 body.is-print-layout .sheet-data-item dd { margin-top: 2px; font-size: 8px; line-height: 1.4; }
+body.is-print-layout .sheet-work-meta { padding-bottom: 2px; }
+body.is-print-layout .sheet-rhythm { padding: 0 8px 5px; gap: 4px; }
+body.is-print-layout .sheet-rhythm-group { border-radius: 5px; }
+body.is-print-layout .sheet-rhythm-group h3 { padding: 3px 5px; font-size: 6px; }
+body.is-print-layout .sheet-rhythm-grid .sheet-data-item { padding: 3px 5px; }
 body.is-print-layout .sheet-meal-table {
   width: calc(100% - 16px);
   margin: 6px 8px 3px;
