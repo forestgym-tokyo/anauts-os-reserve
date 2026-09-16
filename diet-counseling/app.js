@@ -282,7 +282,7 @@
           <h1>ダイエットカウンセリングシート</h1>
         </div>
         <div class="sheet-person">
-          <strong>${sheetValue(sheet.name)}</strong>
+          <strong>${sheetValue(sheet.name, " 様")}</strong>
           <span>${sheetValue(sheet.member_type)}${sheet.member_no ? ` ／ ${sheetValue(sheet.member_no)}` : ""}</span>
         </div>
       </header>
@@ -314,16 +314,28 @@
         </section>
         <section class="sheet-section">
           <h2><span>02</span>仕事・生活リズム</h2>
-          <dl class="sheet-data-grid">
+          <dl class="sheet-data-grid sheet-work-meta">
             ${sheetItem("就業", sheet.employment)}
             ${sheetItem("仕事スタイル", workStyle)}
-            ${sheetItem("仕事日の起床", sheet.wake_work)}
-            ${sheetItem("翌日仕事の就寝", sheet.sleep_work)}
-            ${sheetItem("仕事日前の睡眠", sheet.sleep_hours_work, " 時間")}
-            ${sheetItem("休日の起床", sheet.wake_off)}
-            ${sheetItem("翌日休みの就寝", sheet.sleep_off)}
-            ${sheetItem("休日前の睡眠", sheet.sleep_hours_off, " 時間")}
           </dl>
+          <div class="sheet-rhythm" aria-label="生活リズム">
+            <section class="sheet-rhythm-group">
+              <h3>仕事のとき</h3>
+              <dl class="sheet-rhythm-grid">
+                ${sheetItem("就寝", sheet.sleep_work)}
+                ${sheetItem("起床", sheet.wake_work)}
+                ${sheetItem("睡眠時間", sheet.sleep_hours_work, " 時間")}
+              </dl>
+            </section>
+            <section class="sheet-rhythm-group">
+              <h3>休みのとき</h3>
+              <dl class="sheet-rhythm-grid">
+                ${sheetItem("就寝", sheet.sleep_off)}
+                ${sheetItem("起床", sheet.wake_off)}
+                ${sheetItem("睡眠時間", sheet.sleep_hours_off, " 時間")}
+              </dl>
+            </section>
+          </div>
         </section>
         <section class="sheet-section is-wide">
           <h2><span>03</span>お食事について <small>1日 ${sheetValue(sheet.meal_count, " 回")}</small></h2>
@@ -702,4 +714,3 @@
 
   initializeForm();
 })();
-
