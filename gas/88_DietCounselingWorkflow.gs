@@ -73,6 +73,62 @@ function normalizeDietCounselingMethod_(value) {
   throw error;
 }
 
+function normalizeDietCounselingSubmissionKey_(value) {
+  const key = normalizeDietCounselingText_(value).toUpperCase();
+  return /^DCR-[A-Z0-9]{16,72}$/.test(key) ? key : "";
+}
+
+function getDietCounselingSubmissionMarker_(submissionKey) {
+  const key = normalizeDietCounselingSubmissionKey_(submissionKey);
+  return key ? "【申込照合ID】" + key : "";
+}
+
+function findDietCounselingReservationBySubmissionKey_(submissionKey) {
+  const marker = getDietCounselingSubmissionMarker_(submissionKey);
+  if (!marker) return null;
+  return readDietCounselingReservationRows_().find(function (reservation) {
+    const noteLines = normalizeDietCounselingText_(reservation && reservation.note)
+      .split(/\r?\n/);
+    return isDietCounselingActiveReservation_(reservation) &&
+      normalizeDietCounselingCode_(reservation && reservation.service_code) ===
+        DIET_COUNSELING_CONFIG_.SERVICE_CODE &&
+      noteLines.indexOf(marker) >= 0;
+  }) || null;
+}
+
+function buildDietCounselingReservationStatusData_(reservation) {
+  return {
+    found: true,
+    reservation_id: normalizeDietCounselingText_(reservation && reservation.reservation_id),
+    date: normalizeDietCounselingDate_(
+      reservation && (reservation.reservation_date || reservation.date)
+    ),
+    start_time: normalizeDietCounselingTime_(reservation && reservation.start_time),
+    end_time: normalizeDietCounselingTime_(reservation && reservation.end_time),
+    consultation_method: normalizeDietCounselingMethodForDisplay_(
+      reservation && (
+        reservation.consultation_method ||
+        extractDietCounselingMethodFromNote_(reservation.note)
+      )
+    )
+  };
+}
+
+function getDietCounselingReservationStatus_(params) {
+  params = params || {};
+  const submissionKey = normalizeDietCounselingSubmissionKey_(params.submission_key);
+  if (!submissionKey) {
+    return errorResponse(
+      "申込照合IDを確認できませんでした。",
+      "INVALID_SUBMISSION_KEY"
+    );
+  }
+  const reservation = findDietCounselingReservationBySubmissionKey_(submissionKey);
+  return successResponse(
+    reservation ? buildDietCounselingReservationStatusData_(reservation) : { found: false }
+  );
+}
+
 function getDietCounselingAvailableSlots_(params) {
   params = params || {};
   return runDietCounselingSheetCache_(function () {
@@ -219,6 +275,13 @@ function createDietCounselingReservation_(params) {
   params = params || {};
   return runDietCounselingSheetCache_(function () {
     const method = normalizeDietCounselingMethod_(params.consultation_method);
+    const submissionKey = normalizeDietCounselingSubmissionKey_(params.submission_key);
+    if (submissionKey) {
+      const existingReservation = findDietCounselingReservationBySubmissionKey_(submissionKey);
+      if (existingReservation) {
+        return successResponse(buildDietCounselingReservationStatusData_(existingReservation));
+      }
+    }
     const snapshot = buildDietCounselingSnapshot_();
     const service = findDietCounselingService_(snapshot.services, params.service_code);
     if (!service) {
@@ -250,7 +313,7 @@ function createDietCounselingReservation_(params) {
       assignments, snapshot.reservations, date
     );
     const safeParams = buildDietCounselingReservationParams_(
-      params, service, assignment, method
+      params, service, assignment, method, submissionKey
     );
 
     const baseResponse = createReservationWithTrainerPolicy_(safeParams);
@@ -299,7 +362,9 @@ function createDietCounselingReservation_(params) {
   });
 }
 
-function buildDietCounselingReservationParams_(params, service, assignment, method) {
+function buildDietCounselingReservationParams_(
+  params, service, assignment, method, submissionKey
+) {
   const serviceStoreCode = normalizeDietCounselingCode_(service && service.store_code) ||
     DIET_COUNSELING_CONFIG_.GYM_STORE_CODE;
   const assignmentStoreCode = normalizeDietCounselingCode_(
@@ -312,8 +377,9 @@ function buildDietCounselingReservationParams_(params, service, assignment, meth
   const methodLabel = method === "ONLINE" ? "ONLINE" : "対面";
   const notePrefix = [
     "【実施方法】" + methodLabel,
-    "【担当者所在場所】" + locationLabel
-  ].join("\n");
+    "【担当者所在場所】" + locationLabel,
+    getDietCounselingSubmissionMarker_(submissionKey)
+  ].filter(function (value) { return !!value; }).join("\n");
 
   return Object.assign({}, params || {}, {
     staff_code: normalizeDietCounselingCode_(assignment && assignment.staff_code),
