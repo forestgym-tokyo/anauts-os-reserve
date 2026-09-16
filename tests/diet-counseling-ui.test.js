@@ -27,6 +27,7 @@ assert.match(main, /sendDietCounselingLinksBulk_\(body\)/);
 assert.match(workflow, /OFFICE_STORE_CODE:\s*"HEAD_OFFICE"/);
 assert.match(workflow, /ANSWER_SPREADSHEET_ID:\s*"1muAm2zWPhI7NU3AA1vrd2ygKUqDh9ix6KFDATk9mX90"/);
 assert.match(workflow, /getDietCounselingHeaderMap_/);
+assert.match(workflow, /FORM_VERSION:\s*"1\.1"/);
 assert.match(workflow, /不足：/);
 assert.match(workflow, /重複：/);
 assert.match(workflow, /MailApp\.sendEmail/);
