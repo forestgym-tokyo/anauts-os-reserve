@@ -710,8 +710,8 @@ el.consultationMethodInputs.forEach((input) => {
     el.completeSection.classList.add("is-hidden");
     if (el.consultationMethodNote) {
       el.consultationMethodNote.textContent = getConsultationMethod_() === "ONLINE"
-        ? "ONLINE対応可能な日程を表示しています。"
-        : "The Forest Gymで対面対応可能な日程を表示しています。";
+        ? "ONLINEの日程を表示しています。"
+        : "対面の日程を表示しています。";
     }
     loadWeek();
   });

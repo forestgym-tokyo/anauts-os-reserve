@@ -17,7 +17,7 @@ const DIET_COUNSELING_CONFIG_ = Object.freeze({
   REPLY_TO: "info@theforestgym.com",
   TOKEN_VALID_DAYS: 30,
   TIMEZONE: "Asia/Tokyo",
-  FORM_VERSION: "1.1",
+  FORM_VERSION: "1.2",
   BULK_SEND_LIMIT: 50
 });
 
@@ -581,6 +581,11 @@ function getDietCounselingFormContext_(params) {
   try {
     const tokenInfo = resolveDietCounselingToken_(params && params.token, true);
     const record = tokenInfo.record;
+    const submitted = normalizeDietCounselingText_(record["回答状態"]) === "回答済み";
+    const answerId = normalizeDietCounselingText_(record["回答ID"]);
+    const printSheet = submitted && answerId
+      ? getDietCounselingPrintSheetByAnswerId_(answerId)
+      : null;
     return successResponse({
       reservation_id: normalizeDietCounselingText_(record["予約ID"]),
       counseling_date: normalizeDietCounselingDate_(record["カウンセリング日"]),
@@ -592,8 +597,9 @@ function getDietCounselingFormContext_(params) {
       staff_name: normalizeDietCounselingText_(record["担当者"]),
       consultation_method: normalizeDietCounselingText_(record["実施方法"]) || "ONLINE",
       expires_at: normalizeDietCounselingText_(record["有効期限"]),
-      submitted: normalizeDietCounselingText_(record["回答状態"]) === "回答済み",
-      answer_id: normalizeDietCounselingText_(record["回答ID"])
+      submitted: submitted,
+      answer_id: answerId,
+      print_sheet: printSheet
     });
   } catch (error) {
     return errorResponse(
@@ -637,7 +643,11 @@ function submitDietCounselingResponse_(body) {
     });
     lock.releaseLock();
 
-    return successResponse({ answer_id: answerId, submitted_at: formatDietCounselingDateTime_(now) });
+    return successResponse({
+      answer_id: answerId,
+      submitted_at: formatDietCounselingDateTime_(now),
+      print_sheet: buildDietCounselingPrintSheetData_(record)
+    });
   } catch (error) {
     try { lock.releaseLock(); } catch (_) {}
     return errorResponse(
@@ -729,7 +739,7 @@ function buildDietCounselingAnswerRecord_(answerId, now, tokenRecord, answers) {
     "体調詳細": normalizeDietCounselingText_(answers.condition_detail),
     "ダイエット経験有無": normalizeDietCounselingText_(answers.diet_experience),
     "ダイエット期間・方法": dietExperienceDetail,
-    "PDF処理状態": "未作成",
+    "PDF処理状態": "PDF不要（印刷画面）",
     "PDFファイルID": "",
     "PDF_URL": "",
     "PDF作成日時": "",
@@ -738,6 +748,102 @@ function buildDietCounselingAnswerRecord_(answerId, now, tokenRecord, answers) {
     "ダイエット経験時期": dietExperiencePeriod,
     "ダイエット方法": dietExperienceMethod,
     "ダイエット成果": dietExperienceResult
+  };
+}
+
+function getDietCounselingPrintSheetByAnswerId_(answerId) {
+  const sheet = getDietCounselingAnswerSheet_();
+  const headerMap = getDietCounselingHeaderMap_(
+    sheet, DIET_COUNSELING_ANSWER_HEADERS_
+  );
+  const found = findDietCounselingLogRow_(
+    sheet, headerMap, "回答ID", answerId
+  );
+  if (!found) {
+    const error = new Error("回答内容を確認できませんでした。");
+    error.code = "ANSWER_NOT_FOUND";
+    throw error;
+  }
+
+  const status = normalizeDietCounselingText_(found.record["PDF処理状態"]);
+  if (!status || status === "未作成") {
+    const now = formatDietCounselingStorageDateTime_(new Date());
+    writeDietCounselingRecordToRow_(sheet, headerMap, found.rowNumber, {
+      "PDF処理状態": "PDF不要（印刷画面）",
+      "エラー内容": "",
+      "最終更新日時": now
+    });
+    found.record["PDF処理状態"] = "PDF不要（印刷画面）";
+    found.record["最終更新日時"] = now;
+  }
+  return buildDietCounselingPrintSheetData_(found.record);
+}
+
+function buildDietCounselingPrintSheetData_(record) {
+  record = record || {};
+  const targetLater = record["カウンセリング後に目標決定"] === true ||
+    normalizeDietCounselingCode_(record["カウンセリング後に目標決定"]) === "TRUE";
+  const concerns = [
+    normalizeDietCounselingText_(record["気になる部位"]),
+    normalizeDietCounselingText_(record["その他の気になる部位"])
+  ].filter(Boolean).join("、");
+
+  return {
+    answer_id: normalizeDietCounselingText_(record["回答ID"]),
+    submitted_at: normalizeDietCounselingText_(record["送信日時"]),
+    counseling_date: normalizeDietCounselingDate_(record["カウンセリング日"]),
+    reservation_id: normalizeDietCounselingText_(record["予約ID"]),
+    member_type: normalizeDietCounselingText_(record["会員区分"]),
+    member_no: normalizeDietCounselingText_(record["会員番号"]),
+    name: normalizeDietCounselingText_(record["氏名"]),
+    staff_name: normalizeDietCounselingText_(record["担当者"]),
+    age: normalizeDietCounselingText_(record["年齢"]),
+    gender: normalizeDietCounselingText_(record["性別"]),
+    height_cm: normalizeDietCounselingText_(record["身長_cm"]),
+    weight_kg: normalizeDietCounselingText_(record["体重_kg"]),
+    bmi: normalizeDietCounselingText_(record["BMI"]),
+    bmr_kcal: normalizeDietCounselingText_(record["基礎代謝_kcal"]),
+    concerns: concerns,
+    target_weight_kg: normalizeDietCounselingText_(record["目標体重_kg"]),
+    target_later: targetLater,
+    target_weight_diff_kg: normalizeDietCounselingText_(record["目標体重差_kg"]),
+    reduction_rate: normalizeDietCounselingText_(record["減量率"]),
+    target_bmi: normalizeDietCounselingText_(record["目標BMI"]),
+    target_bmr_kcal: normalizeDietCounselingText_(record["目標基礎代謝_kcal"]),
+    employment: normalizeDietCounselingText_(record["就業有無"]),
+    work_style: normalizeDietCounselingText_(record["仕事スタイル"]),
+    work_other: normalizeDietCounselingText_(record["その他の仕事"]),
+    wake_work: normalizeDietCounselingTime_(record["仕事日起床時間"]),
+    sleep_work: normalizeDietCounselingTime_(record["翌日仕事_就寝時間"]),
+    sleep_hours_work: normalizeDietCounselingText_(record["仕事日前睡眠時間"]),
+    wake_off: normalizeDietCounselingTime_(record["休日起床時間"]),
+    sleep_off: normalizeDietCounselingTime_(record["翌日休み_就寝時間"]),
+    sleep_hours_off: normalizeDietCounselingText_(record["休日前睡眠時間"]),
+    meal_count: normalizeDietCounselingText_(record["食事回数"]),
+    meals: [
+      { label: "朝食", time: normalizeDietCounselingTime_(record["朝食時間"]), menu: normalizeDietCounselingText_(record["朝食メニュー"]) },
+      { label: "昼食", time: normalizeDietCounselingTime_(record["昼食時間"]), menu: normalizeDietCounselingText_(record["昼食メニュー"]) },
+      { label: "夕食", time: normalizeDietCounselingTime_(record["夕食時間"]), menu: normalizeDietCounselingText_(record["夕食メニュー"]) },
+      { label: "間食", time: normalizeDietCounselingTime_(record["間食時間"]), menu: normalizeDietCounselingText_(record["間食メニュー"]) }
+    ],
+    food_dislike: normalizeDietCounselingText_(record["好き嫌い有無"]),
+    dislike_detail: normalizeDietCounselingText_(record["苦手な食材"]),
+    allergy: normalizeDietCounselingText_(record["アレルギー有無"]),
+    allergy_detail: normalizeDietCounselingText_(record["アレルギー詳細"]),
+    alcohol: normalizeDietCounselingText_(record["飲酒有無"]),
+    alcohol_frequency: normalizeDietCounselingText_(record["飲酒頻度"]),
+    exercise_history: normalizeDietCounselingText_(record["運動歴有無"]),
+    exercise_history_detail: normalizeDietCounselingText_(record["運動歴詳細"]),
+    current_exercise: normalizeDietCounselingText_(record["現在の運動有無"]),
+    current_exercise_detail: normalizeDietCounselingText_(record["現在の運動詳細"]),
+    medical_history: normalizeDietCounselingText_(record["既往歴有無"]),
+    medical_history_detail: normalizeDietCounselingText_(record["既往歴詳細"]),
+    condition: normalizeDietCounselingText_(record["現在の体調"]),
+    condition_detail: normalizeDietCounselingText_(record["体調詳細"]),
+    diet_experience: normalizeDietCounselingText_(record["ダイエット経験有無"]),
+    diet_experience_period: normalizeDietCounselingText_(record["ダイエット経験時期"]),
+    diet_experience_method: normalizeDietCounselingText_(record["ダイエット方法"]),
+    diet_experience_result: normalizeDietCounselingText_(record["ダイエット成果"])
   };
 }
 
