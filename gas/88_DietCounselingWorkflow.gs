@@ -249,21 +249,9 @@ function createDietCounselingReservation_(params) {
     const assignment = chooseDietCounselingAssignment_(
       assignments, snapshot.reservations, date
     );
-    const locationLabel = getDietCounselingLocationLabel_(assignment.location_code);
-    const methodLabel = method === "ONLINE" ? "ONLINE" : "対面";
-    const notePrefix = [
-      "【実施方法】" + methodLabel,
-      "【担当者所在場所】" + locationLabel
-    ].join("\n");
-    const safeParams = Object.assign({}, params, {
-      staff_code: assignment.staff_code,
-      store_code: normalizeDietCounselingCode_(service.store_code) ||
-        DIET_COUNSELING_CONFIG_.GYM_STORE_CODE,
-      consultation_method: method,
-      staff_location: assignment.location_code,
-      note: [notePrefix, normalizeDietCounselingText_(params.note)]
-        .filter(Boolean).join("\n")
-    });
+    const safeParams = buildDietCounselingReservationParams_(
+      params, service, assignment, method
+    );
 
     const baseResponse = createReservationWithTrainerPolicy_(safeParams);
     const payload = parseDietCounselingResponse_(baseResponse);
@@ -311,13 +299,40 @@ function createDietCounselingReservation_(params) {
   });
 }
 
+function buildDietCounselingReservationParams_(params, service, assignment, method) {
+  const serviceStoreCode = normalizeDietCounselingCode_(service && service.store_code) ||
+    DIET_COUNSELING_CONFIG_.GYM_STORE_CODE;
+  const assignmentStoreCode = normalizeDietCounselingCode_(
+    assignment && assignment.location_code
+  );
+  const reservationStoreCode = assignmentStoreCode &&
+    assignmentStoreCode !== DIET_COUNSELING_CONFIG_.ONLINE_ONLY_LOCATION_CODE
+    ? assignmentStoreCode : serviceStoreCode;
+  const locationLabel = getDietCounselingLocationLabel_(assignmentStoreCode);
+  const methodLabel = method === "ONLINE" ? "ONLINE" : "対面";
+  const notePrefix = [
+    "【実施方法】" + methodLabel,
+    "【担当者所在場所】" + locationLabel
+  ].join("\n");
+
+  return Object.assign({}, params || {}, {
+    staff_code: normalizeDietCounselingCode_(assignment && assignment.staff_code),
+    store_code: reservationStoreCode,
+    consultation_method: method,
+    staff_location: assignmentStoreCode,
+    note: [notePrefix, normalizeDietCounselingText_(params && params.note)]
+      .filter(Boolean).join("\n")
+  });
+}
+
 function getDietCounselingAssignments_(
   snapshot, service, date, start, end, method, requestedStaffCode, excludedReservationId
 ) {
   const gymStoreCode = normalizeDietCounselingCode_(service && service.store_code) ||
     DIET_COUNSELING_CONFIG_.GYM_STORE_CODE;
+  const officeStoreCode = getDietCounselingOfficeStoreCode_();
   const allowedLocations = method === "ONLINE"
-    ? [gymStoreCode, getDietCounselingOfficeStoreCode_()]
+    ? [gymStoreCode, officeStoreCode]
     : [gymStoreCode];
   const assignments = [];
 
@@ -349,7 +364,7 @@ function getDietCounselingAssignments_(
     const locations = uniqueDietCounselingValues_((snapshot.shifts || [])
       .filter(function (shift) {
         const location = normalizeDietCounselingCode_(shift && shift.store_code);
-        return isDietCounselingActive_(shift && shift.active) &&
+        const baseEligible = isDietCounselingActive_(shift && shift.active) &&
           normalizeDietCounselingCode_(shift && shift.staff_code) === staffCode &&
           normalizeDietCounselingDate_(shift && shift.date) === date &&
           allowedLocations.indexOf(location) >= 0 &&
@@ -359,14 +374,13 @@ function getDietCounselingAssignments_(
             start,
             end
           );
+        if (!baseEligible) return false;
+        if (location !== officeStoreCode) return true;
+        return isDietCounselingHeadOfficeAssignmentAllowed_(
+          snapshot, staffCode, date, start, end
+        );
       })
       .map(function (shift) { return normalizeDietCounselingCode_(shift.store_code); }));
-
-    if (method === "ONLINE" && isDietCounselingOnlineOnlyAssignment_(
-      snapshot, staffCode, date, start, end
-    )) {
-      locations.push(DIET_COUNSELING_CONFIG_.ONLINE_ONLY_LOCATION_CODE);
-    }
 
     locations.forEach(function (locationCode) {
       assignments.push({
@@ -380,7 +394,9 @@ function getDietCounselingAssignments_(
   return assignments;
 }
 
-function isDietCounselingOnlineOnlyAssignment_(snapshot, staffCode, date, start, end) {
+function isDietCounselingHeadOfficeAssignmentAllowed_(
+  snapshot, staffCode, date, start, end
+) {
   if (!isDietCounselingOnlineOnlyWeekday_(date)) return false;
 
   const startMinutes = dietCounselingMinutes_(start);
@@ -395,15 +411,17 @@ function isDietCounselingOnlineOnlyAssignment_(snapshot, staffCode, date, start,
     endMinutes > dayEnd
   ) return false;
 
+  const officeStoreCode = getDietCounselingOfficeStoreCode_();
   const shiftEnds = (snapshot.shifts || []).filter(function (shift) {
     return isDietCounselingActive_(shift && shift.active) &&
       normalizeDietCounselingCode_(shift && shift.staff_code) === staffCode &&
-      normalizeDietCounselingDate_(shift && shift.date) === date;
+      normalizeDietCounselingDate_(shift && shift.date) === date &&
+      normalizeDietCounselingCode_(shift && shift.store_code) !== officeStoreCode;
   }).map(function (shift) {
     return dietCounselingMinutes_(shift && shift.end_time);
   }).filter(isFinite);
 
-  if (!shiftEnds.length) return false;
+  if (!shiftEnds.length) return true;
   const latestShiftEnd = Math.max.apply(null, shiftEnds);
   return startMinutes >= latestShiftEnd +
     Number(DIET_COUNSELING_CONFIG_.ONLINE_ONLY_TRAVEL_MINUTES || 150);
@@ -1527,8 +1545,7 @@ function isDietCounselingRoleAllowed_(staff, service) {
 }
 
 function isDietCounselingStaffAllowed_(staff) {
-  const value = staff && staff.can_counsel;
-  return value == null || value === "" || isDietCounselingActive_(value);
+  return isDietCounselingActive_(staff && staff.can_counsel);
 }
 
 function isDietCounselingActive_(value) {
