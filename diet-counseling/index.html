@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0f3327">
   <meta name="description" content="ダイエットカウンセリング事前回答シート">
   <title>ダイエットカウンセリングシート</title>
-  <link rel="stylesheet" href="./styles.css?v=20260916-print1">
+  <link rel="stylesheet" href="./styles.css?v=20260916-admin-print2">
 </head>
 <body class="is-loading">
   <header class="site-header">
@@ -315,10 +315,10 @@
   <section class="counseling-sheet-screen" id="counselingSheetScreen" hidden>
     <div class="sheet-toolbar">
       <div class="sheet-toolbar-copy">
-        <span>回答済み</span>
+        <span>管理者用</span>
         <div>
           <strong>カウンセリングシート</strong>
-          <small id="sheetViewMessage">iPad閲覧・印刷用</small>
+          <small id="sheetViewMessage">カウンセリング時のiPad表示・A4縦1枚印刷用</small>
         </div>
       </div>
       <button type="button" class="sheet-print-button" id="printSheetButton">
@@ -326,10 +326,13 @@
         印刷する
       </button>
     </div>
-    <article class="print-sheet" id="printSheet" aria-label="ダイエットカウンセリングシート"></article>
+    <div class="print-page" id="printPage">
+      <article class="print-sheet" id="printSheet" aria-label="ダイエットカウンセリングシート"></article>
+    </div>
   </section>
 
   <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
-  <script src="./app.js?v=20260916-print1"></script>
+  <script src="./app.js?v=20260916-admin-print2"></script>
 </body>
 </html>
+

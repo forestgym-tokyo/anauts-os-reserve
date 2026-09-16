@@ -22,6 +22,8 @@ const tables = {
   staff_shifts: [
     { staff_code: "KAWAKAMI", store_code: "YACHIYO", date: "2026-09-20", start_time: "09:00", end_time: "12:00", active: true },
     { staff_code: "KAWAKAMI", store_code: "HEAD_OFFICE", date: "2026-09-21", start_time: "09:00", end_time: "12:00", active: true },
+    { staff_code: "KAWAKAMI", store_code: "YACHIYO", date: "2026-09-22", start_time: "09:00", end_time: "18:00", active: true },
+    { staff_code: "KAWAKAMI", store_code: "YACHIYO", date: "2026-09-23", start_time: "12:00", end_time: "20:00", active: true },
     { staff_code: "OTHER", store_code: "SOGA", date: "2026-09-20", start_time: "09:00", end_time: "12:00", active: true }
   ],
   reservations: []
@@ -46,6 +48,10 @@ const context = {
     }
   },
   Utilities: {
+    DigestAlgorithm: { SHA_256: "SHA_256" },
+    Charset: { UTF_8: "UTF_8" },
+    getUuid() { return "12345678-1234-1234-1234-123456789abc"; },
+    computeDigest() { return Array.from({ length: 32 }, (_, index) => index); },
     formatDate(date, _zone, format) {
       const iso = date.toISOString();
       if (format === "yyyy-MM-dd") return iso.slice(0, 10);
@@ -100,10 +106,15 @@ const officeOnline = context.getDietCounselingAvailableSlotsRange_({
   start_date: "2026-09-21",
   days: 1
 });
-assert.equal(officeOnline.data.results[0].data.slots.length, 1);
+assert.equal(officeOnline.data.results[0].data.slots.length, 8);
 assert.deepEqual(
-  JSON.parse(JSON.stringify(officeOnline.data.results[0].data.slots[0].available_locations)),
+  JSON.parse(JSON.stringify(officeOnline.data.results[0].data.slots.find((slot) => slot.start_time === "10:00").available_locations)),
   ["HEAD_OFFICE"]
+);
+assert.equal(
+  officeOnline.data.results[0].data.slots.find((slot) => slot.start_time === "22:00").end_time,
+  "23:00",
+  "ONLINE専用枠は22時開始・23時終了まで表示する"
 );
 
 const officeInPerson = context.getDietCounselingAvailableSlotsRange_({
@@ -116,6 +127,36 @@ assert.equal(
   officeInPerson.data.results[0].data.slots.length,
   0,
   "本社事務所勤務は対面枠に含めてはいけない"
+);
+
+const movedOnline = context.getDietCounselingAvailableSlotsRange_({
+  service_code: "COUNSEL",
+  consultation_method: "ONLINE",
+  start_date: "2026-09-22",
+  days: 1
+});
+assert.deepEqual(
+  JSON.parse(JSON.stringify(movedOnline.data.results[0].data.slots.map((slot) => slot.start_time))),
+  ["10:00", "20:30", "21:00", "21:30", "22:00"],
+  "18時シフト終了日は移動2時間30分後の20時30分からONLINE専用枠を出す"
+);
+
+const noEveningOnline = context.getDietCounselingAvailableSlotsRange_({
+  service_code: "COUNSEL",
+  consultation_method: "ONLINE",
+  start_date: "2026-09-23",
+  days: 1
+});
+assert.equal(
+  noEveningOnline.data.results[0].data.slots.length,
+  1,
+  "20時までThe Forest Gym勤務中の19時枠はONLINE対応できる"
+);
+assert.equal(noEveningOnline.data.results[0].data.slots[0].start_time, "19:00");
+assert.deepEqual(
+  JSON.parse(JSON.stringify(noEveningOnline.data.results[0].data.slots[0].available_locations)),
+  ["YACHIYO"],
+  "移動時間後が最終受付を超えるためONLINE専用枠は追加しない"
 );
 
 assert.equal(context.calculateDietCounselingBmi_(165, 78), 28.7);
@@ -246,7 +287,7 @@ const structuredDietRecord = context.buildDietCounselingAnswerRecord_(
 assert.equal(structuredDietRecord["ダイエット経験時期"], "2025年4月から3か月間");
 assert.equal(structuredDietRecord["ダイエット方法"], "糖質制限と週2回の運動");
 assert.equal(structuredDietRecord["ダイエット成果"], "体重が5kg減少");
-assert.equal(structuredDietRecord["PDF処理状態"], "PDF不要（印刷画面）");
+assert.equal(structuredDietRecord["PDF処理状態"], "PDF不要（管理画面印刷）");
 assert.equal(
   structuredDietRecord["ダイエット期間・方法"],
   "時期・期間：2025年4月から3か月間\n方法：糖質制限と週2回の運動\n成果：体重が5kg減少"
@@ -265,6 +306,16 @@ assert.equal(printSheet.meals[0].menu, "ごはん、みそ汁、焼き鮭");
 assert.equal(printSheet.diet_experience_method, "糖質制限と週2回の運動");
 assert.equal(context.calculateDietCounselingSleepHours_("00:30", "06:30"), 6);
 assert.equal(context.calculateDietCounselingSleepHours_("23:30", "06:30"), 7);
+
+const adminAccess = context.issueDietCounselingAdminView_(
+  new Date("2026-09-16T00:00:00.000Z")
+);
+assert.match(adminAccess.url, /\?view_token=[a-f0-9]{64}$/);
+assert.equal(adminAccess.tokenHash.length, 64);
+assert.equal(
+  Math.round((adminAccess.expiresAt.getTime() - new Date("2026-09-16T00:00:00.000Z").getTime()) / 86400000),
+  90
+);
 
 function createMockSheet(headers) {
   const writes = [];
@@ -307,6 +358,16 @@ assert.throws(
 assert.throws(
   () => context.getDietCounselingHeaderMap_(createMockSheet(["氏名"]), ["氏名", "回答ID"]),
   /不足：回答ID/
+);
+
+const partialAnswerSheet = createMockSheet(["回答ID", "氏名", "任意の追加列"]);
+const appendedHeaders = context.ensureDietCounselingAnswerHeaders_(partialAnswerSheet);
+assert.ok(appendedHeaders.includes("管理閲覧URL"));
+assert.equal(partialAnswerSheet.writes[0].column, 4);
+assert.deepEqual(
+  JSON.parse(JSON.stringify(partialAnswerSheet.writes[0].values[0])),
+  JSON.parse(JSON.stringify(appendedHeaders)),
+  "既存列を動かさず、不足項目だけを末尾へ追加する"
 );
 
 console.log("diet counseling workflow tests passed");
