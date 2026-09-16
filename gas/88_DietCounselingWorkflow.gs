@@ -17,7 +17,7 @@ const DIET_COUNSELING_CONFIG_ = Object.freeze({
   REPLY_TO: "info@theforestgym.com",
   TOKEN_VALID_DAYS: 30,
   TIMEZONE: "Asia/Tokyo",
-  FORM_VERSION: "1.0",
+  FORM_VERSION: "1.1",
   BULK_SEND_LIMIT: 50
 });
 
