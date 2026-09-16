@@ -246,10 +246,23 @@ const structuredDietRecord = context.buildDietCounselingAnswerRecord_(
 assert.equal(structuredDietRecord["ダイエット経験時期"], "2025年4月から3か月間");
 assert.equal(structuredDietRecord["ダイエット方法"], "糖質制限と週2回の運動");
 assert.equal(structuredDietRecord["ダイエット成果"], "体重が5kg減少");
+assert.equal(structuredDietRecord["PDF処理状態"], "PDF不要（印刷画面）");
 assert.equal(
   structuredDietRecord["ダイエット期間・方法"],
   "時期・期間：2025年4月から3か月間\n方法：糖質制限と週2回の運動\n成果：体重が5kg減少"
 );
+const printSheet = context.buildDietCounselingPrintSheetData_(Object.assign({}, structuredDietRecord, {
+  "氏名": "テスト 太郎",
+  "気になる部位": "全体、おなか周り",
+  "その他の気になる部位": "首まわり",
+  "朝食時間": "07:00",
+  "朝食メニュー": "ごはん、みそ汁、焼き鮭"
+}));
+assert.equal(printSheet.name, "テスト 太郎");
+assert.equal(printSheet.concerns, "全体、おなか周り、首まわり");
+assert.equal(printSheet.meals[0].time, "07:00");
+assert.equal(printSheet.meals[0].menu, "ごはん、みそ汁、焼き鮭");
+assert.equal(printSheet.diet_experience_method, "糖質制限と週2回の運動");
 assert.equal(context.calculateDietCounselingSleepHours_("00:30", "06:30"), 6);
 assert.equal(context.calculateDietCounselingSleepHours_("23:30", "06:30"), 7);
 
