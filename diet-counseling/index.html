@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f3327">
+  <meta name="description" content="ダイエットカウンセリング事前回答シート">
+  <title>ダイエットカウンセリングシート</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body class="is-loading">
+  <header class="site-header">
+    <div class="brand" aria-label="Diet Counseling">
+      <span class="brand-mark" aria-hidden="true">DC</span>
+      <span class="brand-wordmark"><strong>Diet Counseling</strong><small>PERSONAL HEALTH DESIGN</small></span>
+    </div>
+    <div class="header-status" aria-live="polite">
+      <span class="save-dot" aria-hidden="true"></span>
+      <span id="saveStatus">入力内容は自動保存されます</span>
+    </div>
+  </header>
+
+  <section class="access-gate" id="accessGate" aria-live="polite">
+    <div class="access-card">
+      <span class="access-spinner" aria-hidden="true"></span>
+      <h1 id="accessTitle">専用URLを確認しています</h1>
+      <p id="accessMessage">そのまましばらくお待ちください。</p>
+    </div>
+  </section>
+
+  <main class="page-shell" id="formShell">
+    <section class="intro-panel" aria-labelledby="pageTitle">
+      <div class="intro-glow" aria-hidden="true"></div>
+      <p class="kicker">DIET COUNSELING</p>
+      <h1 id="pageTitle">理想のカラダへ、<br>最初の一歩を。</h1>
+      <p class="intro-copy">現在の生活や目標をお伺いし、あなたに合ったプランをご提案します。</p>
+
+      <dl class="reservation-context" aria-label="ご予約内容">
+        <div><dt>ご予約</dt><dd id="reservationDate">—</dd></div>
+        <div><dt>実施方法</dt><dd id="reservationMethod">—</dd></div>
+      </dl>
+
+      <ol class="step-list" aria-label="入力ステップ">
+        <li class="step-list-item is-current" data-step-indicator="0">
+          <span>01</span><div><strong>基本情報</strong><small>プロフィール</small></div>
+        </li>
+        <li class="step-list-item" data-step-indicator="1">
+          <span>02</span><div><strong>カラダの目標</strong><small>気になる部位・目標</small></div>
+        </li>
+        <li class="step-list-item" data-step-indicator="2">
+          <span>03</span><div><strong>仕事・生活</strong><small>生活リズム</small></div>
+        </li>
+        <li class="step-list-item" data-step-indicator="3">
+          <span>04</span><div><strong>食事</strong><small>食事内容・習慣</small></div>
+        </li>
+        <li class="step-list-item" data-step-indicator="4">
+          <span>05</span><div><strong>運動・体調</strong><small>運動歴・健康状態</small></div>
+        </li>
+        <li class="step-list-item" data-step-indicator="5">
+          <span>06</span><div><strong>入力内容の確認</strong><small>確認・送信</small></div>
+        </li>
+      </ol>
+
+      <div class="privacy-note">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 5v6c0 5.1 3.4 9.9 8 11 4.6-1.1 8-5.9 8-11V5l-8-3Zm0 3.1 5 1.8V11c0 3.5-2.1 6.9-5 7.9-2.9-1-5-4.4-5-7.9V6.9l5-1.8Zm-1.1 9.5 4.8-4.8-1.4-1.4-3.4 3.4-1.7-1.7-1.4 1.4 3.1 3.1Z"/></svg>
+        <p><strong>個人情報は安全に取り扱います</strong><br>カウンセリングおよびプラン提案の目的にのみ使用します。</p>
+      </div>
+    </section>
+
+    <section class="form-panel">
+      <div class="mobile-progress" aria-hidden="true">
+        <div class="mobile-progress-copy"><span id="mobileStepLabel">STEP 1 / 6</span><strong id="mobileStepTitle">基本情報</strong></div>
+        <div class="progress-track"><span id="progressBar"></span></div>
+      </div>
+
+      <form id="counselingForm" novalidate>
+        <section class="form-step is-active" data-step="0" aria-labelledby="step0Title">
+          <div class="step-heading">
+            <p>STEP 01</p>
+            <h2 id="step0Title">まずは、あなたのことを<br class="mobile-only">教えてください。</h2>
+            <span>カウンセリングに必要な基本情報です。</span>
+          </div>
+
+          <div class="field-grid two-cols">
+            <div class="field field-wide">
+              <label for="name">お名前 <em>必須</em></label>
+              <input id="name" name="name" type="text" autocomplete="name" placeholder="例）川上 一郎" required>
+              <p class="field-error">お名前を入力してください</p>
+            </div>
+            <div class="field">
+              <label for="height">身長 <em>必須</em></label>
+              <div class="unit-input"><input id="height" name="height" type="number" min="100" max="250" step="0.1" inputmode="decimal" placeholder="170" required><span>cm</span></div>
+              <p class="field-error">100〜250cmで入力してください</p>
+            </div>
+            <div class="field">
+              <label for="weight">体重 <em>必須</em></label>
+              <div class="unit-input"><input id="weight" name="weight" type="number" min="30" max="300" step="0.1" inputmode="decimal" placeholder="65.0" required><span>kg</span></div>
+              <p class="field-error">30〜300kgで入力してください</p>
+            </div>
+            <div class="field">
+              <label for="age">年齢 <em>必須</em></label>
+              <div class="unit-input"><input id="age" name="age" type="number" min="15" max="100" inputmode="numeric" placeholder="35" required><span>歳</span></div>
+              <p class="field-error">15〜100歳で入力してください</p>
+            </div>
+            <div class="field">
+              <label for="gender">性別 <em>必須</em></label>
+              <div class="select-wrap"><select id="gender" name="gender" required><option value="">選択してください</option><option value="男性">男性</option><option value="女性">女性</option></select></div>
+              <p class="field-error">性別を選択してください</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="form-step" data-step="1" aria-labelledby="step1Title" hidden>
+          <div class="step-heading">
+            <p>STEP 02</p>
+            <h2 id="step1Title">目指したいカラダを<br class="mobile-only">イメージしましょう。</h2>
+            <span>複数選択できます。今の気持ちに近いものをお選びください。</span>
+          </div>
+
+          <fieldset class="field choice-field" data-required-group="concerns">
+            <legend>体で気になるところは？ <em>必須</em></legend>
+            <div class="choice-grid three-cols">
+              <label class="choice-card"><input type="checkbox" name="concerns" value="全体"><span><i class="choice-icon">◎</i>全体</span></label>
+              <label class="choice-card"><input type="checkbox" name="concerns" value="おなか周り"><span><i class="choice-icon">◌</i>おなか周り</span></label>
+              <label class="choice-card"><input type="checkbox" name="concerns" value="脚（下半身）"><span><i class="choice-icon">↕</i>脚（下半身）</span></label>
+              <label class="choice-card"><input type="checkbox" name="concerns" value="二の腕"><span><i class="choice-icon">⌁</i>二の腕</span></label>
+              <label class="choice-card"><input type="checkbox" name="concerns" value="背中"><span><i class="choice-icon">◇</i>背中</span></label>
+              <label class="choice-card"><input type="checkbox" name="concerns" value="その他" data-reveal="concernOther"><span><i class="choice-icon">＋</i>その他</span></label>
+            </div>
+            <p class="field-error">1つ以上選択してください</p>
+          </fieldset>
+
+          <div class="field conditional" id="concernOther" hidden>
+            <label for="concern_other">その他の気になる部分</label>
+            <input id="concern_other" name="concern_other" type="text" placeholder="自由にご記入ください">
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="target-row">
+            <div class="field">
+              <label for="target_weight">目標体重</label>
+              <div class="unit-input"><input id="target_weight" name="target_weight" type="number" min="30" max="300" step="0.1" inputmode="decimal" placeholder="60.0"><span>kg</span></div>
+              <p class="field-error">目標体重を入力するか、「カウンセリング後に決めたい」を選択してください</p>
+            </div>
+            <label class="toggle-card"><input id="target_later" name="target_later" type="checkbox" value="カウンセリング後に決めたい"><span class="toggle-ui"></span><span><strong>カウンセリング後に決めたい</strong><small>トレーナーと相談して設定します</small></span></label>
+          </div>
+        </section>
+
+        <section class="form-step" data-step="2" aria-labelledby="step2Title" hidden>
+          <div class="step-heading">
+            <p>STEP 03</p>
+            <h2 id="step2Title">仕事と生活リズムを<br class="mobile-only">教えてください。</h2>
+            <span>無理なく続けられるプランづくりに活用します。</span>
+          </div>
+
+          <fieldset class="field choice-field" data-required-radio="employment">
+            <legend>お仕事をしていますか？ <em>必須</em></legend>
+            <div class="segmented two">
+              <label><input type="radio" name="employment" value="している" data-show="workDetails"><span>している</span></label>
+              <label><input type="radio" name="employment" value="していない"><span>していない</span></label>
+            </div>
+            <p class="field-error">どちらかを選択してください</p>
+          </fieldset>
+
+          <fieldset class="field conditional choice-field" id="workDetails" data-required-when-visible="work_style" hidden>
+            <legend>お仕事のスタイル <em>必須</em></legend>
+            <div class="choice-grid two-cols compact">
+              <label class="choice-card"><input type="checkbox" name="work_style" value="デスクワーク"><span>デスクワーク</span></label>
+              <label class="choice-card"><input type="checkbox" name="work_style" value="立ち仕事"><span>立ち仕事</span></label>
+              <label class="choice-card"><input type="checkbox" name="work_style" value="外回り"><span>外回り</span></label>
+              <label class="choice-card"><input type="checkbox" name="work_style" value="その他" data-reveal="workOther"><span>その他</span></label>
+            </div>
+            <p class="field-error">1つ以上選択してください</p>
+            <div class="field conditional nested" id="workOther" hidden>
+              <label for="work_other">その他のお仕事内容</label>
+              <input id="work_other" name="work_other" type="text" placeholder="例）シフト勤務、在宅勤務など">
+            </div>
+          </fieldset>
+
+          <div class="divider"></div>
+
+          <h3 class="subheading">生活リズム</h3>
+          <div class="field-grid two-cols">
+            <div class="field"><label for="wake_work">起床時間／仕事の日 <em>必須</em></label><div class="select-wrap"><select class="time-select" id="wake_work" name="wake_work" required></select></div><p class="field-error">時間を選択してください</p></div>
+            <div class="field"><label for="wake_off">起床時間／休みの日 <em>必須</em></label><div class="select-wrap"><select class="time-select" id="wake_off" name="wake_off" required></select></div><p class="field-error">時間を選択してください</p></div>
+            <div class="field"><label for="sleep_work">就寝時間／翌日仕事 <em>必須</em></label><div class="select-wrap"><select class="time-select" id="sleep_work" name="sleep_work" required></select></div><p class="field-error">時間を選択してください</p></div>
+            <div class="field"><label for="sleep_off">就寝時間／翌日休み <em>必須</em></label><div class="select-wrap"><select class="time-select" id="sleep_off" name="sleep_off" required></select></div><p class="field-error">時間を選択してください</p></div>
+          </div>
+        </section>
+
+        <section class="form-step" data-step="3" aria-labelledby="step3Title" hidden>
+          <div class="step-heading">
+            <p>STEP 04</p>
+            <h2 id="step3Title">普段の食事について<br class="mobile-only">教えてください。</h2>
+            <span>正解・不正解はありません。普段どおりの内容をご記入ください。</span>
+          </div>
+
+          <aside class="meal-guidance" aria-labelledby="mealGuidanceTitle">
+            <div class="meal-guidance-copy">
+              <p>HOW TO WRITE</p>
+              <h3 id="mealGuidanceTitle">ご記入時のお願い</h3>
+              <span>「お食事内容」の欄は、特定の1日分で構いませんので、できる限り具体的にご記載ください。</span>
+            </div>
+            <div class="meal-examples">
+              <div class="meal-example is-good">
+                <div><span aria-hidden="true">✓</span><strong>良い例</strong></div>
+                <p>ごはん、みそ汁、サラダ、から揚げ、湯豆腐、マグロ刺身、焼き鮭</p>
+              </div>
+              <div class="meal-example is-bad">
+                <div><span aria-hidden="true">×</span><strong>悪い例</strong></div>
+                <p>コンビニ弁当、定食、丼物、麺類、自炊</p>
+              </div>
+            </div>
+          </aside>
+
+          <div class="field meal-count-field">
+            <label for="meal_count">1日の食事回数 <em>必須</em></label>
+            <div class="unit-input short"><input id="meal_count" name="meal_count" type="number" min="1" max="10" inputmode="numeric" placeholder="3" required><span>回</span></div>
+            <p class="field-error">1〜10回で入力してください</p>
+          </div>
+
+          <div class="meal-list">
+            <article class="meal-card">
+              <div class="meal-card-title"><span>01</span><strong>朝食</strong></div>
+              <div class="field"><label for="breakfast_time">時間</label><div class="select-wrap"><select class="time-select optional-time" id="breakfast_time" name="breakfast_time"></select></div></div>
+              <div class="field"><label for="breakfast_menu">お食事内容 <em>必須</em></label><input id="breakfast_menu" name="breakfast_menu" type="text" placeholder="例）ごはん、納豆、みそ汁／食べない場合は「なし」" required><p class="field-error">お食事内容または「なし」と入力してください</p></div>
+            </article>
+            <article class="meal-card">
+              <div class="meal-card-title"><span>02</span><strong>昼食</strong></div>
+              <div class="field"><label for="lunch_time">時間</label><div class="select-wrap"><select class="time-select optional-time" id="lunch_time" name="lunch_time"></select></div></div>
+              <div class="field"><label for="lunch_menu">お食事内容 <em>必須</em></label><input id="lunch_menu" name="lunch_menu" type="text" placeholder="例）そば、サラダ、コーヒー" required><p class="field-error">お食事内容または「なし」と入力してください</p></div>
+            </article>
+            <article class="meal-card">
+              <div class="meal-card-title"><span>03</span><strong>夕食</strong></div>
+              <div class="field"><label for="dinner_time">時間</label><div class="select-wrap"><select class="time-select optional-time" id="dinner_time" name="dinner_time"></select></div></div>
+              <div class="field"><label for="dinner_menu">お食事内容 <em>必須</em></label><input id="dinner_menu" name="dinner_menu" type="text" placeholder="例）ごはん、焼き魚、野菜炒め" required><p class="field-error">お食事内容または「なし」と入力してください</p></div>
+            </article>
+            <article class="meal-card">
+              <div class="meal-card-title"><span>04</span><strong>間食</strong></div>
+              <div class="field"><label for="snack_time">時間</label><div class="select-wrap"><select class="time-select optional-time" id="snack_time" name="snack_time"></select></div></div>
+              <div class="field"><label for="snack_menu">お食事内容 <em>必須</em></label><input id="snack_menu" name="snack_menu" type="text" placeholder="例）ナッツ、プロテイン／食べない場合は「なし」" required><p class="field-error">お食事内容または「なし」と入力してください</p></div>
+            </article>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="question-stack">
+            <fieldset class="inline-question" data-required-radio="food_dislike"><legend>食べ物の好き嫌いはありますか？ <em>必須</em></legend><div class="segmented small"><label><input type="radio" name="food_dislike" value="有" data-show="dislikeDetail"><span>有</span></label><label><input type="radio" name="food_dislike" value="無"><span>無</span></label></div><p class="field-error">選択してください</p><div class="field conditional" id="dislikeDetail" hidden><label for="dislike_detail">苦手な食材</label><input id="dislike_detail" name="dislike_detail" type="text" placeholder="例）きのこ類"></div></fieldset>
+            <fieldset class="inline-question" data-required-radio="allergy"><legend>アレルギーはありますか？ <em>必須</em></legend><div class="segmented small"><label><input type="radio" name="allergy" value="有" data-show="allergyDetail"><span>有</span></label><label><input type="radio" name="allergy" value="無"><span>無</span></label></div><p class="field-error">選択してください</p><div class="field conditional" id="allergyDetail" hidden><label for="allergy_detail">アレルギーの詳細</label><input id="allergy_detail" name="allergy_detail" type="text" placeholder="食材名や症状をご記入ください"></div></fieldset>
+            <fieldset class="inline-question" data-required-radio="alcohol"><legend>飲酒しますか？ <em>必須</em></legend><div class="segmented small"><label><input type="radio" name="alcohol" value="有" data-show="alcoholDetail"><span>有</span></label><label><input type="radio" name="alcohol" value="無"><span>無</span></label></div><p class="field-error">選択してください</p><div class="field conditional" id="alcoholDetail" hidden><label for="alcohol_frequency">飲酒の頻度</label><input id="alcohol_frequency" name="alcohol_frequency" type="text" placeholder="例）週2回、ビール1杯程度"></div></fieldset>
+          </div>
+        </section>
+
+        <section class="form-step" data-step="4" aria-labelledby="step4Title" hidden>
+          <div class="step-heading">
+            <p>STEP 05</p>
+            <h2 id="step4Title">運動経験と体調を<br class="mobile-only">確認します。</h2>
+            <span>安全で効果的なプラン作成のため、現在の状態をお聞かせください。</span>
+          </div>
+
+          <div class="question-stack health-stack">
+            <fieldset class="inline-question" data-required-radio="exercise_history"><legend>運動経験はありますか？ <small>学生時代の部活を含む</small> <em>必須</em></legend><div class="segmented small"><label><input type="radio" name="exercise_history" value="有" data-show="exerciseHistoryDetail"><span>有</span></label><label><input type="radio" name="exercise_history" value="無"><span>無</span></label></div><p class="field-error">選択してください</p><div class="field conditional" id="exerciseHistoryDetail" hidden><label for="exercise_history_detail">運動種目・期間 <em>必須</em></label><input id="exercise_history_detail" name="exercise_history_detail" type="text" placeholder="例）高校3年間、バスケットボール" required><p class="field-error">運動種目と経験期間を入力してください</p></div></fieldset>
+            <fieldset class="inline-question" data-required-radio="current_exercise"><legend>現在、定期的に運動していますか？ <small>継続している運動</small> <em>必須</em></legend><div class="segmented small"><label><input type="radio" name="current_exercise" value="有" data-show="currentExerciseDetail"><span>有</span></label><label><input type="radio" name="current_exercise" value="無"><span>無</span></label></div><p class="field-error">選択してください</p><div class="field conditional" id="currentExerciseDetail" hidden><label for="current_exercise_detail">運動内容・頻度・1回あたりの時間 <em>必須</em></label><input id="current_exercise_detail" name="current_exercise_detail" type="text" placeholder="例）週2回、1回30分のウォーキング" required><p class="field-error">運動内容・頻度・時間を入力してください</p></div></fieldset>
+            <fieldset class="inline-question" data-required-radio="medical_history"><legend>既往症はありますか？ <small>これまでにかかった病気・けが</small> <em>必須</em></legend><div class="segmented small"><label><input type="radio" name="medical_history" value="有" data-show="medicalHistoryDetail"><span>有</span></label><label><input type="radio" name="medical_history" value="無"><span>無</span></label></div><p class="field-error">選択してください</p><div class="field conditional" id="medicalHistoryDetail" hidden><label for="medical_history_detail">病名・時期・現在の状況 <em>必須</em></label><input id="medical_history_detail" name="medical_history_detail" type="text" placeholder="例）2023年に腰椎椎間板ヘルニア、現在は治療終了" required><p class="field-error">既往症の内容を入力してください</p></div></fieldset>
+            <fieldset class="inline-question" data-required-radio="condition"><legend>現在の体調はいかがですか？ <em>必須</em></legend><div class="segmented two"><label><input type="radio" name="condition" value="良好"><span>良好</span></label><label><input type="radio" name="condition" value="不調" data-show="conditionDetail"><span>不調</span></label></div><p class="field-error">選択してください</p><div class="field conditional" id="conditionDetail" hidden><label for="condition_detail">現在の症状や気になる点</label><textarea id="condition_detail" name="condition_detail" rows="3" placeholder="差し支えない範囲でご記入ください"></textarea></div></fieldset>
+            <fieldset class="inline-question" data-required-radio="diet_experience"><legend>ダイエット経験はありますか？ <em>必須</em></legend><div class="segmented small"><label><input type="radio" name="diet_experience" value="有" data-show="dietExperienceDetail"><span>有</span></label><label><input type="radio" name="diet_experience" value="無"><span>無</span></label></div><p class="field-error">選択してください</p><div class="conditional" id="dietExperienceDetail" hidden><div class="field"><label for="diet_experience_period">時期・期間 <em>必須</em></label><input id="diet_experience_period" name="diet_experience_period" type="text" placeholder="例）2025年4月から3か月間" required><p class="field-error">時期・期間を入力してください</p></div><div class="field"><label for="diet_experience_method">どのような方法で？ <em>必須</em></label><textarea id="diet_experience_method" name="diet_experience_method" rows="3" placeholder="例）糖質制限と週2回の運動" required></textarea><p class="field-error">ダイエット方法を入力してください</p></div><div class="field"><label for="diet_experience_result">成果 <em>必須</em></label><textarea id="diet_experience_result" name="diet_experience_result" rows="3" placeholder="例）体重が5kg減少し、3か月維持できた" required></textarea><p class="field-error">成果を入力してください</p></div></div></fieldset>
+          </div>
+        </section>
+
+        <section class="form-step" data-step="5" aria-labelledby="step5Title" hidden>
+          <div class="step-heading">
+            <p>STEP 06</p>
+            <h2 id="step5Title">入力内容をご確認ください。</h2>
+            <span>修正する場合は、各項目の「編集」を押してください。</span>
+          </div>
+
+          <div id="summary" class="summary-list"></div>
+
+          <div class="preview-notice is-live">
+            <strong>送信前にご確認ください</strong>
+            <p>回答はカウンセリングとプラン提案のために使用します。送信後はこの専用URLから再編集できません。</p>
+          </div>
+        </section>
+
+        <div id="formAlert" class="form-alert" role="alert" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 15h-2v-2h2v2Zm0-4h-2V7h2v6Z"/></svg>
+          <span>未入力の項目があります。赤く表示された項目をご確認ください。</span>
+        </div>
+
+        <nav class="form-actions" aria-label="フォーム操作">
+          <button type="button" class="button button-secondary" id="backButton" hidden><span aria-hidden="true">←</span> 戻る</button>
+          <button type="button" class="button button-primary" id="nextButton">次へ進む <span aria-hidden="true">→</span></button>
+          <button type="submit" class="button button-primary submit-button" id="submitButton" hidden>回答を送信する <span aria-hidden="true">✓</span></button>
+        </nav>
+      </form>
+    </section>
+  </main>
+
+  <section class="completion-screen" id="completionScreen" hidden>
+    <div class="completion-card">
+      <span class="completion-mark" aria-hidden="true">✓</span>
+      <p class="kicker">THANK YOU</p>
+      <h1>回答を送信しました</h1>
+      <p>ご回答ありがとうございます。カウンセリング当日は、入力内容をもとに担当者よりご案内します。</p>
+      <small id="answerId"></small>
+    </div>
+  </section>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+  <script src="./app.js"></script>
+</body>
+</html>

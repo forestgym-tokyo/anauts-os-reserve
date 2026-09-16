@@ -69,6 +69,9 @@ const el = {
   pageLead: document.querySelector("#pageLead"),
   serviceSection: document.querySelector("#serviceSection"),
   serviceGrid: document.querySelector("#serviceGrid"),
+  consultationMethodSection: document.querySelector("#consultationMethodSection"),
+  consultationMethodInputs: [...document.querySelectorAll('input[name="consultation_method"]')],
+  consultationMethodNote: document.querySelector("#consultationMethodNote"),
   availabilitySection: document.querySelector("#availabilitySection"),
   availabilityStep: document.querySelector("#availabilityStep"),
   prevWeekButton: document.querySelector("#prevWeekButton"),
@@ -174,8 +177,12 @@ async function init() {
         return;
       }
 
-      el.availabilityStep.textContent = "1";
-      el.customerStep.textContent = "2";
+      const isCounselRoute = key === "counsel";
+      if (isCounselRoute && el.consultationMethodSection) {
+        el.consultationMethodSection.classList.remove("is-hidden");
+      }
+      el.availabilityStep.textContent = isCounselRoute ? "2" : "1";
+      el.customerStep.textContent = isCounselRoute ? "3" : "2";
       publicDays = Number(selectedService.public_days) || 30;
       configureCustomerForm();
       el.availabilitySection.classList.remove("is-hidden");
@@ -696,6 +703,28 @@ el.newReservationButton.addEventListener("click", () => {
   loadWeek();
 });
 
+el.consultationMethodInputs.forEach((input) => {
+  input.addEventListener("change", () => {
+    selectedSlot = null;
+    el.customerSection.classList.add("is-hidden");
+    el.completeSection.classList.add("is-hidden");
+    if (el.consultationMethodNote) {
+      el.consultationMethodNote.textContent = getConsultationMethod_() === "ONLINE"
+        ? "ONLINE対応可能な日程を表示しています。"
+        : "The Forest Gymで対面対応可能な日程を表示しています。";
+    }
+    loadWeek();
+  });
+});
+
+function getConsultationMethod_() {
+  if (!selectedService || String(selectedService.service_code || "").toUpperCase() !== "COUNSEL") {
+    return "";
+  }
+  const checked = el.consultationMethodInputs.find((input) => input.checked);
+  return (checked && checked.value) || "ONLINE";
+}
+
 async function loadWeek() {
   const requestVersion = ++weekLoadVersion;
 
@@ -776,6 +805,9 @@ async function fetchWeekSlotsRange_(dates) {
   const url = new URL(API_URL);
   url.searchParams.set("action", "getAvailableSlotsRange");
   url.searchParams.set("service_code", selectedService.service_code);
+  if (getConsultationMethod_()) {
+    url.searchParams.set("consultation_method", getConsultationMethod_());
+  }
   url.searchParams.set("start_date", dates[0]);
   url.searchParams.set("days", String(dates.length));
   url.searchParams.set("_", Date.now().toString());
@@ -860,6 +892,9 @@ async function fetchSlots(date) {
   const url = new URL(API_URL);
   url.searchParams.set("action", "getAvailableSlots");
   url.searchParams.set("service_code", selectedService.service_code);
+  if (getConsultationMethod_()) {
+    url.searchParams.set("consultation_method", getConsultationMethod_());
+  }
   url.searchParams.set("date", date);
   url.searchParams.set("_", Date.now().toString());
 
@@ -1088,6 +1123,7 @@ async function submitReservation(event) {
     const payload = {
       action: "createReservation",
       service_code: selectedService.service_code,
+      consultation_method: getConsultationMethod_(),
       date: selectedSlot.date,
       start_time: selectedSlot.start_time,
       customer_type: customerType,
@@ -1127,7 +1163,8 @@ async function submitReservation(event) {
     el.completeSection.classList.remove("is-hidden");
     el.completeSummary.textContent =
       `${jpDate(result.data.date)} ${result.data.start_time}〜${result.data.end_time} / ` +
-      `${selectedService.service_name}`;
+      `${selectedService.service_name}` +
+      (getConsultationMethod_() ? ` / ${getConsultationMethod_() === "ONLINE" ? "ONLINE" : "対面"}` : "");
     el.reservationId.textContent = result.data.reservation_id;
     el.completeSection.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (error) {
