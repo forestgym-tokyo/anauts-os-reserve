@@ -774,6 +774,18 @@ function validateDietCounselingAnswer_(answers) {
       throw error;
     }
   }
+  [
+    ["exercise_history", "exercise_history_detail", "運動経験の詳細を入力してください。"],
+    ["current_exercise", "current_exercise_detail", "現在の運動内容・頻度・時間を入力してください。"],
+    ["medical_history", "medical_history_detail", "既往症の詳細を入力してください。"]
+  ].forEach(function (condition) {
+    if (normalizeDietCounselingText_(answers[condition[0]]) === "有" &&
+        !normalizeDietCounselingText_(answers[condition[1]])) {
+      const error = new Error(condition[2]);
+      error.code = "CONDITIONAL_DETAIL_REQUIRED";
+      throw error;
+    }
+  });
 }
 
 function resolveDietCounselingToken_(token, allowSubmitted) {
