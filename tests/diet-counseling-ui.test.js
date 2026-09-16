@@ -21,12 +21,22 @@ assert.match(reserve, /searchParams\.set\("consultation_method", getConsultation
 assert.match(main, /getDietCounselingAvailableSlots_\(params\)/);
 assert.match(main, /getDietCounselingAvailableSlotsRange_\(params\)/);
 assert.match(main, /createDietCounselingReservation_\(body\)/);
+const createReservationCaseIndex = main.indexOf('case "createReservation":');
+const dietCounselingRouteIndex = main.indexOf(
+  "if (isDietCounselingRequest_(body))",
+  createReservationCaseIndex
+);
+const personalCutoffRouteIndex = main.indexOf(
+  "const personalCutoffError = validatePersonalPreviousDayBookingCutoff_(body)",
+  createReservationCaseIndex
+);
+assert.ok(createReservationCaseIndex >= 0);
+assert.ok(dietCounselingRouteIndex > createReservationCaseIndex);
+assert.ok(personalCutoffRouteIndex > dietCounselingRouteIndex);
 assert.match(main, /getDietCounselingFormContext_\(params\)/);
 assert.match(main, /getDietCounselingStaffSheet_\(params\)/);
 assert.match(main, /submitDietCounselingResponse_\(body\)/);
 assert.match(main, /sendDietCounselingLinksBulk_\(body\)/);
-assert.match(main, /function validatePersonalPreviousDayBookingCutoff_/);
-assert.match(main, /PERSONAL_BOOKING_CUTOFF/);
 
 assert.match(workflow, /OFFICE_STORE_CODE:\s*"HEAD_OFFICE"/);
 assert.match(workflow, /ANSWER_SPREADSHEET_ID:\s*"1muAm2zWPhI7NU3AA1vrd2ygKUqDh9ix6KFDATk9mX90"/);
