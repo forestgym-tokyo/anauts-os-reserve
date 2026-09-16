@@ -122,69 +122,6 @@ function getStaffShiftsForSignedInUser_(params, auth) {
   );
 }
 
-/**
- * 通常パーソナル・無料体験パーソナルは予約日の前日まで受け付ける。
- * 当日の日付が変わった時点で、その日の新規予約を停止する。
- *
- * @param {Object} body createReservation のリクエスト
- * @param {Date=} now テスト用の現在日時
- * @return {GoogleAppsScript.Content.TextOutput|null}
- */
-function validatePersonalPreviousDayBookingCutoff_(body, now) {
-  body = body || {};
-  const serviceCode = String(body.service_code || "").trim().toUpperCase();
-  if (!serviceCode) return null;
-
-  let isPersonal = serviceCode === "PT_TRIAL60" || /^PT(?:_|-|\d)/.test(serviceCode);
-
-  if (!isPersonal) {
-    const knownNonPersonalCodes = [
-      "TOUR",
-      "COUNSEL",
-      "PROCEDURE",
-      "MEAL_PLANNING",
-      "TRAINING_SUPPORT45",
-      "UNSUBSCRIBE"
-    ];
-    if (knownNonPersonalCodes.includes(serviceCode)) return null;
-
-    let services = [];
-    if (typeof readStoreAwareSheet_ === "function") {
-      services = readStoreAwareSheet_("services") || [];
-    } else if (typeof getSheetData === "function") {
-      services = getSheetData("services") || [];
-    }
-
-    const service = services.find(function (row) {
-      return String(row && row.service_code || "").trim().toUpperCase() === serviceCode;
-    });
-    isPersonal = String(service && service.category || "").trim().toUpperCase() === "PERSONAL";
-  }
-
-  if (!isPersonal) return null;
-
-  const reservationDate = String(body.date || body.reservation_date || "").trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(reservationDate)) return null;
-
-  const timezone =
-    typeof APP_CONFIG !== "undefined" && APP_CONFIG.TIMEZONE
-      ? APP_CONFIG.TIMEZONE
-      : "Asia/Tokyo";
-  const today = Utilities.formatDate(now || new Date(), timezone, "yyyy-MM-dd");
-
-  if (reservationDate > today) return null;
-
-  return errorResponse(
-    "パーソナルトレーニング（無料体験を含む）のご予約は前日までです。翌日以降の日程を選択してください。",
-    "PERSONAL_BOOKING_CUTOFF",
-    {
-      service_code: serviceCode,
-      reservation_date: reservationDate,
-      today: today
-    }
-  );
-}
-
 function doGet(e) {
   try {
     const params =
@@ -505,11 +442,11 @@ function doPost(e) {
         );
 
       case "createReservation": {
-        const personalCutoffError = validatePersonalPreviousDayBookingCutoff_(body);
-        if (personalCutoffError) return personalCutoffError;
         if (isDietCounselingRequest_(body)) {
           return createDietCounselingReservation_(body);
         }
+        const personalCutoffError = validatePersonalPreviousDayBookingCutoff_(body);
+        if (personalCutoffError) return personalCutoffError;
         return createReservationStoreAware_(
           body
         );
