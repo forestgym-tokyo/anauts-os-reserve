@@ -131,7 +131,7 @@
     condition: "良好",
     diet_experience: "有",
     diet_experience_period: "2025年4月から3か月間",
-    diet_experience_method: "糖質制限と週2回の運動",
+    diet_experience_method: "1日1食の置換えとオンラインヨガ30分を週2回",
     diet_experience_result: "体重が5kg減少し、3か月維持"
   };
 
@@ -220,6 +220,63 @@
       body: JSON.stringify(payload)
     });
     return response.json();
+  }
+
+  function waitForSubmission_(milliseconds) {
+    return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+  }
+
+  async function getSubmittedDietCounselingContext_() {
+    try {
+      const result = await apiGet("getDietCounselingFormContext", { token: TOKEN });
+      if (result?.ok === true && result.data?.submitted === true) {
+        return {
+          ok: true,
+          data: { answer_id: result.data.answer_id || "" }
+        };
+      }
+    } catch (_) {
+      // 一時的な通信失敗は次の確認で再試行する。
+    }
+    return null;
+  }
+
+  async function waitForSubmittedDietCounselingContext_() {
+    await waitForSubmission_(1500);
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      const confirmed = await getSubmittedDietCounselingContext_();
+      if (confirmed) return confirmed;
+      await waitForSubmission_(1500);
+    }
+    throw new Error(
+      "送信結果を確認できませんでした。専用URLを再読み込みして送信状況をご確認ください。"
+    );
+  }
+
+  async function submitDietCounselingWithConfirmation_(payload) {
+    const postOutcome = apiPost(payload)
+      .then((result) => ({ type: "post", result }))
+      .catch((error) => ({ type: "post-error", error }));
+    const statusOutcome = waitForSubmittedDietCounselingContext_()
+      .then((result) => ({ type: "status", result }))
+      .catch((error) => ({ type: "status-error", error }));
+
+    const first = await Promise.race([postOutcome, statusOutcome]);
+    if (first.type === "status") return first.result;
+    if (first.type === "post") {
+      if (first.result?.ok === true) return first.result;
+      if (first.result?.code === "ALREADY_SUBMITTED") {
+        const confirmed = await getSubmittedDietCounselingContext_();
+        if (confirmed) return confirmed;
+      }
+      return first.result;
+    }
+    if (first.type === "post-error") {
+      const status = await statusOutcome;
+      if (status.type === "status") return status.result;
+      throw first.error;
+    }
+    throw first.error;
   }
 
   function formatReservationDate(value, time) {
@@ -688,13 +745,15 @@
     const originalText = submitButton.innerHTML;
     submitButton.textContent = "送信中…";
     try {
-      const result = await apiPost({
+      const result = await submitDietCounselingWithConfirmation_({
         action: "submitDietCounselingResponse",
         token: TOKEN,
         answers: getValues()
       });
       if (!result.ok) throw new Error(result.message || "回答を送信できませんでした。");
       localStorage.removeItem(STORAGE_KEY);
+      submitButton.disabled = false;
+      submitButton.innerHTML = originalText;
       showCompletion(result.data?.answer_id || "");
     } catch (error) {
       showToast(error.message || "回答を送信できませんでした。時間をおいて再度お試しください。");
