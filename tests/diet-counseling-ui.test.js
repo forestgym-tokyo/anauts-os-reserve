@@ -20,6 +20,10 @@ assert.match(reserve, /searchParams\.set\("consultation_method", getConsultation
 assert.match(reserve, /payload\.submission_key = createDietCounselingSubmissionKey_\(\)/);
 assert.match(reserve, /getDietCounselingReservationStatus/);
 assert.match(reserve, /submitDietCounselingReservationWithConfirmation_/);
+assert.match(reserve, /DIET_COUNSELING_SUBMIT_DISPLAY_LIMIT_MS\s*=\s*9000/);
+assert.match(reserve, /DIET_COUNSELING_CONFIRM_POLL_MS\s*=\s*500/);
+assert.match(reserve, /pending_confirmation:\s*true/);
+assert.doesNotMatch(reserve, /予約結果を確認できませんでした/);
 
 assert.match(main, /getDietCounselingAvailableSlots_\(params\)/);
 assert.match(main, /getDietCounselingAvailableSlotsRange_\(params\)/);
@@ -65,6 +69,10 @@ assert.match(form, /getDietCounselingFormContext/);
 assert.match(form, /submitDietCounselingResponse/);
 assert.match(form, /submitDietCounselingWithConfirmation_/);
 assert.match(form, /waitForSubmittedDietCounselingContext_/);
+assert.match(form, /SUBMIT_DISPLAY_LIMIT_MS\s*=\s*9000/);
+assert.match(form, /SUBMIT_CONFIRM_POLL_MS\s*=\s*500/);
+assert.match(form, /pending_confirmation:\s*true/);
+assert.doesNotMatch(form, /送信結果を確認できませんでした/);
 assert.match(form, /showCounselingSheet/);
 assert.match(form, /getDietCounselingStaffSheet/);
 assert.match(form, /view_token/);
@@ -132,7 +140,7 @@ assert.doesNotMatch(reserve, /The Forest Gymで対面対応可能な日程/);
 assert.match(admin, /getDietCounselingLinkCandidates/);
 assert.match(admin, /sendDietCounselingLinksBulk/);
 assert.match(admin, /window\.confirm/);
-assert.match(counsel, /reserve\.js\?v=20260917-submit-confirm-v1/);
-assert.match(formHtml, /app\.js\?v=20260917-submit-confirm-v1/);
+assert.match(counsel, /reserve\.js\?v=20260917-submit-9s-v1/);
+assert.match(formHtml, /app\.js\?v=20260917-submit-9s-v1/);
 
 console.log("diet counseling UI integration tests passed");
