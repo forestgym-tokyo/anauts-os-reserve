@@ -205,6 +205,51 @@ assert.throws(
   })),
   /既往症の詳細/
 );
+assert.throws(
+  () => context.validateDietCounselingAnswer_(Object.assign({}, conditionalBaseAnswers, {
+    diet_experience: "有",
+    diet_experience_period: "",
+    diet_experience_method: "糖質制限",
+    diet_experience_result: "5kg減"
+  })),
+  /時期・期間/
+);
+assert.throws(
+  () => context.validateDietCounselingAnswer_(Object.assign({}, conditionalBaseAnswers, {
+    diet_experience: "有",
+    diet_experience_period: "2025年4月から3か月間",
+    diet_experience_method: "",
+    diet_experience_result: "5kg減"
+  })),
+  /ダイエット方法/
+);
+assert.throws(
+  () => context.validateDietCounselingAnswer_(Object.assign({}, conditionalBaseAnswers, {
+    diet_experience: "有",
+    diet_experience_period: "2025年4月から3か月間",
+    diet_experience_method: "糖質制限",
+    diet_experience_result: ""
+  })),
+  /ダイエットの成果/
+);
+const structuredDietRecord = context.buildDietCounselingAnswerRecord_(
+  "DCA_DIET_TEST",
+  new Date("2026-09-16T12:00:00.000Z"),
+  {},
+  Object.assign({}, conditionalBaseAnswers, {
+    diet_experience: "有",
+    diet_experience_period: "2025年4月から3か月間",
+    diet_experience_method: "糖質制限と週2回の運動",
+    diet_experience_result: "体重が5kg減少"
+  })
+);
+assert.equal(structuredDietRecord["ダイエット経験時期"], "2025年4月から3か月間");
+assert.equal(structuredDietRecord["ダイエット方法"], "糖質制限と週2回の運動");
+assert.equal(structuredDietRecord["ダイエット成果"], "体重が5kg減少");
+assert.equal(
+  structuredDietRecord["ダイエット期間・方法"],
+  "時期・期間：2025年4月から3か月間\n方法：糖質制限と週2回の運動\n成果：体重が5kg減少"
+);
 assert.equal(context.calculateDietCounselingSleepHours_("00:30", "06:30"), 6);
 assert.equal(context.calculateDietCounselingSleepHours_("23:30", "06:30"), 7);
 
