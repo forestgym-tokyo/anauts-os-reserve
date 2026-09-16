@@ -4,16 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0f3327">
-  <meta name="description" content="The Forest Gym ダイエット特化プラン カウンセリングシート">
-  <title>カウンセリングシート | The Forest Gym</title>
+  <meta name="description" content="ダイエットカウンセリング事前回答シート">
+  <title>ダイエットカウンセリングシート</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body class="is-loading">
   <header class="site-header">
-    <a class="brand" href="https://www.theforestgym.com/" aria-label="The Forest Gym ホーム">
-      <svg class="brand-leaf" viewBox="0 0 48 48" aria-hidden="true"><path d="M41.7 6.3C25.6 6 11.1 10.5 7.1 23.3c-2 6.4.6 12.1 5.4 14.8 3.8-9.5 10.2-16.7 20.8-23.2-8.6 7.9-13.9 15.1-16.8 23.8 5.1.5 10.1-2.3 13-6.5 5.8-8.3 3.4-15.8 12.2-25.9Z"/></svg>
-      <span class="brand-wordmark"><strong><span>The</span> Forest Gym</strong><small>24h Fitness</small></span>
-    </a>
+    <div class="brand" aria-label="Diet Counseling">
+      <span class="brand-mark" aria-hidden="true">DC</span>
+      <span class="brand-wordmark"><strong>Diet Counseling</strong><small>PERSONAL HEALTH DESIGN</small></span>
+    </div>
     <div class="header-status" aria-live="polite">
       <span class="save-dot" aria-hidden="true"></span>
       <span id="saveStatus">入力内容は自動保存されます</span>
@@ -104,7 +104,7 @@
             </div>
             <div class="field">
               <label for="gender">性別 <em>必須</em></label>
-              <div class="select-wrap"><select id="gender" name="gender" required><option value="">選択してください</option><option value="男性">男性</option><option value="女性">女性</option><option value="その他・回答しない">その他・回答しない</option></select></div>
+              <div class="select-wrap"><select id="gender" name="gender" required><option value="">選択してください</option><option value="男性">男性</option><option value="女性">女性</option></select></div>
               <p class="field-error">性別を選択してください</p>
             </div>
           </div>
@@ -196,6 +196,24 @@
             <span>正解・不正解はありません。普段どおりの内容をご記入ください。</span>
           </div>
 
+          <aside class="meal-guidance" aria-labelledby="mealGuidanceTitle">
+            <div class="meal-guidance-copy">
+              <p>HOW TO WRITE</p>
+              <h3 id="mealGuidanceTitle">ご記入時のお願い</h3>
+              <span>「お食事内容」の欄は、特定の1日分で構いませんので、できる限り具体的にご記載ください。</span>
+            </div>
+            <div class="meal-examples">
+              <div class="meal-example is-good">
+                <div><span aria-hidden="true">✓</span><strong>良い例</strong></div>
+                <p>ごはん、みそ汁、サラダ、から揚げ、湯豆腐、マグロ刺身、焼き鮭</p>
+              </div>
+              <div class="meal-example is-bad">
+                <div><span aria-hidden="true">×</span><strong>悪い例</strong></div>
+                <p>コンビニ弁当、定食、丼物、麺類、自炊</p>
+              </div>
+            </div>
+          </aside>
+
           <div class="field meal-count-field">
             <label for="meal_count">1日の食事回数 <em>必須</em></label>
             <div class="unit-input short"><input id="meal_count" name="meal_count" type="number" min="1" max="10" inputmode="numeric" placeholder="3" required><span>回</span></div>
@@ -206,22 +224,22 @@
             <article class="meal-card">
               <div class="meal-card-title"><span>01</span><strong>朝食</strong></div>
               <div class="field"><label for="breakfast_time">時間</label><div class="select-wrap"><select class="time-select optional-time" id="breakfast_time" name="breakfast_time"></select></div></div>
-              <div class="field"><label for="breakfast_menu">メニュー <em>必須</em></label><input id="breakfast_menu" name="breakfast_menu" type="text" placeholder="例）ごはん、納豆、味噌汁／食べない場合は「なし」" required><p class="field-error">メニューまたは「なし」と入力してください</p></div>
+              <div class="field"><label for="breakfast_menu">お食事内容 <em>必須</em></label><input id="breakfast_menu" name="breakfast_menu" type="text" placeholder="例）ごはん、納豆、みそ汁／食べない場合は「なし」" required><p class="field-error">お食事内容または「なし」と入力してください</p></div>
             </article>
             <article class="meal-card">
               <div class="meal-card-title"><span>02</span><strong>昼食</strong></div>
               <div class="field"><label for="lunch_time">時間</label><div class="select-wrap"><select class="time-select optional-time" id="lunch_time" name="lunch_time"></select></div></div>
-              <div class="field"><label for="lunch_menu">メニュー <em>必須</em></label><input id="lunch_menu" name="lunch_menu" type="text" placeholder="例）そば、サラダ、コーヒー" required><p class="field-error">メニューまたは「なし」と入力してください</p></div>
+              <div class="field"><label for="lunch_menu">お食事内容 <em>必須</em></label><input id="lunch_menu" name="lunch_menu" type="text" placeholder="例）そば、サラダ、コーヒー" required><p class="field-error">お食事内容または「なし」と入力してください</p></div>
             </article>
             <article class="meal-card">
               <div class="meal-card-title"><span>03</span><strong>夕食</strong></div>
               <div class="field"><label for="dinner_time">時間</label><div class="select-wrap"><select class="time-select optional-time" id="dinner_time" name="dinner_time"></select></div></div>
-              <div class="field"><label for="dinner_menu">メニュー <em>必須</em></label><input id="dinner_menu" name="dinner_menu" type="text" placeholder="例）ごはん、焼き魚、野菜炒め" required><p class="field-error">メニューまたは「なし」と入力してください</p></div>
+              <div class="field"><label for="dinner_menu">お食事内容 <em>必須</em></label><input id="dinner_menu" name="dinner_menu" type="text" placeholder="例）ごはん、焼き魚、野菜炒め" required><p class="field-error">お食事内容または「なし」と入力してください</p></div>
             </article>
             <article class="meal-card">
               <div class="meal-card-title"><span>04</span><strong>間食</strong></div>
               <div class="field"><label for="snack_time">時間</label><div class="select-wrap"><select class="time-select optional-time" id="snack_time" name="snack_time"></select></div></div>
-              <div class="field"><label for="snack_menu">メニュー <em>必須</em></label><input id="snack_menu" name="snack_menu" type="text" placeholder="例）ナッツ、プロテイン／食べない場合は「なし」" required><p class="field-error">メニューまたは「なし」と入力してください</p></div>
+              <div class="field"><label for="snack_menu">お食事内容 <em>必須</em></label><input id="snack_menu" name="snack_menu" type="text" placeholder="例）ナッツ、プロテイン／食べない場合は「なし」" required><p class="field-error">お食事内容または「なし」と入力してください</p></div>
             </article>
           </div>
 
