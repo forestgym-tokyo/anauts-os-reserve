@@ -371,6 +371,9 @@ function doGet(e) {
       case "getDietCounselingFormContext":
         return getDietCounselingFormContext_(params);
 
+      case "getDietCounselingStaffSheet":
+        return getDietCounselingStaffSheet_(params);
+
       case "getDietCounselingLinkCandidates":
         requireAuth_(params, ["ADMIN", "MANAGER"]);
         return getDietCounselingLinkCandidates_(params);
@@ -787,3 +790,4 @@ function health() {
       APP_CONFIG.TIMEZONE
   });
 }
+
