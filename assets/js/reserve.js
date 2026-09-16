@@ -711,7 +711,7 @@ el.consultationMethodInputs.forEach((input) => {
     if (el.consultationMethodNote) {
       el.consultationMethodNote.textContent = getConsultationMethod_() === "ONLINE"
         ? "ONLINEの日程を表示しています。"
-        : "対面の日程を表示しています。";
+        : "対面はThe Forest Gymで実施します。";
     }
     loadWeek();
   });
