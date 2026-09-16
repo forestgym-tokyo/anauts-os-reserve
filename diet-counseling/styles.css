@@ -726,7 +726,7 @@ select { padding-right: 44px; appearance: none; cursor: pointer; }
 .sheet-meal-table th:first-child { width: 70px; }
 .sheet-meal-table th:nth-child(2) { width: 82px; }
 .sheet-meal-table tbody th { color: var(--forest-800); background: #fbfdfb; }
-.sheet-food-notes { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.sheet-food-notes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
 .print-sheet-footer { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line); color: #818b86; font-size: 8px; line-height: 1.7; text-align: right; }
 
