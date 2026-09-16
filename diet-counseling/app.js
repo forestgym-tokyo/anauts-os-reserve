@@ -66,7 +66,9 @@
         ["現在の運動", "current_exercise"], ["運動内容", "current_exercise_detail", "", false, true],
         ["既往歴", "medical_history"], ["既往歴の詳細", "medical_history_detail", "", false, true],
         ["現在の体調", "condition"], ["体調の詳細", "condition_detail", "", false, true], ["ダイエット経験", "diet_experience"],
-        ["期間・方法", "diet_experience_detail", "", false, true]
+        ["時期・期間", "diet_experience_period", "", false, true],
+        ["方法", "diet_experience_method", "", false, true],
+        ["成果", "diet_experience_result", "", false, true]
       ]
     }
   ];
