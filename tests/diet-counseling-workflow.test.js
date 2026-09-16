@@ -92,6 +92,33 @@ assert.equal(context.normalizeDietCounselingMethod_("対面"), "IN_PERSON");
 assert.equal(context.isDietCounselingStaffAllowed_({ can_counsel: true }), true);
 assert.equal(context.isDietCounselingStaffAllowed_({ can_counsel: false }), false);
 assert.equal(context.isDietCounselingStaffAllowed_({ can_counsel: "" }), false);
+assert.equal(
+  context.normalizeDietCounselingSubmissionKey_("dcr-1234567890abcdef"),
+  "DCR-1234567890ABCDEF"
+);
+assert.equal(context.normalizeDietCounselingSubmissionKey_("invalid"), "");
+assert.equal(
+  context.getDietCounselingSubmissionMarker_("DCR-1234567890ABCDEF"),
+  "【申込照合ID】DCR-1234567890ABCDEF"
+);
+
+context.readDietCounselingReservationRows_ = () => [{
+  reservation_id: "R-COUNSEL-TEST",
+  service_code: "COUNSEL",
+  reservation_date: "2026-09-21",
+  start_time: "19:00",
+  end_time: "20:00",
+  status: "CONFIRMED",
+  note: "【実施方法】ONLINE\n【申込照合ID】DCR-1234567890ABCDEF"
+}];
+const confirmedReservation = context.getDietCounselingReservationStatus_({
+  submission_key: "DCR-1234567890ABCDEF"
+});
+assert.equal(confirmedReservation.ok, true);
+assert.equal(confirmedReservation.data.found, true);
+assert.equal(confirmedReservation.data.reservation_id, "R-COUNSEL-TEST");
+assert.equal(confirmedReservation.data.date, "2026-09-21");
+assert.equal(confirmedReservation.data.consultation_method, "ONLINE");
 
 const gymOnline = context.getDietCounselingAvailableSlotsRange_({
   service_code: "COUNSEL",
@@ -154,7 +181,8 @@ const officeReservationParams = context.buildDietCounselingReservationParams_(
   { service_code: "COUNSEL", note: "ご要望" },
   tables.services[0],
   { staff_code: "KAWAKAMI", location_code: "HEAD_OFFICE" },
-  "ONLINE"
+  "ONLINE",
+  "DCR-1234567890ABCDEF"
 );
 assert.equal(officeReservationParams.staff_code, "KAWAKAMI");
 assert.equal(
@@ -164,6 +192,7 @@ assert.equal(
 );
 assert.match(officeReservationParams.note, /【実施方法】ONLINE/);
 assert.match(officeReservationParams.note, /【担当者所在場所】本社事務所/);
+assert.match(officeReservationParams.note, /【申込照合ID】DCR-1234567890ABCDEF/);
 
 const officeInPerson = context.getDietCounselingAvailableSlotsRange_({
   service_code: "COUNSEL",
@@ -333,17 +362,20 @@ const structuredDietRecord = context.buildDietCounselingAnswerRecord_(
   Object.assign({}, conditionalBaseAnswers, {
     diet_experience: "有",
     diet_experience_period: "2025年4月から3か月間",
-    diet_experience_method: "糖質制限と週2回の運動",
+    diet_experience_method: "1日1食の置換えとオンラインヨガ30分を週2回",
     diet_experience_result: "体重が5kg減少"
   })
 );
 assert.equal(structuredDietRecord["ダイエット経験時期"], "2025年4月から3か月間");
-assert.equal(structuredDietRecord["ダイエット方法"], "糖質制限と週2回の運動");
+assert.equal(
+  structuredDietRecord["ダイエット方法"],
+  "1日1食の置換えとオンラインヨガ30分を週2回"
+);
 assert.equal(structuredDietRecord["ダイエット成果"], "体重が5kg減少");
 assert.equal(structuredDietRecord["PDF処理状態"], "PDF不要（管理画面印刷）");
 assert.equal(
   structuredDietRecord["ダイエット期間・方法"],
-  "時期・期間：2025年4月から3か月間\n方法：糖質制限と週2回の運動\n成果：体重が5kg減少"
+  "時期・期間：2025年4月から3か月間\n方法：1日1食の置換えとオンラインヨガ30分を週2回\n成果：体重が5kg減少"
 );
 const printSheet = context.buildDietCounselingPrintSheetData_(Object.assign({}, structuredDietRecord, {
   "氏名": "テスト 太郎",
@@ -356,7 +388,10 @@ assert.equal(printSheet.name, "テスト 太郎");
 assert.equal(printSheet.concerns, "全体、おなか周り、首まわり");
 assert.equal(printSheet.meals[0].time, "07:00");
 assert.equal(printSheet.meals[0].menu, "ごはん、みそ汁、焼き鮭");
-assert.equal(printSheet.diet_experience_method, "糖質制限と週2回の運動");
+assert.equal(
+  printSheet.diet_experience_method,
+  "1日1食の置換えとオンラインヨガ30分を週2回"
+);
 assert.equal(context.calculateDietCounselingSleepHours_("00:30", "06:30"), 6);
 assert.equal(context.calculateDietCounselingSleepHours_("23:30", "06:30"), 7);
 
