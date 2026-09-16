@@ -521,6 +521,7 @@ select { padding-right: 44px; appearance: none; cursor: pointer; }
 .inline-question::after { content: ""; display: block; clear: both; }
 .inline-question > .field-error { clear: both; padding-top: 8px; }
 .inline-question > .conditional { clear: both; padding-top: 16px; }
+.inline-question > .conditional .field + .field { margin-top: 16px; }
 .health-stack .inline-question { background: #fbfdfb; }
 
 .summary-list { display: grid; gap: 14px; }
