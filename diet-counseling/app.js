@@ -4,6 +4,7 @@
   const API_URL = "https://script.google.com/macros/s/AKfycbyvpQRxRpMRfpaQHtBar77dViCqPl-hdFW-2yMdozhN8RHtwcrFiNEM9cvEbny4x9q0/exec";
   const QUERY = new URLSearchParams(window.location.search);
   const TOKEN = QUERY.get("token") || "";
+  const IS_SHEET_PREVIEW = QUERY.get("preview") === "sheet";
   const IS_PREVIEW = QUERY.get("preview") === "1" || !QUERY.has("token");
   const STORAGE_KEY = `tfg-counseling-draft-v1:${IS_PREVIEW ? "preview" : TOKEN.slice(0, 12) || "invalid"}`;
   const TOTAL_STEPS = 6;
@@ -28,6 +29,10 @@
   const formShell = document.getElementById("formShell");
   const completionScreen = document.getElementById("completionScreen");
   const answerId = document.getElementById("answerId");
+  const counselingSheetScreen = document.getElementById("counselingSheetScreen");
+  const printSheet = document.getElementById("printSheet");
+  const printSheetButton = document.getElementById("printSheetButton");
+  const sheetViewMessage = document.getElementById("sheetViewMessage");
   const previewModeBanner = document.getElementById("previewModeBanner");
   let currentStep = 0;
   let saveTimer;
@@ -75,6 +80,56 @@
       ]
     }
   ];
+
+  const samplePrintSheet = {
+    answer_id: "DCA-SAMPLE",
+    submitted_at: "2026-09-16 18:30",
+    counseling_date: "2026-09-20",
+    member_type: "非会員",
+    name: "山田 太郎",
+    staff_name: "担当スタッフ",
+    age: "37",
+    gender: "男性",
+    height_cm: "170",
+    weight_kg: "78",
+    bmi: "27",
+    bmr_kcal: "1715",
+    concerns: "全体、おなか周り",
+    target_weight_kg: "68",
+    target_weight_diff_kg: "-10",
+    reduction_rate: "0.1282",
+    target_bmi: "23.5",
+    target_bmr_kcal: "1608",
+    employment: "している",
+    work_style: "デスクワーク",
+    wake_work: "06:30",
+    sleep_work: "23:30",
+    sleep_hours_work: "7",
+    wake_off: "08:00",
+    sleep_off: "00:30",
+    sleep_hours_off: "7.5",
+    meal_count: "4",
+    meals: [
+      { label: "朝食", time: "07:00", menu: "ごはん、納豆、みそ汁、焼き鮭" },
+      { label: "昼食", time: "12:30", menu: "そば、サラダ、コーヒー" },
+      { label: "夕食", time: "20:00", menu: "ごはん、から揚げ、湯豆腐、サラダ" },
+      { label: "間食", time: "16:00", menu: "ナッツ、プロテイン" }
+    ],
+    food_dislike: "無",
+    allergy: "無",
+    alcohol: "有",
+    alcohol_frequency: "週2回、ビール1杯程度",
+    exercise_history: "有",
+    exercise_history_detail: "高校3年間、バスケットボール",
+    current_exercise: "有",
+    current_exercise_detail: "週2回、1回30分のウォーキング",
+    medical_history: "無",
+    condition: "良好",
+    diet_experience: "有",
+    diet_experience_period: "2025年4月から3か月間",
+    diet_experience_method: "糖質制限と週2回の運動",
+    diet_experience_result: "体重が5kg減少し、3か月維持"
+  };
 
   function createTimeOptions() {
     document.querySelectorAll(".time-select").forEach((select) => {
@@ -179,7 +234,153 @@
     accessMessage.textContent = message || "お申込み先へお問い合わせください。";
   }
 
-  function showCompletion(id) {
+  function escapeSheetHtml(value) {
+    return String(value ?? "").replace(/[&<>"']/g, (character) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;"
+    }[character]));
+  }
+
+  function sheetValue(value, suffix = "") {
+    const text = String(value ?? "").trim();
+    if (!text) return '<span class="sheet-empty">—</span>';
+    return `${escapeSheetHtml(text).replace(/\n/g, "<br>")}${escapeSheetHtml(suffix)}`;
+  }
+
+  function sheetItem(label, value, suffix = "", full = false) {
+    return `<div class="sheet-data-item${full ? " is-full" : ""}"><dt>${escapeSheetHtml(label)}</dt><dd>${sheetValue(value, suffix)}</dd></div>`;
+  }
+
+  function formatSheetPercent(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return "";
+    const percent = Math.abs(number) <= 1 ? number * 100 : number;
+    return String(Math.round(percent * 10) / 10);
+  }
+
+  function renderCounselingSheet(data) {
+    const sheet = data || {};
+    const workStyle = [sheet.work_style, sheet.work_other].filter(Boolean).join("／");
+    const targetWeight = sheet.target_later ? "カウンセリング時に決定" : sheet.target_weight_kg;
+    const targetWeightSuffix = sheet.target_later ? "" : " kg";
+    const meals = Array.isArray(sheet.meals) ? sheet.meals : [];
+    const mealRows = meals.map((meal) => `
+      <tr>
+        <th scope="row">${sheetValue(meal.label)}</th>
+        <td>${sheetValue(meal.time)}</td>
+        <td>${sheetValue(meal.menu)}</td>
+      </tr>`).join("");
+    const consultationDate = formatReservationDate(sheet.counseling_date, "");
+
+    printSheet.innerHTML = `
+      <header class="print-sheet-header">
+        <div>
+          <p>DIET COUNSELING</p>
+          <h1>ダイエットカウンセリングシート</h1>
+        </div>
+        <div class="sheet-person">
+          <strong>${sheetValue(sheet.name)}</strong>
+          <span>${sheetValue(sheet.member_type)}${sheet.member_no ? ` ／ ${sheetValue(sheet.member_no)}` : ""}</span>
+        </div>
+      </header>
+      <div class="sheet-meta">
+        <span><small>カウンセリング日</small>${sheetValue(consultationDate)}</span>
+        <span><small>担当</small>${sheetValue(sheet.staff_name)}</span>
+        <span><small>回答日時</small>${sheetValue(sheet.submitted_at)}</span>
+        <span><small>回答ID</small>${sheetValue(sheet.answer_id)}</span>
+      </div>
+      <section class="sheet-metrics" aria-label="基本データ">
+        <div><small>年齢</small><strong>${sheetValue(sheet.age, " 歳")}</strong></div>
+        <div><small>性別</small><strong>${sheetValue(sheet.gender)}</strong></div>
+        <div><small>身長</small><strong>${sheetValue(sheet.height_cm, " cm")}</strong></div>
+        <div><small>体重</small><strong>${sheetValue(sheet.weight_kg, " kg")}</strong></div>
+        <div><small>BMI</small><strong>${sheetValue(sheet.bmi)}</strong></div>
+        <div><small>基礎代謝</small><strong>${sheetValue(sheet.bmr_kcal, " kcal")}</strong></div>
+      </section>
+      <div class="sheet-content-grid">
+        <section class="sheet-section">
+          <h2><span>01</span>目標・お体について</h2>
+          <dl class="sheet-data-grid">
+            ${sheetItem("気になる部位", sheet.concerns, "", true)}
+            ${sheetItem("目標体重", targetWeight, targetWeightSuffix)}
+            ${sheetItem("現在との差", sheet.target_weight_diff_kg, " kg")}
+            ${sheetItem("減量率", formatSheetPercent(sheet.reduction_rate), "%")}
+            ${sheetItem("目標BMI", sheet.target_bmi)}
+            ${sheetItem("目標基礎代謝", sheet.target_bmr_kcal, " kcal")}
+          </dl>
+        </section>
+        <section class="sheet-section">
+          <h2><span>02</span>仕事・生活リズム</h2>
+          <dl class="sheet-data-grid">
+            ${sheetItem("就業", sheet.employment)}
+            ${sheetItem("仕事スタイル", workStyle)}
+            ${sheetItem("仕事日の起床", sheet.wake_work)}
+            ${sheetItem("翌日仕事の就寝", sheet.sleep_work)}
+            ${sheetItem("仕事日前の睡眠", sheet.sleep_hours_work, " 時間")}
+            ${sheetItem("休日の起床", sheet.wake_off)}
+            ${sheetItem("翌日休みの就寝", sheet.sleep_off)}
+            ${sheetItem("休日前の睡眠", sheet.sleep_hours_off, " 時間")}
+          </dl>
+        </section>
+        <section class="sheet-section is-wide">
+          <h2><span>03</span>お食事について <small>1日 ${sheetValue(sheet.meal_count, " 回")}</small></h2>
+          <table class="sheet-meal-table">
+            <thead><tr><th>区分</th><th>時間</th><th>お食事内容</th></tr></thead>
+            <tbody>${mealRows}</tbody>
+          </table>
+          <dl class="sheet-data-grid sheet-food-notes">
+            ${sheetItem("好き嫌い", sheet.food_dislike)}
+            ${sheetItem("苦手な食材", sheet.dislike_detail)}
+            ${sheetItem("アレルギー", sheet.allergy)}
+            ${sheetItem("アレルギー詳細", sheet.allergy_detail)}
+            ${sheetItem("飲酒", sheet.alcohol)}
+            ${sheetItem("飲酒頻度", sheet.alcohol_frequency)}
+          </dl>
+        </section>
+        <section class="sheet-section">
+          <h2><span>04</span>運動・体調について</h2>
+          <dl class="sheet-data-grid">
+            ${sheetItem("運動経験", sheet.exercise_history)}
+            ${sheetItem("運動経験の詳細", sheet.exercise_history_detail, "", true)}
+            ${sheetItem("定期的な運動", sheet.current_exercise)}
+            ${sheetItem("現在の運動内容", sheet.current_exercise_detail, "", true)}
+            ${sheetItem("既往症", sheet.medical_history)}
+            ${sheetItem("既往症の詳細", sheet.medical_history_detail, "", true)}
+            ${sheetItem("現在の体調", sheet.condition)}
+            ${sheetItem("体調の詳細", sheet.condition_detail, "", true)}
+          </dl>
+        </section>
+        <section class="sheet-section">
+          <h2><span>05</span>ダイエット経験</h2>
+          <dl class="sheet-data-grid">
+            ${sheetItem("経験", sheet.diet_experience)}
+            ${sheetItem("時期・期間", sheet.diet_experience_period)}
+            ${sheetItem("方法", sheet.diet_experience_method, "", true)}
+            ${sheetItem("成果", sheet.diet_experience_result, "", true)}
+          </dl>
+        </section>
+      </div>
+      <footer class="print-sheet-footer">このシートは回答内容から自動作成されています。基礎代謝は改良版ハリス・ベネディクト式による参考値です。</footer>`;
+  }
+
+  function showCounselingSheet(data, justSubmitted = false) {
+    formShell.hidden = true;
+    document.querySelector(".site-header").hidden = true;
+    accessGate.hidden = true;
+    completionScreen.hidden = true;
+    renderCounselingSheet(data);
+    sheetViewMessage.textContent = justSubmitted
+      ? "回答を送信しました。下のシートはそのままiPadで確認・印刷できます。"
+      : "回答済みのカウンセリングシートです。";
+    counselingSheetScreen.hidden = false;
+    document.body.classList.add("is-sheet-view");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function showCompletion(id, sheetData) {
+    if (sheetData) {
+      showCounselingSheet(sheetData, true);
+      return;
+    }
     formShell.hidden = true;
     document.querySelector(".site-header").hidden = true;
     accessGate.hidden = true;
@@ -190,6 +391,12 @@
 
   async function initializeForm() {
     createTimeOptions();
+    if (IS_SHEET_PREVIEW) {
+      document.body.classList.remove("is-loading");
+      showCounselingSheet(samplePrintSheet, false);
+      sheetViewMessage.textContent = "印刷画面の確認用プレビューです。";
+      return;
+    }
     if (IS_PREVIEW) {
       reservationContext = { consultation_method: "ONLINE" };
       reservationDate.textContent = "確認用プレビュー";
@@ -212,7 +419,11 @@
       reservationContext = result.data || {};
       if (reservationContext.submitted) {
         document.body.classList.remove("is-loading");
-        showCompletion(reservationContext.answer_id);
+        if (reservationContext.print_sheet) {
+          showCounselingSheet(reservationContext.print_sheet, false);
+        } else {
+          showCompletion(reservationContext.answer_id);
+        }
         return;
       }
 
@@ -430,13 +641,15 @@
       });
       if (!result.ok) throw new Error(result.message || "回答を送信できませんでした。");
       localStorage.removeItem(STORAGE_KEY);
-      showCompletion(result.data?.answer_id || "");
+      showCompletion(result.data?.answer_id || "", result.data?.print_sheet || null);
     } catch (error) {
       showToast(error.message || "回答を送信できませんでした。時間をおいて再度お試しください。");
       submitButton.disabled = false;
       submitButton.innerHTML = originalText;
     }
   });
+
+  printSheetButton.addEventListener("click", () => window.print());
 
   initializeForm();
 })();
