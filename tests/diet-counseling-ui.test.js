@@ -17,6 +17,9 @@ assert.match(counsel, /name="consultation_method" value="IN_PERSON"/);
 assert.doesNotMatch(counsel, /どちらでもよい/);
 assert.match(reserve, /consultation_method:\s*getConsultationMethod_\(\)/);
 assert.match(reserve, /searchParams\.set\("consultation_method", getConsultationMethod_\(\)\)/);
+assert.match(reserve, /payload\.submission_key = createDietCounselingSubmissionKey_\(\)/);
+assert.match(reserve, /getDietCounselingReservationStatus/);
+assert.match(reserve, /submitDietCounselingReservationWithConfirmation_/);
 
 assert.match(main, /getDietCounselingAvailableSlots_\(params\)/);
 assert.match(main, /getDietCounselingAvailableSlotsRange_\(params\)/);
@@ -34,6 +37,7 @@ assert.ok(createReservationCaseIndex >= 0);
 assert.ok(dietCounselingRouteIndex > createReservationCaseIndex);
 assert.ok(personalCutoffRouteIndex > dietCounselingRouteIndex);
 assert.match(main, /getDietCounselingFormContext_\(params\)/);
+assert.match(main, /getDietCounselingReservationStatus_\(params\)/);
 assert.match(main, /getDietCounselingStaffSheet_\(params\)/);
 assert.match(main, /submitDietCounselingResponse_\(body\)/);
 assert.match(main, /sendDietCounselingLinksBulk_\(body\)/);
@@ -50,6 +54,8 @@ assert.match(workflow, /ONLINE_ONLY_LAST_START_TIME:\s*"22:00"/);
 assert.match(workflow, /ONLINE_ONLY_END_TIME:\s*"23:00"/);
 assert.match(workflow, /ONLINE_ONLY_TRAVEL_MINUTES:\s*150/);
 assert.match(workflow, /ensureDietCounselingAnswerHeaders_/);
+assert.match(workflow, /function getDietCounselingReservationStatus_/);
+assert.match(workflow, /【申込照合ID】/);
 assert.doesNotMatch(
   workflow.match(/function getDietCounselingFormContext_[\s\S]*?\n}\n/)[0],
   /print_sheet/
@@ -57,6 +63,8 @@ assert.doesNotMatch(
 
 assert.match(form, /getDietCounselingFormContext/);
 assert.match(form, /submitDietCounselingResponse/);
+assert.match(form, /submitDietCounselingWithConfirmation_/);
+assert.match(form, /waitForSubmittedDietCounselingContext_/);
 assert.match(form, /showCounselingSheet/);
 assert.match(form, /getDietCounselingStaffSheet/);
 assert.match(form, /view_token/);
@@ -105,6 +113,12 @@ assert.match(formHtml, /id="current_exercise_detail"[^>]*required/);
 assert.match(formHtml, /id="medical_history_detail"[^>]*required/);
 assert.match(formHtml, /id="diet_experience_period"[^>]*required/);
 assert.match(formHtml, /id="diet_experience_method"[^>]*required/);
+assert.match(
+  formHtml,
+  /placeholder="例）1日1食の置換えとオンラインヨガ30分を週2回"/
+);
+assert.match(form, /diet_experience_method: "1日1食の置換えとオンラインヨガ30分を週2回"/);
+assert.doesNotMatch(formHtml, /placeholder="例）糖質制限と週2回の運動"/);
 assert.match(formHtml, /id="diet_experience_result"[^>]*required/);
 assert.match(formHtml, /運動内容・頻度・1回あたりの時間/);
 assert.match(formHtml, /病名・時期・現在の状況/);
@@ -118,5 +132,7 @@ assert.doesNotMatch(reserve, /The Forest Gymで対面対応可能な日程/);
 assert.match(admin, /getDietCounselingLinkCandidates/);
 assert.match(admin, /sendDietCounselingLinksBulk/);
 assert.match(admin, /window\.confirm/);
+assert.match(counsel, /reserve\.js\?v=20260917-submit-confirm-v1/);
+assert.match(formHtml, /app\.js\?v=20260917-submit-confirm-v1/);
 
 console.log("diet counseling UI integration tests passed");
