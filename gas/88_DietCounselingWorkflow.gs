@@ -467,9 +467,8 @@ function sendDietCounselingAnswerUrlForReservation_(reservation, options) {
   const body = [
     name + " 様",
     "",
-    "ダイエットカウンセリング事務局です。",
     "ダイエットカウンセリングのお申込みありがとうございます。",
-    "カウンセリング前に、以下の専用URLから事前回答をお願いいたします。",
+    "カウンセリング前日までに、以下の専用URLから事前回答をお願いいたします。",
     "",
     "予約日時：" + formatDietCounselingDateJa_(date) + " " + start + "〜",
     "実施方法：" + method,
@@ -481,7 +480,7 @@ function sendDietCounselingAnswerUrlForReservation_(reservation, options) {
     "",
     "お問い合わせ：" + getDietCounselingReplyTo_(),
     "",
-    "ダイエットカウンセリング事務局"
+    "The Forest Gym/Meal Fit"
   ].join("\n");
 
   try {
@@ -489,7 +488,7 @@ function sendDietCounselingAnswerUrlForReservation_(reservation, options) {
       to: email,
       subject: "【ダイエットカウンセリング】事前回答のお願い",
       body: body,
-      name: "ダイエットカウンセリング事務局",
+      name: "The Forest Gym/Meal Fit",
       replyTo: getDietCounselingReplyTo_()
     });
     markDietCounselingLinkSent_(linkRecord.sheet, linkRecord.rowNumber, "");
