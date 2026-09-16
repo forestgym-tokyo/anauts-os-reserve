@@ -1019,6 +1019,75 @@ function updateNav() {
   el.reloadButton.disabled = loading;
 }
 
+function waitForDietCounseling_(milliseconds) {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
+function createDietCounselingSubmissionKey_() {
+  let randomPart = "";
+  if (
+    window.crypto &&
+    typeof window.crypto.randomUUID === "function"
+  ) {
+    randomPart = window.crypto.randomUUID().replace(/-/g, "");
+  } else {
+    randomPart = `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
+  }
+  return `DCR-${randomPart}`.toUpperCase();
+}
+
+async function getDietCounselingReservationStatus_(submissionKey) {
+  try {
+    const url = new URL(API_URL);
+    url.searchParams.set("action", "getDietCounselingReservationStatus");
+    url.searchParams.set("submission_key", submissionKey);
+    url.searchParams.set("_", Date.now().toString());
+    const response = await fetch(url.toString(), { cache: "no-store" });
+    const result = await response.json();
+    return result && result.ok === true && result.data && result.data.found === true
+      ? result
+      : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+async function waitForDietCounselingReservation_(submissionKey) {
+  await waitForDietCounseling_(1500);
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    const confirmed = await getDietCounselingReservationStatus_(submissionKey);
+    if (confirmed) return confirmed;
+    await waitForDietCounseling_(1500);
+  }
+  throw new Error(
+    "予約結果を確認できませんでした。ページを再読み込みせず、時間をおいてお問い合わせください。"
+  );
+}
+
+async function submitDietCounselingReservationWithConfirmation_(payload) {
+  const postOutcome = fetch(API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify(payload)
+  })
+    .then((response) => response.json())
+    .then((result) => ({ type: "post", result }))
+    .catch((error) => ({ type: "post-error", error }));
+  const statusOutcome = waitForDietCounselingReservation_(payload.submission_key)
+    .then((result) => ({ type: "status", result }))
+    .catch((error) => ({ type: "status-error", error }));
+
+  const first = await Promise.race([postOutcome, statusOutcome]);
+  if (first.type === "status") return first.result;
+  if (first.type === "post") return first.result;
+  if (first.type === "post-error") {
+    const status = await statusOutcome;
+    if (status.type === "status") return status.result;
+    throw first.error;
+  }
+  throw first.error;
+}
+
 async function submitReservation(event) {
   event.preventDefault();
   hideError();
@@ -1147,25 +1216,35 @@ async function submitReservation(event) {
       note: el.note.value.trim()
     };
 
-    const response = await fetch(API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(payload)
-    });
+    if (isCounsel) {
+      payload.submission_key = createDietCounselingSubmissionKey_();
+    }
 
-    const result = await response.json();
+    let result;
+    if (isCounsel) {
+      result = await submitDietCounselingReservationWithConfirmation_(payload);
+    } else {
+      const response = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload)
+      });
+      result = await response.json();
+    }
 
     if (!result.ok) {
       throw new Error(userMessage(result));
     }
 
+    el.submitButton.disabled = false;
+    el.submitButton.textContent = "この内容で予約する";
     el.customerSection.classList.add("is-hidden");
     el.completeSection.classList.remove("is-hidden");
     el.completeSummary.textContent =
       `${jpDate(result.data.date)} ${result.data.start_time}〜${result.data.end_time} / ` +
       `${selectedService.service_name}` +
       (getConsultationMethod_() ? ` / ${getConsultationMethod_() === "ONLINE" ? "ONLINE" : "対面"}` : "");
-    el.reservationId.textContent = result.data.reservation_id;
+    el.reservationId.textContent = result.data.reservation_id || "予約済み";
     el.completeSection.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (error) {
     showError(error.message || "予約に失敗しました。");
