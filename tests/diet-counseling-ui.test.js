@@ -45,8 +45,13 @@ assert.match(formHtml, /コンビニ弁当、定食、丼物、麺類、自炊/)
 assert.match(formHtml, /id="exercise_history_detail"[^>]*required/);
 assert.match(formHtml, /id="current_exercise_detail"[^>]*required/);
 assert.match(formHtml, /id="medical_history_detail"[^>]*required/);
+assert.match(formHtml, /id="diet_experience_period"[^>]*required/);
+assert.match(formHtml, /id="diet_experience_method"[^>]*required/);
+assert.match(formHtml, /id="diet_experience_result"[^>]*required/);
 assert.match(formHtml, /運動内容・頻度・1回あたりの時間/);
 assert.match(formHtml, /病名・時期・現在の状況/);
+assert.match(formHtml, /どのような方法で？/);
+assert.match(formHtml, /成果/);
 assert.doesNotMatch(workflow, /The Forest Gym/);
 assert.match(admin, /getDietCounselingLinkCandidates/);
 assert.match(admin, /sendDietCounselingLinksBulk/);
