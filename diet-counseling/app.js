@@ -2,8 +2,10 @@
   "use strict";
 
   const API_URL = "https://script.google.com/macros/s/AKfycbyvpQRxRpMRfpaQHtBar77dViCqPl-hdFW-2yMdozhN8RHtwcrFiNEM9cvEbny4x9q0/exec";
-  const TOKEN = new URLSearchParams(window.location.search).get("token") || "";
-  const STORAGE_KEY = `tfg-counseling-draft-v1:${TOKEN.slice(0, 12) || "invalid"}`;
+  const QUERY = new URLSearchParams(window.location.search);
+  const TOKEN = QUERY.get("token") || "";
+  const IS_PREVIEW = QUERY.get("preview") === "1" || !QUERY.has("token");
+  const STORAGE_KEY = `tfg-counseling-draft-v1:${IS_PREVIEW ? "preview" : TOKEN.slice(0, 12) || "invalid"}`;
   const TOTAL_STEPS = 6;
   const stepTitles = ["基本情報", "カラダの目標", "仕事・生活", "食事", "運動・体調", "入力内容の確認"];
   const form = document.getElementById("counselingForm");
@@ -26,6 +28,7 @@
   const formShell = document.getElementById("formShell");
   const completionScreen = document.getElementById("completionScreen");
   const answerId = document.getElementById("answerId");
+  const previewModeBanner = document.getElementById("previewModeBanner");
   let currentStep = 0;
   let saveTimer;
   let reservationContext = null;
@@ -104,7 +107,7 @@
   }
 
   function saveDraft() {
-    if (!reservationContext) return;
+    if (!reservationContext || IS_PREVIEW) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ values: getValues(), step: currentStep, savedAt: Date.now() }));
       const time = new Intl.DateTimeFormat("ja-JP", { hour: "2-digit", minute: "2-digit" }).format(new Date());
@@ -115,12 +118,17 @@
   }
 
   function scheduleSave() {
+    if (IS_PREVIEW) {
+      saveStatus.textContent = "確認用プレビュー";
+      return;
+    }
     saveStatus.textContent = "保存中…";
     clearTimeout(saveTimer);
     saveTimer = setTimeout(saveDraft, 350);
   }
 
   function restoreDraft() {
+    if (IS_PREVIEW) return;
     let draft;
     try { draft = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null"); } catch (_) { return; }
     if (!draft?.values) return;
@@ -182,6 +190,17 @@
 
   async function initializeForm() {
     createTimeOptions();
+    if (IS_PREVIEW) {
+      reservationContext = { consultation_method: "ONLINE" };
+      reservationDate.textContent = "確認用プレビュー";
+      reservationMethod.textContent = "ONLINE";
+      previewModeBanner.hidden = false;
+      submitButton.innerHTML = "送信テスト <span aria-hidden=\"true\">✓</span>";
+      accessGate.hidden = true;
+      document.body.classList.remove("is-loading");
+      showStep(0, { skipScroll: true });
+      return;
+    }
     if (!/^[a-f0-9]{64}$/i.test(TOKEN)) {
       showAccessError("メールに記載された専用URLからアクセスしてください。");
       return;
@@ -378,7 +397,7 @@
   form.addEventListener("change", updateConditionals);
 
   nextButton.addEventListener("click", () => {
-    if (!validateStep(currentStep)) return;
+    if (!IS_PREVIEW && !validateStep(currentStep)) return;
     showStep(currentStep + 1);
   });
   backButton.addEventListener("click", () => showStep(currentStep - 1));
@@ -390,6 +409,10 @@
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (IS_PREVIEW) {
+      showToast("確認用プレビューのため、回答は送信されません。");
+      return;
+    }
     const invalidStep = [0, 1, 2, 3, 4].find((index) => !validateStep(index));
     if (invalidStep !== undefined) {
       showStep(invalidStep);
