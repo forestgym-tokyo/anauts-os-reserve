@@ -148,9 +148,15 @@ function filterDietCounselingSlotData_(data, params, snapshot, service, method) 
       snapshot, service, date, start, end, method, requestedStaffCode, ""
     );
     if (!assignments.length) return;
+    const gymStoreCode = normalizeDietCounselingCode_(service && service.store_code) ||
+      DIET_COUNSELING_CONFIG_.GYM_STORE_CODE;
+    const onlineOnly = method === "ONLINE" && assignments.every(function (item) {
+      return item.location_code !== gymStoreCode;
+    });
 
     filtered.push(Object.assign({}, slot, {
       consultation_method: method,
+      online_only: onlineOnly,
       available_staff_count: assignments.length,
       available_locations: uniqueDietCounselingValues_(assignments.map(function (item) {
         return item.location_code;
@@ -199,8 +205,7 @@ function mergeDietCounselingOnlineOnlySlots_(slots, data, params, service, metho
       start_time: start,
       end_time: end,
       start_at: date + " " + start,
-      end_at: date + " " + end,
-      online_only: true
+      end_at: date + " " + end
     });
   }
 
