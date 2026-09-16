@@ -17,14 +17,16 @@ const tables = {
   }],
   staff: [
     { staff_code: "KAWAKAMI", staff_name: "川上一郎", role: "STAFF", active: true, can_counsel: true },
-    { staff_code: "OTHER", staff_name: "他スタッフ", role: "STAFF", active: true, can_counsel: true }
+    { staff_code: "OTHER", staff_name: "他スタッフ", role: "STAFF", active: true, can_counsel: false }
   ],
   staff_shifts: [
     { staff_code: "KAWAKAMI", store_code: "YACHIYO", date: "2026-09-20", start_time: "09:00", end_time: "12:00", active: true },
-    { staff_code: "KAWAKAMI", store_code: "HEAD_OFFICE", date: "2026-09-21", start_time: "09:00", end_time: "12:00", active: true },
+    { staff_code: "KAWAKAMI", store_code: "HEAD_OFFICE", date: "2026-09-21", start_time: "19:00", end_time: "23:00", active: true },
     { staff_code: "KAWAKAMI", store_code: "YACHIYO", date: "2026-09-22", start_time: "09:00", end_time: "18:00", active: true },
+    { staff_code: "KAWAKAMI", store_code: "HEAD_OFFICE", date: "2026-09-22", start_time: "19:00", end_time: "23:00", active: true },
     { staff_code: "KAWAKAMI", store_code: "YACHIYO", date: "2026-09-23", start_time: "12:00", end_time: "20:00", active: true },
-    { staff_code: "OTHER", store_code: "SOGA", date: "2026-09-20", start_time: "09:00", end_time: "12:00", active: true }
+    { staff_code: "KAWAKAMI", store_code: "HEAD_OFFICE", date: "2026-09-23", start_time: "19:00", end_time: "23:00", active: true },
+    { staff_code: "OTHER", store_code: "HEAD_OFFICE", date: "2026-09-21", start_time: "19:00", end_time: "23:00", active: true }
   ],
   reservations: []
 };
@@ -87,6 +89,9 @@ vm.runInContext(source, context, { filename: "88_DietCounselingWorkflow.gs" });
 assert.equal(context.normalizeDietCounselingMethod_(""), "ONLINE");
 assert.equal(context.normalizeDietCounselingMethod_("ONLINE"), "ONLINE");
 assert.equal(context.normalizeDietCounselingMethod_("対面"), "IN_PERSON");
+assert.equal(context.isDietCounselingStaffAllowed_({ can_counsel: true }), true);
+assert.equal(context.isDietCounselingStaffAllowed_({ can_counsel: false }), false);
+assert.equal(context.isDietCounselingStaffAllowed_({ can_counsel: "" }), false);
 
 const gymOnline = context.getDietCounselingAvailableSlotsRange_({
   service_code: "COUNSEL",
@@ -124,10 +129,11 @@ const officeOnline = context.getDietCounselingAvailableSlotsRange_({
   start_date: "2026-09-21",
   days: 1
 });
-assert.equal(officeOnline.data.results[0].data.slots.length, 8);
+assert.equal(officeOnline.data.results[0].data.slots.length, 7);
 assert.deepEqual(
-  JSON.parse(JSON.stringify(officeOnline.data.results[0].data.slots.find((slot) => slot.start_time === "10:00").available_locations)),
-  ["HEAD_OFFICE"]
+  JSON.parse(JSON.stringify(officeOnline.data.results[0].data.slots.find((slot) => slot.start_time === "19:00").available_locations)),
+  ["HEAD_OFFICE"],
+  "本社ONLINE枠はstaff_shiftsのHEAD_OFFICE勤務だけを使う"
 );
 assert.equal(
   officeOnline.data.results[0].data.slots.find((slot) => slot.start_time === "22:00").end_time,
@@ -138,6 +144,26 @@ assert.equal(
   officeOnline.data.results[0].data.slots.find((slot) => slot.start_time === "22:00").online_only,
   true
 );
+assert.equal(
+  officeOnline.data.results[0].data.slots.every((slot) => slot.available_staff_count === 1),
+  true,
+  "can_counselがTRUEの川上だけを担当候補にする"
+);
+
+const officeReservationParams = context.buildDietCounselingReservationParams_(
+  { service_code: "COUNSEL", note: "ご要望" },
+  tables.services[0],
+  { staff_code: "KAWAKAMI", location_code: "HEAD_OFFICE" },
+  "ONLINE"
+);
+assert.equal(officeReservationParams.staff_code, "KAWAKAMI");
+assert.equal(
+  officeReservationParams.store_code,
+  "HEAD_OFFICE",
+  "予約保存時も本社シフトと同じ店舗コードで共通シフト判定を通す"
+);
+assert.match(officeReservationParams.note, /【実施方法】ONLINE/);
+assert.match(officeReservationParams.note, /【担当者所在場所】本社事務所/);
 
 const officeInPerson = context.getDietCounselingAvailableSlotsRange_({
   service_code: "COUNSEL",
