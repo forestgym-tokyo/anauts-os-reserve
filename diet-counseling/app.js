@@ -166,7 +166,7 @@
     accessGate.hidden = false;
     accessGate.querySelector(".access-card")?.classList.add("is-error");
     accessTitle.textContent = "専用URLを確認できませんでした";
-    accessMessage.textContent = message || "The Forest Gymへお問い合わせください。";
+    accessMessage.textContent = message || "お申込み先へお問い合わせください。";
   }
 
   function showCompletion(id) {
