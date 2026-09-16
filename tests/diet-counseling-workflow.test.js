@@ -158,6 +158,53 @@ assert.throws(
   }),
   /性別は男性または女性/
 );
+const conditionalBaseAnswers = {
+  age: 37,
+  gender: "男性",
+  height: 165,
+  weight: 78,
+  employment: "している",
+  wake_work: "06:30",
+  sleep_work: "23:30",
+  wake_off: "08:00",
+  sleep_off: "00:30",
+  meal_count: 3,
+  breakfast_menu: "あり",
+  lunch_menu: "あり",
+  dinner_menu: "あり",
+  snack_menu: "なし",
+  food_dislike: "無",
+  allergy: "無",
+  alcohol: "無",
+  exercise_history: "無",
+  current_exercise: "無",
+  medical_history: "無",
+  condition: "良好",
+  diet_experience: "無",
+  concerns: ["全体"],
+  target_later: true
+};
+assert.throws(
+  () => context.validateDietCounselingAnswer_(Object.assign({}, conditionalBaseAnswers, {
+    exercise_history: "有",
+    exercise_history_detail: ""
+  })),
+  /運動経験の詳細/
+);
+assert.throws(
+  () => context.validateDietCounselingAnswer_(Object.assign({}, conditionalBaseAnswers, {
+    current_exercise: "有",
+    current_exercise_detail: ""
+  })),
+  /現在の運動内容・頻度・時間/
+);
+assert.throws(
+  () => context.validateDietCounselingAnswer_(Object.assign({}, conditionalBaseAnswers, {
+    medical_history: "有",
+    medical_history_detail: ""
+  })),
+  /既往症の詳細/
+);
 assert.equal(context.calculateDietCounselingSleepHours_("00:30", "06:30"), 6);
 assert.equal(context.calculateDietCounselingSleepHours_("23:30", "06:30"), 7);
 
