@@ -368,6 +368,9 @@ function doGet(e) {
           params
         );
 
+      case "getDietCounselingReservationStatus":
+        return getDietCounselingReservationStatus_(params);
+
       case "getDietCounselingFormContext":
         return getDietCounselingFormContext_(params);
 
