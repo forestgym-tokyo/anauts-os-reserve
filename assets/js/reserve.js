@@ -3,6 +3,10 @@ const DAYS = 7;
 const SERVICES_SESSION_CACHE_KEY = "anauts-reserve-services-v1";
 const SERVICES_SESSION_CACHE_MS = 5 * 60 * 1000;
 const TOUR_RANGE_TIMEOUT_MS = 45000;
+const DIET_COUNSELING_SUBMIT_DISPLAY_LIMIT_MS = 9000;
+const DIET_COUNSELING_CONFIRM_INITIAL_DELAY_MS = 250;
+const DIET_COUNSELING_CONFIRM_POLL_MS = 500;
+const DIET_COUNSELING_BACKGROUND_CONFIRM_LIMIT_MS = 60000;
 
 const ROUTES = {
   personal: {
@@ -1052,19 +1056,32 @@ async function getDietCounselingReservationStatus_(submissionKey) {
   }
 }
 
-async function waitForDietCounselingReservation_(submissionKey) {
-  await waitForDietCounseling_(1500);
-  for (let attempt = 0; attempt < 30; attempt += 1) {
+async function waitForDietCounselingReservation_(submissionKey, shouldStop) {
+  const backgroundDeadline = Date.now() + DIET_COUNSELING_BACKGROUND_CONFIRM_LIMIT_MS;
+  await waitForDietCounseling_(DIET_COUNSELING_CONFIRM_INITIAL_DELAY_MS);
+  while (!shouldStop() && Date.now() < backgroundDeadline) {
     const confirmed = await getDietCounselingReservationStatus_(submissionKey);
     if (confirmed) return confirmed;
-    await waitForDietCounseling_(1500);
+    await waitForDietCounseling_(DIET_COUNSELING_CONFIRM_POLL_MS);
   }
-  throw new Error(
-    "予約結果を確認できませんでした。ページを再読み込みせず、時間をおいてお問い合わせください。"
-  );
+  return null;
+}
+
+function createDietCounselingAcceptedReservation_(payload) {
+  return {
+    ok: true,
+    data: {
+      date: payload.date,
+      start_time: payload.start_time,
+      end_time: selectedSlot?.end_time || "",
+      reservation_id: "受付済み",
+      pending_confirmation: true
+    }
+  };
 }
 
 async function submitDietCounselingReservationWithConfirmation_(payload) {
+  let stopBackgroundConfirmation = false;
   const postOutcome = fetch(API_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -1073,19 +1090,32 @@ async function submitDietCounselingReservationWithConfirmation_(payload) {
     .then((response) => response.json())
     .then((result) => ({ type: "post", result }))
     .catch((error) => ({ type: "post-error", error }));
-  const statusOutcome = waitForDietCounselingReservation_(payload.submission_key)
+  const statusOutcome = waitForDietCounselingReservation_(
+    payload.submission_key,
+    () => stopBackgroundConfirmation
+  )
     .then((result) => ({ type: "status", result }))
     .catch((error) => ({ type: "status-error", error }));
+  const displayLimitOutcome = waitForDietCounseling_(DIET_COUNSELING_SUBMIT_DISPLAY_LIMIT_MS)
+    .then(() => ({ type: "display-limit" }));
 
-  const first = await Promise.race([postOutcome, statusOutcome]);
-  if (first.type === "status") return first.result;
-  if (first.type === "post") return first.result;
-  if (first.type === "post-error") {
-    const status = await statusOutcome;
-    if (status.type === "status") return status.result;
-    throw first.error;
+  const first = await Promise.race([postOutcome, statusOutcome, displayLimitOutcome]);
+  if (first.type === "status" && first.result) {
+    stopBackgroundConfirmation = true;
+    return first.result;
   }
-  throw first.error;
+  if (first.type === "post") {
+    stopBackgroundConfirmation = true;
+    return first.result;
+  }
+  if (first.type === "post-error") {
+    const recovery = await Promise.race([statusOutcome, displayLimitOutcome]);
+    if (recovery.type === "status" && recovery.result) {
+      stopBackgroundConfirmation = true;
+      return recovery.result;
+    }
+  }
+  return createDietCounselingAcceptedReservation_(payload);
 }
 
 async function submitReservation(event) {
