@@ -15,9 +15,17 @@ const DIET_COUNSELING_CONFIG_ = Object.freeze({
   TOKEN_SHEET_NAME: "回答URL管理",
   FORM_URL: "https://forestgym-tokyo.github.io/anauts-os-reserve/diet-counseling/",
   REPLY_TO: "info@theforestgym.com",
+  ADMIN_NOTIFICATION_EMAIL: "info@theforestgym.com",
   TOKEN_VALID_DAYS: 30,
+  ADMIN_VIEW_VALID_DAYS: 90,
+  ONLINE_ONLY_LOCATION_CODE: "ONLINE_ONLY",
+  ONLINE_ONLY_START_TIME: "19:00",
+  ONLINE_ONLY_LAST_START_TIME: "22:00",
+  ONLINE_ONLY_END_TIME: "23:00",
+  ONLINE_ONLY_INTERVAL_MINUTES: 30,
+  ONLINE_ONLY_TRAVEL_MINUTES: 150,
   TIMEZONE: "Asia/Tokyo",
-  FORM_VERSION: "1.2",
+  FORM_VERSION: "1.3",
   BULK_SEND_LIMIT: 50
 });
 
@@ -44,7 +52,9 @@ const DIET_COUNSELING_ANSWER_HEADERS_ = [
   "既往歴有無", "既往歴詳細", "現在の体調", "体調詳細", "ダイエット経験有無",
   "ダイエット期間・方法", "PDF処理状態", "PDFファイルID", "PDF_URL",
   "PDF作成日時", "エラー内容", "最終更新日時", "ダイエット経験時期",
-  "ダイエット方法", "ダイエット成果"
+  "ダイエット方法", "ダイエット成果", "管理閲覧トークンハッシュ",
+  "管理閲覧URL", "管理閲覧有効期限", "管理通知先", "管理通知状態",
+  "管理通知日時", "管理通知エラー"
 ];
 
 function isDietCounselingRequest_(params) {
@@ -114,7 +124,13 @@ function getDietCounselingAvailableSlotsRange_(params) {
 }
 
 function filterDietCounselingSlotData_(data, params, snapshot, service, method) {
-  const slots = Array.isArray(data && data.slots) ? data.slots : [];
+  const slots = mergeDietCounselingOnlineOnlySlots_(
+    Array.isArray(data && data.slots) ? data.slots : [],
+    data,
+    params,
+    service,
+    method
+  );
   const requestedStaffCode = normalizeDietCounselingCode_(params && params.staff_code);
   const filtered = [];
 
@@ -145,6 +161,52 @@ function filterDietCounselingSlotData_(data, params, snapshot, service, method) 
   return Object.assign({}, data || {}, {
     consultation_method: method,
     slots: filtered
+  });
+}
+
+function mergeDietCounselingOnlineOnlySlots_(slots, data, params, service, method) {
+  const merged = (slots || []).slice();
+  if (method !== "ONLINE") return merged;
+
+  const date = normalizeDietCounselingDate_(
+    (data && data.date) || (params && (params.date || params.start_date))
+  );
+  if (!date || !isDietCounselingOnlineOnlyWeekday_(date)) return merged;
+
+  const seen = {};
+  merged.forEach(function (slot) {
+    const slotDate = normalizeDietCounselingDate_(slot && (slot.date || date));
+    const slotStart = normalizeDietCounselingTime_(slot && slot.start_time);
+    if (slotDate && slotStart) seen[slotDate + " " + slotStart] = true;
+  });
+
+  const duration = Math.max(1, Number(service && service.duration) || 60);
+  const interval = Math.max(1, Number(DIET_COUNSELING_CONFIG_.ONLINE_ONLY_INTERVAL_MINUTES) || 30);
+  const firstStart = dietCounselingMinutes_(DIET_COUNSELING_CONFIG_.ONLINE_ONLY_START_TIME);
+  const lastStart = dietCounselingMinutes_(DIET_COUNSELING_CONFIG_.ONLINE_ONLY_LAST_START_TIME);
+  const dayEnd = dietCounselingMinutes_(DIET_COUNSELING_CONFIG_.ONLINE_ONLY_END_TIME);
+
+  for (let cursor = firstStart; cursor <= lastStart; cursor += interval) {
+    const endMinutes = cursor + duration;
+    if (endMinutes > dayEnd) continue;
+    const start = dietCounselingTimeFromMinutes_(cursor);
+    const end = dietCounselingTimeFromMinutes_(endMinutes);
+    const key = date + " " + start;
+    if (seen[key]) continue;
+    seen[key] = true;
+    merged.push({
+      date: date,
+      start_time: start,
+      end_time: end,
+      start_at: date + " " + start,
+      end_at: date + " " + end,
+      online_only: true
+    });
+  }
+
+  return merged.sort(function (a, b) {
+    return normalizeDietCounselingTime_(a && a.start_time)
+      .localeCompare(normalizeDietCounselingTime_(b && b.start_time));
   });
 }
 
@@ -295,6 +357,12 @@ function getDietCounselingAssignments_(
       })
       .map(function (shift) { return normalizeDietCounselingCode_(shift.store_code); }));
 
+    if (method === "ONLINE" && isDietCounselingOnlineOnlyAssignment_(
+      snapshot, staffCode, date, start, end
+    )) {
+      locations.push(DIET_COUNSELING_CONFIG_.ONLINE_ONLY_LOCATION_CODE);
+    }
+
     locations.forEach(function (locationCode) {
       assignments.push({
         staff_code: staffCode,
@@ -305,6 +373,44 @@ function getDietCounselingAssignments_(
   });
 
   return assignments;
+}
+
+function isDietCounselingOnlineOnlyAssignment_(snapshot, staffCode, date, start, end) {
+  if (!isDietCounselingOnlineOnlyWeekday_(date)) return false;
+
+  const startMinutes = dietCounselingMinutes_(start);
+  const endMinutes = dietCounselingMinutes_(end);
+  const firstStart = dietCounselingMinutes_(DIET_COUNSELING_CONFIG_.ONLINE_ONLY_START_TIME);
+  const lastStart = dietCounselingMinutes_(DIET_COUNSELING_CONFIG_.ONLINE_ONLY_LAST_START_TIME);
+  const dayEnd = dietCounselingMinutes_(DIET_COUNSELING_CONFIG_.ONLINE_ONLY_END_TIME);
+  if (
+    ![startMinutes, endMinutes, firstStart, lastStart, dayEnd].every(isFinite) ||
+    startMinutes < firstStart ||
+    startMinutes > lastStart ||
+    endMinutes > dayEnd
+  ) return false;
+
+  const shiftEnds = (snapshot.shifts || []).filter(function (shift) {
+    return isDietCounselingActive_(shift && shift.active) &&
+      normalizeDietCounselingCode_(shift && shift.staff_code) === staffCode &&
+      normalizeDietCounselingDate_(shift && shift.date) === date;
+  }).map(function (shift) {
+    return dietCounselingMinutes_(shift && shift.end_time);
+  }).filter(isFinite);
+
+  if (!shiftEnds.length) return false;
+  const latestShiftEnd = Math.max.apply(null, shiftEnds);
+  return startMinutes >= latestShiftEnd +
+    Number(DIET_COUNSELING_CONFIG_.ONLINE_ONLY_TRAVEL_MINUTES || 150);
+}
+
+function isDietCounselingOnlineOnlyWeekday_(dateText) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(normalizeDietCounselingDate_(dateText));
+  if (!match) return false;
+  const weekday = new Date(Date.UTC(
+    Number(match[1]), Number(match[2]) - 1, Number(match[3])
+  )).getUTCDay();
+  return weekday >= 1 && weekday <= 5;
 }
 
 function chooseDietCounselingAssignment_(assignments, reservations, date) {
@@ -583,9 +689,6 @@ function getDietCounselingFormContext_(params) {
     const record = tokenInfo.record;
     const submitted = normalizeDietCounselingText_(record["回答状態"]) === "回答済み";
     const answerId = normalizeDietCounselingText_(record["回答ID"]);
-    const printSheet = submitted && answerId
-      ? getDietCounselingPrintSheetByAnswerId_(answerId)
-      : null;
     return successResponse({
       reservation_id: normalizeDietCounselingText_(record["予約ID"]),
       counseling_date: normalizeDietCounselingDate_(record["カウンセリング日"]),
@@ -598,8 +701,7 @@ function getDietCounselingFormContext_(params) {
       consultation_method: normalizeDietCounselingText_(record["実施方法"]) || "ONLINE",
       expires_at: normalizeDietCounselingText_(record["有効期限"]),
       submitted: submitted,
-      answer_id: answerId,
-      print_sheet: printSheet
+      answer_id: answerId
     });
   } catch (error) {
     return errorResponse(
@@ -612,6 +714,9 @@ function getDietCounselingFormContext_(params) {
 function submitDietCounselingResponse_(body) {
   body = body || {};
   const lock = LockService.getScriptLock();
+  let answerSheet = null;
+  let answerHeaderMap = null;
+  let answerRowNumber = 0;
   try {
     lock.waitLock(15000);
     const tokenInfo = resolveDietCounselingToken_(body.token, false);
@@ -628,11 +733,21 @@ function submitDietCounselingResponse_(body) {
     const record = buildDietCounselingAnswerRecord_(
       answerId, now, tokenRecord, body.answers || {}
     );
-    const answerSheet = getDietCounselingAnswerSheet_();
-    const answerHeaderMap = getDietCounselingHeaderMap_(
+    const adminAccess = issueDietCounselingAdminView_(now);
+    Object.assign(record, {
+      "管理閲覧トークンハッシュ": adminAccess.tokenHash,
+      "管理閲覧URL": adminAccess.url,
+      "管理閲覧有効期限": formatDietCounselingStorageDateTime_(adminAccess.expiresAt),
+      "管理通知先": getDietCounselingAdminEmail_(),
+      "管理通知状態": "未送信",
+      "管理通知日時": "",
+      "管理通知エラー": ""
+    });
+    answerSheet = getDietCounselingAnswerSheet_();
+    answerHeaderMap = getDietCounselingHeaderMap_(
       answerSheet, DIET_COUNSELING_ANSWER_HEADERS_
     );
-    appendDietCounselingRecord_(answerSheet, answerHeaderMap, record);
+    answerRowNumber = appendDietCounselingRecord_(answerSheet, answerHeaderMap, record);
 
     updateDietCounselingLogFields_(tokenInfo.sheet, tokenInfo.headerMap, tokenInfo.rowNumber, {
       "回答状態": "回答済み",
@@ -643,10 +758,41 @@ function submitDietCounselingResponse_(body) {
     });
     lock.releaseLock();
 
+    let adminNotificationSent = false;
+    let adminNotificationWarning = "";
+    try {
+      sendDietCounselingAdminNotification_(record);
+      adminNotificationSent = true;
+      record["管理通知状態"] = "送信済み";
+      record["管理通知日時"] = formatDietCounselingStorageDateTime_(new Date());
+      record["管理通知エラー"] = "";
+    } catch (mailError) {
+      adminNotificationWarning = mailError && mailError.message
+        ? mailError.message
+        : "管理通知メールを送信できませんでした。";
+      record["管理通知状態"] = "送信失敗";
+      record["管理通知日時"] = "";
+      record["管理通知エラー"] = adminNotificationWarning;
+      console.error("sendDietCounselingAdminNotification_", mailError);
+    }
+    try {
+      writeDietCounselingRecordToRow_(
+        answerSheet, answerHeaderMap, answerRowNumber, {
+          "管理通知状態": record["管理通知状態"],
+          "管理通知日時": record["管理通知日時"],
+          "管理通知エラー": record["管理通知エラー"],
+          "最終更新日時": formatDietCounselingStorageDateTime_(new Date())
+        }
+      );
+    } catch (statusError) {
+      console.error("updateDietCounselingAdminNotificationStatus_", statusError);
+    }
+
     return successResponse({
       answer_id: answerId,
       submitted_at: formatDietCounselingDateTime_(now),
-      print_sheet: buildDietCounselingPrintSheetData_(record)
+      admin_notification_sent: adminNotificationSent,
+      admin_notification_warning: adminNotificationWarning
     });
   } catch (error) {
     try { lock.releaseLock(); } catch (_) {}
@@ -739,7 +885,7 @@ function buildDietCounselingAnswerRecord_(answerId, now, tokenRecord, answers) {
     "体調詳細": normalizeDietCounselingText_(answers.condition_detail),
     "ダイエット経験有無": normalizeDietCounselingText_(answers.diet_experience),
     "ダイエット期間・方法": dietExperienceDetail,
-    "PDF処理状態": "PDF不要（印刷画面）",
+    "PDF処理状態": "PDF不要（管理画面印刷）",
     "PDFファイルID": "",
     "PDF_URL": "",
     "PDF作成日時": "",
@@ -749,6 +895,155 @@ function buildDietCounselingAnswerRecord_(answerId, now, tokenRecord, answers) {
     "ダイエット方法": dietExperienceMethod,
     "ダイエット成果": dietExperienceResult
   };
+}
+
+function issueDietCounselingAdminView_(now) {
+  now = now || new Date();
+  const token = Utilities.getUuid().replace(/-/g, "") +
+    Utilities.getUuid().replace(/-/g, "");
+  const expiresAt = new Date(
+    now.getTime() + getDietCounselingAdminViewValidDays_() * 86400000
+  );
+  return {
+    tokenHash: hashDietCounselingToken_(token),
+    url: getDietCounselingFormUrl_() + "?view_token=" + encodeURIComponent(token),
+    expiresAt: expiresAt
+  };
+}
+
+function getDietCounselingStaffSheet_(params) {
+  try {
+    const token = normalizeDietCounselingText_(params && params.token);
+    if (!/^[a-f0-9]{64}$/i.test(token)) {
+      const invalid = new Error("管理者用URLが正しくありません。");
+      invalid.code = "INVALID_ADMIN_VIEW_TOKEN";
+      throw invalid;
+    }
+    const sheet = getDietCounselingAnswerSheet_();
+    const headerMap = getDietCounselingHeaderMap_(
+      sheet, DIET_COUNSELING_ANSWER_HEADERS_
+    );
+    const found = findDietCounselingLogRow_(
+      sheet, headerMap, "管理閲覧トークンハッシュ", hashDietCounselingToken_(token)
+    );
+    if (!found) {
+      const notFound = new Error("管理者用URLを確認できませんでした。");
+      notFound.code = "ADMIN_VIEW_TOKEN_NOT_FOUND";
+      throw notFound;
+    }
+    const expiresAt = parseDietCounselingDateTime_(found.record["管理閲覧有効期限"]);
+    if (!expiresAt || expiresAt.getTime() <= Date.now()) {
+      const expired = new Error("この管理者用URLの有効期限が切れています。");
+      expired.code = "ADMIN_VIEW_TOKEN_EXPIRED";
+      throw expired;
+    }
+    return successResponse(buildDietCounselingPrintSheetData_(found.record));
+  } catch (error) {
+    return errorResponse(
+      error && error.message ? error.message : "カウンセリングシートを確認できませんでした。",
+      error && error.code ? error.code : "ADMIN_VIEW_ERROR"
+    );
+  }
+}
+
+function sendDietCounselingAdminNotification_(record) {
+  record = record || {};
+  const to = normalizeDietCounselingText_(record["管理通知先"]) ||
+    getDietCounselingAdminEmail_();
+  if (!isDietCounselingEmail_(to)) {
+    throw new Error("管理通知先メールアドレスを確認してください。");
+  }
+  const viewUrl = normalizeDietCounselingText_(record["管理閲覧URL"]);
+  if (!viewUrl) throw new Error("管理者用閲覧URLを確認できませんでした。");
+  const name = normalizeDietCounselingText_(record["氏名"]) || "お客様";
+  const body = [
+    "ダイエットカウンセリングの事前回答が届きました。",
+    "",
+    "氏名：" + name + " 様",
+    "カウンセリング日：" + formatDietCounselingDateJa_(record["カウンセリング日"]),
+    "会員区分：" + normalizeDietCounselingText_(record["会員区分"]),
+    "担当：" + normalizeDietCounselingText_(record["担当者"]),
+    "回答ID：" + normalizeDietCounselingText_(record["回答ID"]),
+    "",
+    "【管理者用カウンセリングシート】",
+    viewUrl,
+    "",
+    "カウンセリング時にiPadで開き、会員様へお見せください。",
+    "印刷する場合はA4縦・片面1枚で出力されます。",
+    "※管理者専用URLです。お客様へ送信・転送しないでください。"
+  ].join("\n");
+  MailApp.sendEmail({
+    to: to,
+    subject: "【ダイエットカウンセリング】事前回答完了：" + name + " 様",
+    body: body,
+    name: "Diet Counseling",
+    replyTo: getDietCounselingReplyTo_()
+  });
+  return { sent: true, to: to };
+}
+
+function backfillDietCounselingAdminViewLinks_() {
+  const sheet = getDietCounselingAnswerSheet_();
+  const headerMap = getDietCounselingHeaderMap_(
+    sheet, DIET_COUNSELING_ANSWER_HEADERS_
+  );
+  const summary = { processed: 0, links_created: 0, mails_sent: 0, skipped: 0, failed: 0 };
+  if (sheet.getLastRow() < 2) return summary;
+
+  const rows = sheet.getRange(
+    2, 1, sheet.getLastRow() - 1, headerMap.columnCount
+  ).getValues();
+  rows.forEach(function (values, offset) {
+    const record = {};
+    headerMap.headers.forEach(function (header, index) {
+      if (header) record[header] = values[index];
+    });
+    if (!normalizeDietCounselingText_(record["回答ID"])) {
+      summary.skipped += 1;
+      return;
+    }
+    summary.processed += 1;
+    const rowNumber = offset + 2;
+    let linkCreated = false;
+    const currentExpiry = parseDietCounselingDateTime_(record["管理閲覧有効期限"]);
+    if (!normalizeDietCounselingText_(record["管理閲覧URL"]) ||
+        !normalizeDietCounselingText_(record["管理閲覧トークンハッシュ"]) ||
+        !currentExpiry || currentExpiry.getTime() <= Date.now()) {
+      const access = issueDietCounselingAdminView_(new Date());
+      record["管理閲覧トークンハッシュ"] = access.tokenHash;
+      record["管理閲覧URL"] = access.url;
+      record["管理閲覧有効期限"] = formatDietCounselingStorageDateTime_(access.expiresAt);
+      linkCreated = true;
+      summary.links_created += 1;
+    }
+    record["管理通知先"] = normalizeDietCounselingText_(record["管理通知先"]) ||
+      getDietCounselingAdminEmail_();
+    record["PDF処理状態"] = "PDF不要（管理画面印刷）";
+    record["最終更新日時"] = formatDietCounselingStorageDateTime_(new Date());
+
+    const shouldSend = linkCreated ||
+      normalizeDietCounselingText_(record["管理通知状態"]) !== "送信済み";
+    if (shouldSend) {
+      try {
+        sendDietCounselingAdminNotification_(record);
+        record["管理通知状態"] = "送信済み";
+        record["管理通知日時"] = formatDietCounselingStorageDateTime_(new Date());
+        record["管理通知エラー"] = "";
+        summary.mails_sent += 1;
+      } catch (error) {
+        record["管理通知状態"] = "送信失敗";
+        record["管理通知日時"] = "";
+        record["管理通知エラー"] = error && error.message
+          ? error.message : "管理通知メールを送信できませんでした。";
+        summary.failed += 1;
+      }
+    } else {
+      summary.skipped += 1;
+    }
+    writeDietCounselingRecordToRow_(sheet, headerMap, rowNumber, record);
+  });
+  console.log(JSON.stringify(summary));
+  return summary;
 }
 
 function getDietCounselingPrintSheetByAnswerId_(answerId) {
@@ -769,11 +1064,11 @@ function getDietCounselingPrintSheetByAnswerId_(answerId) {
   if (!status || status === "未作成") {
     const now = formatDietCounselingStorageDateTime_(new Date());
     writeDietCounselingRecordToRow_(sheet, headerMap, found.rowNumber, {
-      "PDF処理状態": "PDF不要（印刷画面）",
+      "PDF処理状態": "PDF不要（管理画面印刷）",
       "エラー内容": "",
       "最終更新日時": now
     });
-    found.record["PDF処理状態"] = "PDF不要（印刷画面）";
+    found.record["PDF処理状態"] = "PDF不要（管理画面印刷）";
     found.record["最終更新日時"] = now;
   }
   return buildDietCounselingPrintSheetData_(found.record);
@@ -948,7 +1243,25 @@ function getDietCounselingAnswerSheet_() {
   const ss = SpreadsheetApp.openById(getDietCounselingAnswerSpreadsheetId_());
   const sheet = ss.getSheetByName(DIET_COUNSELING_CONFIG_.ANSWER_SHEET_NAME);
   if (!sheet) throw new Error("回答データシートが見つかりません。");
+  ensureDietCounselingAnswerHeaders_(sheet);
   return sheet;
+}
+
+function ensureDietCounselingAnswerHeaders_(sheet) {
+  const lastColumn = Math.max(1, sheet.getLastColumn());
+  const headers = sheet.getRange(1, 1, 1, lastColumn).getDisplayValues()[0]
+    .map(normalizeDietCounselingText_);
+  const existing = {};
+  headers.forEach(function (header) {
+    if (header) existing[header] = true;
+  });
+  const missing = DIET_COUNSELING_ANSWER_HEADERS_.filter(function (header) {
+    return !existing[header];
+  });
+  if (missing.length) {
+    sheet.getRange(1, lastColumn + 1, 1, missing.length).setValues([missing]);
+  }
+  return missing;
 }
 
 function getOrCreateDietCounselingTokenSheet_() {
@@ -1163,6 +1476,22 @@ function getDietCounselingReplyTo_() {
   );
 }
 
+function getDietCounselingAdminEmail_() {
+  return getDietCounselingHeaderProperty_(
+    "DIET_COUNSELING_ADMIN_EMAIL",
+    DIET_COUNSELING_CONFIG_.ADMIN_NOTIFICATION_EMAIL
+  );
+}
+
+function getDietCounselingAdminViewValidDays_() {
+  const value = Number(getDietCounselingHeaderProperty_(
+    "DIET_COUNSELING_ADMIN_VIEW_VALID_DAYS",
+    String(DIET_COUNSELING_CONFIG_.ADMIN_VIEW_VALID_DAYS)
+  ));
+  return isFinite(value) && value >= 1 && value <= 365
+    ? Math.floor(value) : DIET_COUNSELING_CONFIG_.ADMIN_VIEW_VALID_DAYS;
+}
+
 function getDietCounselingTokenValidDays_() {
   const value = Number(getDietCounselingHeaderProperty_(
     "DIET_COUNSELING_TOKEN_VALID_DAYS",
@@ -1241,6 +1570,9 @@ function normalizeDietCounselingMethodForDisplay_(value) {
 }
 
 function getDietCounselingLocationLabel_(code) {
+  if (normalizeDietCounselingCode_(code) === DIET_COUNSELING_CONFIG_.ONLINE_ONLY_LOCATION_CODE) {
+    return "ONLINE専用";
+  }
   return normalizeDietCounselingCode_(code) === getDietCounselingOfficeStoreCode_()
     ? "本社事務所" : "対面会場";
 }
@@ -1325,8 +1657,14 @@ function dietCounselingMinutes_(value) {
 function addDietCounselingMinutes_(value, added) {
   const start = dietCounselingMinutes_(value);
   if (!isFinite(start) || !isFinite(Number(added))) return "";
-  const total = start + Number(added);
-  return String(Math.floor(total / 60)).padStart(2, "0") + ":" + String(total % 60).padStart(2, "0");
+  return dietCounselingTimeFromMinutes_(start + Number(added));
+}
+
+function dietCounselingTimeFromMinutes_(value) {
+  const total = Number(value);
+  if (!isFinite(total) || total < 0) return "";
+  return String(Math.floor(total / 60)).padStart(2, "0") + ":" +
+    String(total % 60).padStart(2, "0");
 }
 
 function dietCounselingCovers_(shiftStart, shiftEnd, slotStart, slotEnd) {
