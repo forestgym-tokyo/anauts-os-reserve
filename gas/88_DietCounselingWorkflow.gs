@@ -172,7 +172,7 @@ function createDietCounselingReservation_(params) {
       return errorResponse(
         method === "ONLINE"
           ? "この時間はONLINE対応できる担当者が不在です。空き状況を更新してください。"
-          : "この時間はThe Forest Gymで対面対応できる担当者が不在です。空き状況を更新してください。",
+          : "この時間は対面対応できる担当者が不在です。空き状況を更新してください。",
         "SLOT_NOT_AVAILABLE",
         { service_code: DIET_COUNSELING_CONFIG_.SERVICE_CODE, consultation_method: method }
       );
@@ -466,7 +466,7 @@ function sendDietCounselingAnswerUrlForReservation_(reservation, options) {
   const body = [
     name + " 様",
     "",
-    "The Forest Gymです。",
+    "ダイエットカウンセリング事務局です。",
     "ダイエットカウンセリングのお申込みありがとうございます。",
     "カウンセリング前に、以下の専用URLから事前回答をお願いいたします。",
     "",
@@ -480,15 +480,15 @@ function sendDietCounselingAnswerUrlForReservation_(reservation, options) {
     "",
     "お問い合わせ：" + getDietCounselingReplyTo_(),
     "",
-    "The Forest Gym"
+    "ダイエットカウンセリング事務局"
   ].join("\n");
 
   try {
     MailApp.sendEmail({
       to: email,
-      subject: "【The Forest Gym】ダイエットカウンセリング事前回答のお願い",
+      subject: "【ダイエットカウンセリング】事前回答のお願い",
       body: body,
-      name: "The Forest Gym",
+      name: "ダイエットカウンセリング事務局",
       replyTo: getDietCounselingReplyTo_()
     });
     markDietCounselingLinkSent_(linkRecord.sheet, linkRecord.rowNumber, "");
@@ -745,6 +745,12 @@ function validateDietCounselingAnswer_(answers) {
       throw error;
     }
   });
+  const gender = normalizeDietCounselingText_(answers.gender);
+  if (["男性", "女性"].indexOf(gender) < 0) {
+    const error = new Error("性別は男性または女性を選択してください。");
+    error.code = "INVALID_GENDER";
+    throw error;
+  }
   if (!dietCounselingListText_(answers.concerns)) {
     const error = new Error("気になる部位を1つ以上選択してください。");
     error.code = "CONCERNS_REQUIRED";
@@ -788,7 +794,7 @@ function resolveDietCounselingToken_(token, allowSubmitted) {
   }
   const expiresAt = parseDietCounselingDateTime_(found.record["有効期限"]);
   if (!expiresAt || expiresAt.getTime() <= Date.now()) {
-    const expired = new Error("この専用URLの有効期限が切れています。The Forest Gymへお問い合わせください。");
+    const expired = new Error("この専用URLの有効期限が切れています。お申込み先へお問い合わせください。");
     expired.code = "TOKEN_EXPIRED";
     throw expired;
   }
@@ -1104,7 +1110,7 @@ function normalizeDietCounselingMethodForDisplay_(value) {
 
 function getDietCounselingLocationLabel_(code) {
   return normalizeDietCounselingCode_(code) === getDietCounselingOfficeStoreCode_()
-    ? "本社事務所" : "The Forest Gym";
+    ? "本社事務所" : "対面会場";
 }
 
 function dietCounselingListText_(value) {
