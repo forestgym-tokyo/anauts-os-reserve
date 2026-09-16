@@ -241,42 +241,63 @@
     return null;
   }
 
-  async function waitForSubmittedDietCounselingContext_() {
-    await waitForSubmission_(1500);
-    for (let attempt = 0; attempt < 30; attempt += 1) {
+  const SUBMIT_DISPLAY_LIMIT_MS = 9000;
+  const SUBMIT_CONFIRM_INITIAL_DELAY_MS = 250;
+  const SUBMIT_CONFIRM_POLL_MS = 500;
+  const BACKGROUND_CONFIRM_LIMIT_MS = 60000;
+
+  async function waitForSubmittedDietCounselingContext_(shouldStop) {
+    const backgroundDeadline = Date.now() + BACKGROUND_CONFIRM_LIMIT_MS;
+    await waitForSubmission_(SUBMIT_CONFIRM_INITIAL_DELAY_MS);
+    while (!shouldStop() && Date.now() < backgroundDeadline) {
       const confirmed = await getSubmittedDietCounselingContext_();
       if (confirmed) return confirmed;
-      await waitForSubmission_(1500);
+      await waitForSubmission_(SUBMIT_CONFIRM_POLL_MS);
     }
-    throw new Error(
-      "送信結果を確認できませんでした。専用URLを再読み込みして送信状況をご確認ください。"
-    );
+    return null;
   }
 
   async function submitDietCounselingWithConfirmation_(payload) {
+    let stopBackgroundConfirmation = false;
     const postOutcome = apiPost(payload)
       .then((result) => ({ type: "post", result }))
       .catch((error) => ({ type: "post-error", error }));
-    const statusOutcome = waitForSubmittedDietCounselingContext_()
+    const statusOutcome = waitForSubmittedDietCounselingContext_(
+      () => stopBackgroundConfirmation
+    )
       .then((result) => ({ type: "status", result }))
       .catch((error) => ({ type: "status-error", error }));
+    const displayLimitOutcome = waitForSubmission_(SUBMIT_DISPLAY_LIMIT_MS)
+      .then(() => ({ type: "display-limit" }));
 
-    const first = await Promise.race([postOutcome, statusOutcome]);
-    if (first.type === "status") return first.result;
+    const first = await Promise.race([postOutcome, statusOutcome, displayLimitOutcome]);
+    if (first.type === "status" && first.result) {
+      stopBackgroundConfirmation = true;
+      return first.result;
+    }
     if (first.type === "post") {
-      if (first.result?.ok === true) return first.result;
-      if (first.result?.code === "ALREADY_SUBMITTED") {
-        const confirmed = await getSubmittedDietCounselingContext_();
-        if (confirmed) return confirmed;
+      if (first.result?.ok === true) {
+        stopBackgroundConfirmation = true;
+        return first.result;
       }
+      if (first.result?.code === "ALREADY_SUBMITTED") {
+        stopBackgroundConfirmation = true;
+        return { ok: true, data: { answer_id: "" } };
+      }
+      stopBackgroundConfirmation = true;
       return first.result;
     }
     if (first.type === "post-error") {
-      const status = await statusOutcome;
-      if (status.type === "status") return status.result;
-      throw first.error;
+      const recovery = await Promise.race([statusOutcome, displayLimitOutcome]);
+      if (recovery.type === "status" && recovery.result) {
+        stopBackgroundConfirmation = true;
+        return recovery.result;
+      }
     }
-    throw first.error;
+    return {
+      ok: true,
+      data: { answer_id: "", pending_confirmation: true }
+    };
   }
 
   function formatReservationDate(value, time) {
