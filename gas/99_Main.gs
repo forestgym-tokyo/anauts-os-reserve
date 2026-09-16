@@ -435,17 +435,23 @@ function doPost(e) {
 
       case "updateReservation":
         return invalidateStoreAwareAfterMutation_(
-          updateReservation(body)
+          updateReservation(body),
+          false,
+          body
         );
 
       case "reassignReservationStaff":
         return invalidateStoreAwareAfterMutation_(
-          reassignReservationStaff(body)
+          reassignReservationStaff(body),
+          false,
+          body
         );
 
       case "reassignInvalidReservations":
         return invalidateStoreAwareAfterMutation_(
-          reassignInvalidReservations(body)
+          reassignInvalidReservations(body),
+          false,
+          body
         );
 
       /*
@@ -469,12 +475,16 @@ function doPost(e) {
 
       case "cancelReservation":
         return invalidateStoreAwareAfterMutation_(
-          cancelReservation(body)
+          cancelReservation(body),
+          false,
+          body
         );
 
       case "restoreConsumedReservation":
         return invalidateStoreAwareAfterMutation_(
-          restoreConsumedReservation(body)
+          restoreConsumedReservation(body),
+          false,
+          body
         );
 
       case "createShiftChangeRequest": {
@@ -498,17 +508,23 @@ function doPost(e) {
 
       case "saveStaffPresenceWeekdays":
         return invalidateStoreAwareAfterMutation_(
-          saveStaffPresenceWeekdays(body)
+          saveStaffPresenceWeekdays(body),
+          false,
+          body
         );
 
       case "saveStaffPresenceSpecial":
         return invalidateStoreAwareAfterMutation_(
-          saveStaffPresenceSpecial(body)
+          saveStaffPresenceSpecial(body),
+          false,
+          body
         );
 
       case "deleteStaffPresenceSpecial":
         return invalidateStoreAwareAfterMutation_(
-          deleteStaffPresenceSpecial(body)
+          deleteStaffPresenceSpecial(body),
+          false,
+          body
         );
 
       case "saveStaff":
@@ -517,7 +533,8 @@ function doPost(e) {
         );
         return invalidateStoreAwareAfterMutation_(
           saveStaff(body),
-          true
+          true,
+          body
         );
 
       case "setStaffActive":
@@ -526,7 +543,8 @@ function doPost(e) {
         );
         return invalidateStoreAwareAfterMutation_(
           setStaffActive(body),
-          true
+          true,
+          body
         );
 
       case "saveService":
@@ -535,7 +553,8 @@ function doPost(e) {
         );
         return invalidateStoreAwareAfterMutation_(
           saveService(body),
-          true
+          true,
+          body
         );
 
       case "setServiceActive":
@@ -544,7 +563,8 @@ function doPost(e) {
         );
         return invalidateStoreAwareAfterMutation_(
           setServiceActive(body),
-          true
+          true,
+          body
         );
 
       case "saveStaffShift":
@@ -552,7 +572,9 @@ function doPost(e) {
           body
         );
         return invalidateStoreAwareAfterMutation_(
-          saveStaffShift(body)
+          saveStaffShift(body),
+          false,
+          body
         );
 
       case "deleteStaffShift":
@@ -560,7 +582,9 @@ function doPost(e) {
           body
         );
         return invalidateStoreAwareAfterMutation_(
-          deleteStaffShift(body)
+          deleteStaffShift(body),
+          false,
+          body
         );
 
       case "previewStaffShiftImport":
@@ -576,7 +600,9 @@ function doPost(e) {
           body
         );
         return invalidateStoreAwareAfterMutation_(
-          importStaffShifts(body)
+          importStaffShifts(body),
+          false,
+          body
         );
 
       case "saveServiceHour":
@@ -584,7 +610,9 @@ function doPost(e) {
           body
         );
         return invalidateStoreAwareAfterMutation_(
-          saveServiceHour(body)
+          saveServiceHour(body),
+          false,
+          body
         );
 
       case "deleteServiceHour":
@@ -592,7 +620,9 @@ function doPost(e) {
           body
         );
         return invalidateStoreAwareAfterMutation_(
-          deleteServiceHour(body)
+          deleteServiceHour(body),
+          false,
+          body
         );
 
       case "saveDailyReport": {

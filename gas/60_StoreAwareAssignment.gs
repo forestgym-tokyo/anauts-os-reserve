@@ -22,6 +22,9 @@ const STORE_AWARE_MAX_SCOPE_DAYS_ = 31;
 const TOUR_WEEK_BULK_ENABLED_ = true;
 const TOUR_WEEK_BULK_SERVICE_CODE_ = "TOUR";
 const TOUR_WEEK_BULK_CACHE_VERSION_ = "tour-week-bulk-v3";
+const TOUR_WEEK_GENERATION_CACHE_KEY_ = "tour-week-generation-v1";
+const TOUR_WEEK_GENERATION_PROPERTY_ = "tour-week-generation-v1";
+const TOUR_WEEK_GENERATION_CACHE_SECONDS_ = 21600;
 const TOUR_WEEK_BULK_CACHE_SECONDS_ = 300;
 const TOUR_WEEK_BULK_STALE_CACHE_SECONDS_ = 21600;
 const TOUR_WEEK_BULK_INFLIGHT_SECONDS_ = 420;
@@ -121,6 +124,8 @@ function shouldUseTourWeekBulk_(params) {
 
 function getTourAvailableSlotsRangeBulk_(params) {
   params = params || {};
+  const requestStartedAt = new Date().getTime();
+  const timings = {};
 
   const startDate = normalizeStoreAwareDate_(params.start_date || params.date);
   const requestedDays = Number(params.days || 7);
@@ -135,24 +140,42 @@ function getTourAvailableSlotsRangeBulk_(params) {
   }
 
   const cacheKey = buildTourWeekCacheKey_(startDate, days);
-  const cached = getTourWeekCache_(cacheKey);
-  if (cached) return successResponse(cached);
+  const cached = measureTourWeekStep_(timings, "cache_read", function() {
+    return getTourWeekCache_(cacheKey);
+  });
+  if (cached) {
+    return successResponse(addTourWeekDiagnostics_(
+      cached,
+      "hit",
+      requestStartedAt,
+      timings
+    ));
+  }
 
   // CacheServiceには原子的な「未設定なら追加」がないため、短時間だけ
   // ScriptLockを使って同じ週の計算権を1実行だけに限定する。
   // 重いシート・カレンダー取得中はロックを保持せず、他機能を塞がない。
   if (!claimTourWeekCalculation_(cacheKey)) {
     const completed = getTourWeekCache_(cacheKey);
-    if (completed) return successResponse(completed);
+    if (completed) {
+      return successResponse(addTourWeekDiagnostics_(
+        completed,
+        "hit_after_wait",
+        requestStartedAt,
+        timings
+      ));
+    }
 
     // 予約確定時には最新状態を再検証するため、計算中だけ直近の正常結果を
     // 表示用に返し、同じ重い計算が並列に増えることを防ぐ。
     const stale = getTourWeekCache_(buildTourWeekStaleCacheKey_(cacheKey));
     if (stale) {
-      return successResponse(Object.assign({}, stale, {
-        cache_status: "stale",
-        refreshing: true
-      }));
+      return successResponse(addTourWeekDiagnostics_(
+        Object.assign({}, stale, { refreshing: true }),
+        "stale",
+        requestStartedAt,
+        timings
+      ));
     }
 
     return errorResponse(
@@ -165,9 +188,18 @@ function getTourAvailableSlotsRangeBulk_(params) {
   try {
     // 計算権の取得直前に別実行が完了している可能性があるため再確認する。
     const completed = getTourWeekCache_(cacheKey);
-    if (completed) return successResponse(completed);
+    if (completed) {
+      return successResponse(addTourWeekDiagnostics_(
+        completed,
+        "hit_after_claim",
+        requestStartedAt,
+        timings
+      ));
+    }
 
-    const services = readTourWeekRows_("services");
+    const services = measureTourWeekStep_(timings, "services", function() {
+      return readTourWeekRows_("services");
+    });
     const service = services.find(function(row) {
       return normalizeStoreAwareCode_(row && row.service_code) ===
         TOUR_WEEK_BULK_SERVICE_CODE_;
@@ -197,12 +229,16 @@ function getTourAvailableSlotsRangeBulk_(params) {
   const wantedDates = {};
   dates.forEach(function(date) { wantedDates[date] = true; });
 
-  const serviceHours = readTourWeekRows_("service_hours").filter(function(row) {
+  const serviceHours = measureTourWeekStep_(timings, "service_hours", function() {
+    return readTourWeekRows_("service_hours");
+  }).filter(function(row) {
     return normalizeStoreAwareCode_(row && row.service_code) ===
       TOUR_WEEK_BULK_SERVICE_CODE_ &&
       isStoreAwareActive_(row && row.active);
   });
-  const staffRows = readTourWeekRows_("staff").filter(function(row) {
+  const staffRows = measureTourWeekStep_(timings, "staff", function() {
+    return readTourWeekRows_("staff");
+  }).filter(function(row) {
     if (!isStoreAwareActive_(row && row.active)) return false;
     if (!isStoreAwareRoleAllowed_(row, service)) return false;
     return isStoreAwareServiceAllowed_(row, service);
@@ -213,7 +249,9 @@ function getTourAvailableSlotsRangeBulk_(params) {
     if (code) staffByCode[code] = staff;
   });
 
-  const shifts = readTourWeekRows_("staff_shifts").filter(function(row) {
+  const shifts = measureTourWeekStep_(timings, "staff_shifts", function() {
+    return readTourWeekRows_("staff_shifts");
+  }).filter(function(row) {
     const date = normalizeStoreAwareDate_(row && row.date);
     const staffCode = normalizeStoreAwareCode_(row && row.staff_code);
     return wantedDates[date] === true &&
@@ -221,14 +259,18 @@ function getTourAvailableSlotsRangeBulk_(params) {
       isStoreAwareActive_(row && row.active) &&
       !!staffByCode[staffCode];
   });
-  const reservations = readTourWeekRows_("reservations").filter(function(row) {
+  const reservations = measureTourWeekStep_(timings, "reservations", function() {
+    return readTourWeekRows_("reservations");
+  }).filter(function(row) {
     const date = normalizeStoreAwareDate_(
       row && (row.reservation_date || row.date)
     );
     return wantedDates[date] === true && isStoreAwareActiveReservation_(row);
   });
 
-  const calendarState = loadTourWeekCalendar_(service, dates);
+  const calendarState = measureTourWeekStep_(timings, "calendar", function() {
+    return loadTourWeekCalendar_(service, dates);
+  });
   const now = new Date();
   const bookingOpenAt = new Date(
     now.getTime() + bookingMinHours * 60 * 60 * 1000
@@ -274,7 +316,12 @@ function getTourAvailableSlotsRangeBulk_(params) {
       data,
       TOUR_WEEK_BULK_STALE_CACHE_SECONDS_
     );
-    return successResponse(data);
+    return successResponse(addTourWeekDiagnostics_(
+      data,
+      "miss",
+      requestStartedAt,
+      timings
+    ));
   } finally {
     releaseTourWeekCalculation_(cacheKey);
   }
@@ -551,13 +598,115 @@ function makeTourWeekDateTime_(dateText, timeText) {
 function buildTourWeekCacheKey_(startDate, days) {
   return [
     TOUR_WEEK_BULK_CACHE_VERSION_,
-    typeof getStoreAwareCacheGeneration_ === "function"
-      ? getStoreAwareCacheGeneration_()
-      : "0",
+    getTourWeekCacheGeneration_(),
     TOUR_WEEK_BULK_SERVICE_CODE_,
     normalizeStoreAwareDate_(startDate),
     Number(days || 7)
   ].join(":");
+}
+
+
+function measureTourWeekStep_(timings, name, callback) {
+  const startedAt = new Date().getTime();
+  try {
+    return callback();
+  } finally {
+    timings[name] = new Date().getTime() - startedAt;
+  }
+}
+
+
+function addTourWeekDiagnostics_(data, cacheStatus, requestStartedAt, timings) {
+  return Object.assign({}, data || {}, {
+    cache_status: cacheStatus,
+    server_elapsed_ms: new Date().getTime() - requestStartedAt,
+    timings_ms: Object.assign({}, timings || {})
+  });
+}
+
+
+function getTourWeekCacheGeneration_() {
+  try {
+    const cache = CacheService.getScriptCache();
+    const cached = cache.get(TOUR_WEEK_GENERATION_CACHE_KEY_);
+    if (cached) return normalizeStoreAwareText_(cached);
+  } catch (_) {
+    // PropertiesServiceへフォールバックする。
+  }
+
+  let generation = "0";
+  try {
+    generation = normalizeStoreAwareText_(
+      PropertiesService.getScriptProperties().getProperty(
+        TOUR_WEEK_GENERATION_PROPERTY_
+      )
+    ) || "0";
+  } catch (_) {
+    // PropertiesServiceが利用できない場合も既定世代で継続する。
+  }
+
+  try {
+    CacheService.getScriptCache().put(
+      TOUR_WEEK_GENERATION_CACHE_KEY_,
+      generation,
+      TOUR_WEEK_GENERATION_CACHE_SECONDS_
+    );
+  } catch (_) {
+    // 世代番号の短期キャッシュ失敗は空き枠取得へ影響させない。
+  }
+  return generation;
+}
+
+
+function bumpTourWeekCacheGeneration_() {
+  const generation = [
+    new Date().getTime().toString(36),
+    Math.random().toString(36).slice(2, 8)
+  ].join("-");
+
+  try {
+    PropertiesService.getScriptProperties().setProperty(
+      TOUR_WEEK_GENERATION_PROPERTY_,
+      generation
+    );
+  } catch (_) {
+    // CacheService側だけでも旧世代を参照しない。
+  }
+  try {
+    CacheService.getScriptCache().put(
+      TOUR_WEEK_GENERATION_CACHE_KEY_,
+      generation,
+      TOUR_WEEK_GENERATION_CACHE_SECONDS_
+    );
+  } catch (_) {
+    // キャッシュ不可でも予約処理は継続する。
+  }
+  return generation;
+}
+
+
+function shouldInvalidateTourWeekCache_(params) {
+  params = params || {};
+  const serviceCode = normalizeStoreAwareCode_(params.service_code);
+  const storeCode = normalizeStoreAwareCode_(params.store_code);
+
+  if (storeCode) return storeCode === "YACHIYO";
+  if (serviceCode === TOUR_WEEK_BULK_SERVICE_CODE_) return true;
+
+  let serialized = "";
+  try {
+    serialized = JSON.stringify(params).toUpperCase();
+  } catch (_) {
+    return true;
+  }
+  if (serialized.indexOf("TOUR") >= 0 || serialized.indexOf("YACHIYO") >= 0) {
+    return true;
+  }
+  if (serialized.indexOf("SOGA") >= 0) return false;
+
+  // 店舗を特定できない予約変更・取消は、同一スタッフやカレンダー予定が
+  // TOUR枠へ影響する可能性があるため、安全側で無効化する。
+  return true;
 }
 
 
@@ -843,7 +992,12 @@ function createReservationStoreAwareImpl_(params) {
 
   const result = createReservationWithTrainerPolicy_(safeParams);
   const created = parseStoreAwareResponse_(result);
-  if (created && created.ok === true) clearStoreAwareSnapshotCache_();
+  if (created && created.ok === true) {
+    clearStoreAwareSnapshotCache_();
+    if (serviceCode === TOUR_WEEK_BULK_SERVICE_CODE_) {
+      bumpTourWeekCacheGeneration_();
+    }
+  }
   return result;
 }
 
@@ -1270,8 +1424,11 @@ function clearStoreAwareSnapshotCache_(clearStatic) {
 }
 
 
-function invalidateStoreAwareAfterMutation_(response, clearStatic) {
+function invalidateStoreAwareAfterMutation_(response, clearStatic, params) {
   clearStoreAwareSnapshotCache_(clearStatic === true);
+  if (shouldInvalidateTourWeekCache_(params)) {
+    bumpTourWeekCacheGeneration_();
+  }
   return response;
 }
 
