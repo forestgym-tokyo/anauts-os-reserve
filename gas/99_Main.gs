@@ -344,8 +344,7 @@ function doGet(e) {
         if (isDietCounselingRequest_(params)) {
           return getDietCounselingAvailableSlots_(params);
         }
-        return applyPersonalPreviousDayCutoffToAvailability_(
-          getAvailableSlotsStoreAware_(params),
+        return getAvailableSlotsStoreAware_(
           params
         );
 
@@ -353,8 +352,7 @@ function doGet(e) {
         if (isDietCounselingRequest_(params)) {
           return getDietCounselingAvailableSlotsRange_(params);
         }
-        return applyPersonalPreviousDayCutoffToAvailability_(
-          getAvailableSlotsRangeStoreAware_(params),
+        return getAvailableSlotsRangeStoreAware_(
           params
         );
 
@@ -448,8 +446,6 @@ function doPost(e) {
         if (isDietCounselingRequest_(body)) {
           return createDietCounselingReservation_(body);
         }
-        const personalCutoffError = validatePersonalPreviousDayBookingCutoff_(body);
-        if (personalCutoffError) return personalCutoffError;
         return createReservationStoreAware_(
           body
         );
