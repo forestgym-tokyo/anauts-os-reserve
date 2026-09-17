@@ -33,13 +33,17 @@ const dietCounselingRouteIndex = main.indexOf(
   "if (isDietCounselingRequest_(body))",
   createReservationCaseIndex
 );
-const personalCutoffRouteIndex = main.indexOf(
-  "const personalCutoffError = validatePersonalPreviousDayBookingCutoff_(body)",
+const normalReservationRouteIndex = main.indexOf(
+  "return createReservationStoreAware_(",
   createReservationCaseIndex
 );
 assert.ok(createReservationCaseIndex >= 0);
 assert.ok(dietCounselingRouteIndex > createReservationCaseIndex);
-assert.ok(personalCutoffRouteIndex > dietCounselingRouteIndex);
+assert.ok(normalReservationRouteIndex > dietCounselingRouteIndex);
+assert.match(main, /return getAvailableSlotsStoreAware_\(\s*params\s*\)/);
+assert.match(main, /return getAvailableSlotsRangeStoreAware_\(\s*params\s*\)/);
+assert.doesNotMatch(main, /applyPersonalPreviousDayCutoffToAvailability_/);
+assert.doesNotMatch(main, /validatePersonalPreviousDayBookingCutoff_/);
 assert.match(main, /getDietCounselingFormContext_\(params\)/);
 assert.match(main, /getDietCounselingReservationStatus_\(params\)/);
 assert.match(main, /getDietCounselingStaffSheet_\(params\)/);
