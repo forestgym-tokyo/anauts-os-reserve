@@ -19,7 +19,7 @@ function requireDirectShiftEditPermission_(params) {
 }
 
 /**
- * SOGA所属の一般スタッフは「自分のシフト」と「9ROUND予定」だけを使う。
+ * SOGA所属の一般スタッフは「自分のシフト」「9ROUND予定」「希望提出」だけを使う。
  * 画面を隠すだけでなく、対象外の管理APIもここで拒否する。
  */
 function requireNonRestrictedAdminFeature_(params, allowedPermissions) {
@@ -30,7 +30,7 @@ function requireNonRestrictedAdminFeature_(params, allowedPermissions) {
 
   if (isRestrictedSogaStaff_(auth)) {
     throw new Error(
-      "9ROUNDスタッフは、自分のシフトと9ROUND予定だけ利用できます。"
+      "9ROUNDスタッフは、自分のシフト・9ROUND予定・希望提出だけ利用できます。"
     );
   }
 
@@ -100,26 +100,33 @@ function filterSogaShiftRows_(rows, requestedStaffCode, auth) {
 }
 
 function getStaffShiftsForSignedInUser_(params, auth) {
-  if (!isRestrictedSogaStaff_(auth)) return getStaffShifts(params);
+  let safeParams = params || {};
+  let response;
 
-  const safeParams = Object.assign({}, params || {}, { store_code: "SOGA" });
-  const response = getStaffShifts(safeParams);
-  const payload = parseAuthJsonResponse_(response);
-  if (!payload || payload.ok !== true) return response;
+  if (!isRestrictedSogaStaff_(auth)) {
+    response = getStaffShifts(safeParams);
+  } else {
+    safeParams = Object.assign({}, safeParams, { store_code: "SOGA" });
+    response = getStaffShifts(safeParams);
+    const payload = parseAuthJsonResponse_(response);
+    if (!payload || payload.ok !== true) return response;
 
-  const data = payload.data;
-  if (Array.isArray(data)) {
-    return successResponse(
-      filterSogaShiftRows_(data, params && params.staff_code, auth)
-    );
+    const data = payload.data;
+    if (Array.isArray(data)) {
+      response = successResponse(
+        filterSogaShiftRows_(data, params && params.staff_code, auth)
+      );
+    } else {
+      const rows = data && Array.isArray(data.shifts) ? data.shifts : [];
+      response = successResponse(
+        Object.assign({}, data || {}, {
+          shifts: filterSogaShiftRows_(rows, params && params.staff_code, auth)
+        })
+      );
+    }
   }
 
-  const rows = data && Array.isArray(data.shifts) ? data.shifts : [];
-  return successResponse(
-    Object.assign({}, data || {}, {
-      shifts: filterSogaShiftRows_(rows, params && params.staff_code, auth)
-    })
-  );
+  return enforceStaffShiftPublication_(response, safeParams, auth);
 }
 
 function doGet(e) {
@@ -178,6 +185,21 @@ function doGet(e) {
 
       case "getMyShiftChangeRequests":
         return getMyShiftChangeRequests(
+          params
+        );
+
+      case "getMySogaShiftRequests":
+        return getMySogaShiftRequests(
+          params
+        );
+
+      case "getSogaShiftBoard":
+        return getSogaShiftBoard(
+          params
+        );
+
+      case "getStaffShiftPublication":
+        return getStaffShiftPublication(
           params
         );
 
@@ -525,6 +547,28 @@ function doPost(e) {
           body
         );
       }
+
+      case "saveMySogaShiftRequests":
+        return saveMySogaShiftRequests(
+          body
+        );
+
+      case "saveSogaShiftAssignments":
+        return invalidateStoreAwareAfterMutation_(
+          saveSogaShiftAssignments(body),
+          false,
+          body
+        );
+
+      case "importSogaShiftRequests":
+        return importSogaShiftRequests(
+          body
+        );
+
+      case "publishStaffShiftMonth":
+        return publishStaffShiftMonth(
+          body
+        );
 
       case "provisionStaffLogin":
         return provisionStaffLogin(

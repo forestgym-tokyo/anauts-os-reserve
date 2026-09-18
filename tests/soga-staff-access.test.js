@@ -40,15 +40,15 @@ test("SOGA navigation restrictions are removed before ADMIN or MANAGER use", () 
   assert.match(admin, /view\.id==="staffScheduleView"/);
 });
 
-test("SOGA staff UI exposes only personal shifts and the fixed 9ROUND schedule", () => {
+test("SOGA staff UI exposes personal shifts, the fixed schedule, and shift wishes", () => {
   const admin = read("admin/admin.js");
   const monthly = read("admin/admin-monthly-v58.js");
   const css = read("admin/admin.css");
 
-  assert.match(admin, /new Set\(\["myShift","monthlySchedule"\]\)/);
+  assert.match(admin, /new Set\(\["myShift","monthlySchedule","sogaShift"\]\)/);
   assert.match(admin, /targetView=activeButton\?\.dataset\.view\|\|"myShift"/);
   assert.match(admin, /storeChip\.textContent="9ROUND \/ SOGA"/);
-  assert.match(css, /\.soga-staff-restricted[\s\S]*data-view="myShift"[\s\S]*data-view="monthlySchedule"/);
+  assert.match(css, /\.soga-staff-restricted[\s\S]*data-view="myShift"[\s\S]*data-view="monthlySchedule"[\s\S]*data-view="sogaShift"/);
 
   assert.match(monthly, /state\.monthlyStore=sogaStaffRestricted_\(\)\?"SOGA"/);
   assert.match(monthly, /if\(sogaStaffRestricted_\(\)\)shiftParams\.store_code="SOGA"/);

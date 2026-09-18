@@ -118,6 +118,14 @@
         if(sogaStaffRestricted_())shiftParams.store_code="SOGA";
         const [j,s]=await Promise.all([apiGet("getStaffShifts",shiftParams),staffRequest]);
         if(s)state.staff=Array.isArray(s.data?.staff)?s.data.staff:(Array.isArray(s.data)?s.data:[]);
+        if(j.data?.publication?.is_published===false){
+          state.monthlyRows=[];
+          storeFilters_();
+          filters();
+          syncMonthlyHeading_();
+          board.innerHTML=`<div class="staff-schedule-empty"><strong>公開前</strong><span>${esc(j.data.publication.message||"管理者が公開すると予定を確認できます。")}</span></div>`;
+          return;
+        }
         state.monthlyRows=(Array.isArray(j.data)?j.data:(j.data?.shifts||[])).filter(x=>x.active!==false);
         storeFilters_();
         filters();

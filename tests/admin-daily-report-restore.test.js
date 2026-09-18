@@ -9,11 +9,12 @@ const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), "u
 test("admin pages load the restored daily report without changing other addons", () => {
   const config = read("admin/firebase-config.js");
   const expectedAddons = [
-    "./admin-monthly-v58.js?v=20260831-soga-staff-access-v1",
+    "./admin-monthly-v58.js?v=20260918-shift-publication-v1",
     "./admin-tour-enrollment.js?v=20260828-master-draft-v1",
     "./admin-tour-ui-polish.js?v=20260828-event-driven-v1",
     "./admin-auto-reassign-enforce.js?v=20260901-store-aware-v1",
-    "./admin-daily-report.js?v=20260903-daily-save-required-v5"
+    "./admin-daily-report.js?v=20260903-daily-save-required-v5",
+    "./admin-soga-shifts.js?v=20260918-shift-publication-v1"
   ];
 
   expectedAddons.forEach((source) => assert.ok(config.includes(source)));
@@ -21,7 +22,7 @@ test("admin pages load the restored daily report without changing other addons",
   ["admin/index.html", "admin/admin.html"].forEach((relativePath) => {
     assert.match(
       read(relativePath),
-      /\.\/firebase-config\.js\?v=20260903-daily-save-required-v2/
+      /\.\/firebase-config\.js\?v=20260918-shift-publication-v1/
     );
   });
 });
