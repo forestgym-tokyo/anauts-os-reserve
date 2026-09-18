@@ -46,7 +46,9 @@ document.addEventListener("DOMContentLoaded", function () {
     )
   );
 
-  const API_REQUEST_TIMEOUT_MS = 20000;
+  // GASは起動直後や混雑時に20秒を超えることがある。
+  // 20秒で打ち切ると、正常な応答が返る直前に予定一覧などのGETが失敗する。
+  const API_REQUEST_TIMEOUT_MS = 60000;
 
   function isHtmlResponse_(text) {
     return /^\s*<!doctype\s+html/i.test(text) || /^\s*<html/i.test(text);
@@ -222,7 +224,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 (function () {
   var addonSources = [
-    "./admin-monthly-v58.js?v=20260918-shift-publication-v1",
+    "./admin-monthly-v58.js?v=20260918-schedule-fetch-v2",
     "./admin-tour-enrollment.js?v=20260828-master-draft-v1",
     "./admin-tour-ui-polish.js?v=20260828-event-driven-v1",
     "./admin-auto-reassign-enforce.js?v=20260901-store-aware-v1",
