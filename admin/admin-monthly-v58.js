@@ -113,10 +113,15 @@
       board.innerHTML='<div class="staff-schedule-loading">読み込んでいます…</div>';
       document.querySelector("#mDetail").classList.add("is-hidden");
       try{
-        const staffRequest=state.staff.length?Promise.resolve(null):apiGet("getStaff",{include_inactive:"false"});
+        const staffRequest=state.staff.length?Promise.resolve(null):apiGet("getStaff",{include_inactive:"false"}).catch(staffError=>{
+          // 名簿取得だけが一時的に失敗しても、シフト行に含まれる情報で予定表を表示する。
+          console.warn("予定一覧のスタッフ名簿を取得できませんでした。",staffError);
+          return null;
+        });
         const shiftParams={start_date:r.start,end_date:r.end};
         if(sogaStaffRestricted_())shiftParams.store_code="SOGA";
-        const [j,s]=await Promise.all([apiGet("getStaffShifts",shiftParams),staffRequest]);
+        const shiftRequest=apiGet("getStaffShifts",shiftParams);
+        const [j,s]=await Promise.all([shiftRequest,staffRequest]);
         if(s)state.staff=Array.isArray(s.data?.staff)?s.data.staff:(Array.isArray(s.data)?s.data:[]);
         if(j.data?.publication?.is_published===false){
           state.monthlyRows=[];
@@ -131,7 +136,7 @@
         filters();
         syncMonthlyHeading_();
         renderMonth();
-      }catch(e){board.innerHTML=`<div class="staff-schedule-empty"><strong>取得できませんでした</strong><span>${esc(e.message)}</span></div>`}
+      }catch(e){board.innerHTML=`<div class="staff-schedule-empty"><strong>取得できませんでした</strong><span>${esc(e.message||"通信に失敗しました。")}</span><button id="mRetry" class="ghost-button" type="button" style="margin-top:14px">再読込</button></div>`;document.querySelector("#mRetry")?.addEventListener("click",loadMonth)}
     }
     function storeLabel_(code){
       const master=(state.stores||[]).find(x=>String(x.store_code)===String(code));
