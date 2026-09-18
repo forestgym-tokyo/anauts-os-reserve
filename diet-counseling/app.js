@@ -5,10 +5,11 @@
   const QUERY = new URLSearchParams(window.location.search);
   const TOKEN = QUERY.get("token") || "";
   const ADMIN_VIEW_TOKEN = QUERY.get("view_token") || "";
+  const CLIENT_VIEW_TOKEN = QUERY.get("client_token") || "";
   const IS_SHEET_PREVIEW = QUERY.get("preview") === "sheet";
   const IS_PRINT_PREVIEW = QUERY.get("preview") === "print";
   const IS_PREVIEW = QUERY.get("preview") === "1" ||
-    (!TOKEN && !ADMIN_VIEW_TOKEN && !IS_SHEET_PREVIEW && !IS_PRINT_PREVIEW);
+    (!TOKEN && !ADMIN_VIEW_TOKEN && !CLIENT_VIEW_TOKEN && !IS_SHEET_PREVIEW && !IS_PRINT_PREVIEW);
   const STORAGE_KEY = `tfg-counseling-draft-v1:${IS_PREVIEW ? "preview" : TOKEN.slice(0, 12) || "invalid"}`;
   const TOTAL_STEPS = 6;
   const stepTitles = ["基本情報", "カラダの目標", "仕事・生活", "食事", "運動・体調", "入力内容の確認"];
@@ -36,6 +37,8 @@
   const printPage = document.getElementById("printPage");
   const printSheet = document.getElementById("printSheet");
   const printSheetButton = document.getElementById("printSheetButton");
+  const copyClientLinkButton = document.getElementById("copyClientLinkButton");
+  const sheetViewBadge = document.getElementById("sheetViewBadge");
   const sheetViewMessage = document.getElementById("sheetViewMessage");
   const previewModeBanner = document.getElementById("previewModeBanner");
   let currentStep = 0;
@@ -339,8 +342,9 @@
     return String(Math.round(percent * 10) / 10);
   }
 
-  function renderCounselingSheet(data) {
+  function renderCounselingSheet(data, options = {}) {
     const sheet = data || {};
+    const isClientView = options.clientView === true;
     const workStyle = [sheet.work_style, sheet.work_other].filter(Boolean).join("／");
     const targetWeight = sheet.target_later ? "カウンセリング時に決定" : sheet.target_weight_kg;
     const targetWeightSuffix = sheet.target_later ? "" : " kg";
@@ -353,6 +357,15 @@
       </tr>`).join("");
     const consultationDate = formatReservationDate(sheet.counseling_date, "");
 
+    const personMeta = [sheet.member_type, sheet.member_no].filter(Boolean).join(" ／ ");
+    const sheetMeta = isClientView
+      ? `<span><small>カウンセリング日</small>${sheetValue(consultationDate)}</span>
+        <span><small>担当</small>${sheetValue(sheet.staff_name)}</span>`
+      : `<span><small>カウンセリング日</small>${sheetValue(consultationDate)}</span>
+        <span><small>担当</small>${sheetValue(sheet.staff_name)}</span>
+        <span><small>回答日時</small>${sheetValue(sheet.submitted_at)}</span>
+        <span><small>回答ID</small>${sheetValue(sheet.answer_id)}</span>`;
+
     printSheet.innerHTML = `
       <header class="print-sheet-header">
         <div>
@@ -361,15 +374,10 @@
         </div>
         <div class="sheet-person">
           <strong>${sheetValue(sheet.name, " 様")}</strong>
-          <span>${sheetValue(sheet.member_type)}${sheet.member_no ? ` ／ ${sheetValue(sheet.member_no)}` : ""}</span>
+          ${personMeta ? `<span>${sheetValue(personMeta)}</span>` : ""}
         </div>
       </header>
-      <div class="sheet-meta">
-        <span><small>カウンセリング日</small>${sheetValue(consultationDate)}</span>
-        <span><small>担当</small>${sheetValue(sheet.staff_name)}</span>
-        <span><small>回答日時</small>${sheetValue(sheet.submitted_at)}</span>
-        <span><small>回答ID</small>${sheetValue(sheet.answer_id)}</span>
-      </div>
+      <div class="sheet-meta${isClientView ? " is-client" : ""}">${sheetMeta}</div>
       <section class="sheet-metrics" aria-label="基本データ">
         <div><small>年齢</small><strong>${sheetValue(sheet.age, " 歳")}</strong></div>
         <div><small>性別</small><strong>${sheetValue(sheet.gender)}</strong></div>
@@ -456,15 +464,22 @@
       <footer class="print-sheet-footer">このシートは回答内容から自動作成されています。基礎代謝は改良版ハリス・ベネディクト式による参考値です。</footer>`;
   }
 
-  function showCounselingSheet(data) {
+  function showCounselingSheet(data, options = {}) {
+    const isClientView = options.clientView === true;
     formShell.hidden = true;
     document.querySelector(".site-header").hidden = true;
     accessGate.hidden = true;
     completionScreen.hidden = true;
-    renderCounselingSheet(data);
-    sheetViewMessage.textContent = "カウンセリング時のiPad表示・A4縦1枚印刷用";
+    renderCounselingSheet(data, { clientView: isClientView });
+    sheetViewBadge.textContent = isClientView ? "お客様用" : "管理者用";
+    sheetViewMessage.textContent = isClientView
+      ? "お客様用・閲覧専用（編集はできません）"
+      : "カウンセリング時のiPad表示・A4縦1枚印刷用";
+    printSheetButton.hidden = isClientView;
+    copyClientLinkButton.hidden = isClientView || !ADMIN_VIEW_TOKEN;
     counselingSheetScreen.hidden = false;
     document.body.classList.add("is-sheet-view");
+    document.body.classList.toggle("is-client-sheet-view", isClientView);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -528,6 +543,23 @@
         if (!result.ok) throw new Error(result.message || "管理者用URLを確認できませんでした。");
         document.body.classList.remove("is-loading");
         showCounselingSheet(result.data || {});
+      } catch (error) {
+        showAccessError(error.message);
+      }
+      return;
+    }
+    if (CLIENT_VIEW_TOKEN) {
+      if (!/^[a-f0-9]{64}$/i.test(CLIENT_VIEW_TOKEN)) {
+        showAccessError("お客様用URLが正しくありません。");
+        return;
+      }
+      try {
+        const result = await apiGet("getDietCounselingClientSheet", {
+          token: CLIENT_VIEW_TOKEN
+        });
+        if (!result.ok) throw new Error(result.message || "お客様用URLを確認できませんでした。");
+        document.body.classList.remove("is-loading");
+        showCounselingSheet(result.data || {}, { clientView: true });
       } catch (error) {
         showAccessError(error.message);
       }
@@ -732,6 +764,27 @@
     window.setTimeout(() => toast.classList.remove("is-visible"), 3500);
   }
 
+  async function copyTextToClipboard(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return;
+      } catch (_) {
+        // iOS Safariなどで権限が失効した場合は、従来のコピー方式を試す。
+      }
+    }
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.select();
+    const copied = document.execCommand("copy");
+    textarea.remove();
+    if (!copied) throw new Error("URLをコピーできませんでした。");
+  }
+
   form.addEventListener("input", (event) => {
     event.target.closest(".has-error")?.classList.remove("has-error");
     updateConditionals();
@@ -786,6 +839,31 @@
   printSheetButton.addEventListener("click", () => {
     preparePrintLayout();
     window.setTimeout(() => window.print(), 50);
+  });
+  copyClientLinkButton.addEventListener("click", async () => {
+    copyClientLinkButton.disabled = true;
+    const originalText = copyClientLinkButton.innerHTML;
+    copyClientLinkButton.textContent = "発行中…";
+    try {
+      const result = await apiPost({
+        action: "issueDietCounselingClientView",
+        admin_token: ADMIN_VIEW_TOKEN
+      });
+      if (!result.ok || !result.data?.url) {
+        throw new Error(result.message || "お客様用URLを発行できませんでした。");
+      }
+      try {
+        await copyTextToClipboard(result.data.url);
+        showToast(`お客様用URLをコピーしました（期限：${result.data.expires_at}）`);
+      } catch (_) {
+        window.prompt("お客様用URLです。長押ししてコピーしてください。", result.data.url);
+      }
+    } catch (error) {
+      showToast(error.message || "お客様用URLを発行できませんでした。");
+    } finally {
+      copyClientLinkButton.disabled = false;
+      copyClientLinkButton.innerHTML = originalText;
+    }
   });
   window.addEventListener("beforeprint", preparePrintLayout);
   window.addEventListener("afterprint", () => {

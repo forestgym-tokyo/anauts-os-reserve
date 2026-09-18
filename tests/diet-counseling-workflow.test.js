@@ -405,6 +405,41 @@ assert.equal(
   90
 );
 
+const clientAccess = context.issueDietCounselingClientView_(
+  "2026-09-20",
+  new Date("2026-09-16T00:00:00.000Z")
+);
+assert.match(clientAccess.url, /\?client_token=[a-f0-9]{64}$/);
+assert.equal(clientAccess.tokenHash.length, 64);
+assert.equal(
+  clientAccess.expiresAt.toISOString(),
+  "2026-09-21T14:59:59.000Z",
+  "お客様用URLはカウンセリング翌日23:59（日本時間）まで有効にする"
+);
+
+const legacyClientExpiry = context.getDietCounselingClientViewExpiry_(
+  "2026-09-01",
+  new Date("2026-09-16T00:00:00.000Z")
+);
+assert.equal(
+  legacyClientExpiry.toISOString(),
+  "2026-09-17T00:00:00.000Z",
+  "過去回答からの再発行でも最低24時間は閲覧できる"
+);
+
+const clientSheet = context.buildDietCounselingClientSheetData_(Object.assign({}, structuredDietRecord, {
+  "回答ID": "DCA_PRIVATE",
+  "予約ID": "RES_PRIVATE",
+  "会員区分": "会員",
+  "会員番号": "12345",
+  "氏名": "テスト 太郎"
+}));
+assert.equal(clientSheet.name, "テスト 太郎");
+assert.equal(Object.prototype.hasOwnProperty.call(clientSheet, "answer_id"), false);
+assert.equal(Object.prototype.hasOwnProperty.call(clientSheet, "reservation_id"), false);
+assert.equal(Object.prototype.hasOwnProperty.call(clientSheet, "member_type"), false);
+assert.equal(Object.prototype.hasOwnProperty.call(clientSheet, "member_no"), false);
+
 function createMockSheet(headers) {
   const writes = [];
   return {
@@ -451,6 +486,7 @@ assert.throws(
 const partialAnswerSheet = createMockSheet(["回答ID", "氏名", "任意の追加列"]);
 const appendedHeaders = context.ensureDietCounselingAnswerHeaders_(partialAnswerSheet);
 assert.ok(appendedHeaders.includes("管理閲覧URL"));
+assert.ok(appendedHeaders.includes("顧客閲覧URL"));
 assert.equal(partialAnswerSheet.writes[0].column, 4);
 assert.deepEqual(
   JSON.parse(JSON.stringify(partialAnswerSheet.writes[0].values[0])),

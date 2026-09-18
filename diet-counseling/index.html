@@ -5,8 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0f3327">
   <meta name="description" content="ダイエットカウンセリング事前回答シート">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex,nofollow,noarchive">
   <title>ダイエットカウンセリングシート</title>
-  <link rel="stylesheet" href="./styles.css?v=20260917-submit-confirm-v1">
+  <link rel="stylesheet" href="./styles.css?v=20260918-client-view-v1">
 </head>
 <body class="is-loading">
   <header class="site-header">
@@ -315,16 +317,22 @@
   <section class="counseling-sheet-screen" id="counselingSheetScreen" hidden>
     <div class="sheet-toolbar">
       <div class="sheet-toolbar-copy">
-        <span>管理者用</span>
+        <span id="sheetViewBadge">管理者用</span>
         <div>
           <strong>カウンセリングシート</strong>
           <small id="sheetViewMessage">カウンセリング時のiPad表示・A4縦1枚印刷用</small>
         </div>
       </div>
-      <button type="button" class="sheet-print-button" id="printSheetButton">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9V2h12v7h1a3 3 0 0 1 3 3v6h-4v4H6v-4H2v-6a3 3 0 0 1 3-3h1Zm2-5v5h8V4H8Zm8 12H8v4h8v-4Zm3-5H5a1 1 0 0 0-1 1v4h2v-2h12v2h2v-4a1 1 0 0 0-1-1Zm-1 1.5a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z"/></svg>
-        印刷する
-      </button>
+      <div class="sheet-toolbar-actions">
+        <button type="button" class="sheet-share-button" id="copyClientLinkButton" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.6 15.4a1 1 0 0 1 0-1.4l5.4-5.4a3 3 0 1 1 4.2 4.2l-2.1 2.1a1 1 0 1 1-1.4-1.4l2.1-2.1a1 1 0 0 0-1.4-1.4L10 15.4a1 1 0 0 1-1.4 0Zm6.8-6.8a1 1 0 0 1 0 1.4L10 15.4a3 3 0 1 1-4.2-4.2l2.1-2.1a1 1 0 1 1 1.4 1.4l-2.1 2.1A1 1 0 0 0 8.6 14l5.4-5.4a1 1 0 0 1 1.4 0Z"/></svg>
+          お客様用URLをコピー
+        </button>
+        <button type="button" class="sheet-print-button" id="printSheetButton">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9V2h12v7h1a3 3 0 0 1 3 3v6h-4v4H6v-4H2v-6a3 3 0 0 1 3-3h1Zm2-5v5h8V4H8Zm8 12H8v4h8v-4Zm3-5H5a1 1 0 0 0-1 1v4h2v-2h12v2h2v-4a1 1 0 0 0-1-1Zm-1 1.5a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z"/></svg>
+          印刷する
+        </button>
+      </div>
     </div>
     <div class="print-page" id="printPage">
       <article class="print-sheet" id="printSheet" aria-label="ダイエットカウンセリングシート"></article>
@@ -332,6 +340,6 @@
   </section>
 
   <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
-  <script src="./app.js?v=20260917-submit-9s-v1"></script>
+  <script src="./app.js?v=20260918-client-view-v1"></script>
 </body>
 </html>

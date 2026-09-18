@@ -397,6 +397,9 @@ function doGet(e) {
       case "getDietCounselingStaffSheet":
         return getDietCounselingStaffSheet_(params);
 
+      case "getDietCounselingClientSheet":
+        return getDietCounselingClientSheet_(params);
+
       case "getDietCounselingLinkCandidates":
         requireAuth_(params, ["ADMIN", "MANAGER"]);
         return getDietCounselingLinkCandidates_(params);
@@ -475,6 +478,9 @@ function doPost(e) {
 
       case "submitDietCounselingResponse":
         return submitDietCounselingResponse_(body);
+
+      case "issueDietCounselingClientView":
+        return issueDietCounselingClientViewForAdmin_(body);
 
       case "sendDietCounselingLinksBulk":
         requireAuth_(body, ["ADMIN", "MANAGER"]);

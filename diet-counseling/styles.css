@@ -644,7 +644,28 @@ select { padding-right: 44px; appearance: none; cursor: pointer; }
   box-shadow: 0 9px 20px rgba(18,60,46,.2);
 }
 .sheet-print-button:hover { background: var(--forest-700); }
+.sheet-print-button[hidden] { display: none; }
 .sheet-print-button svg { width: 17px; height: 17px; fill: currentColor; }
+.sheet-toolbar-actions { display: flex; align-items: center; gap: 9px; flex: 0 0 auto; }
+.sheet-share-button {
+  min-height: 44px;
+  padding: 10px 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid rgba(18,60,46,.2);
+  border-radius: 12px;
+  color: var(--forest-800);
+  background: var(--leaf-100);
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+}
+.sheet-share-button:hover { background: #e6f1e9; }
+.sheet-share-button:disabled { cursor: wait; opacity: .65; }
+.sheet-share-button[hidden] { display: none; }
+.sheet-share-button svg { width: 17px; height: 17px; fill: currentColor; }
 
 .print-page {
   width: min(1180px, 100%);
@@ -684,6 +705,11 @@ select { padding-right: 44px; appearance: none; cursor: pointer; }
 }
 .sheet-meta > span { min-width: 0; display: flex; flex-direction: column; gap: 3px; font-size: 11px; font-weight: 750; word-break: break-word; }
 .sheet-meta small { color: var(--muted); font-size: 8px; font-weight: 750; letter-spacing: .04em; }
+.sheet-meta.is-client { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+body.is-client-sheet-view { background: #f3f7f4; }
+body.is-client-sheet-view .sheet-toolbar { position: static; }
+body.is-client-sheet-view .print-sheet { box-shadow: 0 12px 34px rgba(14,47,36,.09); }
 
 .sheet-metrics {
   margin: 20px 0;
@@ -896,7 +922,13 @@ body.is-print-preview .counseling-sheet-screen { padding-top: 20px; }
   .sheet-toolbar-copy > span { padding: 6px 8px; font-size: 8px; }
   .sheet-toolbar-copy strong { font-size: 13px; }
   .sheet-toolbar-copy small { font-size: 9px; }
+  .sheet-toolbar-actions { align-self: stretch; }
+  .sheet-share-button { min-height: 44px; padding: 9px 11px; font-size: 10px; }
   .sheet-print-button { min-height: 44px; padding: 9px 12px; font-size: 11px; }
+
+  body:not(.is-client-sheet-view) .sheet-toolbar { align-items: stretch; flex-direction: column; }
+  body:not(.is-client-sheet-view) .sheet-toolbar-actions { display: grid; grid-template-columns: 1fr auto; }
+  body:not(.is-client-sheet-view) .sheet-share-button { width: 100%; }
 
   .print-page,
   body.is-print-layout .print-page {
