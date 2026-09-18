@@ -58,7 +58,7 @@ function enforceSogaStaffUi_(){
 
   document.body?.classList.add("soga-staff-restricted");
 
-  const allowedViews=new Set(["myShift","monthlySchedule"]);
+  const allowedViews=new Set(["myShift","monthlySchedule","sogaShift"]);
   $$(".topnav .nav-button").forEach(button=>{
     const allowed=allowedViews.has(String(button.dataset.view||""));
     if(allowed)return;
@@ -1081,6 +1081,16 @@ async function loadMyShiftView(){
     };
     if(isSogaStaffUser())shiftParams.store_code="SOGA";
     const shiftRes=await apiGet("getStaffShifts",shiftParams);
+
+    if(shiftRes.data?.publication?.is_published===false){
+      state.myShiftRows=[];
+      state.myShiftRequests=[];
+      $("#myShiftStatusSummary").textContent="公開前";
+      $("#myShiftList").innerHTML=`<div class="registered-shift-empty"><strong>公開前</strong><span>${esc(shiftRes.data.publication.message||"管理者が公開すると個人シフトを確認できます。")}</span></div>`;
+      $("#myShiftRequestHistory").innerHTML='<div class="registered-shift-empty">公開後にシフト内容を確認できます。</div>';
+      resetMyShiftForm();
+      return;
+    }
 
     state.myShiftRows=(Array.isArray(shiftRes.data)?shiftRes.data:Array.isArray(shiftRes.data?.shifts)?shiftRes.data.shifts:[])
       .filter(r=>r.active!==false)

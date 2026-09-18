@@ -1125,7 +1125,7 @@ input::placeholder,textarea::placeholder{color:#647067}
   }
 }
 
-/* 9ROUNDの一般スタッフは、自分のシフトとSOGA予定だけを表示する。 */
-.soga-staff-restricted .topnav .nav-button:not([data-view="myShift"]):not([data-view="monthlySchedule"]){
+/* 9ROUNDの一般スタッフは、自分のシフト・SOGA予定・希望提出だけを表示する。 */
+.soga-staff-restricted .topnav .nav-button:not([data-view="myShift"]):not([data-view="monthlySchedule"]):not([data-view="sogaShift"]){
   display:none!important;
 }
