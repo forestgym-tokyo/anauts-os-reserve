@@ -110,6 +110,11 @@ function doPost(e) {
       case "submit9RoundSuspensionToken":
         return submit9RoundSuspensionToken_(body);
 
+      case "create9RoundInterviewDraft":
+        return round9Json_(
+          create9RoundInterviewDraftFromService_(body)
+        );
+
       default:
         return round9Json_({
           ok: false,

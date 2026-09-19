@@ -404,6 +404,12 @@ function doGet(e) {
         requireAuth_(params, ["ADMIN", "MANAGER"]);
         return getDietCounselingLinkCandidates_(params);
 
+      case "get9RoundInterviewCandidates":
+        return get9RoundInterviewCandidates(params);
+
+      case "get9RoundInterviewAutomationStatus":
+        return get9RoundInterviewAutomationStatus(params);
+
       default:
         return errorResponse(
           "指定されたactionは存在しません。",
@@ -485,6 +491,12 @@ function doPost(e) {
       case "sendDietCounselingLinksBulk":
         requireAuth_(body, ["ADMIN", "MANAGER"]);
         return sendDietCounselingLinksBulk_(body);
+
+      case "preview9RoundInterviewDraft":
+        return preview9RoundInterviewDraft(body);
+
+      case "create9RoundInterviewDraft":
+        return create9RoundInterviewDraft(body);
 
       case "updateReservation":
         return invalidateStoreAwareAfterMutation_(

@@ -22,7 +22,7 @@ test("admin pages load the restored daily report without changing other addons",
   ["admin/index.html", "admin/admin.html"].forEach((relativePath) => {
     assert.match(
       read(relativePath),
-      /\.\/firebase-config\.js\?v=20260918-schedule-fetch-v2/
+      /\.\/firebase-config\.js\?v=20260919-interview-draft-v1/
     );
   });
 });

@@ -19,3 +19,7 @@
 - `form_type`に応じてMEMBER / VISITOR / BOTHを切替
 - 7日表示＋前週・次週
 - 共通HTML・共通JavaScript
+
+## 9ROUND ONLINE面接案内
+
+管理画面からの面接案内下書き作成と、Indeed応募通知を起点にした自動下書き作成を追加しています。反映手順は `gas/DEPLOY_9ROUND_INTERVIEW_DRAFT.md` を参照してください。
