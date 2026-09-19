@@ -4,7 +4,7 @@
  * ============================================================
  *
  * 9round.ariosoga@gmail.com が所有し、「自分として実行」する
- * 既存の9ROUND申請GASプロジェクトへ追加する。
+ * 専用のスタンドアロンGAS Webアプリとしてデプロイする。
  */
 
 const ROUND9_INTERVIEW_DRAFT_CONFIG = Object.freeze({
@@ -12,6 +12,65 @@ const ROUND9_INTERVIEW_DRAFT_CONFIG = Object.freeze({
   SECRET_PROPERTY: "ROUND9_INTERVIEW_DRAFT_SECRET",
   CACHE_PREFIX: "round9-interview-draft-v1:"
 });
+
+function doGet(e) {
+  const params = e && e.parameter ? e.parameter : {};
+  const action = String(params.action || "health").trim();
+
+  if (action !== "health") {
+    return round9InterviewDraftJson_({
+      ok: false,
+      code: "ACTION_NOT_FOUND",
+      message: "指定されたactionは存在しません。"
+    });
+  }
+
+  return round9InterviewDraftJson_({
+    ok: true,
+    data: {
+      appName: "9ROUND ONLINE面接案内 下書きサービス",
+      store: "9ROUND アリオ蘇我店",
+      status: "ok",
+      sender: ROUND9_INTERVIEW_DRAFT_CONFIG.SENDER_EMAIL
+    }
+  });
+}
+
+function doPost(e) {
+  try {
+    const body = e && e.postData && e.postData.contents
+      ? JSON.parse(e.postData.contents)
+      : {};
+    const action = String(body.action || "").trim();
+
+    if (action !== "create9RoundInterviewDraft") {
+      return round9InterviewDraftJson_({
+        ok: false,
+        code: "ACTION_NOT_FOUND",
+        message: "指定されたactionは存在しません。"
+      });
+    }
+
+    return round9InterviewDraftJson_(
+      create9RoundInterviewDraftFromService_(body)
+    );
+  } catch (error) {
+    console.error("9ROUND interview draft service", error);
+    return round9InterviewDraftJson_({
+      ok: false,
+      code: "ROUND9_INTERVIEW_DRAFT_ERROR",
+      message: error && error.message
+        ? error.message
+        : "9ROUND面接メール下書きサービスでエラーが発生しました。"
+    });
+  }
+}
+
+function round9InterviewDraftJson_(payload) {
+  return ContentService
+    .createTextOutput(JSON.stringify(payload))
+    .setMimeType(ContentService.MimeType.JSON);
+}
 
 function create9RoundInterviewDraftFromService_(body) {
   body = body || {};

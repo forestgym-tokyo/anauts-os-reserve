@@ -14,10 +14,6 @@ const serviceSource = fs.readFileSync(
   "utf8"
 );
 const mainSource = fs.readFileSync(path.join(root, "gas", "99_Main.gs"), "utf8");
-const round9EntrySource = fs.readFileSync(
-  path.join(root, "gas", "85_9RoundWithdrawalWebApp.gs"),
-  "utf8"
-);
 const uiSource = fs.readFileSync(
   path.join(root, "admin", "admin-9round-interview.js"),
   "utf8"
@@ -157,7 +153,8 @@ test("GASルート、5分トリガー、処理ラベル、9ROUND専用下書き�
   assert.match(mainSource, /case "get9RoundInterviewAutomationStatus"/);
   assert.match(mainSource, /case "preview9RoundInterviewDraft"/);
   assert.match(mainSource, /case "create9RoundInterviewDraft"/);
-  assert.match(round9EntrySource, /case "create9RoundInterviewDraft"/);
+  assert.match(serviceSource, /function doPost\(e\)/);
+  assert.match(serviceSource, /action !== "create9RoundInterviewDraft"/);
   assert.match(workflowSource, /everyMinutes\(5\)/);
   assert.match(workflowSource, /from:\(indeedemail\.com\)/);
   assert.match(workflowSource, /A-nauts\/9ROUND面接下書き作成済み/);

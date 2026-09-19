@@ -10,18 +10,17 @@
   - 面接候補の抽出と再検証
   - Indeed応募通知を約5分ごとに確認
   - 9ROUND専用GASへ下書き作成を依頼
-- 9ROUND申請GAS（`9round.ariosoga@gmail.com`）
+- 9ROUND面接下書き専用GAS（`9round.ariosoga@gmail.com`）
   - `GmailApp.createDraft()`で下書きのみ作成
   - 実行アカウントが `9round.ariosoga@gmail.com` でなければ停止
 
 メールは自動送信しない。作成先は `9round.ariosoga@gmail.com` のGmail下書きである。
 
-## 1. 9ROUND申請GASへ反映
+## 1. 9ROUND専用GASへ反映
 
-既存の9ROUND会員申請GASプロジェクトへ次を反映する。
+`9round.ariosoga@gmail.com` が所有するスタンドアロンGASプロジェクト「9ROUND 面接下書きサービス」を作成し、次を反映する。
 
-- `90_9RoundInterviewDraftService.gs` を追加
-- `85_9RoundWithdrawalWebApp.gs` の `create9RoundInterviewDraft` ルートを反映
+- `90_9RoundInterviewDraftService.gs`
 
 このGASは必ず `9round.ariosoga@gmail.com` が所有し、Webアプリを「自分として実行」でデプロイする。
 
@@ -33,11 +32,7 @@ setup9RoundInterviewDraftService()
 
 戻り値の `sender` が `9round.ariosoga@gmail.com` であることを確認し、`sharedSecret` を控える。共有シークレットは第三者へ送らない。
 
-既存Webアプリを「新しいバージョン」で再デプロイする。URLは既存の次のURLを維持する。
-
-```text
-https://script.google.com/macros/s/AKfycbyT8G6rQ-9LFosbFlzSYj4OM0PrCG_KD7bddVxQ65RLMkfYrjmBZ2ebCvL54ncGJSZ2/exec
-```
+新しいWebアプリとしてデプロイし、発行された `/exec` URLを控える。
 
 ## 2. A-nautsメインGASへ反映
 
@@ -54,7 +49,7 @@ https://script.google.com/macros/s/AKfycbyT8G6rQ-9LFosbFlzSYj4OM0PrCG_KD7bddVxQ6
 
 ```javascript
 configure9RoundInterviewDraftService(
-  "https://script.google.com/macros/s/AKfycbyT8G6rQ-9LFosbFlzSYj4OM0PrCG_KD7bddVxQ65RLMkfYrjmBZ2ebCvL54ncGJSZ2/exec",
+  "手順1で発行されたWebアプリURL",
   "手順1で発行したsharedSecret"
 )
 ```
