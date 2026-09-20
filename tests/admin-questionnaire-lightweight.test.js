@@ -46,7 +46,7 @@ assert.doesNotMatch(polish, /MutationObserver|openReplyForRow|wireModal/);
 
 for (const html of [indexHtml, adminHtml]) {
   assert.match(html, /admin-questionnaire\.js\?v=20260906-tour-reply-history-v1/);
-  assert.match(html, /firebase-config\.js\?v=20260920-fast-login-month-v1/);
+  assert.match(html, /firebase-config\.js\?v=20260920-head-office-counsel-v1/);
 }
 
 console.log("admin questionnaire lightweight tests passed");

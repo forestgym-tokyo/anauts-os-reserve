@@ -30,7 +30,7 @@ test("admin pages and monthly addon use the new cache version", () => {
 
   for (const page of ["admin/index.html", "admin/admin.html"]) {
     const html = read(page);
-    assert.match(html, /firebase-config\.js\?v=20260920-fast-login-month-v1/);
+    assert.match(html, /firebase-config\.js\?v=20260920-head-office-counsel-v1/);
   }
 });
 

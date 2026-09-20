@@ -15,6 +15,7 @@
     "COUNSEL",
     "MEAL_PLANNING"
   ]);
+  const HEAD_OFFICE_STORE_CODE="HEAD_OFFICE";
   const INACTIVE_RESERVATION_STATUSES=new Set([
     "CANCELLED",
     "CANCELED",
@@ -51,9 +52,17 @@
       shiftStart<=reservationStart&&shiftEnd>=reservationEnd;
   }
 
+  function isHeadOfficeOnlineCounseling(reservation){
+    return code(reservation?.service_code)==="COUNSEL"&&
+      code(reservation?.store_code)===HEAD_OFFICE_STORE_CODE;
+  }
+
   function needsAssignment(reservation,shifts){
     if(!reservation?.reservation_id||!isActiveReservation(reservation))return false;
     if(!code(reservation.staff_code))return true;
+    // HEAD_OFFICE is the online-only counseling location. Its assigned counselor
+    // is managed by the counseling workflow, not by the displayed store shift.
+    if(isHeadOfficeOnlineCounseling(reservation))return false;
     return !shifts.some(shift=>shiftCoversReservation(shift,reservation));
   }
 

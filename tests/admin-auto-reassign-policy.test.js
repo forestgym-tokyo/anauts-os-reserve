@@ -21,10 +21,10 @@ const adminHtml = fs.readFileSync(
   "utf8"
 );
 
-assert.match(config, /admin-auto-reassign-enforce\.js\?v=20260901-store-aware-v1/);
+assert.match(config, /admin-auto-reassign-enforce\.js\?v=20260920-head-office-counsel-v1/);
 for (const html of [indexHtml, adminHtml]) {
   assert.match(html, /admin\.css\?v=20260920-shift-import-status-v1/);
-  assert.match(html, /firebase-config\.js\?v=20260920-fast-login-month-v1/);
+  assert.match(html, /firebase-config\.js\?v=20260920-head-office-counsel-v1/);
 }
 assert.doesNotMatch(controller, /reassignInvalidReservations/);
 assert.doesNotMatch(controller, /action:\s*["']updateReservation["']/);
@@ -62,6 +62,8 @@ const context = {
         { reservation_id: "support", service_code: "TRAINING_SUPPORT45", store_code: "YACHIYO", staff_code: "ABSENT", start_time: "13:00", end_time: "13:45", status: "RESERVED" },
         { reservation_id: "valid-tour", service_code: "TOUR", store_code: "YACHIYO", staff_code: "WORKING", start_time: "14:00", end_time: "15:00", status: "RESERVED" },
         { reservation_id: "counsel", service_code: "COUNSEL", store_code: "YACHIYO", staff_code: "ABSENT", start_time: "15:00", end_time: "16:00", status: "RESERVED" },
+        { reservation_id: "head-office-counsel", service_code: "COUNSEL", store_code: "HEAD_OFFICE", staff_code: "KAWAKAMI", start_time: "19:00", end_time: "20:00", status: "RESERVED" },
+        { reservation_id: "head-office-counsel-unassigned", service_code: "COUNSEL", store_code: "HEAD_OFFICE", staff_code: "", start_time: "20:00", end_time: "21:00", status: "RESERVED" },
         { reservation_id: "meal", service_code: "MEAL_PLANNING", store_code: "YACHIYO", staff_code: "", start_time: "16:00", end_time: "17:00", status: "RESERVED" },
         { reservation_id: "personal", service_code: "PERSONAL60", store_code: "YACHIYO", staff_code: "ABSENT", start_time: "17:00", end_time: "18:00", status: "RESERVED" },
         { reservation_id: "cancelled", service_code: "TOUR", store_code: "YACHIYO", staff_code: "ABSENT", start_time: "18:00", end_time: "19:00", status: "CANCELLED" }
@@ -91,7 +93,7 @@ vm.runInContext(controller, context, { filename: "admin-auto-reassign-enforce.js
 (async () => {
   const result = await context.ANAUTS_ENFORCE_AUTO_REASSIGN();
   assert.equal(result.completed, 5);
-  assert.equal(result.reschedule_only, 2);
+  assert.equal(result.reschedule_only, 3);
   assert.equal(reloads, 1);
 
   assert.deepEqual(
