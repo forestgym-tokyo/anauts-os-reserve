@@ -51,7 +51,7 @@ test("SOGA staff UI exposes personal shifts, the fixed schedule, and shift wishe
   assert.match(css, /\.soga-staff-restricted[\s\S]*data-view="myShift"[\s\S]*data-view="monthlySchedule"[\s\S]*data-view="sogaShift"/);
 
   assert.match(monthly, /state\.monthlyStore=sogaStaffRestricted_\(\)\?"SOGA"/);
-  assert.match(monthly, /if\(sogaStaffRestricted_\(\)\)shiftParams\.store_code="SOGA"/);
+  assert.match(monthly, /if\(sogaStaffRestricted_\(\)\)params\.store_code="SOGA"/);
   assert.match(monthly, /select\.disabled=true/);
   assert.match(monthly, /9ROUND アリオ蘇我店 \(SOGA\)/);
   assert.match(monthly, /9ROUND予定/);

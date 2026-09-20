@@ -14,11 +14,14 @@ assert.match(source, /REFRESH_MARGIN_MS=5\*60\*1000/);
 assert.match(source, /apiGet=wrapApi_\(apiGet\)/);
 assert.match(source, /apiPost=wrapApi_\(apiPost\)/);
 assert.match(source, /isExpiredAuthError_/);
+assert.match(source, /restorePersistentSession_/);
+assert.match(source, /localStorage\.setItem/);
+assert.match(source, /window\.ANAUTS_CLEAR_AUTH_SESSION=clearRefreshSession_/);
 
 for (const page of ["index.html", "admin.html"]) {
   const html = fs.readFileSync(path.join(root, "admin", page), "utf8");
-  const refreshIndex = html.indexOf("admin-auth-refresh.js?v=20260903-auth-refresh-v1");
-  const adminIndex = html.indexOf("admin.js?v=20260920-shift-import-status-v1");
+  const refreshIndex = html.indexOf("admin-auth-refresh.js?v=20260920-fast-login-v1");
+  const adminIndex = html.indexOf("admin.js?v=20260920-fast-login-month-v1");
   assert.ok(refreshIndex >= 0, `${page} は認証更新スクリプトを読み込む`);
   assert.ok(refreshIndex < adminIndex, `${page} は管理画面起動前に認証更新を準備する`);
 }
@@ -30,6 +33,7 @@ function jwt(exp) {
 
 (async () => {
   const storage = new Map();
+  const persistentStorage = new Map();
   const expiredToken = jwt(Math.floor(Date.now() / 1000) - 60);
   storage.set("anauts_id_token", expiredToken);
   storage.set("anauts_refresh_token", "refresh-1");
@@ -52,6 +56,11 @@ function jwt(exp) {
       getItem: key => storage.get(key) || null,
       setItem: (key, value) => storage.set(key, String(value)),
       removeItem: key => storage.delete(key)
+    },
+    localStorage: {
+      getItem: key => persistentStorage.get(key) || null,
+      setItem: (key, value) => persistentStorage.set(key, String(value)),
+      removeItem: key => persistentStorage.delete(key)
     },
     state: { idToken: expiredToken },
     authEnabled: () => true,
@@ -89,7 +98,16 @@ function jwt(exp) {
   assert.equal(apiCalls, 1, "更新後に本来のAPIを1回だけ呼ぶ");
   assert.equal(refreshedToken, context.state.idToken);
   assert.equal(storage.get("anauts_refresh_token"), "refresh-2");
+  assert.equal(persistentStorage.get("anauts_refresh_token"), "refresh-2");
+  assert.equal(persistentStorage.get("anauts_id_token"), context.state.idToken);
 
+  context.ANAUTS_CLEAR_AUTH_SESSION();
+  assert.equal(storage.has("anauts_id_token"), false);
+  assert.equal(storage.has("anauts_refresh_token"), false);
+  assert.equal(persistentStorage.has("anauts_id_token"), false);
+  assert.equal(persistentStorage.has("anauts_refresh_token"), false);
+
+  context.state.idToken = jwt(Math.floor(Date.now() / 1000) + 3600);
   await context.apiGet("health");
   assert.equal(refreshCalls, 1, "有効期限内は更新通信を増やさない");
 

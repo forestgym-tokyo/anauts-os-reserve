@@ -34,7 +34,7 @@ assert.doesNotMatch(config, /window\.addEventListener\("load", function \(\) \{\
 
 assert.match(indexHtml, /rel="preconnect" href="https:\/\/script\.google\.com"/);
 assert.match(indexHtml, /20260920-shift-import-status-v1/);
-assert.match(config, /admin-monthly-v58\.js\?v=20260918-schedule-fetch-v2/);
+assert.match(config, /admin-monthly-v58\.js\?v=20260920-fast-month-v1/);
 
 assert.match(auth, /getStaffSchedule\(params\)/);
 assert.match(auth, /CacheService\.getScriptCache\(\)/);
