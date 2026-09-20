@@ -227,7 +227,7 @@ document.addEventListener("DOMContentLoaded", function () {
     "./admin-monthly-v58.js?v=20260920-fast-month-v1",
     "./admin-tour-enrollment.js?v=20260828-master-draft-v1",
     "./admin-tour-ui-polish.js?v=20260828-event-driven-v1",
-    "./admin-auto-reassign-enforce.js?v=20260920-head-office-counsel-v1",
+    "./admin-auto-reassign-enforce.js?v=20260920-head-office-counsel-v2",
     "./admin-daily-report.js?v=20260903-daily-save-required-v5",
     "./admin-soga-shifts.js?v=20260918-shift-publication-v1"
   ];

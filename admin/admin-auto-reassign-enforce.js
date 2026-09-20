@@ -16,6 +16,10 @@
     "MEAL_PLANNING"
   ]);
   const HEAD_OFFICE_STORE_CODE="HEAD_OFFICE";
+  const ONLINE_COUNSEL_START_MINUTES=19*60;
+  const ONLINE_COUNSEL_LAST_START_MINUTES=22*60;
+  const ONLINE_COUNSEL_END_MINUTES=23*60;
+  const ONLINE_COUNSEL_TRAVEL_MINUTES=150;
   const INACTIVE_RESERVATION_STATUSES=new Set([
     "CANCELLED",
     "CANCELED",
@@ -52,9 +56,48 @@
       shiftStart<=reservationStart&&shiftEnd>=reservationEnd;
   }
 
-  function isHeadOfficeOnlineCounseling(reservation){
-    return code(reservation?.service_code)==="COUNSEL"&&
-      code(reservation?.store_code)===HEAD_OFFICE_STORE_CODE;
+  function isExplicitInPersonCounseling(reservation){
+    const method=code(reservation?.consultation_method);
+    const note=String(reservation?.note||"");
+    return ["IN_PERSON","INPERSON","FACE_TO_FACE","対面"].includes(method)||
+      /【実施方法】\s*対面/.test(note);
+  }
+
+  function isHeadOfficeOnlineCounseling(reservation,shifts){
+    if(code(reservation?.service_code)!=="COUNSEL")return false;
+
+    const store=code(reservation?.store_code);
+    const staffLocation=code(reservation?.staff_location);
+    const method=code(reservation?.consultation_method);
+    const note=String(reservation?.note||"");
+    if(
+      store===HEAD_OFFICE_STORE_CODE||
+      staffLocation===HEAD_OFFICE_STORE_CODE||
+      method==="ONLINE"||
+      /【実施方法】\s*ONLINE/i.test(note)||
+      /【担当者所在場所】\s*本社事務所/.test(note)
+    )return true;
+    if(isExplicitInPersonCounseling(reservation))return false;
+
+    // The staff-schedule API can normalize HEAD_OFFICE reservations to the
+    // service store and omit counseling metadata. Reconstruct the online-only
+    // rule from its fixed time range and the 150-minute post-shift travel gap.
+    const start=minutes(reservation?.start_time);
+    const end=minutes(reservation?.end_time);
+    if(
+      ![start,end].every(Number.isFinite)||
+      start<ONLINE_COUNSEL_START_MINUTES||
+      start>ONLINE_COUNSEL_LAST_START_MINUTES||
+      end>ONLINE_COUNSEL_END_MINUTES
+    )return false;
+
+    const staffCode=code(reservation?.staff_code);
+    const nonOfficeShiftEnds=(shifts||[]).filter(shift=>
+      code(shift?.staff_code)===staffCode&&
+      code(shift?.store_code)!==HEAD_OFFICE_STORE_CODE
+    ).map(shift=>minutes(shift?.end_time)).filter(Number.isFinite);
+    if(!nonOfficeShiftEnds.length)return true;
+    return start>=Math.max(...nonOfficeShiftEnds)+ONLINE_COUNSEL_TRAVEL_MINUTES;
   }
 
   function needsAssignment(reservation,shifts){
@@ -62,7 +105,7 @@
     if(!code(reservation.staff_code))return true;
     // HEAD_OFFICE is the online-only counseling location. Its assigned counselor
     // is managed by the counseling workflow, not by the displayed store shift.
-    if(isHeadOfficeOnlineCounseling(reservation))return false;
+    if(isHeadOfficeOnlineCounseling(reservation,shifts))return false;
     return !shifts.some(shift=>shiftCoversReservation(shift,reservation));
   }
 
