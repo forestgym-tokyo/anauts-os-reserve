@@ -563,7 +563,17 @@ async function updateReplaceWarning(){
 
 function invalidateShiftImportPreview_(){
   state.shiftPreview=null;
-  if($("#shiftImportButton"))$("#shiftImportButton").disabled=true;
+  setShiftImportButtonState_("idle",true);
+}
+
+function setShiftImportButtonState_(status,disabled){
+  const button=$("#shiftImportButton");
+  if(!button)return;
+  button.classList.toggle("is-registering",status==="registering");
+  button.classList.toggle("is-complete",status==="complete");
+  button.textContent=status==="registering"?"登録中…":status==="complete"?"登録完了":"登録する";
+  button.disabled=disabled;
+  button.setAttribute("aria-busy",status==="registering"?"true":"false");
 }
 
 ["#shiftImportMode","#shiftTargetMonth","#shiftBulkStore"].forEach(selector=>{
@@ -575,6 +585,7 @@ function invalidateShiftImportPreview_(){
 $("#shiftCsvFile")?.addEventListener("change",invalidateShiftImportPreview_);
 $("#shiftPreviewButton").onclick=async()=>{
   hideMsg();
+  setShiftImportButtonState_("idle",true);
   const f=$("#shiftCsvFile").files[0];
   if(!f)return msg("CSVファイルを選択してください。",true);
   try{
@@ -597,7 +608,7 @@ $("#shiftPreviewButton").onclick=async()=>{
 
     state.shiftPreview=j.data;
     renderPreview(j.data);
-    $("#shiftImportButton").disabled=+j.data.error_count>0||+j.data.valid_count===0;
+    setShiftImportButtonState_("idle",+j.data.error_count>0||+j.data.valid_count===0);
 
     if(+j.data.error_count){
       msg("エラーがあります。CSVを修正してください。",true);
@@ -646,6 +657,7 @@ $("#shiftImportButton").onclick=async()=>{
 
   if(!confirm(confirmText))return;
 
+  setShiftImportButtonState_("registering",true);
   try{
     const j=await apiPost({
       action:"importStaffShifts",
@@ -661,9 +673,10 @@ $("#shiftImportButton").onclick=async()=>{
       msg(`追加登録完了（${storeLabel}）：${j.data.inserted_count}件`);
     }
 
-    $("#shiftImportButton").disabled=true;
+    setShiftImportButtonState_("complete",true);
     await updateReplaceWarning();
   }catch(e){
+    setShiftImportButtonState_("idle",false);
     msg(e.message,true);
   }
 };

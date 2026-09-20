@@ -18,7 +18,7 @@ assert.match(source, /isExpiredAuthError_/);
 for (const page of ["index.html", "admin.html"]) {
   const html = fs.readFileSync(path.join(root, "admin", page), "utf8");
   const refreshIndex = html.indexOf("admin-auth-refresh.js?v=20260903-auth-refresh-v1");
-  const adminIndex = html.indexOf("admin.js?v=20260918-shift-publication-v1");
+  const adminIndex = html.indexOf("admin.js?v=20260920-shift-import-status-v1");
   assert.ok(refreshIndex >= 0, `${page} は認証更新スクリプトを読み込む`);
   assert.ok(refreshIndex < adminIndex, `${page} は管理画面起動前に認証更新を準備する`);
 }

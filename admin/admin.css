@@ -678,6 +678,24 @@ input::placeholder,textarea::placeholder{color:#647067}
   color:#ffaaaa;
 }
 
+#shiftImportButton.is-registering,
+#shiftImportButton.is-registering:disabled{
+  background:linear-gradient(180deg,#ffd36a,#f0a928)!important;
+  color:#211500!important;
+  box-shadow:0 10px 24px rgba(240,169,40,.24)!important;
+  opacity:1!important;
+  cursor:wait;
+}
+
+#shiftImportButton.is-complete,
+#shiftImportButton.is-complete:disabled{
+  background:linear-gradient(180deg,#59d9c0,#2eb598)!important;
+  color:#04130f!important;
+  box-shadow:0 10px 24px rgba(46,181,152,.24)!important;
+  opacity:1!important;
+  cursor:default;
+}
+
 
 /* =========================================================
    A-nauts OS Reserve / Fine polish v5
