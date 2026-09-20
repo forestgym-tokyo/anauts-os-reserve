@@ -224,7 +224,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 (function () {
   var addonSources = [
-    "./admin-monthly-v58.js?v=20260918-schedule-fetch-v2",
+    "./admin-monthly-v58.js?v=20260920-fast-month-v1",
     "./admin-tour-enrollment.js?v=20260828-master-draft-v1",
     "./admin-tour-ui-polish.js?v=20260828-event-driven-v1",
     "./admin-auto-reassign-enforce.js?v=20260901-store-aware-v1",

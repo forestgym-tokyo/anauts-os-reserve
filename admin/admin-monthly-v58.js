@@ -80,6 +80,78 @@
     async function directEdit(r){const s=prompt("開始時刻",String(r.start_time).slice(0,5));if(s===null)return;const e=prompt("終了時刻",String(r.end_time).slice(0,5));if(e===null)return;if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(s)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(e)||s>=e)return alert("時刻を確認してください。");try{await apiPost({action:"saveStaffShift",shift_id:r.shift_id,staff_code:state.authUser.staff_code,store_code:r.store_code||state.authUser.store_code||"YACHIYO",date:r.date,start_time:s,end_time:e});await loadMyShiftView()}catch(x){alert(x.message)}}
     async function directDelete(r){if(!confirm(`${r.date} ${r.start_time}〜${r.end_time} を削除しますか？`))return;try{await apiPost({action:"deleteStaffShift",shift_id:r.shift_id});await loadMyShiftView()}catch(x){alert(x.message)}}
 
+    const MONTHLY_CACHE_PREFIX="anauts_monthly_cache_v1:";
+    const MONTHLY_CACHE_FRESH_MS=30*1000;
+    const MONTHLY_CACHE_MAX_AGE_MS=8*60*60*1000;
+    const monthlyRequests_=new Map();
+    let monthlyLoadSequence_=0;
+
+    function monthlySubject_(){
+      const tokenSubject=typeof currentAuthSubject_==="function"?currentAuthSubject_():"";
+      return tokenSubject||String(state.authUser?.email||state.authUser?.staff_code||"anonymous");
+    }
+    function monthlyScope_(){return sogaStaffRestricted_()?"SOGA":"ALL"}
+    function monthlyCacheKey_(ym){return `${MONTHLY_CACHE_PREFIX}${encodeURIComponent(monthlySubject_())}:${monthlyScope_()}:${ym}`}
+    function readMonthlyCache_(ym){
+      try{
+        const cached=JSON.parse(localStorage.getItem(monthlyCacheKey_(ym))||"null");
+        if(!cached||cached.month!==ym||!cached.saved_at)return null;
+        const age=Date.now()-Number(cached.saved_at);
+        if(age<0||age>MONTHLY_CACHE_MAX_AGE_MS)return null;
+        cached.age=age;
+        return cached;
+      }catch(_){return null}
+    }
+    function writeMonthlyCache_(ym,payload){
+      try{
+        localStorage.setItem(monthlyCacheKey_(ym),JSON.stringify({
+          month:ym,
+          saved_at:Date.now(),
+          rows:payload.rows||[],
+          staff:payload.staff||[],
+          publication:payload.publication||null
+        }));
+      }catch(_){
+        // 保存できない端末でも通常取得は継続する。
+      }
+    }
+    function invalidateMonthlyCache_(){
+      monthlyRequests_.clear();
+      try{
+        for(let i=localStorage.length-1;i>=0;i-=1){
+          const key=localStorage.key(i)||"";
+          if(key.startsWith(MONTHLY_CACHE_PREFIX))localStorage.removeItem(key);
+        }
+      }catch(_){ }
+    }
+    window.ANAUTS_INVALIDATE_MONTHLY_CACHE=invalidateMonthlyCache_;
+
+    const monthlyMutationActions_=new Set([
+      "saveStaffShift","deleteStaffShift","importStaffShifts",
+      "saveSogaShiftAssignments","publishStaffShiftMonth",
+      "saveStaff","setStaffActive"
+    ]);
+    if(!window.__ANAUTS_MONTHLY_POST_INVALIDATION_INSTALLED__){
+      window.__ANAUTS_MONTHLY_POST_INVALIDATION_INSTALLED__=true;
+      const originalApiPost=apiPost;
+      apiPost=async function(payload){
+        const result=await originalApiPost.apply(this,arguments);
+        if(monthlyMutationActions_.has(String(payload?.action||"")))invalidateMonthlyCache_();
+        return result;
+      };
+    }
+
+    function monthlyUpdatedLabel_(savedAt){
+      try{return new Date(Number(savedAt)||Date.now()).toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"})}
+      catch(_){return ""}
+    }
+    function setMonthlyFreshness_(text,isWarning){
+      const node=document.querySelector("#mFreshness");
+      if(!node)return;
+      node.textContent=text||"";
+      node.style.color=isWarning?"#ffcf7d":"#91a198";
+    }
+
     function buildMonthly(){
       if(document.querySelector('[data-view="monthlySchedule"]'))return;
       ensureCalendarCss();
@@ -93,7 +165,7 @@
       const v=document.createElement("section");
       v.id="monthlyScheduleView";
       v.className="view";
-      v.innerHTML=`<div class="page-heading"><div><p class="eyebrow">MONTHLY SCHEDULE</p><h1>予定一覧</h1><p>月間カレンダーでスタッフ・トレーナーの勤務予定を確認します。</p></div></div><div class="schedule-toolbar card"><div class="toolbar-group"><button id="mPrev" class="icon-button">‹</button><button id="mNow" class="ghost-button">今月</button><button id="mNext" class="icon-button">›</button></div><strong id="mLabel" class="period-title"></strong><div class="monthly-filter-group"><label class="monthly-filter-field"><span>店舗</span><select id="mStore"></select></label><label class="monthly-filter-field"><span>表示</span><select id="mFilter"></select></label></div></div><div id="mBoard" class="card"></div><div id="mDetail" class="mcal-detail is-hidden"></div>`;
+      v.innerHTML=`<div class="page-heading"><div><p class="eyebrow">MONTHLY SCHEDULE</p><h1>予定一覧</h1><p>月間カレンダーでスタッフ・トレーナーの勤務予定を確認します。</p></div></div><div class="schedule-toolbar card"><div class="toolbar-group"><button id="mPrev" class="icon-button">‹</button><button id="mNow" class="ghost-button">今月</button><button id="mNext" class="icon-button">›</button></div><div><strong id="mLabel" class="period-title"></strong><span id="mFreshness" aria-live="polite" style="display:block;margin-top:4px;color:#91a198;font-size:11px;font-weight:800"></span></div><div class="monthly-filter-group"><label class="monthly-filter-field"><span>店舗</span><select id="mStore"></select></label><label class="monthly-filter-field"><span>表示</span><select id="mFilter"></select></label></div></div><div id="mBoard" class="card"></div><div id="mDetail" class="mcal-detail is-hidden"></div>`;
       main.insertBefore(v,document.querySelector("#registrationView"));
       state.monthlyMonth=state.monthlyMonth||localYmd().slice(0,7);
       state.monthlyStore=sogaStaffRestricted_()?"SOGA":(state.monthlyStore||"ALL");
@@ -105,38 +177,94 @@
       document.querySelector("#mFilter").onchange=()=>{renderMonth();document.querySelector("#mDetail").classList.add("is-hidden")};
     }
     function move(n){const [y,m]=state.monthlyMonth.split("-").map(Number),d=new Date(y,m-1+n,1);state.monthlyMonth=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;loadMonth()}
-    async function loadMonth(){
-      const ym=state.monthlyMonth;
-      const r={start:`${ym}-01`,end:`${ym}-${String(new Date(+ym.slice(0,4),+ym.slice(5,7),0).getDate()).padStart(2,"0")}`};
-      const board=document.querySelector("#mBoard");
-      document.querySelector("#mLabel").textContent=`${+ym.slice(0,4)}年${+ym.slice(5,7)}月`;
-      board.innerHTML='<div class="staff-schedule-loading">読み込んでいます…</div>';
-      document.querySelector("#mDetail").classList.add("is-hidden");
-      try{
-        const staffRequest=state.staff.length?Promise.resolve(null):apiGet("getStaff",{include_inactive:"false"}).catch(staffError=>{
-          // 名簿取得だけが一時的に失敗しても、シフト行に含まれる情報で予定表を表示する。
-          console.warn("予定一覧のスタッフ名簿を取得できませんでした。",staffError);
-          return null;
-        });
-        const shiftParams={start_date:r.start,end_date:r.end};
-        if(sogaStaffRestricted_())shiftParams.store_code="SOGA";
-        const shiftRequest=apiGet("getStaffShifts",shiftParams);
-        const [j,s]=await Promise.all([shiftRequest,staffRequest]);
-        if(s)state.staff=Array.isArray(s.data?.staff)?s.data.staff:(Array.isArray(s.data)?s.data:[]);
-        if(j.data?.publication?.is_published===false){
-          state.monthlyRows=[];
-          storeFilters_();
-          filters();
-          syncMonthlyHeading_();
-          board.innerHTML=`<div class="staff-schedule-empty"><strong>公開前</strong><span>${esc(j.data.publication.message||"管理者が公開すると予定を確認できます。")}</span></div>`;
-          return;
-        }
-        state.monthlyRows=(Array.isArray(j.data)?j.data:(j.data?.shifts||[])).filter(x=>x.active!==false);
+    function applyMonthlyPayload_(ym,payload,sourceLabel){
+      if(state.monthlyMonth!==ym)return;
+      if(Array.isArray(payload.staff)&&payload.staff.length)state.staff=payload.staff;
+      if(payload.publication?.is_published===false){
+        state.monthlyRows=[];
+        storeFilters_();
+        filters();
+        syncMonthlyHeading_();
+        document.querySelector("#mBoard").innerHTML=`<div class="staff-schedule-empty"><strong>公開前</strong><span>${esc(payload.publication.message||"管理者が公開すると予定を確認できます。")}</span></div>`;
+      }else{
+        state.monthlyRows=(payload.rows||[]).filter(x=>x.active!==false);
         storeFilters_();
         filters();
         syncMonthlyHeading_();
         renderMonth();
-      }catch(e){board.innerHTML=`<div class="staff-schedule-empty"><strong>取得できませんでした</strong><span>${esc(e.message||"通信に失敗しました。")}</span><button id="mRetry" class="ghost-button" type="button" style="margin-top:14px">再読込</button></div>`;document.querySelector("#mRetry")?.addEventListener("click",loadMonth)}
+      }
+      if(sourceLabel)setMonthlyFreshness_(sourceLabel,false);
+    }
+    function loginPrefetchFor_(ym){
+      const prefetch=window.ANAUTS_LOGIN_MONTH_PREFETCH;
+      if(!prefetch||prefetch.month!==ym||!prefetch.promise)return null;
+      return Promise.resolve(prefetch.promise).then(result=>result||apiGet("getStaffShifts",monthParams_(ym)));
+    }
+    function monthParams_(ym){
+      const params={start_date:`${ym}-01`,end_date:`${ym}-${String(new Date(+ym.slice(0,4),+ym.slice(5,7),0).getDate()).padStart(2,"0")}`};
+      if(sogaStaffRestricted_())params.store_code="SOGA";
+      return params;
+    }
+    function fetchMonthlyPayload_(ym){
+      const requestKey=`${monthlyScope_()}:${ym}`;
+      if(monthlyRequests_.has(requestKey))return monthlyRequests_.get(requestKey);
+      const shiftRequest=loginPrefetchFor_(ym)||apiGet("getStaffShifts",monthParams_(ym));
+      const request=Promise.resolve(shiftRequest).then(j=>{
+        const payload={
+          rows:(Array.isArray(j.data)?j.data:(j.data?.shifts||[])).filter(x=>x.active!==false),
+          staff:state.staff,
+          publication:j.data?.publication||null
+        };
+        if(!state.staff.length){
+          apiGet("getStaff",{include_inactive:"false"}).then(s=>{
+            const staff=Array.isArray(s.data?.staff)?s.data.staff:(Array.isArray(s.data)?s.data:[]);
+            if(!staff.length)return;
+            state.staff=staff;
+            payload.staff=staff;
+            writeMonthlyCache_(ym,payload);
+            if(state.monthlyMonth===ym){
+              storeFilters_();
+              filters();
+              syncMonthlyHeading_();
+              renderMonth();
+            }
+          }).catch(staffError=>console.warn("予定一覧のスタッフ名簿を取得できませんでした。",staffError));
+        }
+        return payload;
+      }).finally(()=>monthlyRequests_.delete(requestKey));
+      monthlyRequests_.set(requestKey,request);
+      return request;
+    }
+    async function loadMonth(options={}){
+      const ym=state.monthlyMonth;
+      const board=document.querySelector("#mBoard");
+      const sequence=++monthlyLoadSequence_;
+      document.querySelector("#mLabel").textContent=`${+ym.slice(0,4)}年${+ym.slice(5,7)}月`;
+      document.querySelector("#mDetail").classList.add("is-hidden");
+      const cached=readMonthlyCache_(ym);
+      if(cached){
+        const fresh=cached.age<=MONTHLY_CACHE_FRESH_MS&&!options.force;
+        applyMonthlyPayload_(ym,cached,fresh?`更新 ${monthlyUpdatedLabel_(cached.saved_at)}`:`保存データ ${monthlyUpdatedLabel_(cached.saved_at)}・最新情報を確認中`);
+        if(fresh)return;
+      }else{
+        board.innerHTML='<div class="staff-schedule-loading">読み込んでいます…</div>';
+        setMonthlyFreshness_("最新情報を取得中",false);
+      }
+      try{
+        const payload=await fetchMonthlyPayload_(ym);
+        writeMonthlyCache_(ym,payload);
+        if(sequence!==monthlyLoadSequence_||state.monthlyMonth!==ym)return;
+        applyMonthlyPayload_(ym,payload,`更新 ${monthlyUpdatedLabel_(Date.now())}`);
+      }catch(e){
+        if(sequence!==monthlyLoadSequence_||state.monthlyMonth!==ym)return;
+        if(cached){
+          setMonthlyFreshness_("保存データを表示中・更新できませんでした",true);
+          return;
+        }
+        board.innerHTML=`<div class="staff-schedule-empty"><strong>取得できませんでした</strong><span>${esc(e.message||"通信に失敗しました。")}</span><button id="mRetry" class="ghost-button" type="button" style="margin-top:14px">再読込</button></div>`;
+        setMonthlyFreshness_("更新できませんでした",true);
+        document.querySelector("#mRetry")?.addEventListener("click",()=>loadMonth({force:true}),{once:true});
+      }
     }
     function storeLabel_(code){
       const master=(state.stores||[]).find(x=>String(x.store_code)===String(code));
@@ -209,7 +337,11 @@
       detail.scrollIntoView({behavior:"smooth",block:"nearest"});
     }
 
-    buildMonthly();if(state.authUser)applyPermissionUi();
+    buildMonthly();
+    if(state.authUser){
+      applyPermissionUi();
+      window.setTimeout(()=>loadMonth(),0);
+    }
   }
   boot();
 })();

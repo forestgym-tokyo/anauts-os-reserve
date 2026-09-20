@@ -1,11 +1,87 @@
-// BUILD: 20260818-logout-message-v49
+// BUILD: 20260920-fast-login-v1
 const API_URL="https://script.google.com/macros/s/AKfycbyvpQRxRpMRfpaQHtBar77dViCqPl-hdFW-2yMdozhN8RHtwcrFiNEM9cvEbny4x9q0/exec";
-const state={staff:[],stores:[],services:[],serviceHours:[],presenceWeekdays:[],presenceSpecials:[],selectedServiceCode:"",selectedStaffCode:"",shiftRows:[],shiftPreview:null,staffScheduleDate:"",staffSchedule:null,staffScheduleBootstrapDate:"",staffScheduleBootstrapError:"",trainerScheduleDate:"",trainerSchedule:null,myShiftMonth:"",myShiftDate:"",myShiftRows:[],myShiftRequests:[],authUser:null,idToken:""};
+const state={staff:[],stores:[],services:[],serviceHours:[],presenceWeekdays:[],presenceSpecials:[],selectedServiceCode:"",selectedStaffCode:"",shiftRows:[],shiftPreview:null,staffScheduleDate:"",staffSchedule:null,staffScheduleBootstrapDate:"",staffScheduleBootstrapError:"",trainerScheduleDate:"",trainerSchedule:null,myShiftMonth:"",myShiftDate:"",myShiftRows:[],myShiftRequests:[],authUser:null,idToken:"",authRestoredFromCache:false};
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
 function authEnabled(){return !!window.ANAUTS_AUTH?.enabled}
 function withAuth(params={}){const o={...params};if(authEnabled()&&state.idToken)o.id_token=state.idToken;return o}
 async function apiGet(action,params={}){const u=new URL(API_URL);u.searchParams.set("action",action);Object.entries(withAuth(params)).forEach(([k,v])=>u.searchParams.set(k,v));u.searchParams.set("_",Date.now());const r=await fetch(u,{cache:"no-store"}),j=await r.json();if(!j.ok)throw new Error(j.message||"取得失敗");return j}
 async function apiPost(p){const r=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(withAuth(p))}),j=await r.json();if(!j.ok)throw new Error(j.message||"処理失敗");return j}
+
+const AUTH_BOOTSTRAP_CACHE_KEY="anauts_auth_bootstrap_v1";
+const AUTH_BOOTSTRAP_CACHE_MAX_AGE_MS=8*60*60*1000;
+
+function tokenPayload_(token){
+  try{
+    const part=String(token||"").split(".")[1]||"";
+    const normalized=part.replace(/-/g,"+").replace(/_/g,"/");
+    const padded=normalized+"=".repeat((4-normalized.length%4)%4);
+    return JSON.parse(atob(padded));
+  }catch(_){
+    return {};
+  }
+}
+
+function currentAuthSubject_(){
+  const payload=tokenPayload_(state.idToken);
+  return String(payload.sub||payload.user_id||"").trim();
+}
+
+function readAuthBootstrapCache_(){
+  try{
+    const cached=JSON.parse(localStorage.getItem(AUTH_BOOTSTRAP_CACHE_KEY)||"null");
+    if(!cached||!cached.profile||!cached.saved_at)return null;
+    if(Date.now()-Number(cached.saved_at)>AUTH_BOOTSTRAP_CACHE_MAX_AGE_MS)return null;
+    const subject=currentAuthSubject_();
+    if(!subject||String(cached.subject||"")!==subject)return null;
+    return cached;
+  }catch(_){
+    return null;
+  }
+}
+
+function saveAuthBootstrapCache_(){
+  if(!state.authUser)return;
+  const subject=currentAuthSubject_();
+  if(!subject)return;
+  try{
+    localStorage.setItem(AUTH_BOOTSTRAP_CACHE_KEY,JSON.stringify({
+      subject,
+      saved_at:Date.now(),
+      profile:state.authUser,
+      staff_schedule_date:state.staffScheduleBootstrapDate||state.staffScheduleDate||"",
+      staff_schedule_error:state.staffScheduleBootstrapError||"",
+      staff_schedule:state.staffSchedule||null
+    }));
+  }catch(_){
+    // 保存容量不足やプライベートブラウズでも通常ログインは継続する。
+  }
+}
+
+function clearFastLocalCaches_(){
+  try{
+    localStorage.removeItem(AUTH_BOOTSTRAP_CACHE_KEY);
+    for(let i=localStorage.length-1;i>=0;i-=1){
+      const key=localStorage.key(i)||"";
+      if(key.startsWith("anauts_monthly_cache_v1:"))localStorage.removeItem(key);
+    }
+  }catch(_){
+    // ストレージを利用できなくてもログアウト処理は継続する。
+  }
+}
+
+function persistedIdToken_(){
+  try{return localStorage.getItem("anauts_id_token")||""}
+  catch(_){return ""}
+}
+
+function clearStoredAuthTokens_(){
+  const keys=["anauts_id_token","anauts_refresh_token","anauts_id_token_expires_at"];
+  [typeof sessionStorage!=="undefined"?sessionStorage:null,typeof localStorage!=="undefined"?localStorage:null]
+    .filter(Boolean)
+    .forEach(storage=>{
+      try{keys.forEach(key=>storage.removeItem(key))}catch(_){ }
+    });
+}
 
 function roleHonorific(user){
   if(!user)return "";
@@ -116,6 +192,60 @@ async function loadCurrentUserWithSchedule_(){
     store_code:"YACHIYO"
   });
   applyAuthBootstrap_(j.data||null);
+  saveAuthBootstrapCache_();
+}
+
+let loginMonthPrefetch_=null;
+function startLoginMonthPrefetch_(){
+  if(!state.idToken)return null;
+  const ym=localYmd().slice(0,7);
+  if(loginMonthPrefetch_?.month===ym)return loginMonthPrefetch_.promise;
+  const endDay=String(new Date(+ym.slice(0,4),+ym.slice(5,7),0).getDate()).padStart(2,"0");
+  const promise=apiGet("getStaffShifts",{
+    start_date:`${ym}-01`,
+    end_date:`${ym}-${endDay}`
+  }).catch(error=>{
+    console.warn("月間予定の先読みが完了しませんでした。",error);
+    return null;
+  });
+  loginMonthPrefetch_={month:ym,promise};
+  window.ANAUTS_LOGIN_MONTH_PREFETCH=loginMonthPrefetch_;
+  return promise;
+}
+
+function isAuthAccessError_(error){
+  const message=String(error?.message||error||"");
+  return message.includes("利用権限")||
+    message.includes("ログイン情報が無効")||
+    message.includes("ログインが必要")||
+    message.includes("IDトークン")||
+    message.includes("認証トークン");
+}
+
+async function refreshCachedAuthInBackground_(){
+  if(!state.authRestoredFromCache)return;
+  try{
+    await loadCurrentUserWithSchedule_();
+    state.authRestoredFromCache=false;
+    applyPermissionUi();
+    const activeView=document.querySelector(".nav-button.is-active")?.dataset?.view||"";
+    if(activeView==="staffSchedule"){
+      $("#staffScheduleDateLabel").textContent=formatStaffDate(state.staffScheduleDate);
+      renderStaffSchedule(state.staffSchedule||{});
+      installWithdrawalShortcuts_(state.staffSchedule||{});
+    }
+  }catch(error){
+    if(isAuthAccessError_(error)){
+      logout();
+      showLoginMessage("ログインの有効期限または利用権限を確認できませんでした。再度ログインしてください。",true);
+      return;
+    }
+    const message=$("#staffScheduleMessage");
+    if(message){
+      message.textContent="保存済みの予定を表示しています。最新情報の確認を続けています。";
+      message.classList.remove("is-hidden","is-error");
+    }
+  }
 }
 
 function markAdminCoreReady_(){
@@ -150,9 +280,17 @@ async function firebaseSignIn(email,password){
 }
 async function restoreAuthSession(){
   if(!authEnabled())return true;
-  const token=sessionStorage.getItem("anauts_id_token")||"";
+  const token=sessionStorage.getItem("anauts_id_token")||persistedIdToken_();
   if(!token)return false;
   state.idToken=token;
+  startLoginMonthPrefetch_();
+  const cached=readAuthBootstrapCache_();
+  if(cached){
+    applyAuthBootstrap_(cached);
+    state.authRestoredFromCache=true;
+    applyPermissionUi();
+    return !!state.authUser;
+  }
   try{
     await loadCurrentUserWithSchedule_();
     applyPermissionUi();
@@ -198,6 +336,7 @@ async function doLogin(e){
     const auth=await firebaseSignIn($("#loginEmail").value.trim(),$("#loginPassword").value);
     state.idToken=auth.idToken;
     sessionStorage.setItem("anauts_id_token",auth.idToken);
+    startLoginMonthPrefetch_();
     await loadCurrentUserWithSchedule_();
     if(!state.authUser)throw new Error("このアカウントにはA-nauts OS Reserveの利用権限がありません。");
     $("#loginGate").classList.add("is-hidden");
@@ -206,7 +345,14 @@ async function doLogin(e){
     markAdminCoreReady_();
   }catch(err){
     state.idToken="";
-    sessionStorage.removeItem("anauts_id_token");
+    if(typeof window.ANAUTS_CLEAR_AUTH_SESSION==="function"){
+      window.ANAUTS_CLEAR_AUTH_SESSION();
+    }else{
+      clearStoredAuthTokens_();
+    }
+    clearFastLocalCaches_();
+    loginMonthPrefetch_=null;
+    window.ANAUTS_LOGIN_MONTH_PREFETCH=null;
     showLoginMessage(err.message||"ログインに失敗しました。",true);
   }finally{
     button.disabled=false; button.textContent="ログイン";
@@ -215,7 +361,12 @@ async function doLogin(e){
 function logout(){
   state.idToken="";
   state.authUser=null;
-  sessionStorage.removeItem("anauts_id_token");
+  state.authRestoredFromCache=false;
+  clearStoredAuthTokens_();
+  clearFastLocalCaches_();
+  loginMonthPrefetch_=null;
+  window.ANAUTS_LOGIN_MONTH_PREFETCH=null;
+  if(typeof window.ANAUTS_INVALIDATE_MONTHLY_CACHE==="function")window.ANAUTS_INVALIDATE_MONTHLY_CACHE();
   resetSogaStaffUi_(true);
 
   if(authEnabled()){
@@ -1809,6 +1960,7 @@ window.addEventListener("DOMContentLoaded",async()=>{
 
   $("#loginGate")?.classList.add("is-hidden");
   applyPermissionUi();
-  await initializeAppAfterAuth();
   markAdminCoreReady_();
+  await initializeAppAfterAuth();
+  refreshCachedAuthInBackground_();
 });

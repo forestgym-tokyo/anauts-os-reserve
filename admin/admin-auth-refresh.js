@@ -3,8 +3,39 @@
 
   const REFRESH_TOKEN_KEY="anauts_refresh_token";
   const EXPIRES_AT_KEY="anauts_id_token_expires_at";
+  const ID_TOKEN_KEY="anauts_id_token";
   const REFRESH_MARGIN_MS=5*60*1000;
   let refreshPromise=null;
+
+  function storedValue_(key){
+    let persistent="";
+    try{
+      if(typeof localStorage!=="undefined")persistent=localStorage.getItem(key)||"";
+    }catch(_){}
+    return String(sessionStorage.getItem(key)||persistent||"").trim();
+  }
+
+  function storeValue_(key,value){
+    const normalized=String(value||"");
+    sessionStorage.setItem(key,normalized);
+    try{
+      if(typeof localStorage!=="undefined")localStorage.setItem(key,normalized);
+    }catch(_){
+      // 端末側へ保存できない場合も、現在のタブでは利用を継続する。
+    }
+  }
+
+  function removeStoredValue_(key){
+    sessionStorage.removeItem(key);
+    try{if(typeof localStorage!=="undefined")localStorage.removeItem(key)}catch(_){}
+  }
+
+  function restorePersistentSession_(){
+    [ID_TOKEN_KEY,REFRESH_TOKEN_KEY,EXPIRES_AT_KEY].forEach(key=>{
+      const value=storedValue_(key);
+      if(value&&!sessionStorage.getItem(key))sessionStorage.setItem(key,value);
+    });
+  }
 
   function tokenExpiresAt_(token){
     try{
@@ -19,7 +50,7 @@
   }
 
   function storedExpiresAt_(token){
-    const saved=Number(sessionStorage.getItem(EXPIRES_AT_KEY)||0);
+    const saved=Number(storedValue_(EXPIRES_AT_KEY)||0);
     return saved||tokenExpiresAt_(token);
   }
 
@@ -30,16 +61,17 @@
 
     if(idToken){
       state.idToken=idToken;
-      sessionStorage.setItem("anauts_id_token",idToken);
+      storeValue_(ID_TOKEN_KEY,idToken);
       const expiresAt=expiresIn>0?Date.now()+expiresIn*1000:tokenExpiresAt_(idToken);
-      if(expiresAt)sessionStorage.setItem(EXPIRES_AT_KEY,String(expiresAt));
+      if(expiresAt)storeValue_(EXPIRES_AT_KEY,String(expiresAt));
     }
-    if(refreshToken)sessionStorage.setItem(REFRESH_TOKEN_KEY,refreshToken);
+    if(refreshToken)storeValue_(REFRESH_TOKEN_KEY,refreshToken);
   }
 
   function clearRefreshSession_(){
-    sessionStorage.removeItem(REFRESH_TOKEN_KEY);
-    sessionStorage.removeItem(EXPIRES_AT_KEY);
+    removeStoredValue_(ID_TOKEN_KEY);
+    removeStoredValue_(REFRESH_TOKEN_KEY);
+    removeStoredValue_(EXPIRES_AT_KEY);
   }
 
   async function requestRefresh_(refreshToken){
@@ -67,13 +99,13 @@
 
   async function ensureFreshAuthToken_(force){
     if(typeof state==="undefined"||typeof authEnabled!=="function"||!authEnabled())return false;
-    const token=String(state.idToken||sessionStorage.getItem("anauts_id_token")||"").trim();
+    const token=String(state.idToken||storedValue_(ID_TOKEN_KEY)||"").trim();
     if(!token)return false;
 
     const expiresAt=storedExpiresAt_(token);
     if(!force&&(!expiresAt||expiresAt>Date.now()+REFRESH_MARGIN_MS))return false;
 
-    const refreshToken=String(sessionStorage.getItem(REFRESH_TOKEN_KEY)||"").trim();
+    const refreshToken=storedValue_(REFRESH_TOKEN_KEY);
     if(!refreshToken){
       throw new Error("ログインの有効期限が切れました。入力内容を残したまま、別タブで再度ログインしてください。");
     }
@@ -127,6 +159,13 @@
 
     const originalRestore=restoreAuthSession;
     restoreAuthSession=async function(){
+      restorePersistentSession_();
+      try{
+        await ensureFreshAuthToken_(false);
+      }catch(_){
+        clearRefreshSession_();
+        return false;
+      }
       const restored=await originalRestore.apply(this,arguments);
       if(!restored)clearRefreshSession_();
       return restored;
@@ -152,6 +191,7 @@
     apiGet=wrapApi_(apiGet);
     apiPost=wrapApi_(apiPost);
     window.ANAUTS_ENSURE_FRESH_AUTH_TOKEN=ensureFreshAuthToken_;
+    window.ANAUTS_CLEAR_AUTH_SESSION=clearRefreshSession_;
   }
 
   if(document.readyState==="loading"){
