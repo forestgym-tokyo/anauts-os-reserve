@@ -85,6 +85,20 @@ function createContext(fetchImpl) {
   assert.match(recovered.el.weekStatus.textContent, /再確認しています/);
 
   calls = 0;
+  const timeoutRecovered = createContext(async () => {
+    calls += 1;
+    if (calls === 1) {
+      const timeoutError = new Error("The operation was aborted");
+      timeoutError.name = "AbortError";
+      throw timeoutError;
+    }
+    return successResponse();
+  });
+  const timeoutResults = await timeoutRecovered.runRange(dates);
+  assert.equal(calls, 2, "初回タイムアウト後は1回だけ自動再取得する");
+  assert.equal(timeoutResults.length, 7);
+
+  calls = 0;
   const failed = createContext(async () => {
     calls += 1;
     throw new TypeError("Failed to fetch");

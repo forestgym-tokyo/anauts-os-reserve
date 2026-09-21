@@ -875,7 +875,7 @@ async function fetchWeekSlotsRange_(dates) {
       lastError = error;
       const canRetry =
         attempt + 1 < maxAttempts &&
-        isRetryableTourRangeError_(error);
+        isRetryableTourRangeError_(error, attempt);
 
       if (!canRetry) break;
 
@@ -890,8 +890,11 @@ async function fetchWeekSlotsRange_(dates) {
   throw new Error(tourRangeUserMessage_(lastError));
 }
 
-function isRetryableTourRangeError_(error) {
-  if (!error || error.name === "AbortError") return false;
+function isRetryableTourRangeError_(error, attempt) {
+  if (!error) return false;
+  // 初回のコールドスタートが45秒を超えても、GAS側の計算は継続して
+  // キャッシュされるため、タイムアウト後は1回だけ自動で取り直す。
+  if (error.name === "AbortError") return attempt === 0;
   if (error.retryable === true) return true;
 
   return error.name === "TypeError" ||

@@ -40,8 +40,13 @@ assert.match(
 );
 assert.match(
   reserve,
-  /isRetryableTourRangeError_\(error\)/,
+  /isRetryableTourRangeError_\(error, attempt\)/,
   "再試行は通信失敗など回復可能なエラーだけに限定する"
+);
+assert.match(
+  reserve,
+  /if \(error\.name === "AbortError"\) return attempt === 0;/,
+  "初回のコールドスタートがタイムアウトしても1回だけ自動再取得する"
 );
 assert.match(
   reserve,
@@ -138,7 +143,7 @@ const unchangedPages = [
 const tourHtml = fs.readFileSync(path.join(root, "tour", "index.html"), "utf8");
 assert.match(
   tourHtml,
-  /reserve\.js\?v=20260921-tour-retry1/,
+  /reserve\.js\?v=20260921-tour-retry2/,
   "店内見学は通信再試行対応後の reserve.js を読み込む"
 );
 
