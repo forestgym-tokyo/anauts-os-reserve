@@ -35,8 +35,23 @@ assert.match(
 );
 assert.match(
   reserve,
-  /if \(isTour\) \{\s*throw new Error/,
-  "店内見学の一括取得失敗時は日別APIを連続起動しない"
+  /const TOUR_RANGE_MAX_ATTEMPTS = 3/,
+  "店内見学の一時的な通信失敗は最大3回まで再試行する"
+);
+assert.match(
+  reserve,
+  /isRetryableTourRangeError_\(error\)/,
+  "再試行は通信失敗など回復可能なエラーだけに限定する"
+);
+assert.match(
+  reserve,
+  /throw new Error\(tourRangeUserMessage_\(lastError\)\)/,
+  "再試行後も失敗した場合は日本語の案内へ変換する"
+);
+assert.match(
+  reserve,
+  /通信が一時的に不安定です。少し待ってから「空き状況を更新」を押してください。/,
+  "ブラウザのFailed to fetchをそのまま表示しない"
 );
 assert.match(
   reserve,
@@ -113,7 +128,6 @@ assert.match(
 );
 
 const unchangedPages = [
-  "counsel",
   "procedure",
   "meal-planning",
   "training-support",
@@ -124,8 +138,8 @@ const unchangedPages = [
 const tourHtml = fs.readFileSync(path.join(root, "tour", "index.html"), "utf8");
 assert.match(
   tourHtml,
-  /reserve\.js\?v=20260906-tour-queue2/,
-  "店内見学は同時実行抑止後の reserve.js を読み込む"
+  /reserve\.js\?v=20260921-tour-retry1/,
+  "店内見学は通信再試行対応後の reserve.js を読み込む"
 );
 
 for (const page of unchangedPages) {
@@ -136,6 +150,13 @@ for (const page of unchangedPages) {
     `${page} の読込バージョンは変更しない`
   );
 }
+
+const counselHtml = fs.readFileSync(path.join(root, "counsel", "index.html"), "utf8");
+assert.match(
+  counselHtml,
+  /reserve\.js\?v=20260917-submit-9s-v1/,
+  "カウンセリングは9秒受付対応後の reserve.js を読み込む"
+);
 
 const trialHtml = fs.readFileSync(path.join(root, "trial", "index.html"), "utf8");
 assert.match(

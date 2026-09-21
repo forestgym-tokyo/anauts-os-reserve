@@ -3,6 +3,8 @@ const DAYS = 7;
 const SERVICES_SESSION_CACHE_KEY = "anauts-reserve-services-v1";
 const SERVICES_SESSION_CACHE_MS = 5 * 60 * 1000;
 const TOUR_RANGE_TIMEOUT_MS = 45000;
+const TOUR_RANGE_MAX_ATTEMPTS = 3;
+const TOUR_RANGE_RETRY_DELAY_MS = 1200;
 const DIET_COUNSELING_SUBMIT_DISPLAY_LIMIT_MS = 9000;
 const DIET_COUNSELING_CONFIRM_INITIAL_DELAY_MS = 250;
 const DIET_COUNSELING_CONFIRM_POLL_MS = 500;
@@ -814,51 +816,107 @@ async function fetchWeekSlotsRange_(dates) {
   }
   url.searchParams.set("start_date", dates[0]);
   url.searchParams.set("days", String(dates.length));
-  url.searchParams.set("_", Date.now().toString());
+  const maxAttempts = isTour ? TOUR_RANGE_MAX_ATTEMPTS : 1;
+  let lastError = null;
 
-  const controller = isTour && typeof AbortController === "function"
-    ? new AbortController()
-    : null;
-  const timeoutId = controller
-    ? setTimeout(() => controller.abort(), TOUR_RANGE_TIMEOUT_MS)
-    : null;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    url.searchParams.set("_", `${Date.now()}-${attempt}`);
 
-  try {
-    const response = await fetch(url.toString(), {
-      cache: "no-store",
-      ...(controller ? { signal: controller.signal } : {})
-    });
-    const result = await response.json();
-    const rangeResults = result && result.ok === true && result.data &&
-      Array.isArray(result.data.results)
-      ? result.data.results
+    const controller = isTour && typeof AbortController === "function"
+      ? new AbortController()
+      : null;
+    const timeoutId = controller
+      ? setTimeout(() => controller.abort(), TOUR_RANGE_TIMEOUT_MS)
       : null;
 
-    if (rangeResults && rangeResults.length === dates.length) {
-      return rangeResults;
-    }
+    try {
+      const response = await fetch(url.toString(), {
+        cache: "no-store",
+        ...(controller ? { signal: controller.signal } : {})
+      });
 
-    if (isTour) {
-      throw new Error(
+      if (!response.ok) {
+        const httpError = new Error(`HTTP ${response.status}`);
+        httpError.retryable = response.status === 429 || response.status >= 500;
+        throw httpError;
+      }
+
+      const result = await response.json();
+      const rangeResults = result && result.ok === true && result.data &&
+        Array.isArray(result.data.results)
+        ? result.data.results
+        : null;
+
+      if (rangeResults && rangeResults.length === dates.length) {
+        return rangeResults;
+      }
+
+      if (!isTour) return null;
+
+      const resultError = new Error(
         result && result.message
           ? result.message
-          : "空き時間を取得できませんでした。再読み込みしてください。"
+          : "空き時間を取得できませんでした。"
       );
-    }
-    return null;
-  } catch (error) {
-    if (isTour) {
-      throw new Error(
-        error && error.name === "AbortError"
-          ? "空き時間の取得に時間がかかっています。再読み込みしてください。"
-          : (error.message || "空き時間を取得できませんでした。再読み込みしてください。")
+      resultError.code = String((result && result.code) || "");
+      resultError.userMessage = String((result && result.message) || "");
+      resultError.retryable = resultError.code === "TOUR_AVAILABILITY_BUSY";
+      resultError.retryAfterMs = Math.min(
+        5000,
+        Math.max(0, Number(result && result.data && result.data.retry_after_seconds) * 1000 || 0)
       );
+      throw resultError;
+    } catch (error) {
+      if (!isTour) {
+        // 一括APIが利用できない間も、従来の日別取得へ自動で戻す。
+        return null;
+      }
+
+      lastError = error;
+      const canRetry =
+        attempt + 1 < maxAttempts &&
+        isRetryableTourRangeError_(error);
+
+      if (!canRetry) break;
+
+      el.weekStatus.textContent =
+        `通信が不安定なため、空き時間を再確認しています…（${attempt + 2}/${maxAttempts}）`;
+      await waitForTourRangeRetry_(tourRangeRetryDelay_(error, attempt));
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
     }
-    // 一括APIが利用できない間も、従来の日別取得へ自動で戻す。
-    return null;
-  } finally {
-    if (timeoutId) clearTimeout(timeoutId);
   }
+
+  throw new Error(tourRangeUserMessage_(lastError));
+}
+
+function isRetryableTourRangeError_(error) {
+  if (!error || error.name === "AbortError") return false;
+  if (error.retryable === true) return true;
+
+  return error.name === "TypeError" ||
+    error.name === "SyntaxError" ||
+    /failed to fetch|networkerror|load failed/i.test(String(error.message || ""));
+}
+
+function tourRangeRetryDelay_(error, attempt) {
+  const retryAfterMs = Number(error && error.retryAfterMs);
+  return retryAfterMs > 0
+    ? retryAfterMs
+    : TOUR_RANGE_RETRY_DELAY_MS * (attempt + 1);
+}
+
+function waitForTourRangeRetry_(milliseconds) {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
+function tourRangeUserMessage_(error) {
+  if (error && error.name === "AbortError") {
+    return "空き時間の取得に時間がかかっています。「空き状況を更新」を押して、もう一度お試しください。";
+  }
+  if (error && error.userMessage) return error.userMessage;
+
+  return "通信が一時的に不安定です。少し待ってから「空き状況を更新」を押してください。";
 }
 
 async function fetchSlotsWithLimit_(dates, requestVersion) {
@@ -1073,7 +1131,7 @@ function createDietCounselingAcceptedReservation_(payload) {
     data: {
       date: payload.date,
       start_time: payload.start_time,
-      end_time: selectedSlot?.end_time || "",
+      end_time: (selectedSlot && selectedSlot.end_time) || "",
       reservation_id: "受付済み",
       pending_confirmation: true
     }
