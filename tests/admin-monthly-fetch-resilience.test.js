@@ -26,11 +26,11 @@ test("monthly schedule survives a staff-directory fetch failure", () => {
 
 test("admin pages and monthly addon use the new cache version", () => {
   const firebase = read("admin/firebase-config.js");
-  assert.match(firebase, /admin-monthly-v58\.js\?v=20260924-a4-print-v2/);
+  assert.match(firebase, /admin-monthly-v58\.js\?v=20260924-a4-print-white-v3/);
 
   for (const page of ["admin/index.html", "admin/admin.html"]) {
     const html = read(page);
-    assert.match(html, /firebase-config\.js\?v=20260924-a4-print-v2/);
+    assert.match(html, /firebase-config\.js\?v=20260924-a4-print-white-v3/);
   }
 });
 
