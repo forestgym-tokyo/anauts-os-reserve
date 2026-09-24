@@ -11,6 +11,7 @@
       originalApply();
       if(state.authUser?.staff_code)document.querySelector("#myShiftNav")?.classList.remove("is-hidden");
       buildMonthly();
+      syncMonthlyPrintPermission_();
       const monthlyNav=document.querySelector('[data-view="monthlySchedule"]');
       if(monthlyNav)monthlyNav.innerHTML=sogaStaffRestricted_()?"<span>📅</span>9ROUND予定":"<span>📅</span>予定一覧";
       if(typeof enforceSogaStaffUi_==="function")enforceSogaStaffUi_();
@@ -23,6 +24,17 @@
     function ensureCalendarCss(){if(document.querySelector("#anautsCalendarCss"))return;const style=document.createElement("style");style.id="anautsCalendarCss";style.textContent=`.mcal-wrap{overflow-x:auto}.mcal{min-width:980px;border:1px solid #294037;border-radius:14px;overflow:hidden;background:#10231d}.mcal-week{display:grid;grid-template-columns:repeat(7,1fr);background:#183129}.mcal-week div{padding:10px;text-align:center;font-weight:900;color:#b9c9c2;border-right:1px solid #294037}.mcal-week div:last-child{border-right:0}.mcal-grid{display:grid;grid-template-columns:repeat(7,1fr)}.mcal-day{min-height:145px;padding:8px;border-right:1px solid #294037;border-top:1px solid #294037;background:#10231d;cursor:pointer}.mcal-day:nth-child(7n){border-right:0}.mcal-day.out{background:#0c1b16;opacity:.5}.mcal-day.today{box-shadow:inset 0 0 0 2px #7ed6a5}.mcal-day.my-shift-selected{background:#173f2a!important;box-shadow:inset 0 0 0 3px #63d179!important}.mcal-num{font-weight:900;color:#e7f1ed;margin-bottom:6px}.mcal-event{display:block;padding:5px 6px;margin:4px 0;border-left:4px solid var(--staff-color,#63d179);border-radius:7px;background:#24483b;color:#fff;font-size:11px;line-height:1.25;white-space:normal;overflow:hidden}.mcal-event b{display:block;font-size:12px}.mcal-event-name{display:flex;align-items:center;gap:5px;margin-top:3px}.mcal-event-dot,.mcal-detail-dot{display:inline-block;width:8px;height:8px;flex:0 0 8px;border-radius:999px;background:var(--staff-color,#63d179)}.mcal-event-store{display:block;margin-top:3px;color:#a9bab1;font-size:9px;font-weight:800;letter-spacing:.05em}.mcal-detail{margin-top:14px;padding:14px;border:1px solid #294037;border-radius:12px;background:#10231d}.mcal-detail h3{margin:0 0 10px}.mcal-detail-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-top:1px solid #294037}.mcal-detail-row:first-of-type{border-top:0}.mcal-detail-store{margin-left:auto;color:#91a198;font-size:11px;font-weight:800}.monthly-filter-group{justify-self:end;display:flex;align-items:flex-end;gap:8px}.monthly-filter-field{display:grid;gap:4px}.monthly-filter-field span{color:#91a198;font-size:10px;font-weight:900}.monthly-filter-field select{min-width:170px}.mycal-actions{display:flex;gap:7px;margin-top:8px;flex-wrap:wrap}.mycal-actions button{font-size:12px;padding:6px 9px}@media(max-width:900px){#monthlyScheduleView .schedule-toolbar{grid-template-columns:1fr auto}.monthly-filter-group{grid-column:1/-1;justify-self:stretch}.monthly-filter-field{flex:1}.monthly-filter-field select{width:100%;min-width:0}}@media(max-width:700px){.mcal{min-width:760px}.mcal-day{min-height:105px;padding:5px}.mcal-event{font-size:10px;padding:4px}.mcal-event b{font-size:10px}.monthly-filter-group{display:grid;grid-template-columns:1fr 1fr;width:100%}}`;document.head.appendChild(style)}
 
     let monthlyLoadedMonth_=null;
+    function canPrintMonthly_(){
+      const permission=String(state.authUser?.permission||"").trim().toUpperCase();
+      return permission==="ADMIN"||permission==="MANAGER";
+    }
+    function syncMonthlyPrintPermission_(){
+      const button=document.querySelector("#mPrint");
+      if(!button)return;
+      const allowed=canPrintMonthly_();
+      button.classList.toggle("is-hidden",!allowed);
+      button.disabled=!allowed;
+    }
     function ensureMonthlyPrintCss_(){
       const style=document.createElement("style");
       style.id="monthlyPrintCss";
@@ -40,7 +52,8 @@
         #monthlyPrintSheet .print-grid{height:174mm;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-template-rows:repeat(var(--print-weeks),minmax(0,1fr));border-right:1px solid #aaa}
         #monthlyPrintSheet .print-day{min-width:0;min-height:0;padding:.8mm 1mm;border-left:1px solid #aaa;border-bottom:1px solid #aaa;overflow:hidden}
         #monthlyPrintSheet .print-day-number{display:block;font-size:8pt;font-weight:700;line-height:1.2;margin-bottom:.3mm}
-        #monthlyPrintSheet .print-shift{display:block;font-size:var(--shift-size,7.4pt);line-height:1.15;overflow-wrap:anywhere}
+        #monthlyPrintSheet .print-day-content{font-size:7.4pt;line-height:1.12;transform-origin:top left}
+        #monthlyPrintSheet .print-shift{display:block;font-size:inherit;line-height:inherit;overflow-wrap:anywhere}
         @media print{
           html,body{margin:0!important;padding:0!important;background:#fff!important;color:#111!important}
           body.monthly-print-active > :not(#monthlyPrintSheet){display:none!important}
@@ -50,6 +63,7 @@
       document.head.appendChild(style);
     }
     function printMonth_(){
+      if(!canPrintMonthly_())return;
       if(monthlyLoadedMonth_!==state.monthlyMonth){alert("予定の読み込みが完了してから印刷してください。");return}
       const store=sogaStaffRestricted_()?"SOGA":(document.querySelector("#mStore")?.value||"ALL");
       if(store==="ALL"){alert("印刷する部門・店舗を選択してください。");document.querySelector("#mStore")?.focus();return}
@@ -76,7 +90,7 @@
           const name=person.display_name||person.staff_name||x.staff_name||x.staff_code;
           return `<span class="print-shift">${esc(String(x.start_time).slice(0,5))}–${esc(String(x.end_time).slice(0,5))} ${esc(String(name))}</span>`;
         }).join("");
-        cells+=`<div class="print-day"><span class="print-day-number">${day}</span>${shifts}</div>`;
+        cells+=`<div class="print-day"><span class="print-day-number">${day}</span><div class="print-day-content">${shifts}</div></div>`;
       }
       const sheet=document.createElement("div");
       sheet.id="monthlyPrintSheet";
@@ -86,16 +100,21 @@
       document.body.appendChild(sheet);
       sheet.classList.add("monthly-print-measuring");
       const days=Array.from(sheet.querySelectorAll(".print-day"));
-      for(let size=7.4;size>=3.0;size-=0.3){
-        sheet.style.setProperty("--shift-size",`${size.toFixed(1)}pt`);
-        if(days.every(x=>x.scrollHeight<=x.clientHeight+1))break;
-      }
-      if(days.some(x=>x.scrollHeight>x.clientHeight+1)){
-        sheet.remove();
-        document.querySelector("#monthlyPrintCss")?.remove();
-        alert("この部門の予定はA4一枚に収まらないため、印刷を中止しました。");
-        return;
-      }
+      days.forEach(day=>{
+        const content=day.querySelector(".print-day-content");
+        if(!content)return;
+        const available=Math.max(1,day.clientHeight-day.querySelector(".print-day-number").offsetHeight-9);
+        let size=7.4;
+        while(content.scrollHeight>available&&size>2.1){
+          size=Math.max(2.1,Math.min(size-.25,size*available/content.scrollHeight*.94));
+          content.style.fontSize=`${size.toFixed(2)}pt`;
+        }
+        if(content.scrollHeight>available){
+          const scale=Math.min(1,available/content.scrollHeight*.94);
+          content.style.transform=`scale(${scale})`;
+          content.style.width=`${100/scale}%`;
+        }
+      });
       sheet.classList.remove("monthly-print-measuring");
       document.body.classList.add("monthly-print-active");
       const cleanup=()=>{
@@ -260,6 +279,7 @@
       document.querySelector("#mStore").onchange=()=>{state.monthlyStore=document.querySelector("#mStore").value;filters();syncMonthlyHeading_();renderMonth();document.querySelector("#mDetail").classList.add("is-hidden")};
       document.querySelector("#mFilter").onchange=()=>{renderMonth();document.querySelector("#mDetail").classList.add("is-hidden")};
       document.querySelector("#mPrint").onclick=printMonth_;
+      syncMonthlyPrintPermission_();
     }
     function move(n){const [y,m]=state.monthlyMonth.split("-").map(Number),d=new Date(y,m-1+n,1);state.monthlyMonth=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;loadMonth()}
     function applyMonthlyPayload_(ym,payload,sourceLabel){
