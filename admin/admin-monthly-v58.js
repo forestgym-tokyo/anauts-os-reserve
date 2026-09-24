@@ -90,6 +90,12 @@
         sheet.style.setProperty("--shift-size",`${size.toFixed(1)}pt`);
         if(days.every(x=>x.scrollHeight<=x.clientHeight+1))break;
       }
+      if(days.some(x=>x.scrollHeight>x.clientHeight+1)){
+        sheet.remove();
+        document.querySelector("#monthlyPrintCss")?.remove();
+        alert("この部門の予定はA4一枚に収まらないため、印刷を中止しました。");
+        return;
+      }
       sheet.classList.remove("monthly-print-measuring");
       document.body.classList.add("monthly-print-active");
       const cleanup=()=>{
