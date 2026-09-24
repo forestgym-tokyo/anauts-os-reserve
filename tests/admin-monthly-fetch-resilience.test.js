@@ -26,11 +26,11 @@ test("monthly schedule survives a staff-directory fetch failure", () => {
 
 test("admin pages and monthly addon use the new cache version", () => {
   const firebase = read("admin/firebase-config.js");
-  assert.match(firebase, /admin-monthly-v58\.js\?v=20260924-a4-print-v1/);
+  assert.match(firebase, /admin-monthly-v58\.js\?v=20260924-a4-print-v2/);
 
   for (const page of ["admin/index.html", "admin/admin.html"]) {
     const html = read(page);
-    assert.match(html, /firebase-config\.js\?v=20260924-a4-print-v1/);
+    assert.match(html, /firebase-config\.js\?v=20260924-a4-print-v2/);
   }
 });
 
@@ -56,4 +56,28 @@ test("monthly request covers the exact selected calendar month", () => {
       { start_date: "2028-02-01", end_date: "2028-02-29" }
     ]
   );
+});
+
+test("monthly printing is available only to admins and managers", () => {
+  const monthly = read("admin/admin-monthly-v58.js");
+  const permission = monthly.match(/function canPrintMonthly_\(\)\{[\s\S]*?^    \}/m)?.[0];
+  const sync = monthly.match(/function syncMonthlyPrintPermission_\(\)\{[\s\S]*?^    \}/m)?.[0];
+  const print = monthly.match(/function printMonth_\(\)\{[\s\S]*?^    \}/m)?.[0];
+  assert.ok(permission && sync && print);
+  const button = { hiddenByClass: false, disabled: false, classList: { toggle(name, hidden) {
+    assert.equal(name, "is-hidden");
+    button.hiddenByClass = hidden;
+  } } };
+  const scope = vm.createContext({
+    state: { authUser: null },
+    document: { querySelector: () => button }
+  });
+  vm.runInContext(`${permission}\n${sync}\n${print}`, scope);
+  for (const [role, allowed] of [[null, false], ["STAFF", false], ["MANAGER", true], ["ADMIN", true]]) {
+    scope.state.authUser = role ? { permission: role } : null;
+    vm.runInContext("syncMonthlyPrintPermission_()", scope);
+    assert.equal(button.hiddenByClass, !allowed, role || "logged out");
+    assert.equal(button.disabled, !allowed, role || "logged out");
+    if (!allowed) assert.doesNotThrow(() => vm.runInContext("printMonth_()", scope));
+  }
 });
