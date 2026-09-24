@@ -22,6 +22,84 @@
 
     function ensureCalendarCss(){if(document.querySelector("#anautsCalendarCss"))return;const style=document.createElement("style");style.id="anautsCalendarCss";style.textContent=`.mcal-wrap{overflow-x:auto}.mcal{min-width:980px;border:1px solid #294037;border-radius:14px;overflow:hidden;background:#10231d}.mcal-week{display:grid;grid-template-columns:repeat(7,1fr);background:#183129}.mcal-week div{padding:10px;text-align:center;font-weight:900;color:#b9c9c2;border-right:1px solid #294037}.mcal-week div:last-child{border-right:0}.mcal-grid{display:grid;grid-template-columns:repeat(7,1fr)}.mcal-day{min-height:145px;padding:8px;border-right:1px solid #294037;border-top:1px solid #294037;background:#10231d;cursor:pointer}.mcal-day:nth-child(7n){border-right:0}.mcal-day.out{background:#0c1b16;opacity:.5}.mcal-day.today{box-shadow:inset 0 0 0 2px #7ed6a5}.mcal-day.my-shift-selected{background:#173f2a!important;box-shadow:inset 0 0 0 3px #63d179!important}.mcal-num{font-weight:900;color:#e7f1ed;margin-bottom:6px}.mcal-event{display:block;padding:5px 6px;margin:4px 0;border-left:4px solid var(--staff-color,#63d179);border-radius:7px;background:#24483b;color:#fff;font-size:11px;line-height:1.25;white-space:normal;overflow:hidden}.mcal-event b{display:block;font-size:12px}.mcal-event-name{display:flex;align-items:center;gap:5px;margin-top:3px}.mcal-event-dot,.mcal-detail-dot{display:inline-block;width:8px;height:8px;flex:0 0 8px;border-radius:999px;background:var(--staff-color,#63d179)}.mcal-event-store{display:block;margin-top:3px;color:#a9bab1;font-size:9px;font-weight:800;letter-spacing:.05em}.mcal-detail{margin-top:14px;padding:14px;border:1px solid #294037;border-radius:12px;background:#10231d}.mcal-detail h3{margin:0 0 10px}.mcal-detail-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-top:1px solid #294037}.mcal-detail-row:first-of-type{border-top:0}.mcal-detail-store{margin-left:auto;color:#91a198;font-size:11px;font-weight:800}.monthly-filter-group{justify-self:end;display:flex;align-items:flex-end;gap:8px}.monthly-filter-field{display:grid;gap:4px}.monthly-filter-field span{color:#91a198;font-size:10px;font-weight:900}.monthly-filter-field select{min-width:170px}.mycal-actions{display:flex;gap:7px;margin-top:8px;flex-wrap:wrap}.mycal-actions button{font-size:12px;padding:6px 9px}@media(max-width:900px){#monthlyScheduleView .schedule-toolbar{grid-template-columns:1fr auto}.monthly-filter-group{grid-column:1/-1;justify-self:stretch}.monthly-filter-field{flex:1}.monthly-filter-field select{width:100%;min-width:0}}@media(max-width:700px){.mcal{min-width:760px}.mcal-day{min-height:105px;padding:5px}.mcal-event{font-size:10px;padding:4px}.mcal-event b{font-size:10px}.monthly-filter-group{display:grid;grid-template-columns:1fr 1fr;width:100%}}`;document.head.appendChild(style)}
 
+    let monthlyLoadedMonth_=null;
+    function ensureMonthlyPrintCss_(){
+      const style=document.createElement("style");
+      style.id="monthlyPrintCss";
+      style.textContent=`
+        @page{size:A4 landscape;margin:5mm}
+        #monthlyPrintSheet{display:none;width:280mm;height:190mm;margin:0 auto;background:#fff;color:#111;font-family:Arial,"Noto Sans JP",sans-serif;box-sizing:border-box}
+        #monthlyPrintSheet *{box-sizing:border-box}
+        #monthlyPrintSheet.monthly-print-measuring{display:block;position:fixed;top:0;left:-10000px}
+        #monthlyPrintSheet .print-title{height:10mm;display:flex;align-items:center;justify-content:space-between}
+        #monthlyPrintSheet .print-title h2{margin:0;font-size:14pt;font-weight:700;color:#111}
+        #monthlyPrintSheet .print-title strong{font-size:11pt}
+        #monthlyPrintSheet .print-weekdays{height:6mm;display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
+        #monthlyPrintSheet .print-weekdays span{border:1px solid #aaa;border-right:0;text-align:center;line-height:5.6mm;font-size:8pt;font-weight:700}
+        #monthlyPrintSheet .print-weekdays span:last-child{border-right:1px solid #aaa}
+        #monthlyPrintSheet .print-grid{height:174mm;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-template-rows:repeat(var(--print-weeks),minmax(0,1fr));border-right:1px solid #aaa}
+        #monthlyPrintSheet .print-day{min-width:0;min-height:0;padding:.8mm 1mm;border-left:1px solid #aaa;border-bottom:1px solid #aaa;overflow:hidden}
+        #monthlyPrintSheet .print-day-number{display:block;font-size:8pt;font-weight:700;line-height:1.2;margin-bottom:.3mm}
+        #monthlyPrintSheet .print-shift{display:block;font-size:var(--shift-size,7.4pt);line-height:1.15;overflow-wrap:anywhere}
+        @media print{
+          html,body{margin:0!important;padding:0!important;background:#fff!important;color:#111!important}
+          body.monthly-print-active > :not(#monthlyPrintSheet){display:none!important}
+          #monthlyPrintSheet{display:block!important;position:static!important;break-inside:avoid;page-break-inside:avoid}
+        }
+      `;
+      document.head.appendChild(style);
+    }
+    function printMonth_(){
+      if(monthlyLoadedMonth_!==state.monthlyMonth){alert("予定の読み込みが完了してから印刷してください。");return}
+      const store=sogaStaffRestricted_()?"SOGA":(document.querySelector("#mStore")?.value||"ALL");
+      if(store==="ALL"){alert("印刷する部門・店舗を選択してください。");document.querySelector("#mStore")?.focus();return}
+      const rows=(state.monthlyRows||[]).filter(x=>String(x.store_code)===store);
+      if(!rows.length){alert("この月の部門・店舗に印刷できる予定がありません。");return}
+      document.querySelector("#monthlyPrintSheet")?.remove();
+      document.querySelector("#monthlyPrintCss")?.remove();
+      ensureMonthlyPrintCss_();
+      const ym=state.monthlyMonth,[year,month]=ym.split("-").map(Number);
+      const offset=(new Date(year,month-1,1).getDay()+6)%7;
+      const last=new Date(year,month,0).getDate();
+      const total=Math.ceil((offset+last)/7)*7;
+      const people=new Map(state.staff.map(x=>[String(x.staff_code),x]));
+      const by=new Map();
+      rows.sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.start_time).localeCompare(String(b.start_time))||String(a.staff_code).localeCompare(String(b.staff_code)));
+      rows.forEach(x=>{if(!by.has(x.date))by.set(x.date,[]);by.get(x.date).push(x)});
+      let cells="";
+      for(let i=0;i<total;i++){
+        const day=i-offset+1;
+        if(day<1||day>last){cells+='<div class="print-day"></div>';continue}
+        const date=`${ym}-${String(day).padStart(2,"0")}`;
+        const shifts=(by.get(date)||[]).map(x=>{
+          const person=people.get(String(x.staff_code))||{};
+          const name=person.display_name||person.staff_name||x.staff_name||x.staff_code;
+          return `<span class="print-shift">${esc(String(x.start_time).slice(0,5))}–${esc(String(x.end_time).slice(0,5))} ${esc(String(name))}</span>`;
+        }).join("");
+        cells+=`<div class="print-day"><span class="print-day-number">${day}</span>${shifts}</div>`;
+      }
+      const sheet=document.createElement("div");
+      sheet.id="monthlyPrintSheet";
+      sheet.setAttribute("aria-label","月間予定 印刷用");
+      sheet.style.setProperty("--print-weeks",String(total/7));
+      sheet.innerHTML=`<div class="print-title"><h2>${esc(storeLabel_(store))} 予定</h2><strong>${year}年${month}月</strong></div><div class="print-weekdays">${["月","火","水","木","金","土","日"].map(x=>`<span>${x}</span>`).join("")}</div><div class="print-grid">${cells}</div>`;
+      document.body.appendChild(sheet);
+      sheet.classList.add("monthly-print-measuring");
+      const days=Array.from(sheet.querySelectorAll(".print-day"));
+      for(let size=7.4;size>=3.0;size-=0.3){
+        sheet.style.setProperty("--shift-size",`${size.toFixed(1)}pt`);
+        if(days.every(x=>x.scrollHeight<=x.clientHeight+1))break;
+      }
+      sheet.classList.remove("monthly-print-measuring");
+      document.body.classList.add("monthly-print-active");
+      const cleanup=()=>{
+        document.body.classList.remove("monthly-print-active");
+        sheet.remove();
+        document.querySelector("#monthlyPrintCss")?.remove();
+      };
+      window.addEventListener("afterprint",cleanup,{once:true});
+      try{window.print()}catch(error){window.removeEventListener("afterprint",cleanup);cleanup();throw error}
+    }
     function renderMyShiftCalendar(){
       ensureCalendarCss();const box=document.querySelector("#myShiftList"),rows=(state.myShiftRows||[]).filter(x=>x.active!==false);if(!box)return;
       const p=document.querySelector("#myShiftView .page-heading p:last-child");
@@ -165,7 +243,7 @@
       const v=document.createElement("section");
       v.id="monthlyScheduleView";
       v.className="view";
-      v.innerHTML=`<div class="page-heading"><div><p class="eyebrow">MONTHLY SCHEDULE</p><h1>予定一覧</h1><p>月間カレンダーでスタッフ・トレーナーの勤務予定を確認します。</p></div></div><div class="schedule-toolbar card"><div class="toolbar-group"><button id="mPrev" class="icon-button">‹</button><button id="mNow" class="ghost-button">今月</button><button id="mNext" class="icon-button">›</button></div><div><strong id="mLabel" class="period-title"></strong><span id="mFreshness" aria-live="polite" style="display:block;margin-top:4px;color:#91a198;font-size:11px;font-weight:800"></span></div><div class="monthly-filter-group"><label class="monthly-filter-field"><span>店舗</span><select id="mStore"></select></label><label class="monthly-filter-field"><span>表示</span><select id="mFilter"></select></label></div></div><div id="mBoard" class="card"></div><div id="mDetail" class="mcal-detail is-hidden"></div>`;
+      v.innerHTML=`<div class="page-heading"><div><p class="eyebrow">MONTHLY SCHEDULE</p><h1>予定一覧</h1><p>月間カレンダーでスタッフ・トレーナーの勤務予定を確認します。</p></div></div><div class="schedule-toolbar card"><div class="toolbar-group"><button id="mPrev" class="icon-button">‹</button><button id="mNow" class="ghost-button">今月</button><button id="mNext" class="icon-button">›</button></div><div><strong id="mLabel" class="period-title"></strong><span id="mFreshness" aria-live="polite" style="display:block;margin-top:4px;color:#91a198;font-size:11px;font-weight:800"></span></div><div class="monthly-filter-group"><label class="monthly-filter-field"><span>部門・店舗</span><select id="mStore"></select></label><label class="monthly-filter-field"><span>表示</span><select id="mFilter"></select></label><button id="mPrint" type="button" class="ghost-button" title="選択した部門・店舗の月間予定をA4一枚で印刷">🖨 A4印刷</button></div></div><div id="mBoard" class="card"></div><div id="mDetail" class="mcal-detail is-hidden"></div>`;
       main.insertBefore(v,document.querySelector("#registrationView"));
       state.monthlyMonth=state.monthlyMonth||localYmd().slice(0,7);
       state.monthlyStore=sogaStaffRestricted_()?"SOGA":(state.monthlyStore||"ALL");
@@ -175,10 +253,12 @@
       document.querySelector("#mNow").onclick=()=>{state.monthlyMonth=localYmd().slice(0,7);loadMonth()};
       document.querySelector("#mStore").onchange=()=>{state.monthlyStore=document.querySelector("#mStore").value;filters();syncMonthlyHeading_();renderMonth();document.querySelector("#mDetail").classList.add("is-hidden")};
       document.querySelector("#mFilter").onchange=()=>{renderMonth();document.querySelector("#mDetail").classList.add("is-hidden")};
+      document.querySelector("#mPrint").onclick=printMonth_;
     }
     function move(n){const [y,m]=state.monthlyMonth.split("-").map(Number),d=new Date(y,m-1+n,1);state.monthlyMonth=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;loadMonth()}
     function applyMonthlyPayload_(ym,payload,sourceLabel){
       if(state.monthlyMonth!==ym)return;
+      monthlyLoadedMonth_=payload.publication?.is_published===false?null:ym;
       if(Array.isArray(payload.staff)&&payload.staff.length)state.staff=payload.staff;
       if(payload.publication?.is_published===false){
         state.monthlyRows=[];
@@ -237,6 +317,7 @@
     }
     async function loadMonth(options={}){
       const ym=state.monthlyMonth;
+      monthlyLoadedMonth_=null;
       const board=document.querySelector("#mBoard");
       const sequence=++monthlyLoadSequence_;
       document.querySelector("#mLabel").textContent=`${+ym.slice(0,4)}年${+ym.slice(5,7)}月`;
