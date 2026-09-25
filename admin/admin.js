@@ -16,6 +16,8 @@ const TOUR_RESERVATION_VERSION_POLL_MS_=1000;
 let tourReservationVersion_="";
 let tourReservationVersionTimer_=null;
 let tourReservationVersionChecking_=false;
+let tourReservationVersionFailureCount_=0;
+let tourReservationVersionRetryAfter_=0;
 
 function staffScheduleCacheKey_(date,storeCode="YACHIYO"){
   return STAFF_SCHEDULE_CACHE_PREFIX_+String(storeCode||"YACHIYO").toUpperCase()+":"+String(date||"");
@@ -47,10 +49,18 @@ function isStaffScheduleViewActive_(){
   return document.querySelector(".nav-button.is-active")?.dataset?.view==="staffSchedule";
 }
 async function checkTourReservationVersion_(){
-  if(tourReservationVersionChecking_||document.hidden||!state.idToken||!isStaffScheduleViewActive_())return;
+  if(
+    tourReservationVersionChecking_||
+    document.hidden||
+    !state.idToken||
+    !isStaffScheduleViewActive_()||
+    Date.now()<tourReservationVersionRetryAfter_
+  )return;
   tourReservationVersionChecking_=true;
   try{
     const versionResponse=await apiGet("getTourReservationVersion");
+    tourReservationVersionFailureCount_=0;
+    tourReservationVersionRetryAfter_=0;
     const version=String(versionResponse?.data?.version||"").trim();
     const cached=readStaffScheduleCache_(state.staffScheduleDate||localYmd(),"YACHIYO");
 
@@ -75,7 +85,10 @@ async function checkTourReservationVersion_(){
       await loadStaffSchedule({force:true,silent:true});
     }
   }catch(_){
-    // 軽量監視が一時失敗しても、表示中の予定表は維持する。
+    // GAS公開版が未更新・一時障害でも1秒ごとの連打を避ける。
+    tourReservationVersionFailureCount_+=1;
+    const backoffMs=tourReservationVersionFailureCount_>=3?60000:5000;
+    tourReservationVersionRetryAfter_=Date.now()+backoffMs;
   }finally{
     tourReservationVersionChecking_=false;
   }
