@@ -9,6 +9,7 @@ const DIET_COUNSELING_SUBMIT_DISPLAY_LIMIT_MS = 9000;
 const DIET_COUNSELING_CONFIRM_INITIAL_DELAY_MS = 250;
 const DIET_COUNSELING_CONFIRM_POLL_MS = 500;
 const DIET_COUNSELING_BACKGROUND_CONFIRM_LIMIT_MS = 60000;
+const TOUR_WEEK_CACHE_PREFIX = "anauts-tour-week-v1:";
 
 const ROUTES = {
   personal: {
@@ -131,6 +132,7 @@ let publicDays = 30;
 let loading = false;
 let weekLoadVersion = 0;
 let pendingWeekReload = false;
+let tourVersionCheckInFlight = false;
 
 init();
 
@@ -701,7 +703,7 @@ function getAddressParts_() {
 
 el.prevWeekButton.addEventListener("click", () => changeWeek(-7));
 el.nextWeekButton.addEventListener("click", () => changeWeek(7));
-el.reloadButton.addEventListener("click", loadWeek);
+el.reloadButton.addEventListener("click", () => loadWeek({ force: true }));
 el.reservationForm.addEventListener("submit", submitReservation);
 el.newReservationButton.addEventListener("click", () => {
   el.completeSection.classList.add("is-hidden");
@@ -731,27 +733,47 @@ function getConsultationMethod_() {
   return (checked && checked.value) || "ONLINE";
 }
 
-async function loadWeek() {
+async function loadWeek(options = {}) {
   const requestVersion = ++weekLoadVersion;
 
   if (!selectedService) return;
+
+  const isTour = isTourService_();
+  const force = options.force === true;
+  const silent = options.silent === true;
+  const preserveComplete = options.preserveComplete === true;
+  const cached = isTour ? readTourWeekCache_() : null;
+
+  // 店内見学は、保存済みの前回画面を通信前に同期描画する。
+  if (cached && !force) {
+    selectedSlot = null;
+    el.customerSection.classList.add("is-hidden");
+    if (!preserveComplete) el.completeSection.classList.add("is-hidden");
+    renderWeek(cached.results);
+    renderWeekStatus_(cached.results);
+    updateNav();
+    checkTourWeekVersion_(cached);
+    return;
+  }
+
   if (loading) {
     pendingWeekReload = true;
     return;
   }
 
   loading = true;
-  selectedSlot = null;
-  el.customerSection.classList.add("is-hidden");
-  el.completeSection.classList.add("is-hidden");
-  el.weekStatus.textContent = "7日分の空き時間を確認しています…";
+  if (!preserveComplete) {
+    selectedSlot = null;
+    el.customerSection.classList.add("is-hidden");
+    el.completeSection.classList.add("is-hidden");
+  }
+  if (!silent) {
+    el.weekStatus.textContent = "7日分の空き時間を確認しています…";
+    if (!cached) renderLoadingWeek_();
+  }
   updateNav();
 
-  const dates = Array.from({ length: DAYS }, (_, index) => {
-    const date = new Date(weekStart);
-    date.setDate(date.getDate() + index);
-    return apiDate(date);
-  });
+  const dates = weekDates_();
 
   try {
     let results = null;
@@ -765,42 +787,166 @@ async function loadWeek() {
     if (requestVersion !== weekLoadVersion) return;
 
     if (!Array.isArray(results) || results.length !== dates.length) {
+      if (isTour) {
+        throw new Error("空き時間を取得できませんでした。");
+      }
       results = await fetchSlotsWithLimit_(dates, requestVersion);
     }
 
     if (requestVersion !== weekLoadVersion) return;
 
     const first = results.find((result) => result.ok && result.data);
-
     if (first && first.data && first.data.public_days !== undefined) {
       publicDays = Number(first.data.public_days) || 30;
     }
 
     renderWeek(results);
+    renderWeekStatus_(results);
 
-    const total = results.reduce((sum, result) =>
-      sum + (result.data && Array.isArray(result.data.slots) ? result.data.slots.length : 0), 0
-    );
-    const failed = results.filter((result) => !result.ok).length;
-
-    if (failed) {
-      el.weekStatus.textContent = `${DAYS - failed}日分を表示しました。${failed}日分は取得できませんでした。`;
-    } else {
-      el.weekStatus.textContent = total
-        ? `この7日間に${total}件の空きがあります。`
-        : "この7日間に空きはありません。";
+    if (isTour) {
+      writeTourWeekCache_(results, cached && cached.version);
+      fetchTourReservationVersion_().then((version) => {
+        if (version) writeTourWeekCache_(results, version);
+      }).catch(() => {});
     }
   } catch (error) {
-    el.weekStatus.textContent = error.message || "空き時間の取得に失敗しました。";
+    if (!cached) {
+      el.weekStatus.textContent = error.message || "空き時間の取得に失敗しました。";
+    } else if (!silent) {
+      renderWeek(cached.results);
+      renderWeekStatus_(cached.results);
+    }
   } finally {
     loading = false;
     updateNav();
 
     if (pendingWeekReload) {
       pendingWeekReload = false;
-      loadWeek();
+      loadWeek(options);
     }
   }
+}
+
+function isTourService_() {
+  return String(selectedService && selectedService.service_code || "").toUpperCase() === "TOUR";
+}
+
+function weekDates_() {
+  return Array.from({ length: DAYS }, (_, index) => {
+    const date = new Date(weekStart);
+    date.setDate(date.getDate() + index);
+    return apiDate(date);
+  });
+}
+
+function tourWeekCacheKey_() {
+  return TOUR_WEEK_CACHE_PREFIX + apiDate(weekStart);
+}
+
+function readTourWeekCache_() {
+  if (!isTourService_()) return null;
+  try {
+    const cached = JSON.parse(localStorage.getItem(tourWeekCacheKey_()) || "null");
+    if (
+      !cached ||
+      cached.start_date !== apiDate(weekStart) ||
+      !Array.isArray(cached.results) ||
+      cached.results.length !== DAYS
+    ) return null;
+    if (cached.public_days !== undefined) {
+      publicDays = Number(cached.public_days) || 30;
+    }
+    return cached;
+  } catch (_) {
+    return null;
+  }
+}
+
+function writeTourWeekCache_(results, version = "") {
+  if (!isTourService_() || !Array.isArray(results) || results.length !== DAYS) return;
+  try {
+    localStorage.setItem(tourWeekCacheKey_(), JSON.stringify({
+      start_date: apiDate(weekStart),
+      saved_at: Date.now(),
+      public_days: publicDays,
+      version: String(version || ""),
+      results
+    }));
+  } catch (_) {
+    // 保存できない環境では通常取得を継続する。
+  }
+}
+
+function renderWeekStatus_(results) {
+  const total = results.reduce((sum, result) =>
+    sum + (result.data && Array.isArray(result.data.slots) ? result.data.slots.length : 0), 0
+  );
+  const failed = results.filter((result) => !result.ok).length;
+
+  if (failed) {
+    el.weekStatus.textContent = `${DAYS - failed}日分を表示しました。${failed}日分は取得できませんでした。`;
+  } else {
+    el.weekStatus.textContent = total
+      ? `この7日間に${total}件の空きがあります。`
+      : "この7日間に空きはありません。";
+  }
+}
+
+async function fetchTourReservationVersion_() {
+  const url = new URL(API_URL);
+  url.searchParams.set("action", "getTourReservationVersion");
+  url.searchParams.set("_", Date.now().toString());
+  const response = await fetch(url.toString(), { cache: "no-store" });
+  if (!response.ok) return "";
+  const result = await response.json();
+  return String(result && result.ok && result.data && result.data.version || "");
+}
+
+function checkTourWeekVersion_(cached) {
+  if (tourVersionCheckInFlight || !cached) return;
+  tourVersionCheckInFlight = true;
+  fetchTourReservationVersion_().then((version) => {
+    if (!version) return;
+    if (!cached.version) {
+      writeTourWeekCache_(cached.results, version);
+      return;
+    }
+    if (version !== String(cached.version)) {
+      loadWeek({ force: true, silent: true });
+    }
+  }).catch(() => {
+    // 前回画面を維持する。
+  }).finally(() => {
+    tourVersionCheckInFlight = false;
+  });
+}
+
+function updateTourCacheAfterReservation_(slot) {
+  if (!isTourService_() || !slot) return;
+  const cached = readTourWeekCache_();
+  if (!cached) return;
+
+  const results = cached.results.map((result) => {
+    if (!result || !result.data || result.data.date !== slot.date) return result;
+    const slots = Array.isArray(result.data.slots) ? result.data.slots : [];
+    return Object.assign({}, result, {
+      data: Object.assign({}, result.data, {
+        slots: slots.filter((item) =>
+          !(item.date === slot.date && item.start_time === slot.start_time)
+        )
+      })
+    });
+  });
+
+  writeTourWeekCache_(results, cached.version);
+  renderWeek(results);
+  renderWeekStatus_(results);
+}
+
+function refreshTourWeekAfterReservation_() {
+  window.setTimeout(() => {
+    loadWeek({ force: true, silent: true, preserveComplete: true });
+  }, 0);
 }
 
 async function fetchWeekSlotsRange_(dates) {
@@ -1327,6 +1473,10 @@ async function submitReservation(event) {
       throw new Error(userMessage(result));
     }
 
+    if (isTour) {
+      updateTourCacheAfterReservation_(selectedSlot);
+    }
+
     el.submitButton.disabled = false;
     el.submitButton.textContent = "この内容で予約する";
     el.customerSection.classList.add("is-hidden");
@@ -1337,6 +1487,7 @@ async function submitReservation(event) {
       (getConsultationMethod_() ? ` / ${getConsultationMethod_() === "ONLINE" ? "ONLINE" : "対面"}` : "");
     el.reservationId.textContent = result.data.reservation_id || "予約済み";
     el.completeSection.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (isTour) refreshTourWeekAfterReservation_();
   } catch (error) {
     showError(error.message || "予約に失敗しました。");
   } finally {
