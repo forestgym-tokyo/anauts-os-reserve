@@ -18,6 +18,23 @@ function requireDirectShiftEditPermission_(params) {
   );
 }
 
+
+/**
+ * スタッフ登録・ログイン設定は ADMIN / MANAGER のみに許可する。
+ * 旧コードで誤って requiresStaffManagementPermission_ と呼んでいる箇所も
+ * 互換エイリアス経由で同じ権限チェックに統一する。
+ */
+function requireStaffManagementPermission_(params) {
+  return requireAuth_(
+    params || {},
+    ["ADMIN", "MANAGER"]
+  );
+}
+
+function requiresStaffManagementPermission_(params) {
+  return requireStaffManagementPermission_(params);
+}
+
 /**
  * SOGA所属の一般スタッフは「自分のシフト」「9ROUND予定」「希望提出」だけを使う。
  * 画面を隠すだけでなく、対象外の管理APIもここで拒否する。
