@@ -65,6 +65,8 @@ h2{margin:0}
 .day-slots{display:flex;gap:8px;flex-wrap:wrap}
 .slot-button{border:1px solid #3c594b;border-radius:11px;background:#0b1912;color:var(--text);padding:9px 11px;font-weight:800;cursor:pointer}
 .slot-button.is-selected{border-color:var(--accent);background:rgba(215,182,111,.14);color:var(--accent2)}
+.tour-page .slot-button{border:2px solid #78c53a;background:rgba(120,197,58,.08);color:#fff}
+.tour-page .slot-button.is-selected{border-color:#78c53a;background:#78c53a;color:#07110d}
 .no-slots{margin:0;color:var(--muted);padding:8px 0}
 .selected-summary{display:flex;justify-content:space-between;gap:12px;padding:14px 16px;border-radius:14px;background:#07100c;margin-bottom:20px}
 .selected-summary span{color:var(--muted)}
