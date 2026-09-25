@@ -269,6 +269,19 @@ function doGet(e) {
         );
       }
 
+      case "getTourReservationVersion":
+        /*
+         * 見学予約の新規確定だけを検知する軽量シグナル。
+         * 個人情報・予約内容は返さず、既存のTOUR空き枠世代番号のみ返す。
+         * 管理画面はこの値だけを短周期監視し、値が変わった時だけ予定表を再取得する。
+         */
+        return successResponse({
+          version:
+            typeof getTourWeekCacheGeneration_ === "function"
+              ? getTourWeekCacheGeneration_()
+              : "0"
+        });
+
       case "getStaffSchedule":
         requireNonRestrictedAdminFeature_(
           params,
