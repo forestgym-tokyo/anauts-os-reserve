@@ -1,4 +1,4 @@
-// BUILD: 20260920-fast-login-v1
+// BUILD: 20260925-tour-live-fast-v1
 const API_URL="https://script.google.com/macros/s/AKfycbyvpQRxRpMRfpaQHtBar77dViCqPl-hdFW-2yMdozhN8RHtwcrFiNEM9cvEbny4x9q0/exec";
 const state={staff:[],stores:[],services:[],serviceHours:[],presenceWeekdays:[],presenceSpecials:[],selectedServiceCode:"",selectedStaffCode:"",shiftRows:[],shiftPreview:null,staffScheduleDate:"",staffSchedule:null,staffScheduleBootstrapDate:"",staffScheduleBootstrapError:"",trainerScheduleDate:"",trainerSchedule:null,myShiftMonth:"",myShiftDate:"",myShiftRows:[],myShiftRequests:[],authUser:null,idToken:"",authRestoredFromCache:false};
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
@@ -9,6 +9,86 @@ async function apiPost(p){const r=await fetch(API_URL,{method:"POST",headers:{"C
 
 const AUTH_BOOTSTRAP_CACHE_KEY="anauts_auth_bootstrap_v1";
 const AUTH_BOOTSTRAP_CACHE_MAX_AGE_MS=8*60*60*1000;
+
+const STAFF_SCHEDULE_CACHE_PREFIX_="anauts_staff_schedule_v2:";
+const STAFF_SCHEDULE_CACHE_MAX_AGE_MS_=60*60*1000;
+const TOUR_RESERVATION_VERSION_POLL_MS_=1000;
+let tourReservationVersion_="";
+let tourReservationVersionTimer_=null;
+let tourReservationVersionChecking_=false;
+
+function staffScheduleCacheKey_(date,storeCode="YACHIYO"){
+  return STAFF_SCHEDULE_CACHE_PREFIX_+String(storeCode||"YACHIYO").toUpperCase()+":"+String(date||"");
+}
+function readStaffScheduleCache_(date,storeCode="YACHIYO"){
+  try{
+    const cached=JSON.parse(localStorage.getItem(staffScheduleCacheKey_(date,storeCode))||"null");
+    if(!cached||!cached.saved_at||!cached.data)return null;
+    return cached;
+  }catch(_){
+    return null;
+  }
+}
+function writeStaffScheduleCache_(date,data,storeCode="YACHIYO"){
+  if(!date||!data)return;
+  try{
+    localStorage.setItem(staffScheduleCacheKey_(date,storeCode),JSON.stringify({
+      saved_at:Date.now(),
+      data:data
+    }));
+  }catch(_){
+    // 保存容量不足・プライベートブラウズでも通常取得は継続する。
+  }
+}
+function staffScheduleCacheIsFresh_(cached){
+  return !!cached&&Date.now()-Number(cached.saved_at||0)<STAFF_SCHEDULE_CACHE_MAX_AGE_MS_;
+}
+function isStaffScheduleViewActive_(){
+  return document.querySelector(".nav-button.is-active")?.dataset?.view==="staffSchedule";
+}
+async function checkTourReservationVersion_(){
+  if(tourReservationVersionChecking_||document.hidden||!state.idToken||!isStaffScheduleViewActive_())return;
+  tourReservationVersionChecking_=true;
+  try{
+    const versionResponse=await apiGet("getTourReservationVersion");
+    const version=String(versionResponse?.data?.version||"").trim();
+    const cached=readStaffScheduleCache_(state.staffScheduleDate||localYmd(),"YACHIYO");
+
+    // 初回は現在値を基準にする。予定表が1時間以上古ければ同時に更新する。
+    if(!tourReservationVersion_){
+      tourReservationVersion_=version;
+      if(!staffScheduleCacheIsFresh_(cached)){
+        await loadStaffSchedule({force:true,silent:true});
+      }
+      return;
+    }
+
+    // 見学予約が成立した時だけ、重い予定表取得を即時実行する。
+    if(version&&version!==tourReservationVersion_){
+      tourReservationVersion_=version;
+      await loadStaffSchedule({force:true,silent:true});
+      return;
+    }
+
+    // 通常の全体更新は最大1時間に1回。
+    if(!staffScheduleCacheIsFresh_(cached)){
+      await loadStaffSchedule({force:true,silent:true});
+    }
+  }catch(_){
+    // 軽量監視が一時失敗しても、表示中の予定表は維持する。
+  }finally{
+    tourReservationVersionChecking_=false;
+  }
+}
+function startTourReservationVersionWatcher_(){
+  if(tourReservationVersionTimer_)return;
+  checkTourReservationVersion_();
+  tourReservationVersionTimer_=window.setInterval(
+    checkTourReservationVersion_,
+    TOUR_RESERVATION_VERSION_POLL_MS_
+  );
+}
+
 
 function tokenPayload_(token){
   try{
@@ -63,6 +143,7 @@ function clearFastLocalCaches_(){
     for(let i=localStorage.length-1;i>=0;i-=1){
       const key=localStorage.key(i)||"";
       if(key.startsWith("anauts_monthly_cache_v1:"))localStorage.removeItem(key);
+      if(key.startsWith(STAFF_SCHEDULE_CACHE_PREFIX_))localStorage.removeItem(key);
     }
   }catch(_){
     // ストレージを利用できなくてもログアウト処理は継続する。
@@ -181,17 +262,26 @@ function applyAuthBootstrap_(data){
     );
     state.staffScheduleBootstrapError=String(payload.staff_schedule_error||"");
     state.staffSchedule=payload.staff_schedule||null;
+    if(state.staffSchedule&&state.staffScheduleBootstrapDate){
+      writeStaffScheduleCache_(state.staffScheduleBootstrapDate,state.staffSchedule,"YACHIYO");
+    }
   }
 }
 
 async function loadCurrentUserWithSchedule_(){
   if(!state.staffScheduleDate)state.staffScheduleDate=localYmd();
+  const cachedSchedule=readStaffScheduleCache_(state.staffScheduleDate,"YACHIYO");
   const j=await apiGet("getCurrentUser",{
-    include_staff_schedule:"1",
+    include_staff_schedule:cachedSchedule?"0":"1",
     date:state.staffScheduleDate,
     store_code:"YACHIYO"
   });
   applyAuthBootstrap_(j.data||null);
+  if(cachedSchedule&&!state.staffScheduleBootstrapDate){
+    state.staffScheduleBootstrapDate=state.staffScheduleDate;
+    state.staffScheduleBootstrapError="";
+    state.staffSchedule=cachedSchedule.data||{};
+  }
   saveAuthBootstrapCache_();
 }
 
@@ -303,6 +393,7 @@ async function restoreAuthSession(){
 }
 
 async function initializeAppAfterAuth(){
+  startTourReservationVersionWatcher_();
   if(!state.staffScheduleDate)state.staffScheduleDate=localYmd();
   if(!state.myShiftMonth)state.myShiftMonth=localYmd().slice(0,7);
   const activeButton=document.querySelector(".nav-button.is-active");
@@ -967,29 +1058,49 @@ function showStaffScheduleError_(message){
     n.classList.add("is-error");
   }
 }
-async function loadStaffSchedule(){
+async function loadStaffSchedule(options={}){
   const board=$("#staffScheduleBoard");
   if(!board)return;
   if(!state.staffScheduleDate)state.staffScheduleDate=localYmd();
+
+  const force=!!options.force;
+  const silent=!!options.silent;
   const requestedDate=state.staffScheduleDate;
-  const requestSequence=++staffScheduleRequestSequence_;
+  const cached=readStaffScheduleCache_(requestedDate,"YACHIYO");
+  let renderedCache=false;
+
   $("#staffScheduleDateLabel").textContent=formatStaffDate(requestedDate);
-  board.innerHTML='<div class="staff-schedule-loading">スタッフ予定を読み込んでいます…</div>';
+
+  // まずローカルキャッシュを同期描画。通常はここだけなので体感1秒未満。
+  if(cached&&cached.data){
+    state.staffSchedule=cached.data;
+    renderStaffSchedule(state.staffSchedule);
+    installWithdrawalShortcuts_(state.staffSchedule);
+    renderedCache=true;
+    if(!force&&staffScheduleCacheIsFresh_(cached))return;
+  }
+
+  const requestSequence=++staffScheduleRequestSequence_;
+  if(!renderedCache&&!silent){
+    board.innerHTML='<div class="staff-schedule-loading">スタッフ予定を読み込んでいます…</div>';
+  }
   const message=$("#staffScheduleMessage");
-  if(message){
+  if(message&&!silent){
     message.textContent="";
     message.classList.add("is-hidden");
     message.classList.remove("is-error");
   }
+
   try{
     const j=await apiGet("getStaffSchedule",{date:requestedDate,store_code:"YACHIYO"});
     if(requestSequence!==staffScheduleRequestSequence_||requestedDate!==state.staffScheduleDate)return;
     state.staffSchedule=j.data||{};
+    writeStaffScheduleCache_(requestedDate,state.staffSchedule,"YACHIYO");
     renderStaffSchedule(state.staffSchedule);
     installWithdrawalShortcuts_(state.staffSchedule);
   }catch(e){
     if(requestSequence!==staffScheduleRequestSequence_||requestedDate!==state.staffScheduleDate)return;
-    showStaffScheduleError_(e&&e.message);
+    if(!renderedCache)showStaffScheduleError_(e&&e.message);
   }
 }
 function renderStaffSchedule(d){const shifts=Array.isArray(d.shifts)?d.shifts:[],reservations=(Array.isArray(d.reservations)?d.reservations:[]).filter(r=>String(r.status||"").trim().toUpperCase()!=="CANCELLED");$("#staffScheduleSummary").innerHTML=`<span>勤務 <b>${shifts.length}</b>名</span><span>予約 <b>${reservations.length}</b>件</span>`;const staffCodes=[...new Set([...shifts.map(x=>x.staff_code),...reservations.map(x=>x.staff_code)].filter(Boolean))];if(!staffCodes.length){$("#staffScheduleBoard").innerHTML='<div class="staff-schedule-empty"><strong>この日のスタッフ予定はありません</strong><span>シフト・予約ともに登録されていません。</span></div>';return}const sections=staffCodes.map(code=>{const ss=shifts.filter(x=>x.staff_code===code),rr=reservations.filter(x=>x.staff_code===code).sort((a,b)=>String(a.start_time).localeCompare(String(b.start_time)));const name=ss[0]?.staff_name||rr[0]?.staff_name||code;const shiftText=ss.length?ss.map(x=>`${esc(x.start_time)}〜${esc(x.end_time)}`).join(" / "):"シフト登録なし";const rows=rr.length?rr.map(r=>`<div class="staff-reservation-row"><div class="staff-reservation-time">${esc(r.start_time)}〜${esc(r.end_time)}</div><div class="staff-reservation-service"><strong>${esc(r.service_name||r.service_code)}</strong><small>${esc(r.service_code||"")}</small></div><div class="staff-reservation-customer"><strong>${esc(r.customer_name||"氏名未登録")}</strong><small>${r.member_no?`会員番号 ${esc(r.member_no)}`:esc(r.customer_type||"")}</small></div><span class="reservation-status">${esc(r.status||"RESERVED")}</span><button type="button" class="reservation-manage-button" data-reservation-id="${esc(r.reservation_id||"")}" style="border:1px solid #cfd4d4;background:#fff;border-radius:8px;padding:7px 10px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">変更・キャンセル</button></div>`).join(""):'<div class="staff-no-reservation">予約はありません。</div>';return `<section class="staff-day-section"><div class="staff-day-head"><div class="staff-day-person"><span class="staff-day-avatar">${esc(String(name).slice(0,1))}</span><span><strong>${esc(name)}</strong><small>${esc(code)}</small></span></div><span class="shift-pill">${shiftText}</span></div><div class="staff-reservation-list">${rows}</div></section>`}).join("");$("#staffScheduleBoard").innerHTML=`<div class="staff-day-grid">${sections}</div>`}
