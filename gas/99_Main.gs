@@ -487,6 +487,22 @@ function doPost(e) {
 
     switch (action) {
 
+      /*
+       * =====================================================
+       * The Forest Gym 精算承認
+       * 管理側作成のみ認証必須。会員側はワンタイムURL＋会員番号＋登録メールで照合。
+       * =====================================================
+       */
+      case "createTfgSettlement":
+        requireAuth_(body, ["ADMIN", "MANAGER"]);
+        return createTfgSettlement_(body);
+
+      case "getTfgSettlement":
+        return getTfgSettlement_(body);
+
+      case "approveTfgSettlement":
+        return approveTfgSettlement_(body);
+
       case "verifyMpgSuspensionMember":
         return verifyMpgSuspensionMember_(
           body
