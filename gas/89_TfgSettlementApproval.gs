@@ -36,7 +36,7 @@ function createTfgSettlement_(body){
     const memberName=String(body.memberName||"").trim();
     const email=String(body.email||"").trim().toLowerCase();
     const now=new Date();
-    const withdrawalDate=String(body.withdrawalDate||tfgSettlementWithdrawalDate_(now)).trim();
+    const withdrawalDate=tfgSettlementWithdrawalDate_(now);
     const items=Array.isArray(body.items)?body.items:[];
     const paymentMethod=tfgSettlementNormalizePaymentMethod_(body.paymentMethod);
     if(!memberNo||!memberName||!/^\S+@\S+\.\S+$/.test(email)||!items.length)throw new Error("会員番号・氏名・メール・精算明細が必要です。");
