@@ -255,6 +255,7 @@ function applyPermissionUi(){
   const permission=String(state.authUser?.permission||"STAFF").toUpperCase();
   const isManagement=permission==="ADMIN"||permission==="MANAGER";
   document.querySelectorAll('[data-view="registration"]').forEach(el=>el.classList.toggle("is-hidden",!isManagement));
+  document.querySelectorAll('[data-view="settlement"]').forEach(el=>el.classList.toggle("is-hidden",!isManagement));
   $("#myShiftNav")?.classList.toggle("is-hidden",!state.authUser?.staff_code);
   $("#authUserArea")?.classList.remove("is-hidden");
   if($("#authUserName"))$("#authUserName").textContent=roleHonorific(state.authUser);
