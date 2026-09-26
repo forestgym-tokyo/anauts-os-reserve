@@ -20,7 +20,7 @@ function cutoffInfo(now=new Date()){
   if(before9) expiry=new Date(y,m,9,20,0,1);
   else if(d<=26) expiry=new Date(y,m,27,0,0,0);
   else expiry=new Date(y,m+1,9,20,0,0);
-  return {withdrawalDate,expiry,beforeFinalCharge:d<=26};
+  return {withdrawalDate,expiry,beforeFinalCharge:after9&&d<=26};
 }
 function monthsBetween(joinDate,withdrawalDate){
   const j=new Date(joinDate+"T00:00:00"),w=new Date(withdrawalDate+"T00:00:00");
