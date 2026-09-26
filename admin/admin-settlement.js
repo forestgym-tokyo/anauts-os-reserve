@@ -72,7 +72,8 @@ function calc(){
   const firstNormal=Number($("#settlementFirstNormal").value||0);
   const initialPaid=Number($("#settlementInitialPaid").value||0);
   const paymentMethod=$("#settlementPaymentMethod").value;
-  if(!memberNo||!memberName||!email||!joinDate){show("会員番号・氏名・メールアドレス・入会日を入力してください。",true);return}
+  if(!/^\d{6}$/.test(memberNo)){show("会員番号は6桁の数字で入力してください。",true);return}
+  if(!memberName||!email||!joinDate){show("氏名・メールアドレス・入会日を入力してください。",true);return}
   const cut=cutoffInfo(),rate=rateFor(plan,joinDate),months=monthsBetween(joinDate,cut.withdrawalDate);
   const items=[];
   items.push({target:"—",label:"初期費用",paid:initialPaid,normal:8800,settlement:Math.max(0,8800-initialPaid),note:"入会金・事務手数料",kind:"INITIAL",basePaid:initialPaid,baseNormal:8800});
@@ -169,12 +170,25 @@ async function send(){
       items:current.items.map(x=>({target:x.target,label:x.label,paid:x.paid,normal:x.normal,settlement:x.settlement,note:x.note,status:x.status||"",paymentSequence:x.paymentSequence||null,isFinalMonth:!!x.isFinalMonth}))
     };
     const r=await apiPost(payload);
-    show("承認URLを会員へ送信しました。精算ID："+(r.data?.settlementId||""));
+    const fallback=$("#settlementFallbackUrl"),fallbackText=$("#settlementFallbackUrlText");
+    if(r.data?.mailWarning){
+      if(fallback&&fallbackText){fallbackText.value=r.data.approvalUrl||"";fallback.classList.remove("is-hidden");}
+      show(r.data.mailWarning+" 精算ID："+(r.data?.settlementId||""),true);
+    }else{
+      fallback?.classList.add("is-hidden");
+      show("承認URLを会員へ送信しました。精算ID："+(r.data?.settlementId||""));
+    }
   }catch(e){show(e.message||"送信できませんでした。",true)}
   finally{btn.disabled=false;btn.textContent="会員へ承認URLを送信"}
 }
 document.addEventListener("DOMContentLoaded",()=>{
   $("#settlementCalculate")?.addEventListener("click",calc);
   $("#settlementSend")?.addEventListener("click",send);
+  $("#settlementCopyUrl")?.addEventListener("click",async()=>{
+    const value=$("#settlementFallbackUrlText")?.value||"";
+    if(!value)return;
+    try{await navigator.clipboard.writeText(value);show("承認URLをコピーしました。");}
+    catch(_){$("#settlementFallbackUrlText")?.select();}
+  });
 });
 })();
