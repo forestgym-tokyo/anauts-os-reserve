@@ -35,7 +35,8 @@
     </section>
     <section class="card">
       <div class="eyebrow">IDENTITY</div><h2 style="margin:4px 0 8px;font-size:18px">ご本人確認</h2>
-      <div class="field"><label>会員番号</label><input id="memberNo" inputmode="numeric" autocomplete="off"></div>
+      <div class="field"><label>会員番号</label><input id="memberNo" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="off" placeholder="6桁"></div>
+      <p class="note" style="margin-top:-4px"><a href="https://forestgym-tokyo.github.io/tfg-member-id-lookup/" target="_blank" rel="noopener" style="color:var(--green)">会員番号がわからない方はこちら</a></p>
       <div class="field"><label>登録メールアドレス</label><input id="email" type="email" autocomplete="email"></div>
     </section>
     <section class="card">
@@ -86,7 +87,7 @@ async function load(){try{
 }}
 function esc(v){return String(v).replace(/[&<>"']/g,s=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[s]))}
 function showDone(at){$("loading").classList.add("hidden");$("main").classList.add("hidden");$("done").classList.remove("hidden");$("approvedAt").textContent=at?"承認日時："+at:""}
-$("approve").addEventListener("click",async()=>{const btn=$("approve"),msg=$("message");msg.className="msg";msg.textContent="";if(!$("c1").checked||!$("c2").checked||!$("c3").checked){msg.classList.add("error");msg.textContent="確認事項3項目すべてへの同意が必要です。";return}btn.disabled=true;btn.textContent="承認処理中…";try{const d=await api({action:"approveTfgSettlement",token,memberNo:$("memberNo").value.trim(),email:$("email").value.trim(),consent1:true,consent2:true,consent3:true});if(!d.ok)throw new Error(d.message||"承認できませんでした。");showDone(d.data&&d.data.approvedAt)}catch(e){msg.classList.add("error");msg.textContent=e.message;btn.disabled=false;btn.textContent="上記内容に同意して承認する"}});
+$("approve").addEventListener("click",async()=>{const btn=$("approve"),msg=$("message");msg.className="msg";msg.textContent="";if(!/^\d{6}$/.test($("memberNo").value.trim())){msg.classList.add("error");msg.textContent="会員番号は6桁の数字で入力してください。";return}if(!$("c1").checked||!$("c2").checked||!$("c3").checked){msg.classList.add("error");msg.textContent="確認事項3項目すべてへの同意が必要です。";return}btn.disabled=true;btn.textContent="承認処理中…";try{const d=await api({action:"approveTfgSettlement",token,memberNo:$("memberNo").value.trim(),email:$("email").value.trim(),consent1:true,consent2:true,consent3:true});if(!d.ok)throw new Error(d.message||"承認できませんでした。");showDone(d.data&&d.data.approvedAt)}catch(e){msg.classList.add("error");msg.textContent=e.message;btn.disabled=false;btn.textContent="上記内容に同意して承認する"}});
 load();
 </script>
 </body></html>
