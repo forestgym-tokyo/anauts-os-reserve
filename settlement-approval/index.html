@@ -188,6 +188,13 @@ function renderSettlement(){
     :"クレジットカード決済が完了しない場合、退会手続きが完了しないことを理解しました。";
   $("loading").classList.add("hidden");
   $("main").classList.remove("hidden");
+  if(settlement.status==="DRAFT"){
+    $("status").textContent="下書きプレビュー";
+    $("approve").disabled=true;
+    $("approve").textContent="下書きのため承認できません";
+    const demoArea=$("demoArea");
+    if(demoArea){demoArea.classList.remove("hidden");demoArea.querySelector(".demo-badge").textContent="下書きプレビューです。会員へはまだ送信されておらず、この画面では承認できません。";}
+  }
 }
 async function load(){
   try{
