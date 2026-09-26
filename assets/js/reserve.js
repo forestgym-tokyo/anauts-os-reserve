@@ -10,6 +10,8 @@ const DIET_COUNSELING_CONFIRM_INITIAL_DELAY_MS = 250;
 const DIET_COUNSELING_CONFIRM_POLL_MS = 500;
 const DIET_COUNSELING_BACKGROUND_CONFIRM_LIMIT_MS = 60000;
 const TOUR_WEEK_CACHE_PREFIX = "anauts-tour-week-v1:";
+const TOUR_WEEK_CACHE_MAX_AGE_MS = 60 * 60 * 1000;
+const TOUR_BACKGROUND_REFRESH_MS = 60 * 60 * 1000;
 
 const ROUTES = {
   personal: {
@@ -133,6 +135,7 @@ let loading = false;
 let weekLoadVersion = 0;
 let pendingWeekReload = false;
 let tourVersionCheckInFlight = false;
+let tourBackgroundRefreshTimer = null;
 
 init();
 
@@ -198,6 +201,9 @@ async function init() {
       // 初期化中の不要な空き枠リクエストを送らない。
       if (String(selectedService.service_code || "").toUpperCase() !== "PT_TRIAL60") {
         loadWeek();
+        if (String(selectedService.service_code || "").toUpperCase() === "TOUR") {
+          startTourBackgroundRefresh_();
+        }
       }
     }
   } catch (error) {
@@ -752,7 +758,17 @@ async function loadWeek(options = {}) {
     renderWeek(cached.results);
     renderWeekStatus_(cached.results);
     updateNav();
-    checkTourWeekVersion_(cached);
+
+    // 前回画面は即時表示する。1時間以上経過している場合だけ裏で再取得する。
+    const cacheAge = Math.max(0, Date.now() - Number(cached.saved_at || 0));
+    if (cacheAge >= TOUR_WEEK_CACHE_MAX_AGE_MS) {
+      window.setTimeout(() => {
+        loadWeek({ force: true, silent: true, preserveComplete: true });
+      }, 0);
+    } else {
+      // 新規予約だけは1時間を待たず、軽量な世代番号確認で即時反映する。
+      checkTourWeekVersion_(cached);
+    }
     return;
   }
 
@@ -829,6 +845,26 @@ async function loadWeek(options = {}) {
 
 function isTourService_() {
   return String(selectedService && selectedService.service_code || "").toUpperCase() === "TOUR";
+}
+
+function startTourBackgroundRefresh_() {
+  if (!isTourService_() || tourBackgroundRefreshTimer) return;
+
+  tourBackgroundRefreshTimer = window.setInterval(() => {
+    if (document.visibilityState === "hidden") return;
+    loadWeek({ force: true, silent: true, preserveComplete: true });
+  }, TOUR_BACKGROUND_REFRESH_MS);
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible" || !isTourService_()) return;
+    const cached = readTourWeekCache_();
+    const cacheAge = cached
+      ? Math.max(0, Date.now() - Number(cached.saved_at || 0))
+      : TOUR_WEEK_CACHE_MAX_AGE_MS;
+    if (cacheAge >= TOUR_WEEK_CACHE_MAX_AGE_MS) {
+      loadWeek({ force: true, silent: true, preserveComplete: true });
+    }
+  });
 }
 
 function weekDates_() {
