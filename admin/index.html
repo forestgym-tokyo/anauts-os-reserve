@@ -855,11 +855,13 @@
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px">
       <button id="settlementCalculate" class="ghost-button" type="button">精算明細を計算</button>
-      <button id="settlementSend" class="primary-button" type="button" disabled>会員へ承認URLを送信</button>
+      <button id="settlementDraft" class="primary-button" type="button" disabled>下書き保存・URL発行</button>
+      <button id="settlementPreviewButton" class="ghost-button" type="button" disabled>会員画面をプレビュー</button>
+      <button id="settlementSend" class="primary-button" type="button" disabled>会員へ承認依頼を送信</button>
     </div>
     <div id="settlementMessage" class="form-message is-hidden" style="margin-top:14px"></div>
     <div id="settlementFallbackUrl" class="is-hidden" style="margin-top:12px;padding:12px;border:1px solid #506158;border-radius:10px">
-      <div style="font-size:12px;color:#aab6ad;margin-bottom:6px">承認URL（メール送信失敗時の手動送付用）</div>
+      <div style="font-size:12px;color:#aab6ad;margin-bottom:6px">下書き承認URL</div>
       <div style="display:flex;gap:8px;align-items:center">
         <input id="settlementFallbackUrlText" readonly style="flex:1;min-width:0">
         <button id="settlementCopyUrl" class="ghost-button" type="button">コピー</button>
