@@ -224,7 +224,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 (function () {
   var addonSources = [
-    "./admin-monthly-v58.js?v=20260926-soga-a4-time-large-v2",
+    "./admin-monthly-v58.js?v=20260926-soga-a4-time-xlarge-v3",
     "./admin-tour-enrollment.js?v=20260828-master-draft-v1",
     "./admin-tour-ui-polish.js?v=20260828-event-driven-v1",
     "./admin-auto-reassign-enforce.js?v=20260920-head-office-counsel-v2",
