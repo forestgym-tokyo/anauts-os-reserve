@@ -1174,7 +1174,7 @@ function renderWeek(results) {
 
     const rawSlots = result.data && Array.isArray(result.data.slots) ? result.data.slots : [];
     const slots = isTourService_()
-      ? rawSlots.filter((slot) => Number(slot && slot.capacity == null ? 1 : slot.capacity) > 0)
+      ? rawSlots.filter((slot) => Number((slot == null || slot.capacity == null) ? 1 : slot.capacity) > 0)
       : rawSlots;
 
     if (result.pending) {
