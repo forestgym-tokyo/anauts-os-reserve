@@ -12,6 +12,7 @@ const DIET_COUNSELING_BACKGROUND_CONFIRM_LIMIT_MS = 60000;
 const TOUR_WEEK_CACHE_PREFIX = "anauts-tour-week-v1:";
 const TOUR_WEEK_CACHE_MAX_AGE_MS = 60 * 60 * 1000;
 const TOUR_BACKGROUND_REFRESH_MS = 60 * 60 * 1000;
+const TOUR_BOOKING_CUTOFF_MS = 90 * 60 * 1000;
 
 const ROUTES = {
   personal: {
@@ -847,6 +848,33 @@ function isTourService_() {
   return String(selectedService && selectedService.service_code || "").toUpperCase() === "TOUR";
 }
 
+function isTourSlotBookableNow_(slot, fallbackDate = "") {
+  if (!isTourService_()) return true;
+  const date = String(slot && slot.date || fallbackDate || "").trim();
+  const start = String(slot && slot.start_time || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{1,2}:\d{2}$/.test(start)) {
+    return false;
+  }
+
+  const normalizedStart = start.length === 4 ? "0" + start : start;
+  const startAt = new Date(date + "T" + normalizedStart + ":00+09:00");
+  if (Number.isNaN(startAt.getTime())) return false;
+  return startAt.getTime() > Date.now() + TOUR_BOOKING_CUTOFF_MS;
+}
+
+function getRenderableSlots_(result) {
+  const rawSlots = result && result.data && Array.isArray(result.data.slots)
+    ? result.data.slots
+    : [];
+  if (!isTourService_()) return rawSlots;
+
+  const fallbackDate = result && result.data ? result.data.date : "";
+  return rawSlots.filter((slot) =>
+    Number((slot == null || slot.capacity == null) ? 1 : slot.capacity) > 0 &&
+    isTourSlotBookableNow_(slot, fallbackDate)
+  );
+}
+
 function startTourBackgroundRefresh_() {
   if (!isTourService_() || tourBackgroundRefreshTimer) return;
 
@@ -915,7 +943,7 @@ function writeTourWeekCache_(results, version = "") {
 
 function renderWeekStatus_(results) {
   const total = results.reduce((sum, result) =>
-    sum + (result.data && Array.isArray(result.data.slots) ? result.data.slots.length : 0), 0
+    sum + getRenderableSlots_(result).length, 0
   );
   const failed = results.filter((result) => !result.ok).length;
 
@@ -1172,10 +1200,7 @@ function renderWeek(results) {
     const area = document.createElement("div");
     area.className = "day-slots";
 
-    const rawSlots = result.data && Array.isArray(result.data.slots) ? result.data.slots : [];
-    const slots = isTourService_()
-      ? rawSlots.filter((slot) => Number((slot == null || slot.capacity == null) ? 1 : slot.capacity) > 0)
-      : rawSlots;
+    const slots = getRenderableSlots_(result);
 
     if (result.pending) {
       const p = document.createElement("p");
