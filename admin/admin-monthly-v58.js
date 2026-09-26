@@ -77,6 +77,137 @@
         }
       });
     }
+    const SOGA_PRINT_START_=10*60+15;
+    const SOGA_PRINT_END_=20*60+45;
+    const SOGA_BREAK_START_=14*60;
+    const SOGA_BREAK_END_=16*60+15;
+
+    function sogaPrintMinutes_(value){
+      const m=String(value||"").match(/^(\d{1,2}):(\d{2})/);
+      return m?Number(m[1])*60+Number(m[2]):NaN;
+    }
+    function sogaPrintTime_(minutes){
+      const v=Math.max(0,Number(minutes)||0);
+      return `${String(Math.floor(v/60)).padStart(2,"0")}:${String(v%60).padStart(2,"0")}`;
+    }
+    function sogaPrintSurname_(staff,row){
+      const raw=String(staff?.staff_name||staff?.display_name||row?.staff_name||row?.staff_code||"")
+        .replace(/(?:トレーナー|さん)$/,"").trim();
+      const parts=raw.split(/[\s　]+/).filter(Boolean);
+      return parts[0]||raw;
+    }
+    function sogaPrintColor_(staff,row){
+      const color=String(staff?.color||"");
+      return /^#[0-9a-f]{6}$/i.test(color)?color:"#63d179";
+    }
+    function sogaPrintWeeks_(ym){
+      const [y,m]=ym.split("-").map(Number),last=new Date(y,m,0).getDate(),offset=(new Date(y,m-1,1).getDay()+6)%7;
+      const days=Array(offset).fill(null);
+      for(let d=1;d<=last;d++)days.push(`${ym}-${String(d).padStart(2,"0")}`);
+      while(days.length%7)days.push(null);
+      const weeks=[];for(let i=0;i<days.length;i+=7)weeks.push(days.slice(i,i+7));
+      return weeks;
+    }
+    function sogaPrintSegments_(date,rows,people){
+      const byStaff=new Map();
+      rows.filter(x=>String(x.date)===date).forEach(row=>{
+        const staffCode=String(row.staff_code||"");
+        const startMin=sogaPrintMinutes_(row.start_time),endMin=sogaPrintMinutes_(row.end_time);
+        if(!Number.isFinite(startMin)||!Number.isFinite(endMin)||endMin<=startMin)return;
+        if(!byStaff.has(staffCode))byStaff.set(staffCode,[]);
+        byStaff.get(staffCode).push({staffCode,startMin,endMin,row});
+      });
+      const segments=[];
+      byStaff.forEach((items,staffCode)=>{
+        items.sort((a,b)=>a.startMin-b.startMin);
+        let current=null;
+        items.forEach(item=>{
+          if(!current){current={...item,through:false};return}
+          const adjacent=current.endMin===item.startMin;
+          const acrossBreak=current.endMin===SOGA_BREAK_START_&&item.startMin===SOGA_BREAK_END_;
+          if(adjacent||acrossBreak){
+            current.endMin=item.endMin;
+            current.through=current.through||acrossBreak;
+          }else{
+            segments.push(current);
+            current={...item,through:false};
+          }
+        });
+        if(current)segments.push(current);
+      });
+      segments.forEach(x=>{x.staff=people.get(String(x.staffCode))||{}});
+      segments.sort((a,b)=>Number(b.through)-Number(a.through)||a.startMin-b.startMin||a.endMin-b.endMin||String(a.staffCode).localeCompare(String(b.staffCode),"ja"));
+      const placed=[];
+      segments.forEach(segment=>{
+        const occupied=new Set(placed.filter(other=>segment.startMin<other.endMin&&segment.endMin>other.startMin).map(other=>other.lane));
+        let lane=0;while(occupied.has(lane))lane++;
+        segment.lane=lane;
+        placed.push(segment);
+      });
+      return placed;
+    }
+    function sogaPrintSegmentHtml_(segment){
+      const range=SOGA_PRINT_END_-SOGA_PRINT_START_;
+      const top=Math.max(0,(segment.startMin-SOGA_PRINT_START_)/range*100);
+      const bottom=Math.min(100,(segment.endMin-SOGA_PRINT_START_)/range*100);
+      const height=Math.max(.8,bottom-top);
+      const name=esc(sogaPrintSurname_(segment.staff,segment.row));
+      const color=esc(sogaPrintColor_(segment.staff,segment.row));
+      const common=`class="soga-p-shift${segment.through?" is-through":""}" style="--lane:${Math.min(segment.lane,1)};--person-color:${color};top:${top.toFixed(4)}%;height:${height.toFixed(4)}%"`;
+      if(segment.through&&segment.startMin<SOGA_BREAK_START_&&segment.endMin>SOGA_BREAK_END_){
+        const duration=segment.endMin-segment.startMin;
+        const bTop=(SOGA_BREAK_START_-segment.startMin)/duration*100;
+        const bHeight=(SOGA_BREAK_END_-SOGA_BREAK_START_)/duration*100;
+        const topName=Math.max(12,bTop/2),bottomName=Math.min(88,bTop+bHeight+(100-bTop-bHeight)/2);
+        return `<div ${common}><span class="soga-p-time is-start">${esc(sogaPrintTime_(segment.startMin))}</span><strong class="soga-p-name" style="top:${topName.toFixed(2)}%">${name}</strong><span class="soga-p-break" style="top:${bTop.toFixed(4)}%;height:${bHeight.toFixed(4)}%"></span><strong class="soga-p-name" style="top:${bottomName.toFixed(2)}%">${name}</strong><span class="soga-p-time is-end">${esc(sogaPrintTime_(segment.endMin))}</span></div>`;
+      }
+      return `<div ${common}><span class="soga-p-time is-start">${esc(sogaPrintTime_(segment.startMin))}</span><strong class="soga-p-name" style="top:50%">${name}</strong><span class="soga-p-time is-end">${esc(sogaPrintTime_(segment.endMin))}</span></div>`;
+    }
+    function sogaPrintDayHtml_(date,rows,people){
+      if(!date)return '<div class="soga-p-day is-out"></div>';
+      const segments=sogaPrintSegments_(date,rows,people),day=Number(date.slice(-2));
+      const range=SOGA_PRINT_END_-SOGA_PRINT_START_;
+      const breakStart=(SOGA_BREAK_START_-SOGA_PRINT_START_)/range*100;
+      const breakEnd=(SOGA_BREAK_END_-SOGA_PRINT_START_)/range*100;
+      return `<div class="soga-p-day"><span class="soga-p-date">${day}日</span><div class="soga-p-timeline"><i class="soga-p-guide" style="top:${breakStart.toFixed(4)}%"></i><i class="soga-p-guide" style="top:${breakEnd.toFixed(4)}%"></i>${segments.map(sogaPrintSegmentHtml_).join("")}</div></div>`;
+    }
+    function sogaPrintWeekInfo_(index){
+      const range=SOGA_PRINT_END_-SOGA_PRINT_START_;
+      const breakStart=(SOGA_BREAK_START_-SOGA_PRINT_START_)/range*100;
+      const breakEnd=(SOGA_BREAK_END_-SOGA_PRINT_START_)/range*100;
+      return `<div class="soga-p-weekinfo"><strong>${index+1}週目</strong><div class="soga-p-scale"><span class="start">10:15</span><span style="top:${breakStart.toFixed(4)}%">14:00</span><span style="top:${breakEnd.toFixed(4)}%">16:15</span><span class="end">20:45</span></div></div>`;
+    }
+    function sogaPrintCss_(weekCount){return `
+      @page{size:A4 portrait;margin:0}
+      *{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff;color:#111;font-family:Arial,"Yu Gothic","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif}
+      .soga-p-actions{display:flex;justify-content:center;gap:10px;padding:10px;background:#111}.soga-p-actions button{border:0;border-radius:8px;background:#2f8f49;color:#fff;padding:9px 18px;font-weight:800;cursor:pointer}
+      .soga-p-sheet{width:210mm;height:297mm;padding:6mm 5mm 5mm;overflow:hidden;background:#fff}
+      .soga-p-title{height:13mm;display:flex;align-items:flex-start;justify-content:space-between;padding:0 1mm}.soga-p-title h1{margin:0;font-size:15pt;font-weight:500}.soga-p-title span{margin-top:5mm;font-size:7pt}
+      .soga-p-calendar{height:273mm;border-top:.28mm solid #333;border-left:.28mm solid #333;display:grid;grid-template-rows:8mm repeat(${weekCount},minmax(0,1fr))}
+      .soga-p-header,.soga-p-week{display:grid;grid-template-columns:18mm repeat(7,minmax(0,1fr));min-height:0}
+      .soga-p-header>div{display:grid;place-items:center;border-right:.28mm solid #333;border-bottom:.28mm solid #333;font-size:7.2pt}.soga-p-header .corner{font-size:6.1pt}
+      .soga-p-weekinfo,.soga-p-day{position:relative;min-width:0;min-height:0;border-right:.28mm solid #333;border-bottom:.28mm solid #333;overflow:hidden}
+      .soga-p-weekinfo{background:#fafafa}.soga-p-weekinfo>strong{position:absolute;top:2mm;left:1mm;font-size:6.1pt;font-weight:600}.soga-p-scale{position:absolute;left:0;right:.6mm;top:6mm;bottom:1mm;font-size:4.8pt;text-align:right}.soga-p-scale span{position:absolute;right:0;transform:translateY(-50%)}.soga-p-scale .start{top:0;transform:none}.soga-p-scale .end{bottom:0;top:auto;transform:none}
+      .soga-p-date{position:absolute;z-index:5;top:1mm;left:1mm;font-size:6.5pt}.soga-p-timeline{position:absolute;left:0;right:0;top:6mm;bottom:1mm}.soga-p-guide{position:absolute;left:0;right:0;border-top:.18mm dotted #aaa;z-index:0}
+      .soga-p-shift{position:absolute;z-index:2;left:calc(50% * var(--lane) + .55mm);width:calc(50% - 1.1mm);min-height:3mm;border:.28mm solid #222;border-radius:1mm;background:#fff;box-shadow:inset .7mm 0 0 var(--person-color);overflow:hidden}
+      .soga-p-time{position:absolute;z-index:5;left:1.1mm;font-size:4pt;line-height:1}.soga-p-time.is-start{top:.65mm}.soga-p-time.is-end{bottom:.6mm}.soga-p-name{position:absolute;z-index:5;left:0;right:0;transform:translateY(-50%);padding:0 .5mm 0 1mm;text-align:center;font-size:7pt;line-height:1.05;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .soga-p-break{position:absolute;z-index:3;left:0;right:0;border-top:.18mm dashed #666;border-bottom:.18mm dashed #666;background:repeating-linear-gradient(135deg,#fff 0,#fff 1.4mm,#999 1.5mm,#999 1.7mm);-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .soga-p-day.is-out{background:#fff}
+      @media print{html,body{width:210mm;height:297mm;overflow:hidden}.soga-p-actions{display:none!important}.soga-p-sheet{padding:6mm 5mm 5mm;break-inside:avoid;page-break-inside:avoid}.soga-p-shift,.soga-p-break{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+    `}
+    function printSogaMonth_(rows){
+      const printWindow=window.open("","_blank");
+      if(!printWindow){alert("印刷用ページを開けませんでした。ポップアップを許可して再度お試しください。");return}
+      const ym=state.monthlyMonth,[year,month]=ym.split("-").map(Number),weeks=sogaPrintWeeks_(ym),people=new Map(state.staff.map(x=>[String(x.staff_code),x]));
+      const weekRows=weeks.map((week,index)=>`<div class="soga-p-week">${sogaPrintWeekInfo_(index)}${week.map(date=>sogaPrintDayHtml_(date,rows,people)).join("")}</div>`).join("");
+      const title=`${year}年${month}月　9ROUND シフト`;
+      const markup=`<div class="soga-p-actions"><button id="printNow" type="button">印刷 / PDF保存</button></div><main class="soga-p-sheet"><header class="soga-p-title"><h1>${esc(title)}</h1><span>タイムカード確認用</span></header><section class="soga-p-calendar"><div class="soga-p-header"><div class="corner">週・時間</div>${["月","火","水","木","金","土","日"].map(x=>`<div>${x}</div>`).join("")}</div>${weekRows}</section></main>`;
+      const doc=printWindow.document;
+      doc.open();doc.write(`<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>${esc(title)}</title><style>${sogaPrintCss_(weeks.length)}</style></head><body>${markup}</body></html>`);doc.close();
+      doc.querySelector("#printNow").onclick=()=>printWindow.print();
+      printWindow.focus();
+    }
+
     function printMonth_(){
       if(!canPrintMonthly_())return;
       if(monthlyLoadedMonth_!==state.monthlyMonth){alert("予定の読み込みが完了してから印刷してください。");return}
@@ -84,6 +215,7 @@
       if(store==="ALL"){alert("印刷する部門・店舗を選択してください。");document.querySelector("#mStore")?.focus();return}
       const rows=(state.monthlyRows||[]).filter(x=>String(x.store_code)===store);
       if(!rows.length){alert("この月の部門・店舗に印刷できる予定がありません。");return}
+      if(store==="SOGA"){printSogaMonth_(rows);return}
       // A separate document keeps the dark admin theme out of printer previews.
       const printWindow=window.open("","_blank");
       if(!printWindow){alert("印刷用ページを開けませんでした。ポップアップを許可して再度お試しください。");return}
@@ -421,6 +553,7 @@
       view.querySelector(".eyebrow").textContent=store==="SOGA"?"9ROUND ARIO SOGA":"MONTHLY SCHEDULE";
       view.querySelector("h1").textContent=store==="SOGA"?"9ROUNDシフト":"予定一覧";
       view.querySelector(".page-heading p:last-child").textContent=store==="SOGA"?"アリオ蘇我店の確定シフトを月間カレンダーで確認します。":"月間カレンダーでスタッフ・トレーナーの勤務予定を確認します。";
+      const printButton=document.querySelector("#mPrint");if(printButton){printButton.innerHTML=store==="SOGA"?"🖨 A4縦印刷 / PDF":"🖨 A4印刷";printButton.title=store==="SOGA"?"見本形式の9ROUNDシフトをA4縦1枚で印刷・PDF保存":"選択した部門・店舗の月間予定をA4一枚で印刷"}
     }
     function renderMonth(){
       const board=document.querySelector("#mBoard"),a=filtered(),people=new Map(state.staff.map(x=>[String(x.staff_code),x])),ym=state.monthlyMonth,[y,m]=ym.split("-").map(Number),first=new Date(y,m-1,1),last=new Date(y,m,0).getDate(),offset=(first.getDay()+6)%7,total=Math.ceil((offset+last)/7)*7,today=localYmd(),by=new Map();
