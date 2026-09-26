@@ -497,6 +497,10 @@ function doPost(e) {
         requireAuth_(body, ["ADMIN", "MANAGER"]);
         return createTfgSettlement_(body);
 
+      case "sendTfgSettlementApproval":
+        requireAuth_(body, ["ADMIN", "MANAGER"]);
+        return sendTfgSettlementApproval_(body);
+
       case "getTfgSettlement":
         return getTfgSettlement_(body);
 
