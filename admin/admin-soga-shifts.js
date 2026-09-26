@@ -92,8 +92,8 @@
   function renderFinal_(){
     const staffMap=new Map(SG.staff.map(staff=>[String(staff.staff_code),staff])),requestBySlot=new Map();SG.requests.forEach(row=>{const k=key(row.date,row.start_time);if(!requestBySlot.has(k))requestBySlot.set(k,new Set());requestBySlot.get(k).add(String(row.staff_code))});SG.assignments.forEach((_,assignmentKey)=>{const [date,start,staffCode]=assignmentKey.split("|");const k=key(date,start);if(!requestBySlot.has(k))requestBySlot.set(k,new Set());requestBySlot.get(k).add(staffCode)});
     const activeDates=monthDates_().filter(date=>SG.slots.some(slot=>(requestBySlot.get(key(date,slot.start_time))||new Set()).size));
-    q("#sogaShiftBody").innerHTML=`${publicationHtml_()}<div class="soga-help"><b>「希望を全てシフトへ入れる」で、全スタッフの希望枠を人数制限なく一括選択</b>できます。その後、各カードをタップしてシフト・体験担当・取消を調整してください。</div><div class="soga-legend"><span class="wish">希望</span><span class="shift">シフトイン</span><span class="trial">体験担当</span></div><div class="soga-final-tools"><button id="sogaSelectAllRequests" class="primary-button" type="button" ${SG.requests.length?"":"disabled"}>希望を全てシフトへ入れる</button></div><div class="soga-import"><label>希望CSV（staff_code,date,start_time,end_time）<input id="sogaRequestCsv" type="file" accept=".csv,text/csv"></label><button id="sogaImportRequests" class="ghost-button" type="button">希望CSVを取り込む</button></div>${activeDates.length?`<div class="soga-day-list">${activeDates.map(date=>`<details class="soga-day" open><summary><span>${h(dateLabel_(date))}</span><small>${SG.slots.reduce((sum,slot)=>sum+(requestBySlot.get(key(date,slot.start_time))?.size||0),0)}希望</small></summary><div class="soga-final-slots">${SG.slots.map(slot=>{const codes=Array.from(requestBySlot.get(key(date,slot.start_time))||[]);return `<div class="soga-final-slot"><div class="soga-slot-time">${h(slot.start_time)}〜${h(slot.end_time)}</div><div class="soga-candidates">${codes.length?codes.map(code=>candidateHtml_(date,slot,code,staffMap.get(code))).join(""):'<span class="soga-no-candidate">希望者なし</span>'}</div></div>`}).join("")}</div></details>`).join("")}</div>`:'<div class="soga-empty">この月のシフト希望はまだありません。</div>'}<div class="soga-submit-bar"><div><strong id="sogaAssignmentTotal">${SG.assignments.size}件を調整案へ登録中</strong><small>保存後も、ADMINが公開するまではスタッフに表示されません。</small></div><button id="sogaSaveAssignments" class="primary-button" type="button">調整内容を保存</button></div>`;
-    bindCandidateCards_();q("#sogaSelectAllRequests").onclick=selectAllRequests_;q("#sogaImportRequests").onclick=importRequests_;q("#sogaSaveAssignments").onclick=saveAssignments_;if(q("#sogaPublishMonth"))q("#sogaPublishMonth").onclick=publishMonth_;
+    q("#sogaShiftBody").innerHTML=`${publicationHtml_()}<div class="soga-help"><b>「希望を全てシフトへ入れる」で、全スタッフの希望枠を人数制限なく一括選択</b>できます。その後、各カードをタップしてシフト・体験担当・取消を調整してください。</div><div class="soga-legend"><span class="wish">希望</span><span class="shift">シフトイン</span><span class="trial">体験担当</span></div><div class="soga-final-tools"><button id="sogaSelectAllRequests" class="primary-button" type="button" ${SG.requests.length?"":"disabled"}>希望を全てシフトへ入れる</button><button id="sogaPrintShift" class="ghost-button" type="button">A4印刷 / PDF</button></div><div class="soga-import"><label>希望CSV（staff_code,date,start_time,end_time）<input id="sogaRequestCsv" type="file" accept=".csv,text/csv"></label><button id="sogaImportRequests" class="ghost-button" type="button">希望CSVを取り込む</button></div>${activeDates.length?`<div class="soga-day-list">${activeDates.map(date=>`<details class="soga-day" open><summary><span>${h(dateLabel_(date))}</span><small>${SG.slots.reduce((sum,slot)=>sum+(requestBySlot.get(key(date,slot.start_time))?.size||0),0)}希望</small></summary><div class="soga-final-slots">${SG.slots.map(slot=>{const codes=Array.from(requestBySlot.get(key(date,slot.start_time))||[]);return `<div class="soga-final-slot"><div class="soga-slot-time">${h(slot.start_time)}〜${h(slot.end_time)}</div><div class="soga-candidates">${codes.length?codes.map(code=>candidateHtml_(date,slot,code,staffMap.get(code))).join(""):'<span class="soga-no-candidate">希望者なし</span>'}</div></div>`}).join("")}</div></details>`).join("")}</div>`:'<div class="soga-empty">この月のシフト希望はまだありません。</div>'}<div class="soga-submit-bar"><div><strong id="sogaAssignmentTotal">${SG.assignments.size}件を調整案へ登録中</strong><small>保存後も、ADMINが公開するまではスタッフに表示されません。</small></div><button id="sogaSaveAssignments" class="primary-button" type="button">調整内容を保存</button></div>`;
+    bindCandidateCards_();q("#sogaSelectAllRequests").onclick=selectAllRequests_;q("#sogaPrintShift").onclick=openPrintView_;q("#sogaImportRequests").onclick=importRequests_;q("#sogaSaveAssignments").onclick=saveAssignments_;if(q("#sogaPublishMonth"))q("#sogaPublishMonth").onclick=publishMonth_;
   }
   function candidateHtml_(date,slot,code,staff){const stateValue=SG.assignments.get(key(date,slot.start_time,code))||"",className=stateValue==="TRIAL"?"is-trial":(stateValue==="SHIFT"?"is-shift":""),label=stateValue==="TRIAL"?"体験担当":(stateValue==="SHIFT"?"シフトイン":"希望");return `<button type="button" class="soga-candidate ${className}" data-candidate-date="${date}" data-candidate-start="${slot.start_time}" data-candidate-end="${slot.end_time}" data-candidate-staff="${h(code)}"><strong>${h(personLabel_(staff||{staff_code:code}))}</strong><small>${label}</small></button>`}
   function bindCandidateCards_(){qa(".soga-candidate").forEach(button=>{let timer=0,longPressed=false;const clear=()=>{if(timer)clearTimeout(timer);timer=0};button.addEventListener("pointerdown",()=>{longPressed=false;timer=setTimeout(()=>{longPressed=true;clearAssignment_(button);},650)});button.addEventListener("pointerup",clear);button.addEventListener("pointercancel",clear);button.addEventListener("pointerleave",clear);button.addEventListener("contextmenu",event=>event.preventDefault());button.addEventListener("click",()=>{if(longPressed){longPressed=false;return}cycleAssignment_(button)})})}
@@ -104,6 +104,150 @@
   function selectAllRequests_(){let added=0;SG.requests.forEach(row=>{const k=key(row.date,row.start_time,row.staff_code);if(!SG.assignments.has(k)){SG.assignments.set(k,"SHIFT");added++}});SG.dirty=SG.dirty||added>0;renderFinal_();message_(added?`希望 ${added}件を調整案へ追加しました。人数上限はありません。`:"すべての希望がすでに調整案へ入っています。")}
   async function saveAssignments_(){if(!confirm(`${monthLabel_()}の調整内容 ${SG.assignments.size}件を保存しますか？`))return;const button=q("#sogaSaveAssignments");button.disabled=true;button.textContent="保存中…";try{const assignments=[];SG.assignments.forEach((type,k)=>{const [date,start,staffCode]=k.split("|"),slot=SG.slots.find(row=>row.start_time===start);if(slot)assignments.push({date,start_time:start,end_time:slot.end_time,staff_code:staffCode,assignment_type:type})});const result=await apiPost({action:"saveSogaShiftAssignments",month:SG.month,store_code:SG.storeCode,assignments});SG.dirty=false;message_(`調整内容を保存しました（${result.data?.saved_count||0}件／体験担当 ${result.data?.trial_count||0}件）。公開操作を行うまでスタッフには表示されません。`);await loadFinal_()}catch(error){message_(error.message||"調整内容を保存できませんでした。",true)}finally{button.disabled=false;button.textContent="調整内容を保存"}}
   async function publishMonth_(){if(!administrator())return;if(SG.dirty){message_("未保存の調整があります。先に「調整内容を保存」を押してください。",true);return}if(!confirm(`${monthLabel_()}の予定と個人シフトをスタッフへ公開しますか？`))return;const button=q("#sogaPublishMonth");button.disabled=true;button.textContent="公開中…";try{await apiPost({action:"publishStaffShiftMonth",month:SG.month,store_code:SG.storeCode});message_(`${monthLabel_()}の予定と個人シフトを公開しました。`);await loadFinal_()}catch(error){message_(error.message||"シフトを公開できませんでした。",true);button.disabled=false;button.textContent="スタッフへ公開"}}
+
+
+  const PRINT_DAY_START_=10*60+15;
+  const PRINT_DAY_END_=20*60+45;
+  const PRINT_BREAK_START_=14*60;
+  const PRINT_BREAK_END_=16*60+15;
+
+  function printMinutes_(value){
+    const match=String(value||"").match(/^(\d{1,2}):(\d{2})$/);
+    return match?Number(match[1])*60+Number(match[2]):NaN;
+  }
+  function printTime_(minutes){
+    const value=Math.max(0,Number(minutes)||0),hour=Math.floor(value/60),minute=value%60;
+    return `${String(hour).padStart(2,"0")}:${String(minute).padStart(2,"0")}`;
+  }
+  function printSurname_(staff,code){
+    const raw=String(staff?.last_name||staff?.family_name||staff?.display_name||staff?.staff_name||code||"").trim()
+      .replace(/(?:トレーナー|さん)$/,"").trim();
+    const pieces=raw.split(/[\s　]+/).filter(Boolean);
+    return pieces[0]||raw||String(code||"");
+  }
+  function printStaffColor_(staff,code){
+    const raw=String(staff?.color||"").trim();
+    if(/^#[0-9A-Fa-f]{6}$/.test(raw))return raw;
+    const palette=["#1f77b4","#2ca02c","#d62728","#9467bd","#ff7f0e","#17becf","#8c564b","#e377c2","#7f7f7f","#bcbd22"];
+    const text=String(code||staff?.staff_code||"");
+    let hash=0;for(let i=0;i<text.length;i++)hash=(hash*31+text.charCodeAt(i))>>>0;
+    return palette[hash%palette.length];
+  }
+  function printWeeks_(){
+    const [year,month]=SG.month.split("-").map(Number),last=new Date(year,month,0).getDate(),first=new Date(year,month-1,1);
+    const offset=(first.getDay()+6)%7,days=Array(offset).fill(null);
+    for(let day=1;day<=last;day++)days.push(`${SG.month}-${String(day).padStart(2,"0")}`);
+    while(days.length%7)days.push(null);
+    const weeks=[];for(let i=0;i<days.length;i+=7)weeks.push(days.slice(i,i+7));
+    return weeks;
+  }
+  function printIntervalsForDate_(date){
+    const slotEnds=new Map(SG.slots.map(slot=>[String(slot.start_time),String(slot.end_time)]));
+    const byStaff=new Map();
+    SG.assignments.forEach((type,assignmentKey)=>{
+      if(!type)return;
+      const [rowDate,start,staffCode]=assignmentKey.split("|");
+      if(rowDate!==date)return;
+      const end=slotEnds.get(start);
+      const startMin=printMinutes_(start),endMin=printMinutes_(end);
+      if(!Number.isFinite(startMin)||!Number.isFinite(endMin)||endMin<=startMin)return;
+      if(!byStaff.has(staffCode))byStaff.set(staffCode,[]);
+      byStaff.get(staffCode).push({startMin,endMin,start,end,staffCode});
+    });
+    const staffMap=new Map(SG.staff.map(staff=>[String(staff.staff_code),staff]));
+    const segments=[];
+    byStaff.forEach((rows,staffCode)=>{
+      rows.sort((a,b)=>a.startMin-b.startMin);
+      let current=null;
+      rows.forEach(row=>{
+        if(!current){current={...row,through:false};return}
+        const adjacent=current.endMin===row.startMin;
+        const acrossBreak=current.endMin===PRINT_BREAK_START_&&row.startMin===PRINT_BREAK_END_;
+        if(adjacent||acrossBreak){
+          current.endMin=row.endMin;
+          current.end=row.end;
+          current.through=current.through||acrossBreak;
+        }else{
+          segments.push(current);
+          current={...row,through:false};
+        }
+      });
+      if(current)segments.push(current);
+    });
+    segments.sort((a,b)=>Number(b.through)-Number(a.through)||a.startMin-b.startMin||a.endMin-b.endMin||String(a.staffCode).localeCompare(String(b.staffCode),"ja"));
+    const placed=[];
+    segments.forEach(segment=>{
+      const occupied=new Set(placed.filter(other=>segment.startMin<other.endMin&&segment.endMin>other.startMin).map(other=>other.lane));
+      let lane=0;while(occupied.has(lane))lane++;
+      segment.lane=lane;
+      segment.staff=staffMap.get(segment.staffCode)||{staff_code:segment.staffCode};
+      placed.push(segment);
+    });
+    const maxLane=placed.reduce((max,row)=>Math.max(max,row.lane),0);
+    return {segments:placed,columns:Math.max(2,maxLane+1)};
+  }
+  function printSegmentHtml_(segment,columns){
+    const range=PRINT_DAY_END_-PRINT_DAY_START_;
+    const top=Math.max(0,(segment.startMin-PRINT_DAY_START_)/range*100);
+    const bottom=Math.min(100,(segment.endMin-PRINT_DAY_START_)/range*100);
+    const height=Math.max(.8,bottom-top);
+    const name=h(printSurname_(segment.staff,segment.staffCode));
+    const color=h(printStaffColor_(segment.staff,segment.staffCode));
+    const common=`class="print-shift${segment.through?" is-through":""}" style="--lane:${segment.lane};--columns:${columns};--person-color:${color};top:${top.toFixed(4)}%;height:${height.toFixed(4)}%"`;
+    if(segment.through&&segment.startMin<PRINT_BREAK_START_&&segment.endMin>PRINT_BREAK_END_){
+      const duration=segment.endMin-segment.startMin;
+      const breakTop=(PRINT_BREAK_START_-segment.startMin)/duration*100;
+      const breakHeight=(PRINT_BREAK_END_-PRINT_BREAK_START_)/duration*100;
+      const topName=Math.max(12,breakTop/2);
+      const bottomName=Math.min(88,breakTop+breakHeight+(100-breakTop-breakHeight)/2);
+      return `<div ${common}><span class="shift-time is-start">${h(printTime_(segment.startMin))}</span><strong class="shift-name" style="top:${topName.toFixed(2)}%">${name}</strong><span class="shift-break" style="top:${breakTop.toFixed(4)}%;height:${breakHeight.toFixed(4)}%"></span><strong class="shift-name" style="top:${bottomName.toFixed(2)}%">${name}</strong><span class="shift-time is-end">${h(printTime_(segment.endMin))}</span></div>`;
+    }
+    return `<div ${common}><span class="shift-time is-start">${h(printTime_(segment.startMin))}</span><strong class="shift-name" style="top:50%">${name}</strong><span class="shift-time is-end">${h(printTime_(segment.endMin))}</span></div>`;
+  }
+  function printDayHtml_(date){
+    if(!date)return '<div class="print-day is-outside"></div>';
+    const {segments,columns}=printIntervalsForDate_(date),day=Number(date.slice(-2));
+    const breakStart=(PRINT_BREAK_START_-PRINT_DAY_START_)/(PRINT_DAY_END_-PRINT_DAY_START_)*100;
+    const breakEnd=(PRINT_BREAK_END_-PRINT_DAY_START_)/(PRINT_DAY_END_-PRINT_DAY_START_)*100;
+    return `<div class="print-day"><div class="print-date">${day}日</div><div class="print-timeline"><span class="print-guide" style="top:${breakStart.toFixed(4)}%"></span><span class="print-guide" style="top:${breakEnd.toFixed(4)}%"></span>${segments.map(segment=>printSegmentHtml_(segment,columns)).join("")}</div></div>`;
+  }
+  function printWeekInfoHtml_(index){
+    const range=PRINT_DAY_END_-PRINT_DAY_START_;
+    const breakStart=(PRINT_BREAK_START_-PRINT_DAY_START_)/range*100;
+    const breakEnd=(PRINT_BREAK_END_-PRINT_DAY_START_)/range*100;
+    return `<div class="print-week-info"><strong>${index+1}週目</strong><div class="print-time-scale"><span class="t-start">10:15</span><span style="top:${breakStart.toFixed(4)}%">14:00</span><span style="top:${breakEnd.toFixed(4)}%">16:15</span><span class="t-end">20:45</span></div></div>`;
+  }
+  function printDocumentHtml_(){
+    const weeks=printWeeks_(),weekdays=["月","火","水","木","金","土","日"];
+    const rows=weeks.map((week,index)=>`<div class="print-week-row">${printWeekInfoHtml_(index)}${week.map(printDayHtml_).join("")}</div>`).join("");
+    const title=`${monthLabel_()}　9ROUND シフト`;
+    return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${h(title)}</title><style>
+      *{box-sizing:border-box}html,body{margin:0;padding:0;background:#e7e7e7;color:#111;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Yu Gothic","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif}
+      .print-toolbar{position:sticky;top:0;z-index:20;display:flex;justify-content:center;gap:10px;padding:10px;background:#111}.print-toolbar button{border:0;border-radius:9px;background:#2f8f49;color:#fff;padding:10px 20px;font-weight:800;font-size:14px;cursor:pointer}
+      .sheet{width:210mm;height:297mm;margin:8mm auto;padding:5mm 5mm 4mm;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,.18);overflow:hidden}
+      .print-title{height:14mm;display:flex;align-items:flex-start;justify-content:space-between;gap:8mm;padding:0 1mm}.print-title h1{margin:0;font-size:15pt;font-weight:500;letter-spacing:.01em}.print-title p{margin:5mm 0 0;font-size:7pt;color:#333;white-space:nowrap}
+      .print-calendar{height:274mm;border-top:.28mm solid #333;border-left:.28mm solid #333;display:grid;grid-template-rows:8mm repeat(${weeks.length},minmax(0,1fr));background:#fff}
+      .print-header,.print-week-row{display:grid;grid-template-columns:18mm repeat(7,minmax(0,1fr));min-height:0}
+      .print-header>div{display:grid;place-items:center;border-right:.28mm solid #333;border-bottom:.28mm solid #333;font-size:7.4pt}.print-header .corner{font-size:6.4pt}
+      .print-week-info,.print-day{position:relative;min-width:0;min-height:0;border-right:.28mm solid #333;border-bottom:.28mm solid #333;overflow:hidden}
+      .print-week-info{background:#fafafa}.print-week-info>strong{position:absolute;top:2.2mm;left:1.2mm;font-size:6.2pt;font-weight:600}.print-time-scale{position:absolute;left:0;right:.7mm;top:6mm;bottom:1.2mm;font-size:5.1pt;color:#111;text-align:right}.print-time-scale span{position:absolute;right:0;transform:translateY(-50%)}.print-time-scale .t-start{top:0;transform:none}.print-time-scale .t-end{bottom:0;top:auto;transform:none}
+      .print-date{position:absolute;z-index:4;top:1.1mm;left:1.2mm;font-size:6.6pt}.print-timeline{position:absolute;left:0;right:0;top:6mm;bottom:1.2mm}.print-guide{position:absolute;left:0;right:0;border-top:.18mm dotted #aaa;z-index:0}
+      .print-shift{position:absolute;z-index:2;left:calc((100% / var(--columns)) * var(--lane) + .7mm);width:calc(100% / var(--columns) - 1.4mm);min-height:3.2mm;border:.28mm solid #222;border-radius:1.1mm;background:#fff;box-shadow:inset .7mm 0 0 var(--person-color);overflow:hidden}
+      .shift-time{position:absolute;z-index:5;left:1.25mm;font-size:4.2pt;line-height:1;color:#333}.shift-time.is-start{top:.75mm}.shift-time.is-end{bottom:.7mm}.shift-name{position:absolute;z-index:5;left:0;right:0;transform:translateY(-50%);padding:0 .6mm 0 1.1mm;text-align:center;font-size:7.4pt;line-height:1.05;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .shift-break{position:absolute;z-index:3;left:0;right:0;border-top:.18mm dashed #666;border-bottom:.18mm dashed #666;background:repeating-linear-gradient(135deg,#f7f7f7 0,#f7f7f7 1.5mm,#9d9d9d 1.6mm,#9d9d9d 1.8mm);-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .print-day.is-outside{background:#fff}
+      @page{size:A4 portrait;margin:0}
+      @media print{html,body{width:210mm;height:297mm;background:#fff}.print-toolbar{display:none!important}.sheet{margin:0;box-shadow:none;page-break-after:avoid;break-after:avoid}.print-calendar,.print-shift,.shift-break{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+    </style></head><body><div class="print-toolbar"><button type="button" onclick="window.print()">印刷 / PDF保存</button></div><main class="sheet"><header class="print-title"><h1>${h(title)}</h1><p>タイムカード確認用</p></header><section class="print-calendar"><div class="print-header"><div class="corner">週・時間</div>${weekdays.map(day=>`<div>${day}</div>`).join("")}</div>${rows}</section></main></body></html>`;
+  }
+  function openPrintView_(){
+    const printWindow=window.open("","_blank");
+    if(!printWindow){message_("印刷画面を開けませんでした。ブラウザのポップアップ許可を確認してください。",true);return}
+    printWindow.document.open();
+    printWindow.document.write(printDocumentHtml_());
+    printWindow.document.close();
+    printWindow.focus();
+  }
 
   function csvLine_(line){const cells=[];let value="",quoted=false;for(let i=0;i<line.length;i++){const c=line[i];if(c==='"'){if(quoted&&line[i+1]==='"'){value+='"';i++}else quoted=!quoted}else if(c===","&&!quoted){cells.push(value);value=""}else value+=c}cells.push(value);return cells}
   async function importRequests_(){const input=q("#sogaRequestCsv"),file=input?.files?.[0];if(!file){message_("希望CSVを選択してください。",true);return}const button=q("#sogaImportRequests");button.disabled=true;button.textContent="取込中…";try{const lines=(await file.text()).replace(/^\uFEFF/,"").split(/\r?\n/).filter(line=>line.trim());if(lines.length<2)throw new Error("CSVに希望データがありません。");const headers=csvLine_(lines[0]).map(cell=>cell.trim()),required=["staff_code","date","start_time","end_time"];required.forEach(column=>{if(!headers.includes(column))throw new Error(`CSVに${column}列がありません。`)});const requests=lines.slice(1).map(line=>{const cells=csvLine_(line),row={};headers.forEach((column,index)=>row[column]=String(cells[index]??"").trim());return row});if(!confirm(`${requests.length}行の希望を追加取り込みしますか？`))return;const result=await apiPost({action:"importSogaShiftRequests",month:SG.month,store_code:SG.storeCode,requests});message_(`希望CSVを取り込みました（追加 ${result.data?.inserted_count||0}件／登録済み ${result.data?.skipped_count||0}件）。`);await loadFinal_()}catch(error){message_(error.message||"希望CSVを取り込めませんでした。",true)}finally{button.disabled=false;button.textContent="希望CSVを取り込む"}}
