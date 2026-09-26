@@ -28,9 +28,12 @@ test("9th 20:00 exactly is still current-month withdrawal; one second later is n
   assert.equal(exact.expiry.getTime(),new Date(2026,8,9,20,0,1).getTime());
 });
 
-test("through the 26th final month is treated as not yet charged",()=>{
+test("final month is zero only after the 9th cutoff and through the 26th",()=>{
   const scope=vm.createContext({});
   vm.runInContext(extractFunction(adminSource,"cutoffInfo")+";this.cutoffInfo=cutoffInfo;",scope);
+  assert.equal(scope.cutoffInfo(new Date(2026,8,5,12,0,0)).beforeFinalCharge,false);
+  assert.equal(scope.cutoffInfo(new Date(2026,8,9,20,0,0)).beforeFinalCharge,false);
+  assert.equal(scope.cutoffInfo(new Date(2026,8,9,20,0,1)).beforeFinalCharge,true);
   assert.equal(scope.cutoffInfo(new Date(2026,8,26,23,59,59)).beforeFinalCharge,true);
   assert.equal(scope.cutoffInfo(new Date(2026,8,27,0,0,0)).beforeFinalCharge,false);
 });
