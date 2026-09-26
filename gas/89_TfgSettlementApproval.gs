@@ -35,11 +35,11 @@ function createTfgSettlement_(body){
     const memberNo=String(body.memberNo||"").replace(/\D/g,"");
     const memberName=String(body.memberName||"").trim();
     const email=String(body.email||"").trim().toLowerCase();
-    const withdrawalDate=String(body.withdrawalDate||"").trim();
+    const now=new Date();
+    const withdrawalDate=String(body.withdrawalDate||tfgSettlementWithdrawalDate_(now)).trim();
     const items=Array.isArray(body.items)?body.items:[];
     const paymentMethod=tfgSettlementNormalizePaymentMethod_(body.paymentMethod);
     if(!memberNo||!memberName||!/^\S+@\S+\.\S+$/.test(email)||!items.length)throw new Error("会員番号・氏名・メール・精算明細が必要です。");
-    const now=new Date();
     const beforeFinalMonthCharge=tfgSettlementIsBeforeMonthlyCharge_(now);
     const normalized=items.map(function(x){
       const normal=Number(x.normal||0);
@@ -168,6 +168,15 @@ function tfgSettlementIsWithdrawalMonth_(target,withdrawalDate){
   const t=String(target||"").replace(/\s/g,"");
   const ym1=d[1]+"-"+d[2],ym2=d[1]+"年"+Number(d[2])+"月",ym3=d[1]+"/"+Number(d[2]);
   return t.indexOf(ym1)>=0||t.indexOf(ym2)>=0||t.indexOf(ym3)>=0;
+}
+function tfgSettlementWithdrawalDate_(now){
+  const p=tfgSettlementJstParts_(now);
+  const y=p[0],m=p[1],d=p[2],h=p[3];
+  const afterCutoff=d>9||(d===9&&h>=20);
+  const first=new Date(Date.UTC(y,m-1+(afterCutoff?1:0),1));
+  const ty=first.getUTCFullYear(),tm=first.getUTCMonth()+1;
+  const lastDay=new Date(Date.UTC(ty,tm,0)).getUTCDate();
+  return String(ty)+"-"+String(tm).padStart(2,"0")+"-"+String(lastDay).padStart(2,"0");
 }
 function tfgSettlementNextExpiry_(now){
   const p=tfgSettlementJstParts_(now);
