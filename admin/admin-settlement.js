@@ -7,6 +7,7 @@ const planRates={
   NIGHT365:{after202603:{normal:4950,campaign:3300},before202603:{normal:4950,campaign:3300}}
 };
 let current=null;
+let draft=null;
 
 function cutoffInfo(now=new Date()){
   const y=now.getFullYear(),m=now.getMonth(),d=now.getDate(),h=now.getHours(),min=now.getMinutes(),sec=now.getSeconds();
@@ -135,15 +136,18 @@ function render(){
     ?"口座振替会員：承認後、みずほ銀行 新浦安支店 普通 1917298 A-nauts株式会社 へ振込が必要です。"
     :"登録済みの決済方法で精算します。");
   $("#settlementPreview").classList.remove("is-hidden");
-  $("#settlementSend").disabled=false;
+  $("#settlementDraft").disabled=false;
+  $("#settlementPreviewButton").disabled=true;
+  $("#settlementSend").disabled=true;
+  draft=null;
 }
 function show(text,isError=false){
   const el=$("#settlementMessage"); if(!el)return;
   el.textContent=text; el.classList.remove("is-hidden"); el.style.color=isError?"#ff8e8e":"#79dc8c";
 }
-async function send(){
+async function createDraft(){
   if(!current)return;
-  const btn=$("#settlementSend"); btn.disabled=true; btn.textContent="送信中…";
+  const btn=$("#settlementDraft"); btn.disabled=true; btn.textContent="下書き保存中…";
   try{
     if(typeof apiPost!=="function")throw new Error("管理APIを読み込めませんでした。");
     const payload={
@@ -151,24 +155,41 @@ async function send(){
       memberNo:current.memberNo,
       memberName:current.memberName,
       email:current.email,
-      withdrawalDate:current.withdrawalDate,
       paymentMethod:current.paymentMethod,
       items:current.items.map(x=>({target:x.target,label:x.label,paid:x.paid,normal:x.normal,settlement:x.settlement,note:x.note,status:x.status||"",paymentSequence:x.paymentSequence||null,isFinalMonth:!!x.isFinalMonth}))
     };
     const r=await apiPost(payload);
+    draft={settlementId:r.data?.settlementId||"",approvalUrl:r.data?.approvalUrl||""};
     const fallback=$("#settlementFallbackUrl"),fallbackText=$("#settlementFallbackUrlText");
-    if(r.data?.mailWarning){
-      if(fallback&&fallbackText){fallbackText.value=r.data.approvalUrl||"";fallback.classList.remove("is-hidden");}
-      show(r.data.mailWarning+" 精算ID："+(r.data?.settlementId||""),true);
-    }else{
-      fallback?.classList.add("is-hidden");
-      show("承認URLを会員へ送信しました。精算ID："+(r.data?.settlementId||""));
-    }
-  }catch(e){show(e.message||"送信できませんでした。",true)}
-  finally{btn.disabled=false;btn.textContent="会員へ承認URLを送信"}
+    if(fallback&&fallbackText){fallbackText.value=draft.approvalUrl;fallback.classList.remove("is-hidden");}
+    $("#settlementPreviewButton").disabled=!draft.approvalUrl;
+    $("#settlementSend").disabled=!draft.approvalUrl;
+    show("下書きを保存し、承認URLを発行しました。会員にはまだ送信していません。精算ID："+draft.settlementId);
+  }catch(e){show(e.message||"下書きを保存できませんでした。",true)}
+  finally{btn.disabled=false;btn.textContent="下書き保存・URL発行"}
+}
+function draftToken(){
+  try{return new URL(draft?.approvalUrl||"",location.href).searchParams.get("token")||""}catch(_){return ""}
+}
+function previewDraft(){
+  if(!draft?.approvalUrl)return;
+  window.open(draft.approvalUrl,"_blank","noopener");
+}
+async function send(){
+  if(!draft?.approvalUrl)return;
+  const token=draftToken();
+  if(!token){show("承認URLのトークンを確認できません。下書きを作り直してください。",true);return}
+  const btn=$("#settlementSend"); btn.disabled=true; btn.textContent="送信中…";
+  try{
+    const r=await apiPost({action:"sendTfgSettlementApproval",token});
+    show("会員へ承認依頼を送信しました。精算ID："+(r.data?.settlementId||draft.settlementId));
+  }catch(e){show(e.message||"承認依頼を送信できませんでした。",true)}
+  finally{btn.disabled=false;btn.textContent="会員へ承認依頼を送信"}
 }
 document.addEventListener("DOMContentLoaded",()=>{
   $("#settlementCalculate")?.addEventListener("click",calc);
+  $("#settlementDraft")?.addEventListener("click",createDraft);
+  $("#settlementPreviewButton")?.addEventListener("click",previewDraft);
   $("#settlementSend")?.addEventListener("click",send);
   $("#settlementCopyUrl")?.addEventListener("click",async()=>{
     const value=$("#settlementFallbackUrlText")?.value||"";
