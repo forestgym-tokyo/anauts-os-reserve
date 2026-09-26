@@ -1172,7 +1172,10 @@ function renderWeek(results) {
     const area = document.createElement("div");
     area.className = "day-slots";
 
-    const slots = result.data && Array.isArray(result.data.slots) ? result.data.slots : [];
+    const rawSlots = result.data && Array.isArray(result.data.slots) ? result.data.slots : [];
+    const slots = isTourService_()
+      ? rawSlots.filter((slot) => Number(slot && slot.capacity == null ? 1 : slot.capacity) > 0)
+      : rawSlots;
 
     if (result.pending) {
       const p = document.createElement("p");
