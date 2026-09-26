@@ -45,7 +45,7 @@
   <section id="done" class="card done hidden"><h2>承認が完了しました</h2><p>精算内容への承認を受け付けました。</p><p id="approvedAt" class="note"></p></section>
 </div>
 <script>
-const GAS_URL="__SETTLEMENT_GAS_URL__";
+const GAS_URL="https://script.google.com/macros/s/AKfycbyvpQRxRpMRfpaQHtBar77dViCqPl-hdFW-2yMdozhN8RHtwcrFiNEM9cvEbny4x9q0/exec";
 const token=new URLSearchParams(location.search).get("token")||"";
 const $=id=>document.getElementById(id); let settlement=null;
 const yen=n=>Number(n||0).toLocaleString("ja-JP")+"円";
