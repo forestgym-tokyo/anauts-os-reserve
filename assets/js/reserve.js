@@ -66,6 +66,12 @@ const ROUTES = {
     mode: "FIXED",
     serviceCode: "TRAINING_SUPPORT45"
   },
+  "mpg-training-support": {
+    title: "My Private Gym トレーニングサポート",
+    lead: "My Private Gym会員様向けトレーニングサポート（45分）のご予約です。",
+    mode: "FIXED",
+    serviceCode: "MPG_TRAINING_SUPPORT45"
+  },
   unsubscribe: {
     title: "退会手続き",
     lead: "退会手続きのご来店予約です。",
@@ -378,6 +384,7 @@ function isCustomerNameRequired_(serviceCode, customerType) {
   // 会員向けで氏名入力を不要にするサービス
   if ([
     "TRAINING_SUPPORT45",
+    "MPG_TRAINING_SUPPORT45",
     "PROCEDURE",
     "UNSUBSCRIBE",
     "MEAL_PLANNING"
@@ -452,7 +459,8 @@ function configureCustomerForm() {
     code === "COUNSEL";
 
   const isTrainingSupport =
-    code === "TRAINING_SUPPORT45";
+    code === "TRAINING_SUPPORT45" ||
+    code === "MPG_TRAINING_SUPPORT45";
 
   // トレーニングサポートは会員専用
   if (isTrainingSupport) {
