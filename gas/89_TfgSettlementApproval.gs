@@ -72,46 +72,66 @@ function createTfgSettlement_(body){
     const createLock=LockService.getScriptLock();
     createLock.waitLock(10000);
     try{
-      sh.appendRow([id,Utilities.formatDate(now,TFG_SETTLEMENT_CONFIG.TIMEZONE,"yyyy-MM-dd HH:mm:ss"),memberNo,memberName,email,withdrawalDate,JSON.stringify(normalized),total,tokenHash,Utilities.formatDate(expires,TFG_SETTLEMENT_CONFIG.TIMEZONE,"yyyy-MM-dd HH:mm:ss"),"PENDING","","","","",paymentMethod,tfgSettlementPaymentNote_(paymentMethod)]);
+      sh.appendRow([id,Utilities.formatDate(now,TFG_SETTLEMENT_CONFIG.TIMEZONE,"yyyy-MM-dd HH:mm:ss"),memberNo,memberName,email,withdrawalDate,JSON.stringify(normalized),total,tokenHash,Utilities.formatDate(expires,TFG_SETTLEMENT_CONFIG.TIMEZONE,"yyyy-MM-dd HH:mm:ss"),"DRAFT","","","","",paymentMethod,tfgSettlementPaymentNote_(paymentMethod)]);
       invalidatePreviousPendingTfgSettlements_(sh,memberNo,id);
     }finally{
       createLock.releaseLock();
     }
     const base=String(body.approvalBaseUrl||TFG_SETTLEMENT_CONFIG.APPROVAL_BASE_URL).trim();
     const approvalUrl=base+(base.indexOf("?")>=0?"&":"?")+"token="+encodeURIComponent(token);
-    let mailWarning="";
-    try{
-      MailApp.sendEmail({
-        to:email,
-        subject:"【The Forest Gym】退会に伴う精算内容のご確認",
-        body:[
-          memberName+" 様",
-          "",
-          "The Forest Gymでございます。",
-          "退会に伴う精算内容をご確認いただくため、下記の専用URLへアクセスしてください。",
-          "",
-          approvalUrl,
-          "",
-          "会員番号とご登録メールアドレスをご入力のうえ、内容をご確認・承認してください。",
-          "承認URLの有効期限："+Utilities.formatDate(expires,TFG_SETTLEMENT_CONFIG.TIMEZONE,"yyyy年M月d日 H:mm"),
-          paymentMethod==="BANK_TRANSFER"?"お支払い方法：銀行振込":"お支払い方法：登録済み決済方法",
-          "",
-          paymentMethod==="BANK_TRANSFER"?"【お振込先】":"",
-          paymentMethod==="BANK_TRANSFER"?(TFG_SETTLEMENT_CONFIG.BANK_NAME+" "+TFG_SETTLEMENT_CONFIG.BANK_BRANCH):"",
-          paymentMethod==="BANK_TRANSFER"?(TFG_SETTLEMENT_CONFIG.BANK_ACCOUNT_TYPE+" "+TFG_SETTLEMENT_CONFIG.BANK_ACCOUNT_NO):"",
-          paymentMethod==="BANK_TRANSFER"?TFG_SETTLEMENT_CONFIG.BANK_ACCOUNT_NAME:"",
-          paymentMethod==="BANK_TRANSFER"?"※口座振替会員様は、承認後に上記口座へのお振込みが必要です。":"",
-          "",
-          "※精算内容に相違がある場合は承認せず、info@theforestgym.comまでお問い合わせください。",
-          "",
-          "The Forest Gym"
-        ].join("\n"),
-        name:"The Forest Gym",
-        replyTo:TFG_SETTLEMENT_CONFIG.ADMIN_EMAIL
-      });
-    }catch(mailError){console.error("TFG settlement approval mail",mailError);mailWarning="会員への承認メール送信に失敗しました。承認URLを別途送付してください。";}
-    return tfgSettlementJson_({ok:true,data:{settlementId:id,total:total,approvalUrl:approvalUrl,expiresAt:Utilities.formatDate(expires,TFG_SETTLEMENT_CONFIG.TIMEZONE,"yyyy-MM-dd HH:mm:ss"),paymentMethod:paymentMethod,mailWarning:mailWarning}});
+    return tfgSettlementJson_({ok:true,data:{settlementId:id,total:total,approvalUrl:approvalUrl,expiresAt:Utilities.formatDate(expires,TFG_SETTLEMENT_CONFIG.TIMEZONE,"yyyy-MM-dd HH:mm:ss"),paymentMethod:paymentMethod,status:"DRAFT"}});
   }catch(e){return tfgSettlementJson_({ok:false,code:"CREATE_ERROR",message:e.message||"精算承認データを作成できませんでした。"});}
+}
+
+function sendTfgSettlementApproval_(body){
+  const lock=LockService.getScriptLock(); let locked=false;
+  try{
+    const row=findTfgSettlementByToken_(body&&body.token);
+    if(!row)throw new Error("下書きURLが無効です。");
+    lock.waitLock(10000);locked=true;
+    const fresh=findTfgSettlementByToken_(body&&body.token);
+    if(!fresh)throw new Error("下書きURLが無効です。");
+    if(fresh.status==="APPROVED")throw new Error("この精算書はすでに承認済みです。");
+    if(fresh.status==="SUPERSEDED")throw new Error("この精算書は再発行により無効です。");
+    if(fresh.status!=="DRAFT"&&fresh.status!=="PENDING")throw new Error("この精算書は送信できない状態です。");
+    if(tfgSettlementParseJst_(fresh.expiresAt).getTime()<Date.now())throw new Error("有効期限が切れています。明細を再作成してください。");
+    const base=String(body.approvalBaseUrl||TFG_SETTLEMENT_CONFIG.APPROVAL_BASE_URL).trim();
+    const approvalUrl=base+(base.indexOf("?")>=0?"&":"?")+"token="+encodeURIComponent(String(body.token||"").trim());
+    MailApp.sendEmail({
+      to:fresh.email,
+      subject:"【The Forest Gym】退会に伴う精算内容のご確認",
+      body:[
+        fresh.memberName+" 様",
+        "",
+        "The Forest Gymでございます。",
+        "退会に伴う精算内容をご確認いただくため、下記の専用URLへアクセスしてください。",
+        "",
+        approvalUrl,
+        "",
+        "会員番号とご登録メールアドレスをご入力のうえ、内容をご確認・承認してください。",
+        "承認URLの有効期限："+Utilities.formatDate(tfgSettlementParseJst_(fresh.expiresAt),TFG_SETTLEMENT_CONFIG.TIMEZONE,"yyyy年M月d日 H:mm"),
+        fresh.paymentMethod==="BANK_TRANSFER"?"お支払い方法：銀行振込":"お支払い方法：クレジットカード",
+        "",
+        fresh.paymentMethod==="BANK_TRANSFER"?"【お振込先】":"",
+        fresh.paymentMethod==="BANK_TRANSFER"?(TFG_SETTLEMENT_CONFIG.BANK_NAME+" "+TFG_SETTLEMENT_CONFIG.BANK_BRANCH):"",
+        fresh.paymentMethod==="BANK_TRANSFER"?(TFG_SETTLEMENT_CONFIG.BANK_ACCOUNT_TYPE+" "+TFG_SETTLEMENT_CONFIG.BANK_ACCOUNT_NO):"",
+        fresh.paymentMethod==="BANK_TRANSFER"?TFG_SETTLEMENT_CONFIG.BANK_ACCOUNT_NAME:"",
+        fresh.paymentMethod==="BANK_TRANSFER"?"※口座振替会員様は、承認後に上記口座へのお振込みが必要です。":"",
+        "",
+        "※精算内容に相違がある場合は承認せず、info@theforestgym.comまでお問い合わせください。",
+        "",
+        "The Forest Gym"
+      ].join("\n"),
+      name:"The Forest Gym",
+      replyTo:TFG_SETTLEMENT_CONFIG.ADMIN_EMAIL
+    });
+    if(fresh.status==="DRAFT")getTfgSettlementSheet_().getRange(fresh.row,11).setValue("PENDING");
+    lock.releaseLock();locked=false;
+    return tfgSettlementJson_({ok:true,data:{settlementId:fresh.id,status:"PENDING",approvalUrl:approvalUrl}});
+  }catch(e){
+    if(locked){try{lock.releaseLock()}catch(_){}}
+    return tfgSettlementJson_({ok:false,code:"SEND_ERROR",message:e.message||"承認依頼メールを送信できませんでした。"});
+  }
 }
 
 function getTfgSettlement_(body){
@@ -162,7 +182,7 @@ function invalidatePreviousPendingTfgSettlements_(sheet,memberNo,keepId){
   if(lastRow<2)return;
   const values=sheet.getRange(2,1,lastRow-1,17).getDisplayValues();
   values.forEach(function(row,index){
-    if(String(row[0]||"").trim()!==String(keepId||"").trim()&&String(row[2]||"").trim()===memberNo&&String(row[10]||"").trim()==="PENDING"){
+    if(String(row[0]||"").trim()!==String(keepId||"").trim()&&String(row[2]||"").trim()===memberNo&&["DRAFT","PENDING"].indexOf(String(row[10]||"").trim())>=0){
       sheet.getRange(index+2,11).setValue("SUPERSEDED");
     }
   });
@@ -180,10 +200,10 @@ function tfgSettlementNormalizePaymentMethod_(value){
   return "CARD";
 }
 function tfgSettlementPaymentLabel_(value){
-  return tfgSettlementNormalizePaymentMethod_(value)==="BANK_TRANSFER"?"銀行振込（口座振替会員）":"登録済み決済方法";
+  return tfgSettlementNormalizePaymentMethod_(value)==="BANK_TRANSFER"?"銀行振込（口座振替会員）":"クレジットカード";
 }
 function tfgSettlementPaymentNote_(value){
-  if(tfgSettlementNormalizePaymentMethod_(value)!=="BANK_TRANSFER")return "登録済み決済方法で精算";
+  if(tfgSettlementNormalizePaymentMethod_(value)!=="BANK_TRANSFER")return "登録済みクレジットカードで精算";
   return TFG_SETTLEMENT_CONFIG.BANK_NAME+" "+TFG_SETTLEMENT_CONFIG.BANK_BRANCH+" "+TFG_SETTLEMENT_CONFIG.BANK_ACCOUNT_TYPE+" "+TFG_SETTLEMENT_CONFIG.BANK_ACCOUNT_NO+" "+TFG_SETTLEMENT_CONFIG.BANK_ACCOUNT_NAME;
 }
 function tfgSettlementJstParts_(date){
