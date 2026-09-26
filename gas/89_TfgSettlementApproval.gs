@@ -117,6 +117,7 @@ function getTfgSettlement_(body){
   try{
     const row=findTfgSettlementByToken_(body&&body.token);
     if(!row)throw new Error("この承認URLは無効です。");
+    if(row.status==="SUPERSEDED")throw new Error("この承認URLは再発行により無効になりました。最新の精算書をご確認ください。");
     if(row.status!=="APPROVED" && tfgSettlementParseJst_(row.expiresAt).getTime()<Date.now())throw new Error("精算条件が更新されたため、この承認URLは無効になりました。最新の精算書をご確認ください。");
     return tfgSettlementJson_({ok:true,data:{settlementId:row.id,memberName:row.memberName,withdrawalDate:row.withdrawalDate,items:row.items,total:row.total,status:row.status,approvedAt:row.approvedAt,paymentMethod:row.paymentMethod,paymentNote:row.paymentNote,bank:row.paymentMethod==="BANK_TRANSFER"?{bankName:TFG_SETTLEMENT_CONFIG.BANK_NAME,branch:TFG_SETTLEMENT_CONFIG.BANK_BRANCH,accountType:TFG_SETTLEMENT_CONFIG.BANK_ACCOUNT_TYPE,accountNo:TFG_SETTLEMENT_CONFIG.BANK_ACCOUNT_NO,accountName:TFG_SETTLEMENT_CONFIG.BANK_ACCOUNT_NAME}:null}});
   }catch(e){return tfgSettlementJson_({ok:false,code:"GET_ERROR",message:e.message||"精算内容を取得できませんでした。"});}
@@ -133,6 +134,7 @@ function approveTfgSettlement_(body){
     const row=findTfgSettlementByToken_(body&&body.token);
     if(!row)throw new Error("この承認URLは無効です。");
     if(row.status==="APPROVED")return tfgSettlementJson_({ok:true,data:{approvedAt:row.approvedAt,alreadyApproved:true}});
+    if(row.status!=="PENDING")throw new Error("この承認URLは無効になりました。最新の精算書をご確認ください。");
     if(tfgSettlementParseJst_(row.expiresAt).getTime()<Date.now())throw new Error("精算条件が更新されたため、この承認URLは無効になりました。最新の精算書をご確認ください。");
     if(memberNo!==row.memberNo||email!==row.email)throw new Error("会員番号または登録メールアドレスが一致しません。");
     const now=Utilities.formatDate(new Date(),TFG_SETTLEMENT_CONFIG.TIMEZONE,"yyyy-MM-dd HH:mm:ss");
