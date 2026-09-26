@@ -9,10 +9,10 @@ const planRates={
 let current=null;
 
 function authReady(){
-  return window.state&&window.state.authUser;
+  return typeof state!=="undefined"&&state.authUser;
 }
 function permission(){
-  return String(window.state?.authUser?.permission||window.state?.authUser?.role||"").toUpperCase();
+  return String((typeof state!=="undefined"&&state.authUser&&(state.authUser.permission||state.authUser.role))||"").toUpperCase();
 }
 function refreshNav(){
   const nav=$("#settlementNav");
@@ -133,7 +133,7 @@ async function send(){
   if(!current)return;
   const btn=$("#settlementSend"); btn.disabled=true; btn.textContent="送信中…";
   try{
-    if(typeof window.apiPost!=="function")throw new Error("管理APIを読み込めませんでした。");
+    if(typeof apiPost!=="function")throw new Error("管理APIを読み込めませんでした。");
     const payload={
       action:"createTfgSettlement",
       memberNo:current.memberNo,
@@ -143,7 +143,7 @@ async function send(){
       paymentMethod:current.paymentMethod,
       items:current.items.map(x=>({target:x.target,label:x.label,paid:x.paid,normal:x.normal,settlement:x.settlement,note:x.note,isFinalMonth:!!x.isFinalMonth}))
     };
-    const r=await window.apiPost(payload);
+    const r=await apiPost(payload);
     show("承認URLを会員へ送信しました。精算ID："+(r.data?.settlementId||""));
   }catch(e){show(e.message||"送信できませんでした。",true)}
   finally{btn.disabled=false;btn.textContent="会員へ承認URLを送信"}
