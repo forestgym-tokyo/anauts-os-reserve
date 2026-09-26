@@ -61,14 +61,17 @@ test("settlement approval requires a six-digit member number",()=>{
   assert.match(gasSource,/会員番号は6桁の数字で入力してください/);
 });
 
-test("reissuing a settlement invalidates previous pending links",()=>{
+test("reissuing a settlement invalidates previous active draft or pending links",()=>{
   assert.match(gasSource,/invalidatePreviousPendingTfgSettlements_/);
   assert.match(gasSource,/setValue\("SUPERSEDED"\)/);
+  assert.match(gasSource,/\["DRAFT","PENDING"\]/);
   assert.match(gasSource,/row\.status==="SUPERSEDED"/);
-  assert.match(gasSource,/row\.status!=="PENDING"/);
 });
 
-test("mail failure returns the approval URL for manual delivery",()=>{
-  assert.match(gasSource,/mailWarning="会員への承認メール送信に失敗しました。承認URLを別途送付してください。"/);
-  assert.match(gasSource,/approvalUrl:approvalUrl/);
+test("URL issuance creates a draft and member email is a separate authenticated action",()=>{
+  assert.match(gasSource,/"DRAFT"/);
+  assert.match(gasSource,/function sendTfgSettlementApproval_/);
+  assert.match(gasSource,/fresh\.status==="DRAFT"/);
+  assert.match(gasSource,/setValue\("PENDING"\)/);
+  assert.match(adminSource,/下書きを保存し、承認URLを発行しました。会員にはまだ送信していません。/);
 });
