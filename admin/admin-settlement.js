@@ -23,15 +23,15 @@ setInterval(refreshNav,1200);
 document.addEventListener("DOMContentLoaded",refreshNav);
 
 function cutoffInfo(now=new Date()){
-  const y=now.getFullYear(),m=now.getMonth(),d=now.getDate(),h=now.getHours(),min=now.getMinutes();
-  const before9=d<9||(d===9&&(h<20));
+  const y=now.getFullYear(),m=now.getMonth(),d=now.getDate(),h=now.getHours(),min=now.getMinutes(),sec=now.getSeconds();
+  const before9=d<9||(d===9&&(h<20||(h===20&&min===0&&sec===0)));
   const after9=!before9;
   let wy=y,wm=m;
   if(after9){wm+=1;if(wm>11){wm=0;wy++}}
   const last=new Date(wy,wm+1,0).getDate();
   const withdrawalDate=`${wy}-${String(wm+1).padStart(2,"0")}-${String(last).padStart(2,"0")}`;
   let expiry;
-  if(before9) expiry=new Date(y,m,9,20,0,0);
+  if(before9) expiry=new Date(y,m,9,20,0,1);
   else if(d<=26) expiry=new Date(y,m,27,0,0,0);
   else expiry=new Date(y,m+1,9,20,0,0);
   return {withdrawalDate,expiry,beforeFinalCharge:d<=26};
