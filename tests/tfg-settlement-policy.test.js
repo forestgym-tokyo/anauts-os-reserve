@@ -51,3 +51,21 @@ test("payments after the twelfth do not recreate campaign settlement",()=>{
   assert.match(gasSource,/paymentSequence!==null&&paymentSequence>12[\s\S]*?settlement=0;/);
   assert.match(adminSource,/completed>=12/);
 });
+
+
+test("settlement approval requires a six-digit member number",()=>{
+  assert.match(gasSource,/\^\\d\{6\}\$/);
+  assert.match(gasSource,/会員番号は6桁の数字で入力してください/);
+});
+
+test("reissuing a settlement invalidates previous pending links",()=>{
+  assert.match(gasSource,/invalidatePreviousPendingTfgSettlements_/);
+  assert.match(gasSource,/setValue\("SUPERSEDED"\)/);
+  assert.match(gasSource,/row\.status==="SUPERSEDED"/);
+  assert.match(gasSource,/row\.status!=="PENDING"/);
+});
+
+test("mail failure returns the approval URL for manual delivery",()=>{
+  assert.match(gasSource,/mailWarning="会員への承認メール送信に失敗しました。承認URLを別途送付してください。"/);
+  assert.match(gasSource,/approvalUrl:approvalUrl/);
+});
