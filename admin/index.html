@@ -121,6 +121,8 @@
 <span>＋</span>登録</button>
 <button class="nav-button" data-view="dailyReport">
 <span>📝</span>業務日報</button>
+<button id="settlementNav" class="nav-button is-hidden" data-view="settlement">
+<span>¥</span>精算書作成</button>
 </nav>
 <div id="authUserArea" class="auth-user-area is-hidden">
   <div class="auth-user-text">
@@ -812,6 +814,71 @@
 </div>
 </section>
 </section>
+
+<section id="settlementView" class="view">
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">SETTLEMENT</p>
+      <h1>退会精算書作成</h1>
+      <p>キャンペーン早期退会の精算明細を作成し、会員本人の端末へ承認URLを送信します。</p>
+    </div>
+  </div>
+  <div class="card" style="padding:22px">
+    <div class="form-grid">
+      <label><span>会員番号</span><input id="settlementMemberNo" inputmode="numeric"></label>
+      <label><span>氏名</span><input id="settlementMemberName"></label>
+      <label><span>登録メールアドレス</span><input id="settlementEmail" type="email"></label>
+      <label><span>入会日</span><input id="settlementJoinDate" type="date"></label>
+      <label><span>会員プラン</span>
+        <select id="settlementPlan">
+          <option value="REGULAR">REGULAR</option>
+          <option value="DAY">平日 DAY</option>
+          <option value="NIGHT365">NIGHT365</option>
+        </select>
+      </label>
+      <label><span>選べる特典</span>
+        <select id="settlementBenefit">
+          <option value="PERSONAL">無料パーソナル（6,600円）</option>
+          <option value="SECOND_MONTH_FREE">2か月目無料</option>
+          <option value="NONE">対象外／なし</option>
+        </select>
+      </label>
+      <label><span>初月決済額</span><input id="settlementFirstPaid" type="number" min="0" value="0"></label>
+      <label><span>初月通常料金（日割り）</span><input id="settlementFirstNormal" type="number" min="0" value="0"></label>
+      <label><span>初期費用の決済額</span><input id="settlementInitialPaid" type="number" min="0" value="0"></label>
+      <label><span>支払方法</span>
+        <select id="settlementPaymentMethod">
+          <option value="CARD">登録済み決済方法</option>
+          <option value="BANK_TRANSFER">口座振替会員（銀行振込）</option>
+        </select>
+      </label>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px">
+      <button id="settlementCalculate" class="ghost-button" type="button">精算明細を計算</button>
+      <button id="settlementSend" class="primary-button" type="button" disabled>会員へ承認URLを送信</button>
+    </div>
+    <div id="settlementMessage" class="form-message is-hidden" style="margin-top:14px"></div>
+  </div>
+
+  <div id="settlementPreview" class="card is-hidden" style="margin-top:16px;padding:22px">
+    <div class="manager-header">
+      <div><p class="eyebrow">PREVIEW</p><h2>精算明細</h2></div>
+      <div id="settlementDeadlineBadge" class="shift-request-pending-badge"></div>
+    </div>
+    <div style="overflow:auto">
+      <table class="data-table">
+        <thead><tr><th>対象</th><th>区分</th><th>内容</th><th>決済額</th><th>通常価格</th><th>精算額</th></tr></thead>
+        <tbody id="settlementRows"></tbody>
+      </table>
+    </div>
+    <div style="display:flex;justify-content:flex-end;align-items:end;gap:18px;margin-top:18px">
+      <span style="color:#aab6ad">今回の精算金額</span>
+      <strong id="settlementTotal" style="font-size:30px;color:#79dc8c">0円</strong>
+    </div>
+    <p id="settlementPaymentGuide" style="margin-top:14px;color:#cbd4cd;line-height:1.8"></p>
+  </div>
+</section>
+
 <section id="dailyReportView" class="view daily-report-view">
 <div class="empty-state card">
 <div class="empty-icon">📝</div>
@@ -829,5 +896,6 @@
 <script src="./admin-questionnaire.js?v=20260906-tour-reply-history-v1" defer>
 </script>
 <script src="./admin-counseling-links.js?v=20260915-diet-counseling-v1" defer></script>
+<script src="./admin-settlement.js?v=20260926-branch-v1" defer></script>
 </body>
 </html>
