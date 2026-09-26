@@ -26,6 +26,7 @@ const TOUR_WEEK_GENERATION_CACHE_KEY_ = "tour-week-generation-v1";
 const TOUR_WEEK_GENERATION_PROPERTY_ = "tour-week-generation-v1";
 const TOUR_WEEK_GENERATION_CACHE_SECONDS_ = 21600;
 const TOUR_WEEK_BULK_CACHE_SECONDS_ = 3600;
+const TOUR_BOOKING_CUTOFF_MINUTES_ = 90;
 const TOUR_WEEK_BULK_STALE_CACHE_SECONDS_ = 21600;
 const TOUR_WEEK_BULK_INFLIGHT_SECONDS_ = 420;
 const TOUR_WEEK_BULK_LOCK_WAIT_MILLISECONDS_ = 500;
@@ -43,9 +44,10 @@ const STORE_AWARE_INACTIVE_RESERVATION_STATUSES_ = Object.freeze([
 function getAvailableSlotsStoreAware_(params) {
   params = params || {};
 
-  return runStoreAwareWithRequestSheetCache_(function() {
+  const response = runStoreAwareWithRequestSheetCache_(function() {
     return getAvailableSlotsStoreAwareImpl_(params);
   });
+  return applyTourBookingCutoffToAvailability_(response, params);
 }
 
 
@@ -77,7 +79,7 @@ function getAvailableSlotsStoreAwareImpl_(params) {
 function getAvailableSlotsRangeStoreAware_(params) {
   params = params || {};
 
-  return runStoreAwareWithRequestSheetCache_(function() {
+  const response = runStoreAwareWithRequestSheetCache_(function() {
     if (
       typeof shouldUseTrialAutoTrainerRange_ === "function" &&
       shouldUseTrialAutoTrainerRange_(params)
@@ -98,6 +100,7 @@ function getAvailableSlotsRangeStoreAware_(params) {
     }
     return getAvailableSlotsRangeStoreAwareImpl_(params);
   });
+  return applyTourBookingCutoffToAvailability_(response, params);
 }
 
 
@@ -216,7 +219,7 @@ function getTourAvailableSlotsRangeBulk_(params) {
   const storeCode = normalizeStoreAwareCode_(service.store_code);
   const duration = Math.max(1, Number(service.duration || 60));
   const interval = Math.max(1, Number(service.slot_interval_minutes || 30));
-  const bookingMinHours = Math.max(0, Number(service.booking_min_hours || 0));
+  const bookingMinHours = TOUR_BOOKING_CUTOFF_MINUTES_ / 60;
   const publicDays = Math.max(1, Number(service.public_days || 30));
   const providerRoles = normalizeStoreAwareText_(service.provider_role)
     .split(",")
@@ -899,12 +902,131 @@ function filterStoreAwareSlotData_(data, params, snapshot, service) {
 }
 
 
+function isTourBookingCutoffTarget_(serviceCodeValue) {
+  return normalizeStoreAwareCode_(serviceCodeValue) === TOUR_WEEK_BULK_SERVICE_CODE_;
+}
+
+
+function getTourBookingCutoffAt_() {
+  return new Date(
+    new Date().getTime() + TOUR_BOOKING_CUTOFF_MINUTES_ * 60 * 1000
+  );
+}
+
+
+function isTourSlotBeforeBookingCutoff_(dateValue, startValue, cutoffAt) {
+  const date = normalizeStoreAwareDate_(dateValue);
+  const start = normalizeStoreAwareTime_(startValue);
+  if (!date || !start) return false;
+
+  const startAt = makeTourWeekDateTime_(date, start);
+  return startAt instanceof Date &&
+    !isNaN(startAt.getTime()) &&
+    startAt.getTime() <= cutoffAt.getTime();
+}
+
+
+function filterTourBookingCutoffSlotData_(data, fallbackDate, cutoffAt) {
+  data = data || {};
+  const slots = Array.isArray(data.slots) ? data.slots : [];
+  const filteredSlots = slots.filter(function(slot) {
+    return !isTourSlotBeforeBookingCutoff_(
+      slot && (slot.date || data.date || fallbackDate),
+      slot && slot.start_time,
+      cutoffAt
+    );
+  });
+
+  const filteredData = Object.assign({}, data, {
+    slots: filteredSlots,
+    booking_min_hours: TOUR_BOOKING_CUTOFF_MINUTES_ / 60,
+    booking_open_at: formatTourWeekDateTime_(cutoffAt)
+  });
+  if (Object.prototype.hasOwnProperty.call(filteredData, "available_slot_count")) {
+    filteredData.available_slot_count = filteredSlots.length;
+  }
+  return filteredData;
+}
+
+
+function applyTourBookingCutoffToAvailability_(response, params) {
+  params = params || {};
+  if (!isTourBookingCutoffTarget_(params.service_code)) return response;
+
+  const payload = parseStoreAwareResponse_(response);
+  if (!payload || payload.ok !== true || !payload.data) return response;
+
+  const cutoffAt = getTourBookingCutoffAt_();
+  const data = payload.data || {};
+
+  if (Array.isArray(data.results)) {
+    const fallbackStartDate = normalizeStoreAwareDate_(
+      params.start_date || params.date
+    );
+    const results = data.results.map(function(result, index) {
+      if (!result || result.ok !== true) return result;
+      const fallbackDate = result.data && result.data.date
+        ? result.data.date
+        : (fallbackStartDate
+            ? addStoreAwareUtcDays_(fallbackStartDate, index)
+            : "");
+      return Object.assign({}, result, {
+        data: filterTourBookingCutoffSlotData_(
+          result.data || {},
+          fallbackDate,
+          cutoffAt
+        )
+      });
+    });
+    return successResponse(Object.assign({}, data, { results: results }));
+  }
+
+  return successResponse(
+    filterTourBookingCutoffSlotData_(
+      data,
+      params.date || params.start_date,
+      cutoffAt
+    )
+  );
+}
+
+
+function validateTourBookingCutoff_(params) {
+  params = params || {};
+  if (!isTourBookingCutoffTarget_(params.service_code)) return null;
+
+  const date = normalizeStoreAwareDate_(
+    params.date || params.reservation_date
+  );
+  const start = normalizeStoreAwareTime_(params.start_time);
+  if (!date || !start) return null;
+
+  const cutoffAt = getTourBookingCutoffAt_();
+  if (!isTourSlotBeforeBookingCutoff_(date, start, cutoffAt)) return null;
+
+  return errorResponse(
+    "店内見学は開始時刻の90分前までご予約いただけます。別の時間をお選びください。",
+    "TOUR_BOOKING_CUTOFF",
+    {
+      service_code: TOUR_WEEK_BULK_SERVICE_CODE_,
+      reservation_date: date,
+      start_time: start,
+      cutoff_minutes: TOUR_BOOKING_CUTOFF_MINUTES_,
+      timezone: Session.getScriptTimeZone() || "Asia/Tokyo"
+    }
+  );
+}
+
+
 /**
  * 予約確定直前にも同じ店舗条件を再確認する。
  * STAFF系サービスは、同一店舗で勤務している候補を明示して既存作成処理へ渡す。
  */
 function createReservationStoreAware_(params) {
   params = params || {};
+
+  const cutoffError = validateTourBookingCutoff_(params);
+  if (cutoffError) return cutoffError;
 
   return runStoreAwareWithRequestSheetCache_(function() {
     return createReservationStoreAwareImpl_(params);
