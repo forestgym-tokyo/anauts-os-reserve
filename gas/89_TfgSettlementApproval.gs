@@ -171,8 +171,8 @@ function tfgSettlementIsWithdrawalMonth_(target,withdrawalDate){
 }
 function tfgSettlementWithdrawalDate_(now){
   const p=tfgSettlementJstParts_(now);
-  const y=p[0],m=p[1],d=p[2],h=p[3];
-  const afterCutoff=d>9||(d===9&&h>=20);
+  const y=p[0],m=p[1],d=p[2],h=p[3],min=p[4],sec=p[5];
+  const afterCutoff=d>9||(d===9&&(h>20||(h===20&&(min>0||sec>0))));
   const first=new Date(Date.UTC(y,m-1+(afterCutoff?1:0),1));
   const ty=first.getUTCFullYear(),tm=first.getUTCMonth()+1;
   const lastDay=new Date(Date.UTC(ty,tm,0)).getUTCDate();
@@ -181,8 +181,8 @@ function tfgSettlementWithdrawalDate_(now){
 function tfgSettlementNextExpiry_(now){
   const p=tfgSettlementJstParts_(now);
   const y=p[0],m=p[1],d=p[2],h=p[3],min=p[4],sec=p[5];
-  const beforeNineCutoff=d<9||(d===9&&(h<20));
-  if(beforeNineCutoff)return new Date(Date.UTC(y,m-1,9,11,0,0)); // JST 20:00
+  const beforeNineCutoff=d<9||(d===9&&(h<20||(h===20&&min===0&&sec===0)));
+  if(beforeNineCutoff)return new Date(Date.UTC(y,m-1,9,11,0,1)); // JST 20:00:01（20:00ちょうどまでは当月扱い）
   if(d<=26)return new Date(Date.UTC(y,m-1,26,15,0,0)); // JST 27日 00:00
   const next=new Date(Date.UTC(y,m,1,0,0,0));
   return new Date(Date.UTC(next.getUTCFullYear(),next.getUTCMonth(),9,11,0,0)); // 翌月9日 JST 20:00
