@@ -133,7 +133,7 @@ function approveTfgSettlement_(body){
     lock.waitLock(10000);locked=true;
     const row=findTfgSettlementByToken_(body&&body.token);
     if(!row)throw new Error("この承認URLは無効です。");
-    if(row.status==="APPROVED"){lock.releaseLock();locked=false;return tfgSettlementJson_({ok:true,data:{approvedAt:row.approvedAt,alreadyApproved:true}});
+    if(row.status==="APPROVED"){lock.releaseLock();locked=false;return tfgSettlementJson_({ok:true,data:{approvedAt:row.approvedAt,alreadyApproved:true}});}
     if(row.status!=="PENDING")throw new Error("この承認URLは無効になりました。最新の精算書をご確認ください。");
     if(tfgSettlementParseJst_(row.expiresAt).getTime()<Date.now())throw new Error("精算条件が更新されたため、この承認URLは無効になりました。最新の精算書をご確認ください。");
     if(memberNo!==row.memberNo||email!==row.email)throw new Error("会員番号または登録メールアドレスが一致しません。");
