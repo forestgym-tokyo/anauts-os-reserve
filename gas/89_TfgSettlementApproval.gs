@@ -45,7 +45,8 @@ function createTfgSettlement_(body){
     const normalized=items.map(function(x){
       let normal=Number(x.normal||0);
       let paid=Number(x.paid||0);
-      let settlement=Number(x.settlement||0);
+      if(!Number.isFinite(normal)||!Number.isFinite(paid)||normal<0||paid<0)throw new Error("精算明細の金額が不正です。");
+      let settlement=Math.max(0,normal-paid);
       const status=String(x.status||"").trim();
       const paymentSequence=x.paymentSequence==null?null:Number(x.paymentSequence);
       const isFinalMonth=x.isFinalMonth===true||tfgSettlementIsWithdrawalMonth_(x.target,withdrawalDate);
