@@ -1,15 +1,6 @@
 /**
- * The Forest Gym 精算承認 Web App 用エントリポイント。
- * 独立したGASプロジェクトとしてデプロイする場合に使用する。
+ * Deprecated compatibility stub.
+ *
+ * The Forest Gym settlement approval API is routed through gas/99_Main.gs.
+ * Keep this file without doGet/doPost to avoid duplicate Apps Script entry points.
  */
-function doGet(){
-  return ContentService.createTextOutput(JSON.stringify({ok:true,app:"TFG Settlement Approval"})).setMimeType(ContentService.MimeType.JSON);
-}
-function doPost(e){
-  try{
-    const body=e&&e.postData&&e.postData.contents?JSON.parse(e.postData.contents):{};
-    return tfgSettlementDoPost_(body);
-  }catch(error){
-    return tfgSettlementJson_({ok:false,code:"API_ERROR",message:error&&error.message?error.message:"処理中にエラーが発生しました。"});
-  }
-}
