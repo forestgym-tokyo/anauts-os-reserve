@@ -39,7 +39,8 @@ function createTfgSettlement_(body){
     const withdrawalDate=tfgSettlementWithdrawalDate_(now);
     const items=Array.isArray(body.items)?body.items:[];
     const paymentMethod=tfgSettlementNormalizePaymentMethod_(body.paymentMethod);
-    if(!memberNo||!memberName||!/^\S+@\S+\.\S+$/.test(email)||!items.length)throw new Error("会員番号・氏名・メール・精算明細が必要です。");
+    if(!/^\d{6}$/.test(memberNo))throw new Error("会員番号は6桁の数字で入力してください。");
+    if(!memberName||!/^\S+@\S+\.\S+$/.test(email)||!items.length)throw new Error("氏名・メール・精算明細が必要です。");
     const beforeFinalMonthCharge=tfgSettlementIsBeforeMonthlyCharge_(now);
     const normalized=items.map(function(x){
       let normal=Number(x.normal||0);
@@ -67,9 +68,17 @@ function createTfgSettlement_(body){
     const id="TFG-ST-"+Utilities.formatDate(now,TFG_SETTLEMENT_CONFIG.TIMEZONE,"yyyyMMdd-HHmmss")+"-"+Math.floor(Math.random()*10000).toString().padStart(4,"0");
     const expires=tfgSettlementNextExpiry_(now);
     const sh=getTfgSettlementSheet_();
-    sh.appendRow([id,Utilities.formatDate(now,TFG_SETTLEMENT_CONFIG.TIMEZONE,"yyyy-MM-dd HH:mm:ss"),memberNo,memberName,email,withdrawalDate,JSON.stringify(normalized),total,tokenHash,Utilities.formatDate(expires,TFG_SETTLEMENT_CONFIG.TIMEZONE,"yyyy-MM-dd HH:mm:ss"),"PENDING","","","","",paymentMethod,tfgSettlementPaymentNote_(paymentMethod)]);
+    const createLock=LockService.getScriptLock();
+    createLock.waitLock(10000);
+    try{
+      invalidatePreviousPendingTfgSettlements_(sh,memberNo);
+      sh.appendRow([id,Utilities.formatDate(now,TFG_SETTLEMENT_CONFIG.TIMEZONE,"yyyy-MM-dd HH:mm:ss"),memberNo,memberName,email,withdrawalDate,JSON.stringify(normalized),total,tokenHash,Utilities.formatDate(expires,TFG_SETTLEMENT_CONFIG.TIMEZONE,"yyyy-MM-dd HH:mm:ss"),"PENDING","","","","",paymentMethod,tfgSettlementPaymentNote_(paymentMethod)]);
+    }finally{
+      createLock.releaseLock();
+    }
     const base=String(body.approvalBaseUrl||TFG_SETTLEMENT_CONFIG.APPROVAL_BASE_URL).trim();
     const approvalUrl=base+(base.indexOf("?")>=0?"&":"?")+"token="+encodeURIComponent(token);
+    let mailWarning="";
     try{
       MailApp.sendEmail({
         to:email,
@@ -99,8 +108,8 @@ function createTfgSettlement_(body){
         name:"The Forest Gym",
         replyTo:TFG_SETTLEMENT_CONFIG.ADMIN_EMAIL
       });
-    }catch(mailError){console.error("TFG settlement approval mail",mailError);}
-    return tfgSettlementJson_({ok:true,data:{settlementId:id,total:total,approvalUrl:approvalUrl,expiresAt:Utilities.formatDate(expires,TFG_SETTLEMENT_CONFIG.TIMEZONE,"yyyy-MM-dd HH:mm:ss"),paymentMethod:paymentMethod}});
+    }catch(mailError){console.error("TFG settlement approval mail",mailError);mailWarning="会員への承認メール送信に失敗しました。承認URLを別途送付してください。";}
+    return tfgSettlementJson_({ok:true,data:{settlementId:id,total:total,approvalUrl:approvalUrl,expiresAt:Utilities.formatDate(expires,TFG_SETTLEMENT_CONFIG.TIMEZONE,"yyyy-MM-dd HH:mm:ss"),paymentMethod:paymentMethod,mailWarning:mailWarning}});
   }catch(e){return tfgSettlementJson_({ok:false,code:"CREATE_ERROR",message:e.message||"精算承認データを作成できませんでした。"});}
 }
 
@@ -119,6 +128,7 @@ function approveTfgSettlement_(body){
     if(body.consent1!==true||body.consent2!==true||body.consent3!==true)throw new Error("確認事項3項目すべてへの同意が必要です。");
     const memberNo=String(body.memberNo||"").replace(/\D/g,"");
     const email=String(body.email||"").trim().toLowerCase();
+    if(!/^\d{6}$/.test(memberNo))throw new Error("会員番号は6桁の数字で入力してください。");
     lock.waitLock(10000);locked=true;
     const row=findTfgSettlementByToken_(body&&body.token);
     if(!row)throw new Error("この承認URLは無効です。");
@@ -143,6 +153,16 @@ function getTfgSettlementSheet_(){
   if(sh.getLastRow()===0){sh.appendRow(headers);sh.setFrozenRows(1);}
   else if(sh.getLastColumn()<headers.length){sh.getRange(1,1,1,headers.length).setValues([headers]);}
   return sh;
+}
+function invalidatePreviousPendingTfgSettlements_(sheet,memberNo){
+  const lastRow=sheet.getLastRow();
+  if(lastRow<2)return;
+  const values=sheet.getRange(2,1,lastRow-1,17).getDisplayValues();
+  values.forEach(function(row,index){
+    if(String(row[2]||"").trim()===memberNo&&String(row[10]||"").trim()==="PENDING"){
+      sheet.getRange(index+2,11).setValue("SUPERSEDED");
+    }
+  });
 }
 function findTfgSettlementByToken_(token){
   token=String(token||"").trim();if(!token)return null;
