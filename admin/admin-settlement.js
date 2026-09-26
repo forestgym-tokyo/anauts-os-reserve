@@ -8,20 +8,6 @@ const planRates={
 };
 let current=null;
 
-function authReady(){
-  return typeof state!=="undefined"&&state.authUser;
-}
-function permission(){
-  return String((typeof state!=="undefined"&&state.authUser&&(state.authUser.permission||state.authUser.role))||"").toUpperCase();
-}
-function refreshNav(){
-  const nav=$("#settlementNav");
-  if(!nav)return;
-  nav.classList.toggle("is-hidden",!["ADMIN","MANAGER"].includes(permission()));
-}
-setInterval(refreshNav,1200);
-document.addEventListener("DOMContentLoaded",refreshNav);
-
 function cutoffInfo(now=new Date()){
   const y=now.getFullYear(),m=now.getMonth(),d=now.getDate(),h=now.getHours(),min=now.getMinutes(),sec=now.getSeconds();
   const before9=d<9||(d===9&&(h<20||(h===20&&min===0&&sec===0)));
