@@ -7,7 +7,8 @@ const TFG_SETTLEMENT_CONFIG=Object.freeze({
   TIMEZONE:"Asia/Tokyo",
   SHEET_NAME:"精算承認",
   TOKEN_TTL_DAYS:7,
-  ADMIN_EMAIL:"info@theforestgym.com"
+  ADMIN_EMAIL:"info@theforestgym.com",
+  APPROVAL_BASE_URL:"https://forestgym-tokyo.github.io/anauts-os-reserve/settlement-approval/"
 });
 
 function tfgSettlementDoPost_(body){
@@ -42,8 +43,31 @@ function createTfgSettlement_(body){
     const now=new Date(), expires=new Date(now.getTime()+TFG_SETTLEMENT_CONFIG.TOKEN_TTL_DAYS*86400000);
     const sh=getTfgSettlementSheet_();
     sh.appendRow([id,Utilities.formatDate(now,TFG_SETTLEMENT_CONFIG.TIMEZONE,"yyyy-MM-dd HH:mm:ss"),memberNo,memberName,email,withdrawalDate,JSON.stringify(normalized),total,tokenHash,Utilities.formatDate(expires,TFG_SETTLEMENT_CONFIG.TIMEZONE,"yyyy-MM-dd HH:mm:ss"),"PENDING","","","",""]);
-    const base=String(body.approvalBaseUrl||"").trim();
-    const approvalUrl=base?(base+(base.indexOf("?")>=0?"&":"?")+"token="+encodeURIComponent(token)):"";
+    const base=String(body.approvalBaseUrl||TFG_SETTLEMENT_CONFIG.APPROVAL_BASE_URL).trim();
+    const approvalUrl=base+(base.indexOf("?")>=0?"&":"?")+"token="+encodeURIComponent(token);
+    try{
+      MailApp.sendEmail({
+        to:email,
+        subject:"【The Forest Gym】退会に伴う精算内容のご確認",
+        body:[
+          memberName+" 様",
+          "",
+          "The Forest Gymでございます。",
+          "退会に伴う精算内容をご確認いただくため、下記の専用URLへアクセスしてください。",
+          "",
+          approvalUrl,
+          "",
+          "会員番号とご登録メールアドレスをご入力のうえ、内容をご確認・承認してください。",
+          "承認URLの有効期限："+Utilities.formatDate(expires,TFG_SETTLEMENT_CONFIG.TIMEZONE,"yyyy年M月d日 H:mm"),
+          "",
+          "※精算内容に相違がある場合は承認せず、info@theforestgym.comまでお問い合わせください。",
+          "",
+          "The Forest Gym"
+        ].join("\n"),
+        name:"The Forest Gym",
+        replyTo:TFG_SETTLEMENT_CONFIG.ADMIN_EMAIL
+      });
+    }catch(mailError){console.error("TFG settlement approval mail",mailError);}
     return tfgSettlementJson_({ok:true,data:{settlementId:id,total:total,approvalUrl:approvalUrl,expiresAt:Utilities.formatDate(expires,TFG_SETTLEMENT_CONFIG.TIMEZONE,"yyyy-MM-dd HH:mm:ss")}});
   }catch(e){return tfgSettlementJson_({ok:false,code:"CREATE_ERROR",message:e.message||"精算承認データを作成できませんでした。"});}
 }
