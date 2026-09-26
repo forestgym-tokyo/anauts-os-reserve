@@ -191,7 +191,11 @@ function tfgSettlementJstParts_(date){
 }
 function tfgSettlementIsBeforeMonthlyCharge_(date){
   const p=tfgSettlementJstParts_(date);
-  return p[2]<=26;
+  const day=p[2],hour=p[3],minute=p[4],second=p[5];
+  const afterWithdrawalCutoff=
+    day>9||
+    (day===9&&(hour>20||(hour===20&&(minute>0||second>0))));
+  return afterWithdrawalCutoff&&day<=26;
 }
 function tfgSettlementIsWithdrawalMonth_(target,withdrawalDate){
   const d=String(withdrawalDate||"").match(/^(\d{4})-(\d{2})-/);
