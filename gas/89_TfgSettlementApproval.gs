@@ -42,15 +42,23 @@ function createTfgSettlement_(body){
     if(!memberNo||!memberName||!/^\S+@\S+\.\S+$/.test(email)||!items.length)throw new Error("会員番号・氏名・メール・精算明細が必要です。");
     const beforeFinalMonthCharge=tfgSettlementIsBeforeMonthlyCharge_(now);
     const normalized=items.map(function(x){
-      const normal=Number(x.normal||0);
+      let normal=Number(x.normal||0);
       let paid=Number(x.paid||0);
       let settlement=Number(x.settlement||0);
+      const status=String(x.status||"").trim();
+      const paymentSequence=x.paymentSequence==null?null:Number(x.paymentSequence);
       const isFinalMonth=x.isFinalMonth===true||tfgSettlementIsWithdrawalMonth_(x.target,withdrawalDate);
-      if(isFinalMonth&&beforeFinalMonthCharge){
+      if(status==="休会"){
+        normal=550;
+        paid=550;
+        settlement=0;
+      }else if(paymentSequence!==null&&paymentSequence>12){
+        settlement=0;
+      }else if(isFinalMonth&&beforeFinalMonthCharge){
         paid=0;
-        settlement=Math.max(0,normal-paid);
+        settlement=Math.max(0,normal);
       }
-      return{target:String(x.target||""),label:String(x.label||""),paid:paid,normal:normal,settlement:settlement,note:String(x.note||""),isFinalMonth:isFinalMonth};
+      return{target:String(x.target||""),label:String(x.label||""),paid:paid,normal:normal,settlement:settlement,note:String(x.note||""),status:status,paymentSequence:paymentSequence,isFinalMonth:isFinalMonth};
     });
     const total=normalized.reduce(function(s,x){return s+x.settlement},0);
     if(total<0)throw new Error("精算金額が不正です。");
