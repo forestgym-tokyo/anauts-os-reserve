@@ -71,8 +71,8 @@ function createTfgSettlement_(body){
     const createLock=LockService.getScriptLock();
     createLock.waitLock(10000);
     try{
-      invalidatePreviousPendingTfgSettlements_(sh,memberNo);
       sh.appendRow([id,Utilities.formatDate(now,TFG_SETTLEMENT_CONFIG.TIMEZONE,"yyyy-MM-dd HH:mm:ss"),memberNo,memberName,email,withdrawalDate,JSON.stringify(normalized),total,tokenHash,Utilities.formatDate(expires,TFG_SETTLEMENT_CONFIG.TIMEZONE,"yyyy-MM-dd HH:mm:ss"),"PENDING","","","","",paymentMethod,tfgSettlementPaymentNote_(paymentMethod)]);
+      invalidatePreviousPendingTfgSettlements_(sh,memberNo,id);
     }finally{
       createLock.releaseLock();
     }
@@ -133,7 +133,7 @@ function approveTfgSettlement_(body){
     lock.waitLock(10000);locked=true;
     const row=findTfgSettlementByToken_(body&&body.token);
     if(!row)throw new Error("この承認URLは無効です。");
-    if(row.status==="APPROVED")return tfgSettlementJson_({ok:true,data:{approvedAt:row.approvedAt,alreadyApproved:true}});
+    if(row.status==="APPROVED"){lock.releaseLock();locked=false;return tfgSettlementJson_({ok:true,data:{approvedAt:row.approvedAt,alreadyApproved:true}});
     if(row.status!=="PENDING")throw new Error("この承認URLは無効になりました。最新の精算書をご確認ください。");
     if(tfgSettlementParseJst_(row.expiresAt).getTime()<Date.now())throw new Error("精算条件が更新されたため、この承認URLは無効になりました。最新の精算書をご確認ください。");
     if(memberNo!==row.memberNo||email!==row.email)throw new Error("会員番号または登録メールアドレスが一致しません。");
@@ -156,12 +156,12 @@ function getTfgSettlementSheet_(){
   else if(sh.getLastColumn()<headers.length){sh.getRange(1,1,1,headers.length).setValues([headers]);}
   return sh;
 }
-function invalidatePreviousPendingTfgSettlements_(sheet,memberNo){
+function invalidatePreviousPendingTfgSettlements_(sheet,memberNo,keepId){
   const lastRow=sheet.getLastRow();
   if(lastRow<2)return;
   const values=sheet.getRange(2,1,lastRow-1,17).getDisplayValues();
   values.forEach(function(row,index){
-    if(String(row[2]||"").trim()===memberNo&&String(row[10]||"").trim()==="PENDING"){
+    if(String(row[0]||"").trim()!==String(keepId||"").trim()&&String(row[2]||"").trim()===memberNo&&String(row[10]||"").trim()==="PENDING"){
       sheet.getRange(index+2,11).setValue("SUPERSEDED");
     }
   });
