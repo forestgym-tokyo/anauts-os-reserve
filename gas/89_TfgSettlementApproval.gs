@@ -21,6 +21,7 @@ function tfgSettlementDoPost_(body){
     case "getTfgSettlement": return getTfgSettlement_(body);
     case "approveTfgSettlement": return approveTfgSettlement_(body);
     case "createTfgSettlement": return createTfgSettlement_(body);
+    case "sendTfgSettlementApproval": return sendTfgSettlementApproval_(body);
     default:return tfgSettlementJson_({ok:false,code:"ACTION_NOT_FOUND",message:"指定されたactionは存在しません。"});
   }
 }
