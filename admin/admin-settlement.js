@@ -152,7 +152,7 @@ function render(){
     :"クレジットカードで精算します。");
   $("#settlementPreview").classList.remove("is-hidden");
   $("#settlementDraft").disabled=false;
-  $("#settlementPreviewButton").disabled=true;
+  $("#settlementPreviewButton").disabled=false;
   $("#settlementSend").disabled=true;
   draft=null;
 }
@@ -189,10 +189,88 @@ async function createDraft(){
 function draftToken(){
   try{return new URL(draft?.approvalUrl||"",location.href).searchParams.get("token")||""}catch(_){return ""}
 }
+function escapePreview_(value){
+  return String(value==null?"":value).replace(/[&<>"']/g,s=>({"&":"&amp;","<":"&lt;",">":"&gt;","\\":"&#92;","\"":"&quot;","'":"&#39;"}[s]||s));
+}
+function buildMemberPreviewHtml_(){
+  if(!current)return "";
+  const total=current.items.reduce((s,x)=>s+Number(x.settlement||0),0);
+  const bank=current.paymentMethod==="BANK_TRANSFER";
+  const rows=current.items.map(x=>`
+    <tr>
+      <td style="padding:10px 6px;border-bottom:1px solid #e2e9e5;font-size:12px">${escapePreview_(x.target||"—")}</td>
+      <td style="padding:10px 6px;border-bottom:1px solid #e2e9e5;font-size:12px">${escapePreview_(x.label||"")}</td>
+      <td style="padding:10px 6px;border-bottom:1px solid #e2e9e5;font-size:12px;text-align:right;white-space:nowrap">${yen(x.paid)}</td>
+      <td style="padding:10px 6px;border-bottom:1px solid #e2e9e5;font-size:12px;text-align:right;white-space:nowrap">${yen(x.normal)}</td>
+      <td style="padding:10px 6px;border-bottom:1px solid #e2e9e5;font-size:12px;text-align:right;white-space:nowrap"><strong>${yen(x.settlement)}</strong></td>
+    </tr>`).join("");
+  const payment=bank
+    ? `<div style="margin-top:16px;border:2px solid #dbc98f;background:#fffaf0;border-radius:15px;padding:17px 18px">
+        <div style="font-weight:900;font-size:16px">🏦 銀行振込でお支払い</div>
+        <p style="font-size:13px;margin:8px 0 0">口座振替会員様は、精算金を自動引落しせず、承認後に下記口座へお振込みいただきます。</p>
+        <p style="font-size:14px;font-weight:900">承認だけでは退会手続きは完了しません。お振込みが必要です。</p>
+        <div style="background:#fff;border:1px solid #e6ddbf;border-radius:12px;padding:12px;font-size:13px"><strong>みずほ銀行　新浦安支店</strong><br>普通　1917298<br>A-nauts株式会社</div>
+      </div>`
+    : `<div style="margin-top:16px;border:2px solid #b8cde3;background:#f2f7fc;border-radius:15px;padding:17px 18px">
+        <div style="font-weight:900;font-size:16px">💳 クレジットカードで決済</div>
+        <p style="font-size:13px;margin:8px 0 0">ご登録済みのクレジットカードへ、表示されている精算金額を一括で決済します。</p>
+        <p style="font-size:14px;font-weight:900">お客様による振込作業は不要です。</p>
+      </div>`;
+  return `
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans JP',Arial,sans-serif;color:#17231d;background:#f5f8f6">
+      <div style="background:linear-gradient(135deg,#0b3b2a,#0f5138);color:#fff;padding:28px 22px 34px">
+        <div style="font-size:13px;font-weight:800">The Forest Gym</div>
+        <h1 style="margin:18px 0 5px;font-size:27px">退会精算明細</h1>
+        <p style="margin:0;color:#dcebe4;font-size:13px">退会に伴う精算内容をご確認のうえ、本人確認と承認をお願いいたします。</p>
+      </div>
+      <div style="padding:16px">
+        <div style="background:#fff;border:1px solid #dce6e0;border-radius:18px;padding:20px;margin-bottom:14px">
+          <h2 style="font-size:17px;margin:0 0 14px">会員情報</h2>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div style="background:#f8fbf9;border:1px solid #e2ebe6;border-radius:12px;padding:13px"><span style="display:block;color:#66746d;font-size:11px">お名前</span><strong>${escapePreview_(current.memberName)} 様</strong></div>
+            <div style="background:#f8fbf9;border:1px solid #e2ebe6;border-radius:12px;padding:13px"><span style="display:block;color:#66746d;font-size:11px">退会予定</span><strong>${escapePreview_(current.withdrawalDate)}</strong></div>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid #dce6e0;border-radius:18px;padding:20px;margin-bottom:14px">
+          <h2 style="font-size:17px;margin:0 0 14px">精算明細</h2>
+          <div style="overflow:auto"><table style="width:100%;border-collapse:collapse;min-width:620px"><thead><tr>
+            <th style="padding:9px 6px;text-align:left;color:#66746d;font-size:12px">対象</th>
+            <th style="padding:9px 6px;text-align:left;color:#66746d;font-size:12px">内容</th>
+            <th style="padding:9px 6px;text-align:right;color:#66746d;font-size:12px">決済済</th>
+            <th style="padding:9px 6px;text-align:right;color:#66746d;font-size:12px">通常価格</th>
+            <th style="padding:9px 6px;text-align:right;color:#66746d;font-size:12px">精算額</th>
+          </tr></thead><tbody>${rows}</tbody></table></div>
+          <div style="display:flex;justify-content:space-between;align-items:end;margin-top:17px;padding:17px 18px;background:#eef6f1;border:1px solid #cfe1d7;border-radius:14px">
+            <span style="font-size:12px;color:#496258">今回のご精算金額</span><strong style="font-size:30px;color:#0b3b2a">${yen(total)}</strong>
+          </div>
+          ${payment}
+        </div>
+        <div style="background:#fff;border:1px solid #dce6e0;border-radius:18px;padding:20px;margin-bottom:14px">
+          <h2 style="font-size:17px;margin:0 0 14px">ご本人確認</h2>
+          <div style="margin-bottom:12px"><label style="font-size:12px;font-weight:700">会員番号（6桁）</label><div style="margin-top:6px;border:1px solid #bfcac4;border-radius:11px;padding:13px;color:#66746d">例：108035</div></div>
+          <div><label style="font-size:12px;font-weight:700">登録メールアドレス</label><div style="margin-top:6px;border:1px solid #bfcac4;border-radius:11px;padding:13px;color:#66746d">example@gmail.com</div></div>
+        </div>
+        <div style="background:#fff;border:1px solid #dce6e0;border-radius:18px;padding:20px">
+          <h2 style="font-size:17px;margin:0 0 14px">確認・同意</h2>
+          <div style="padding:12px;background:#fafcfb;border:1px solid #e0e8e3;border-radius:12px;margin-bottom:10px">☐ 上記の精算内容および精算金額を確認しました。</div>
+          <div style="padding:12px;background:#fafcfb;border:1px solid #e0e8e3;border-radius:12px;margin-bottom:10px">☐ ${bank?"表示された精算金額を、承認後に指定口座へ一括で振り込むことに同意します。":"表示された精算金額を、登録済みクレジットカードで一括決済することに同意します。"}</div>
+          <div style="padding:12px;background:#fafcfb;border:1px solid #e0e8e3;border-radius:12px;margin-bottom:12px">☐ ${bank?"振込確認ができない場合、退会手続きが完了しないことを理解しました。":"クレジットカード決済が完了しない場合、退会手続きが完了しないことを理解しました。"}</div>
+          <button disabled style="width:100%;border:0;border-radius:13px;padding:16px;background:#0b3b2a;color:#fff;font-size:16px;font-weight:900;opacity:.5">下書きプレビューのため承認できません</button>
+        </div>
+      </div>
+    </div>`;
+}
 function previewDraft(){
-  if(!draft?.approvalUrl)return;
-  const previewUrl=draft.approvalUrl+(draft.approvalUrl.includes("?")?"&":"?")+"preview="+Date.now();
-  location.href=previewUrl;
+  if(!current)return;
+  const modal=$("#settlementMemberPreviewModal"),body=$("#settlementMemberPreviewBody");
+  if(!modal||!body)return;
+  body.innerHTML=buildMemberPreviewHtml_();
+  modal.classList.remove("is-hidden");
+  document.body.style.overflow="hidden";
+}
+function closeMemberPreview_(){
+  $("#settlementMemberPreviewModal")?.classList.add("is-hidden");
+  document.body.style.overflow="";
 }
 async function send(){
   if(!draft?.approvalUrl)return;
@@ -213,6 +291,8 @@ document.addEventListener("DOMContentLoaded",()=>{
   $("#settlementDraft")?.addEventListener("click",createDraft);
   $("#settlementPreviewButton")?.addEventListener("click",previewDraft);
   $("#settlementSend")?.addEventListener("click",send);
+  $("#settlementMemberPreviewClose")?.addEventListener("click",closeMemberPreview_);
+  $("#settlementMemberPreviewModal")?.addEventListener("click",e=>{if(e.target?.id==="settlementMemberPreviewModal")closeMemberPreview_();});
   $("#settlementCopyUrl")?.addEventListener("click",async()=>{
     const value=$("#settlementFallbackUrlText")?.value||"";
     if(!value)return;
