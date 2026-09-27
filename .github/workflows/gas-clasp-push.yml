@@ -1,0 +1,66 @@
+name: GAS Push (manual guarded)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type PUSH_TO_GAS to replace Apps Script source'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require explicit confirmation
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          test "$CONFIRM" = "PUSH_TO_GAS" || (echo "Confirmation mismatch. Push cancelled." && exit 1)
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Validate migration snapshot
+        shell: bash
+        run: |
+          test -f gas/appsscript.json || (echo "gas/appsscript.json is missing. Run GAS Pull (safe) first." && exit 1)
+          test -f gas/91_TfgSettlementApproval.gs || (echo "TFG settlement core 91 is missing." && exit 1)
+          test -f gas/92_TfgSettlementApprovalWebApp.gs || (echo "TFG settlement web app 92 is missing." && exit 1)
+          shopt -s nullglob
+          interview=(gas/89*9RoundInterview*.gs)
+          if [ "${#interview[@]}" -eq 0 ]; then
+            echo "Remote-only 89*9RoundInterview*.gs files have not been captured yet."
+            echo "Run GAS Pull (safe) before any push."
+            exit 1
+          fi
+
+      - name: Validate clasp secrets
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+          CLASP_JSON: ${{ secrets.CLASP_JSON }}
+        run: |
+          test -n "$CLASPRC_JSON" || (echo "CLASPRC_JSON is missing" && exit 1)
+          test -n "$CLASP_JSON" || (echo "CLASP_JSON is missing" && exit 1)
+
+      - name: Setup clasp credentials
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+          CLASP_JSON: ${{ secrets.CLASP_JSON }}
+        run: |
+          printf '%s' "$CLASPRC_JSON" > "$HOME/.clasprc.json"
+          printf '%s' "$CLASP_JSON" > .clasp.json
+
+      - name: Show files that will be pushed
+        run: npx -y @google/clasp@3.4.1 show-file-status
+
+      - name: Push source to Apps Script
+        run: npx -y @google/clasp@3.4.1 push
