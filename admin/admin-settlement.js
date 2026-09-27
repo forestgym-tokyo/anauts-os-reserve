@@ -149,7 +149,7 @@ function render(){
     :`決済済み ${current.completedPayments}/12回。未達のためキャンペーン差額を精算します。`;
   $("#settlementPaymentGuide").textContent=campaignText+" "+(current.paymentMethod==="BANK_TRANSFER"
     ?"口座振替会員：承認後、みずほ銀行 新浦安支店 普通 1917298 A-nauts株式会社 へ振込が必要です。"
-    :"登録済みの決済方法で精算します。");
+    :"クレジットカードで精算します。");
   $("#settlementPreview").classList.remove("is-hidden");
   $("#settlementDraft").disabled=false;
   $("#settlementPreviewButton").disabled=true;
