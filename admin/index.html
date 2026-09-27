@@ -844,12 +844,12 @@
         </select>
       </label>
       <label><span>初月決済額</span><input id="settlementFirstPaid" type="number" min="0" value="0"></label>
-      <label><span>初月通常料金（日割り）</span><input id="settlementFirstNormal" type="number" min="0" value="0"></label>
+      <label><span>初月通常料金（日割り・自動計算）</span><input id="settlementFirstNormal" type="number" min="0" value="0" readonly></label>
       <label><span>初期費用の決済額</span><input id="settlementInitialPaid" type="number" min="0" value="0"></label>
       <label><span>支払方法</span>
         <select id="settlementPaymentMethod">
-          <option value="CARD">登録済み決済方法</option>
-          <option value="BANK_TRANSFER">口座振替会員（銀行振込）</option>
+          <option value="CARD">クレジットカード</option>
+          <option value="BANK_TRANSFER">口座振替</option>
         </select>
       </label>
     </div>
@@ -862,9 +862,10 @@
     <div id="settlementMessage" class="form-message is-hidden" style="margin-top:14px"></div>
     <div id="settlementFallbackUrl" class="is-hidden" style="margin-top:12px;padding:12px;border:1px solid #506158;border-radius:10px">
       <div style="font-size:12px;color:#aab6ad;margin-bottom:6px">下書き承認URL</div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <input id="settlementFallbackUrlText" readonly style="flex:1;min-width:0">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input id="settlementFallbackUrlText" readonly style="flex:1;min-width:260px">
         <button id="settlementCopyUrl" class="ghost-button" type="button">コピー</button>
+        <a id="settlementPreviewLink" class="ghost-button is-hidden" href="#" target="_blank" rel="noopener">会員画面を開く</a>
       </div>
     </div>
   </div>
