@@ -844,7 +844,10 @@
         </select>
       </label>
       <label><span>初月決済額</span><input id="settlementFirstPaid" type="number" min="0" value="0"></label>
-      <label><span>初月通常料金（日割り・自動計算）</span><input id="settlementFirstNormal" type="number" min="0" value="0" readonly></label>
+      <label><span>初月通常料金（日割り・自動計算）</span>
+        <input id="settlementFirstNormal" type="number" min="0" value="0" readonly>
+        <small id="settlementFirstNormalHint" style="display:block;margin-top:6px;color:#91a198">入会日・プラン・初月決済額から自動計算します。</small>
+      </label>
       <label><span>初期費用の決済額</span><input id="settlementInitialPaid" type="number" min="0" value="0"></label>
       <label><span>支払方法</span>
         <select id="settlementPaymentMethod">
@@ -888,15 +891,14 @@
     <p id="settlementPaymentGuide" style="margin-top:14px;color:#cbd4cd;line-height:1.8"></p>
   </div>
 
-  <div id="settlementMemberPreviewModal" class="is-hidden" style="position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.72);padding:18px;overflow:auto">
-    <div style="max-width:780px;margin:18px auto;background:#f5f8f6;border-radius:18px;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.45)">
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#0b3b2a;color:#fff">
-        <strong>会員画面プレビュー</strong>
-        <button id="settlementMemberPreviewClose" type="button" style="border:1px solid rgba(255,255,255,.4);background:transparent;color:#fff;border-radius:8px;padding:7px 11px;cursor:pointer">閉じる</button>
-      </div>
-      <div id="settlementMemberPreviewBody" style="padding:0;background:#f5f8f6"></div>
+  <div id="settlementInlineMemberPreview" class="card is-hidden" style="margin-top:16px;padding:0;overflow:hidden">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#0b3b2a;color:#fff">
+      <strong>会員画面プレビュー</strong>
+      <button id="settlementInlinePreviewClose" type="button" class="ghost-button">閉じる</button>
     </div>
+    <div id="settlementInlineMemberPreviewBody" style="background:#f5f8f6"></div>
   </div>
+
 </section>
 
 <section id="dailyReportView" class="view daily-report-view">
@@ -916,6 +918,6 @@
 <script src="./admin-questionnaire.js?v=20260906-tour-reply-history-v1" defer>
 </script>
 <script src="./admin-counseling-links.js?v=20260915-diet-counseling-v1" defer></script>
-<script src="./admin-settlement.js?v=20260927-inline-preview-v1" defer></script>
+<script src="./admin-settlement-v2.js?v=20260927-v2" defer></script>
 </body>
 </html>
