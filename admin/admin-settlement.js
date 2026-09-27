@@ -36,6 +36,19 @@ function rateFor(plan,joinDate){
   const d=String(joinDate||"");
   return planRates[plan][d>="2026-03-01"?"after202603":"before202603"];
 }
+function firstNormalFromPaid_(firstPaid,rate){
+  const paid=Math.max(0,Number(firstPaid||0));
+  const campaign=Number(rate&&rate.campaign||0);
+  const normal=Number(rate&&rate.normal||0);
+  if(!campaign||!normal)return 0;
+  return Math.floor((paid*normal)/campaign);
+}
+function refreshFirstNormal_(){
+  const planEl=$("#settlementPlan"),joinEl=$("#settlementJoinDate"),paidEl=$("#settlementFirstPaid"),normalEl=$("#settlementFirstNormal");
+  if(!planEl||!joinEl||!paidEl||!normalEl||!joinEl.value)return;
+  const rate=rateFor(planEl.value,joinEl.value);
+  normalEl.value=firstNormalFromPaid_(paidEl.value,rate);
+}
 function benefitAmount(benefit,rate,joinDate,plan){
   if(benefit==="PERSONAL"){
     if(joinDate<"2026-03-01"&&(plan==="DAY"||plan==="NIGHT365"))return 0;
@@ -56,12 +69,14 @@ function calc(){
   const plan=$("#settlementPlan").value;
   const benefit=$("#settlementBenefit").value;
   const firstPaid=Number($("#settlementFirstPaid").value||0);
-  const firstNormal=Number($("#settlementFirstNormal").value||0);
+  const rate=rateFor(plan,joinDate);
+  const firstNormal=firstNormalFromPaid_(firstPaid,rate);
+  $("#settlementFirstNormal").value=firstNormal;
   const initialPaid=Number($("#settlementInitialPaid").value||0);
   const paymentMethod=$("#settlementPaymentMethod").value;
   if(!/^\d{6}$/.test(memberNo)){show("会員番号は6桁の数字で入力してください。",true);return}
   if(!memberName||!email||!joinDate){show("氏名・メールアドレス・入会日を入力してください。",true);return}
-  const cut=cutoffInfo(),rate=rateFor(plan,joinDate),months=monthsBetween(joinDate,cut.withdrawalDate);
+  const cut=cutoffInfo(),months=monthsBetween(joinDate,cut.withdrawalDate);
   const items=[];
   items.push({target:"—",label:"初期費用",paid:initialPaid,normal:8800,settlement:Math.max(0,8800-initialPaid),note:"入会金・事務手数料",kind:"INITIAL",basePaid:initialPaid,baseNormal:8800});
   const benefitValue=benefitAmount(benefit,rate,joinDate,plan);
@@ -161,7 +176,10 @@ async function createDraft(){
     const r=await apiPost(payload);
     draft={settlementId:r.data?.settlementId||"",approvalUrl:r.data?.approvalUrl||""};
     const fallback=$("#settlementFallbackUrl"),fallbackText=$("#settlementFallbackUrlText");
+    const previewUrl=draft.approvalUrl+(draft.approvalUrl.includes("?")?"&":"?")+"preview="+Date.now();
+    const previewLink=$("#settlementPreviewLink");
     if(fallback&&fallbackText){fallbackText.value=draft.approvalUrl;fallback.classList.remove("is-hidden");}
+    if(previewLink){previewLink.href=previewUrl;previewLink.classList.remove("is-hidden");}
     $("#settlementPreviewButton").disabled=!draft.approvalUrl;
     $("#settlementSend").disabled=!draft.approvalUrl;
     show("下書きを保存し、承認URLを発行しました。会員にはまだ送信していません。精算ID："+draft.settlementId);
@@ -173,7 +191,8 @@ function draftToken(){
 }
 function previewDraft(){
   if(!draft?.approvalUrl)return;
-  window.open(draft.approvalUrl,"_blank","noopener");
+  const previewUrl=draft.approvalUrl+(draft.approvalUrl.includes("?")?"&":"?")+"preview="+Date.now();
+  location.href=previewUrl;
 }
 async function send(){
   if(!draft?.approvalUrl)return;
@@ -188,6 +207,9 @@ async function send(){
 }
 document.addEventListener("DOMContentLoaded",()=>{
   $("#settlementCalculate")?.addEventListener("click",calc);
+  $("#settlementFirstPaid")?.addEventListener("input",refreshFirstNormal_);
+  $("#settlementPlan")?.addEventListener("change",refreshFirstNormal_);
+  $("#settlementJoinDate")?.addEventListener("change",refreshFirstNormal_);
   $("#settlementDraft")?.addEventListener("click",createDraft);
   $("#settlementPreviewButton")?.addEventListener("click",previewDraft);
   $("#settlementSend")?.addEventListener("click",send);
