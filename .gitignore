@@ -1,0 +1,5 @@
+# clasp local/auth configuration (never commit real credentials)
+.clasp.json
+.clasprc.json
+.clasp-remote/
+node_modules/
