@@ -1,0 +1,5 @@
+# rootDir is gas/. Only Apps Script source files and manifest may be pushed.
+**/**
+!appsscript.json
+!**/*.gs
+!**/*.html
