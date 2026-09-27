@@ -1,0 +1,53 @@
+name: GAS Pull (safe)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  pull:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Validate clasp secrets
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+          CLASP_JSON: ${{ secrets.CLASP_JSON }}
+        run: |
+          test -n "$CLASPRC_JSON" || (echo "CLASPRC_JSON is missing" && exit 1)
+          test -n "$CLASP_JSON" || (echo "CLASP_JSON is missing" && exit 1)
+
+      - name: Setup clasp credentials
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+          CLASP_JSON: ${{ secrets.CLASP_JSON }}
+        run: |
+          printf '%s' "$CLASPRC_JSON" > "$HOME/.clasprc.json"
+          printf '%s' "$CLASP_JSON" > .clasp.json
+
+      - name: Pull Apps Script source
+        run: npx -y @google/clasp@3.4.1 pull
+
+      - name: Show pulled files
+        run: git status --short
+
+      - name: Commit pulled GAS snapshot
+        run: |
+          git add gas
+          if git diff --cached --quiet; then
+            echo "No GAS changes."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Sync Apps Script source from GAS"
+          git push
