@@ -4,7 +4,7 @@ const test=require("node:test");
 const assert=require("node:assert/strict");
 const vm=require("node:vm");
 
-const adminSource=fs.readFileSync(path.join(__dirname,"../admin/admin-settlement.js"),"utf8");
+const adminSource=fs.readFileSync(path.join(__dirname,"../admin/admin-settlement-v2.js"),"utf8");
 const gasSource=fs.readFileSync(path.join(__dirname,"../gas/89_TfgSettlementApproval.gs"),"utf8");
 
 function extractFunction(source,name){
@@ -74,4 +74,22 @@ test("URL issuance creates a draft and member email is a separate authenticated 
   assert.match(gasSource,/fresh\.status==="DRAFT"/);
   assert.match(gasSource,/setValue\("PENDING"\)/);
   assert.match(adminSource,/下書きを保存し、承認URLを発行しました。会員にはまだ送信していません。/);
+});
+
+
+test("first-month normal fee is auto-calculated from campaign proration",()=>{
+  const scope=vm.createContext({});
+  vm.runInContext(extractFunction(adminSource,"firstNormalFromPaid_")+";this.fn=firstNormalFromPaid_;",scope);
+  assert.equal(scope.fn(2874,{campaign:4950,normal:7480}),4342);
+});
+
+test("settlement UI initializes even if DOMContentLoaded already fired",()=>{
+  assert.match(adminSource,/document\.readyState==="loading"/);
+  assert.match(adminSource,/else initSettlementUi_\(\);/);
+});
+
+test("member preview renders inline in admin",()=>{
+  assert.match(adminSource,/settlementInlineMemberPreview/);
+  assert.match(adminSource,/buildMemberPreviewHtml_/);
+  assert.match(adminSource,/scrollIntoView/);
 });
