@@ -124,10 +124,10 @@ function send9RoundSuspensionUrlForSelectedRow() {
       }
     });
     log.getRange(newRow, 10).setValue("会員へ専用URLメール送信済");
-    ui.alert(member.name + " 様の登録メールアドレスへ休会URLを送信しました。");
   } finally {
     lock.releaseLock();
   }
+  ui.alert(member.name + " 様の登録メールアドレスへ休会URLを送信しました。");
 }
 
 function send9RoundSuspensionUrlEmail_(member, url, expiresAt) {
