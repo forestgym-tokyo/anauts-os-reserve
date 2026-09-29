@@ -13,11 +13,26 @@ var ROUND9_MEMBER_MENU_CONFIG = Object.freeze({
   ttlHours: 72
 });
 
-function onOpen() {
+function add9RoundSuspensionMenu() {
   SpreadsheetApp.getUi()
     .createMenu("9ROUND休会届")
     .addItem("選択会員へ休会URLをメール送信", "send9RoundSuspensionUrlForSelectedRow")
     .addToUi();
+}
+
+/** 最初の1回だけ実行。既存の onOpen 関数と衝突しない開封トリガーを設置する。 */
+function install9RoundSuspensionMenu() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss || ss.getId() !== ROUND9_MEMBER_MENU_CONFIG.spreadsheetId) {
+    throw new Error("9ROUND_Member のスプレッドシートに紐づく Apps Script から実行してください。");
+  }
+  var exists = ScriptApp.getProjectTriggers().some(function(trigger) {
+    return trigger.getHandlerFunction() === "add9RoundSuspensionMenu";
+  });
+  if (!exists) {
+    ScriptApp.newTrigger("add9RoundSuspensionMenu").forSpreadsheet(ss).onOpen().create();
+  }
+  return exists ? "設置済みです。シートを再読み込みしてください。" : "設置しました。シートを再読み込みしてください。";
 }
 
 function send9RoundSuspensionUrlForSelectedRow() {
