@@ -511,6 +511,9 @@ function doPost(e) {
       case "approveTfgSettlement":
         return approveTfgSettlement_(body);
 
+      case "deferTfgSettlement":
+        return deferTfgSettlement_(body);
+
       case "verifyMpgSuspensionMember":
         return verifyMpgSuspensionMember_(
           body
