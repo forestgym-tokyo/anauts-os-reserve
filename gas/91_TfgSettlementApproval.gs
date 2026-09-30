@@ -203,6 +203,34 @@ function createTfgSettlement_(body){
   }catch(e){return tfgSettlementJson_({ok:false,code:"CREATE_ERROR",message:e.message||"精算承認データを作成できませんでした。"});}
 }
 
+function tfgSettlementCampaignProgress_(items,withdrawalDate){
+  const rows=Array.isArray(items)?items:[];
+  let first=null;
+  for(let i=0;i<rows.length;i++){
+    const row=rows[i]||{};
+    if(String(row.label||"").trim()!=="初月会費")continue;
+    const m=String(row.target||"").match(/(\d{4})年(\d{1,2})月/);
+    if(m){first={year:Number(m[1]),month:Number(m[2])};break;}
+  }
+  const w=String(withdrawalDate||"").match(/^(\d{4})-(\d{2})-/);
+  if(!first||!w)return null;
+
+  let suspensionCount=0;
+  rows.forEach(function(row){
+    if(String((row&&row.status)||"").trim()==="休会")suspensionCount++;
+  });
+
+  const baseIndex=first.year*12+(first.month-1);
+  const achievementIndex=baseIndex+12+suspensionCount;
+  const withdrawalIndex=Number(w[1])*12+(Number(w[2])-1);
+  return{
+    remainingMonths:Math.max(0,achievementIndex-withdrawalIndex),
+    achievementYear:Math.floor(achievementIndex/12),
+    achievementMonth:(achievementIndex%12)+1,
+    suspensionCount:suspensionCount
+  };
+}
+
 function sendTfgSettlementApproval_(body){
   const lock=LockService.getScriptLock(); let locked=false;
   try{
@@ -217,6 +245,12 @@ function sendTfgSettlementApproval_(body){
     if(tfgSettlementParseJst_(fresh.expiresAt).getTime()<Date.now())throw new Error("有効期限が切れています。明細を再作成してください。");
     const base=String(body.approvalBaseUrl||TFG_SETTLEMENT_CONFIG.APPROVAL_BASE_URL).trim();
     const approvalUrl=base+(base.indexOf("?")>=0?"&":"?")+"token="+encodeURIComponent(String(body.token||"").trim());
+    const campaignProgress=tfgSettlementCampaignProgress_(fresh.items,fresh.withdrawalDate);
+    const campaignProgressLine=campaignProgress
+      ? (campaignProgress.remainingMonths>0
+          ? "キャンペーン条件達成まで：残り"+campaignProgress.remainingMonths+"か月（達成月："+campaignProgress.achievementYear+"年"+campaignProgress.achievementMonth+"月）"
+          : "キャンペーン条件：達成済み（達成月："+campaignProgress.achievementYear+"年"+campaignProgress.achievementMonth+"月）")
+      : "";
     MailApp.sendEmail({
       to:fresh.email,
       subject:"【The Forest Gym】退会に伴う精算内容のご確認",
@@ -224,11 +258,15 @@ function sendTfgSettlementApproval_(body){
         fresh.memberName+" 様",
         "",
         "The Forest Gymでございます。",
-        "退会に伴う精算内容をご確認いただくため、下記の専用URLへアクセスしてください。",
+        "精算内容をご確認いただくため、下記の専用URLへアクセスしてください。",
+        "精算金額との兼ね合いで、ご入会時のキャンペーン条件達成まで退会を見送る場合は、画面内の「キャンペーン条件達成まで見送る」をタップしてください。",
         "",
         approvalUrl,
         "",
-        "会員番号とご登録メールアドレスをご入力のうえ、内容をご確認・承認してください。",
+        "会員番号とご登録メールアドレスをご入力のうえ、内容をご確認ください。",
+        "そのうえで「この内容で承認する」または「キャンペーン条件達成まで見送る」を選択してください。",
+        campaignProgressLine,
+        campaignProgress?"※表示の達成月は、今後追加の休会がない場合の目安です。":"",
         "承認URLの有効期限："+Utilities.formatDate(tfgSettlementParseJst_(fresh.expiresAt),TFG_SETTLEMENT_CONFIG.TIMEZONE,"yyyy年M月d日 H:mm"),
         fresh.paymentMethod==="BANK_TRANSFER"?"お支払い方法：銀行振込":"お支払い方法：クレジットカード",
         "",
@@ -260,7 +298,8 @@ function getTfgSettlement_(body){
     if(!row)throw new Error("この承認URLは無効です。");
     if(row.status==="SUPERSEDED")throw new Error("この承認URLは再発行により無効になりました。最新の精算書をご確認ください。");
     if(["APPROVED","DEFERRED"].indexOf(row.status)<0 && tfgSettlementParseJst_(row.expiresAt).getTime()<Date.now())throw new Error("精算条件が更新されたため、この承認URLは無効になりました。最新の精算書をご確認ください。");
-    return tfgSettlementJson_({ok:true,data:{settlementId:row.id,memberName:row.memberName,withdrawalDate:row.withdrawalDate,items:row.items,total:row.total,status:row.status,approvedAt:row.approvedAt,deferredAt:row.deferredAt,paymentMethod:row.paymentMethod,paymentNote:row.paymentNote,bank:row.paymentMethod==="BANK_TRANSFER"?{bankName:TFG_SETTLEMENT_CONFIG.BANK_NAME,branch:TFG_SETTLEMENT_CONFIG.BANK_BRANCH,accountType:TFG_SETTLEMENT_CONFIG.BANK_ACCOUNT_TYPE,accountNo:TFG_SETTLEMENT_CONFIG.BANK_ACCOUNT_NO,accountName:TFG_SETTLEMENT_CONFIG.BANK_ACCOUNT_NAME}:null}});
+    const campaignProgress=tfgSettlementCampaignProgress_(row.items,row.withdrawalDate);
+    return tfgSettlementJson_({ok:true,data:{settlementId:row.id,memberName:row.memberName,withdrawalDate:row.withdrawalDate,items:row.items,total:row.total,status:row.status,approvedAt:row.approvedAt,deferredAt:row.deferredAt,paymentMethod:row.paymentMethod,paymentNote:row.paymentNote,campaignProgress:campaignProgress,bank:row.paymentMethod==="BANK_TRANSFER"?{bankName:TFG_SETTLEMENT_CONFIG.BANK_NAME,branch:TFG_SETTLEMENT_CONFIG.BANK_BRANCH,accountType:TFG_SETTLEMENT_CONFIG.BANK_ACCOUNT_TYPE,accountNo:TFG_SETTLEMENT_CONFIG.BANK_ACCOUNT_NO,accountName:TFG_SETTLEMENT_CONFIG.BANK_ACCOUNT_NAME}:null}});
   }catch(e){return tfgSettlementJson_({ok:false,code:"GET_ERROR",message:e.message||"精算内容を取得できませんでした。"});}
 }
 
