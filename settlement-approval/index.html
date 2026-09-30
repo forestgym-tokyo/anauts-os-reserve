@@ -201,6 +201,8 @@ function renderSettlement(){
     $("status").textContent="下書きプレビュー";
     $("approve").disabled=true;
     $("approve").textContent="下書きのため承認できません";
+    $("defer").disabled=true;
+    $("defer").textContent="下書きのため選択できません";
     const demoArea=$("demoArea");
     if(demoArea){demoArea.classList.remove("hidden");demoArea.querySelector(".demo-badge").textContent="下書きプレビューです。会員へはまだ送信されておらず、この画面では承認できません。";}
   }
