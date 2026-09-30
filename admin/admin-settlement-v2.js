@@ -212,15 +212,10 @@ function campaignProgressForPreview_(items,withdrawalDate){
   const m=String(first.target||"").match(/(\d{4})年(\d{1,2})月/);
   if(!m)return null;
   const suspensionCount=rows.filter(x=>String(x&&x.status||"").trim()==="休会").length;
-  const baseAchievementIndex=Number(m[1])*12+(Number(m[2])-1)+12;
-  const achievementIndex=baseAchievementIndex+suspensionCount;
+  const achievementIndex=Number(m[1])*12+(Number(m[2])-1)+12+suspensionCount;
   const withdrawalIndex=Number(w[1])*12+(Number(w[2])-1);
-  const baseRemaining=Math.max(0,baseAchievementIndex-withdrawalIndex);
-  const remaining=Math.max(0,achievementIndex-withdrawalIndex);
   return{
-    remaining:remaining,
-    baseRemaining:baseRemaining,
-    suspensionAdded:Math.max(0,remaining-baseRemaining),
+    remaining:Math.max(0,achievementIndex-withdrawalIndex),
     year:Math.floor(achievementIndex/12),
     month:(achievementIndex%12)+1,
     suspensionCount:suspensionCount
@@ -234,8 +229,7 @@ function buildMemberPreviewHtml_(){
   const campaignProgressHtml=campaignProgress
     ? `<div style="margin-top:9px;padding:11px 13px;border-radius:11px;background:#f8fbf9;border:1px solid #dfe9e3;font-size:13px;color:#294b3b">
         ${campaignProgress.remaining>0?`キャンペーン条件達成まで <strong>残り${campaignProgress.remaining}か月</strong>`:"<strong>キャンペーン条件達成済み</strong>"}
-        ${campaignProgress.suspensionCount>0?`（通常残り${campaignProgress.baseRemaining}か月＋休会加算${campaignProgress.suspensionAdded}か月）`:""}
-        <div style="margin-top:2px;color:#66746d;font-size:11px">達成月：${campaignProgress.year}年${campaignProgress.month}月　${campaignProgress.suspensionCount>0?`休会${campaignProgress.suspensionCount}か月分を加算`:"※今後休会がない場合"}</div>
+        <div style="margin-top:2px;color:#66746d;font-size:11px">達成月：${campaignProgress.year}年${campaignProgress.month}月　※今後追加の休会がない場合</div>
       </div>`
     : "";
   const rows=current.items.map(x=>`
