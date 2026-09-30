@@ -53,6 +53,9 @@ th{text-align:left;color:var(--muted);font-weight:700;background:#fbfcfb}
 .check label{font-size:13px}
 .btn{width:100%;border:0;border-radius:13px;padding:16px;background:var(--forest);color:white;font-size:16px;font-weight:900;cursor:pointer;margin-top:8px}
 .btn:disabled{opacity:.45}
+.btn-secondary{background:white;color:var(--forest);border:2px solid var(--forest)}
+.choice-note{margin:10px 0 0;padding:12px 13px;border-radius:11px;background:#fff8e8;border:1px solid #ead59d;color:#6f5310;font-size:12px;font-weight:700}
+.choice-note strong{display:block;margin-bottom:3px}
 .msg{font-size:13px;margin-top:12px}
 .error{color:var(--danger)}
 .ok{color:var(--forest2)}
@@ -132,6 +135,12 @@ a{color:var(--forest2)}
       <div class="check"><input id="c2" type="checkbox"><label id="c2Label" for="c2"></label></div>
       <div class="check"><input id="c3" type="checkbox"><label id="c3Label" for="c3"></label></div>
       <button id="approve" class="btn">この内容で承認する</button>
+      <button id="defer" class="btn btn-secondary">退会申請をキャンペーン条件達成まで見送る</button>
+      <div class="choice-note">
+        <strong>退会申請を見送る場合のご注意</strong>
+        今回の退会申請は見送りとなり、キャンペーン条件達成時に自動で退会にはなりません。<br>
+        ※キャンペーン条件達成後に退会をご希望の場合は、再度退会申請のお申し出が必要です。
+      </div>
       <div id="message" class="msg"></div>
     </section>
   </div>
@@ -211,6 +220,7 @@ async function load(){
     if(!d.ok)throw new Error(d.message||"精算内容を取得できませんでした。");
     settlement=d.data;
     if(settlement.status==="APPROVED"){showDone(settlement.approvedAt);return}
+    if(settlement.status==="DEFERRED"){showDeferred(settlement.deferredAt);return}
     renderSettlement();
   }catch(e){
     $("loading").textContent=e.message;
@@ -224,6 +234,8 @@ function showDone(at){
   $("status").textContent="承認済み";
   const bank=settlement&&settlement.paymentMethod==="BANK_TRANSFER";
   $("doneBank").classList.toggle("hidden",!bank);
+  $("done").querySelector(".done-mark").textContent="✓";
+  $("done").querySelector("h2").textContent="承認を受け付けました";
   if(bank){
     $("doneLead").textContent="精算内容への承認を受け付けました。続けて銀行振込をお願いいたします。";
     $("doneAmount").textContent=yen(settlement.total);
@@ -232,11 +244,27 @@ function showDone(at){
   }
   $("approvedAt").textContent=at?"承認日時："+at:"";
 }
+function showDeferred(at){
+  $("loading").classList.add("hidden");
+  $("main").classList.add("hidden");
+  $("done").classList.remove("hidden");
+  $("status").textContent="退会申請見送り";
+  $("doneBank").classList.add("hidden");
+  $("done").querySelector(".done-mark").textContent="✓";
+  $("done").querySelector("h2").textContent="退会申請の見送りを受け付けました";
+  $("doneLead").innerHTML="キャンペーン条件達成まで、今回の退会申請を見送ります。<br><strong>条件達成後に退会をご希望の場合は、再度退会申請のお申し出が必要です。</strong>";
+  $("approvedAt").textContent=at?"受付日時："+at:"";
+}
+function validateIdentity_(msg){
+  msg.className="msg";msg.textContent="";
+  if(!/^\d{6}$/.test($("memberNo").value.trim())){msg.classList.add("error");msg.textContent="会員番号は6桁の数字で入力してください。";return false}
+  if(!$("email").value.trim()){msg.classList.add("error");msg.textContent="登録メールアドレスを入力してください。";return false}
+  return true;
+}
+
 $("approve").addEventListener("click",async()=>{
   const btn=$("approve"),msg=$("message");
-  msg.className="msg";msg.textContent="";
-  if(!/^\d{6}$/.test($("memberNo").value.trim())){msg.classList.add("error");msg.textContent="会員番号は6桁の数字で入力してください。";return}
-  if(!$("email").value.trim()){msg.classList.add("error");msg.textContent="登録メールアドレスを入力してください。";return}
+  if(!validateIdentity_(msg))return;
   if(!$("c1").checked||!$("c2").checked||!$("c3").checked){msg.classList.add("error");msg.textContent="確認事項3項目すべてへの同意が必要です。";return}
   btn.disabled=true;btn.textContent="承認処理中…";
   try{
@@ -249,6 +277,32 @@ $("approve").addEventListener("click",async()=>{
     showDone(d.data&&d.data.approvedAt);
   }catch(e){
     msg.classList.add("error");msg.textContent=e.message;btn.disabled=false;btn.textContent="この内容で承認する";
+  }
+});
+
+$("defer").addEventListener("click",async()=>{
+  const btn=$("defer"),msg=$("message");
+  if(!validateIdentity_(msg))return;
+  if(!window.confirm("今回の退会申請をキャンペーン条件達成まで見送ります。\n\n条件達成後に退会をご希望の場合は、再度退会申請のお申し出が必要です。\n\nよろしいですか？"))return;
+  btn.disabled=true;btn.textContent="見送り受付中…";
+  $("approve").disabled=true;
+  try{
+    if(demo==="card"||demo==="bank"){
+      setTimeout(()=>showDeferred(new Date().toLocaleString("ja-JP")),250);
+      return;
+    }
+    const d=await api({
+      action:"deferTfgSettlement",
+      token,
+      memberNo:$("memberNo").value.trim(),
+      email:$("email").value.trim()
+    });
+    if(!d.ok)throw new Error(d.message||"退会申請の見送りを受け付けできませんでした。");
+    showDeferred(d.data&&d.data.deferredAt);
+  }catch(e){
+    msg.classList.add("error");msg.textContent=e.message;
+    btn.disabled=false;btn.textContent="退会申請をキャンペーン条件達成まで見送る";
+    $("approve").disabled=false;
   }
 });
 load();
