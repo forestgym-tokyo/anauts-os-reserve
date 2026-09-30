@@ -264,21 +264,25 @@ function sendTfgSettlementApproval_(body){
           ? "キャンペーン条件達成まで：残り"+campaignProgress.remainingMonths+"か月（達成月："+campaignProgress.achievementYear+"年"+campaignProgress.achievementMonth+"月）"
           : "キャンペーン条件：達成済み（達成月："+campaignProgress.achievementYear+"年"+campaignProgress.achievementMonth+"月）")
       : "";
+    const expiryText=Utilities.formatDate(tfgSettlementParseJst_(fresh.expiresAt),TFG_SETTLEMENT_CONFIG.TIMEZONE,"yyyy年M月d日 H:mm");
+    const paymentText=fresh.paymentMethod==="BANK_TRANSFER"?"お支払い方法：銀行振込":"お支払い方法：クレジットカード";
     const draftBody=[
       fresh.memberName+" 様",
       "",
       "The Forest Gymでございます。",
-      "精算内容をご確認いただくため、下記の専用URLへアクセスしてください。",
-      "精算金額との兼ね合いで、ご入会時のキャンペーン条件達成まで退会を見送る場合は、画面内の「キャンペーン条件達成まで見送る」をタップしてください。",
+      "この度、退会申請のお申し込みを頂きましたが、現時点ではご入会時のキャンペーン条件を満たしていないためご退会にあたり値引き分の精算が必要となります。",
+      "要精算内容をご確認いただくため、下記の専用URLへアクセスしてください。",
+      "要精算金額との兼ね合いで、ご入会時のキャンペーン条件達成まで退会を見送る場合は、画面内の「キャンペーン条件達成まで見送る」をタップしてください。",
       "",
       approvalUrl,
       "",
       "会員番号とご登録メールアドレスをご入力のうえ、内容をご確認ください。",
-      "そのうえで「この内容で承認する」または「キャンペーン条件達成まで見送る」を選択してください。",
+      "「この内容で承認する」または「キャンペーン条件達成まで見送る」を選択してください。",
+      "",
       campaignProgressLine,
       campaignProgress?"※表示の達成月は、今後追加の休会がない場合の目安です。":"",
-      "承認URLの有効期限："+Utilities.formatDate(tfgSettlementParseJst_(fresh.expiresAt),TFG_SETTLEMENT_CONFIG.TIMEZONE,"yyyy年M月d日 H:mm"),
-      fresh.paymentMethod==="BANK_TRANSFER"?"お支払い方法：銀行振込":"お支払い方法：クレジットカード",
+      "承認URLの有効期限："+expiryText,
+      paymentText,
       "",
       fresh.paymentMethod==="BANK_TRANSFER"?"【お振込先】":"",
       fresh.paymentMethod==="BANK_TRANSFER"?(TFG_SETTLEMENT_CONFIG.BANK_NAME+" "+TFG_SETTLEMENT_CONFIG.BANK_BRANCH):"",
@@ -289,7 +293,41 @@ function sendTfgSettlementApproval_(body){
       "※精算内容に相違がある場合は承認せず、info@theforestgym.comまでお問い合わせください。",
       "",
       "The Forest Gym"
-    ].join("\n");
+    ].filter(function(line){return line!==""||true;}).join("\n");
+
+    const escHtml=function(value){
+      return String(value==null?"":value)
+        .replace(/&/g,"&amp;")
+        .replace(/</g,"&lt;")
+        .replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;")
+        .replace(/'/g,"&#39;");
+    };
+    const bankHtml=fresh.paymentMethod==="BANK_TRANSFER"
+      ? '<p style="margin:18px 0 6px;font-weight:700">【お振込先】</p>'
+        +'<p style="margin:0 0 16px">'+escHtml(TFG_SETTLEMENT_CONFIG.BANK_NAME+" "+TFG_SETTLEMENT_CONFIG.BANK_BRANCH)
+        +'<br>'+escHtml(TFG_SETTLEMENT_CONFIG.BANK_ACCOUNT_TYPE+" "+TFG_SETTLEMENT_CONFIG.BANK_ACCOUNT_NO)
+        +'<br>'+escHtml(TFG_SETTLEMENT_CONFIG.BANK_ACCOUNT_NAME)
+        +'<br><span style="font-size:13px">※口座振替会員様は、承認後に上記口座へのお振込みが必要です。</span></p>'
+      : '';
+    const campaignHtml=campaignProgressLine
+      ? '<p style="margin:18px 0 0;font-weight:700">'+escHtml(campaignProgressLine)+'</p>'
+        +(campaignProgress?'<p style="margin:4px 0 16px;font-size:13px;color:#5f6d66">※表示の達成月は、今後追加の休会がない場合の目安です。</p>':'')
+      : '';
+    const draftHtml=[
+      '<div style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Noto Sans JP,Arial,sans-serif;color:#17231d;line-height:1.8;font-size:14px">',
+      '<p>'+escHtml(fresh.memberName)+' 様</p>',
+      '<p>The Forest Gymでございます。<br>この度、退会申請のお申し込みを頂きましたが、現時点ではご入会時のキャンペーン条件を満たしていないためご退会にあたり値引き分の精算が必要となります。</p>',
+      '<p>要精算内容をご確認いただくため、下記のボタンより専用ページへアクセスしてください。<br>要精算金額との兼ね合いで、ご入会時のキャンペーン条件達成まで退会を見送る場合は、画面内の「キャンペーン条件達成まで見送る」をタップしてください。</p>',
+      '<div style="margin:24px 0"><a href="'+escHtml(approvalUrl)+'" style="display:inline-block;background:#0b3b2a;color:#ffffff;text-decoration:none;font-weight:700;padding:13px 24px;border-radius:9px">要精算内容を確認する</a></div>',
+      '<p>会員番号とご登録メールアドレスをご入力のうえ、内容をご確認ください。<br>「この内容で承認する」または「キャンペーン条件達成まで見送る」を選択してください。</p>',
+      campaignHtml,
+      '<p>承認URLの有効期限：'+escHtml(expiryText)+'<br>'+escHtml(paymentText)+'</p>',
+      bankHtml,
+      '<p style="margin-top:20px">※精算内容に相違がある場合は承認せず、info@theforestgym.comまでお問い合わせください。</p>',
+      '<p>The Forest Gym</p>',
+      '</div>'
+    ].join("");
 
     const gmailDraft=GmailApp.createDraft(
       fresh.email,
@@ -297,7 +335,8 @@ function sendTfgSettlementApproval_(body){
       draftBody,
       {
         name:"The Forest Gym",
-        replyTo:TFG_SETTLEMENT_CONFIG.ADMIN_EMAIL
+        replyTo:TFG_SETTLEMENT_CONFIG.ADMIN_EMAIL,
+        htmlBody:draftHtml
       }
     );
 
