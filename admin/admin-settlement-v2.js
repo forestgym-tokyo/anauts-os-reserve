@@ -204,10 +204,34 @@ function draftToken(){
 function escapePreview_(value){
   return String(value==null?"":value).replace(/[&<>"']/g,s=>({"&":"&amp;","<":"&lt;",">":"&gt;","\\":"&#92;","\"":"&quot;","'":"&#39;"}[s]||s));
 }
+function campaignProgressForPreview_(items,withdrawalDate){
+  const rows=Array.isArray(items)?items:[];
+  const first=rows.find(x=>String(x&&x.label||"").trim()==="初月会費"&&/(\d{4})年(\d{1,2})月/.test(String(x&&x.target||"")));
+  const w=String(withdrawalDate||"").match(/^(\d{4})-(\d{2})-/);
+  if(!first||!w)return null;
+  const m=String(first.target||"").match(/(\d{4})年(\d{1,2})月/);
+  if(!m)return null;
+  const suspensionCount=rows.filter(x=>String(x&&x.status||"").trim()==="休会").length;
+  const achievementIndex=Number(m[1])*12+(Number(m[2])-1)+12+suspensionCount;
+  const withdrawalIndex=Number(w[1])*12+(Number(w[2])-1);
+  return{
+    remaining:Math.max(0,achievementIndex-withdrawalIndex),
+    year:Math.floor(achievementIndex/12),
+    month:(achievementIndex%12)+1,
+    suspensionCount:suspensionCount
+  };
+}
 function buildMemberPreviewHtml_(){
   if(!current)return "";
   const total=current.items.reduce((s,x)=>s+Number(x.settlement||0),0);
   const bank=current.paymentMethod==="BANK_TRANSFER";
+  const campaignProgress=campaignProgressForPreview_(current.items,current.withdrawalDate);
+  const campaignProgressHtml=campaignProgress
+    ? `<div style="margin-top:9px;padding:11px 13px;border-radius:11px;background:#f8fbf9;border:1px solid #dfe9e3;font-size:13px;color:#294b3b">
+        ${campaignProgress.remaining>0?`キャンペーン条件達成まで <strong>残り${campaignProgress.remaining}か月</strong>`:"<strong>キャンペーン条件達成済み</strong>"}
+        <div style="margin-top:2px;color:#66746d;font-size:11px">達成月：${campaignProgress.year}年${campaignProgress.month}月　※今後追加の休会がない場合</div>
+      </div>`
+    : "";
   const rows=current.items.map(x=>`
     <tr>
       <td style="padding:10px 6px;border-bottom:1px solid #e2e9e5;font-size:12px">${escapePreview_(x.target||"—")}</td>
@@ -255,6 +279,7 @@ function buildMemberPreviewHtml_(){
           <div style="display:flex;justify-content:space-between;align-items:end;margin-top:17px;padding:17px 18px;background:#eef6f1;border:1px solid #cfe1d7;border-radius:14px">
             <span style="font-size:12px;color:#496258">今回のご精算金額</span><strong style="font-size:30px;color:#0b3b2a">${yen(total)}</strong>
           </div>
+          ${campaignProgressHtml}
           ${payment}
         </div>
         <div style="background:#fff;border:1px solid #dce6e0;border-radius:18px;padding:20px;margin-bottom:14px">
@@ -268,6 +293,7 @@ function buildMemberPreviewHtml_(){
           <div style="padding:12px;background:#fafcfb;border:1px solid #e0e8e3;border-radius:12px;margin-bottom:10px">☐ ${bank?"表示された精算金額を、承認後に指定口座へ一括で振り込むことに同意します。":"表示された精算金額を、登録済みクレジットカードで一括決済することに同意します。"}</div>
           <div style="padding:12px;background:#fafcfb;border:1px solid #e0e8e3;border-radius:12px;margin-bottom:12px">☐ ${bank?"振込確認ができない場合、退会手続きが完了しないことを理解しました。":"クレジットカード決済が完了しない場合、退会手続きが完了しないことを理解しました。"}</div>
           <button disabled style="width:100%;border:0;border-radius:13px;padding:16px;background:#0b3b2a;color:#fff;font-size:16px;font-weight:900;opacity:.5">下書きプレビューのため承認できません</button>
+          <button disabled style="width:100%;border:2px solid #0b3b2a;border-radius:13px;padding:16px;background:#fff;color:#0b3b2a;font-size:16px;font-weight:900;opacity:.5;margin-top:8px">キャンペーン条件達成まで見送る</button>
         </div>
       </div>
     </div>`;
