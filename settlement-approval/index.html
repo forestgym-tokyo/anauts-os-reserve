@@ -210,16 +210,11 @@ function renderCampaignRemaining_(){
   if(!el)return;
   const p=campaignProgress_(settlement&&settlement.items,settlement&&settlement.withdrawalDate);
   if(!p){el.classList.add("hidden");el.innerHTML="";return;}
-  const main=p.remaining>0
-    ? `キャンペーン条件達成まで <strong>残り${p.remaining}か月</strong>`
-    : `<strong>キャンペーン条件達成済み</strong>`;
-  const breakdown=p.suspensionCount>0
-    ? `（通常残り${p.baseRemaining}か月＋休会加算${p.suspensionAdded}か月）`
-    : "";
-  const suspensionNote=p.suspensionCount>0
-    ? `休会${p.suspensionCount}か月分を条件達成までの期間に加算しています。`
-    : "※今後休会がない場合";
-  el.innerHTML=`${main}${breakdown}<span class="sub">達成月：${p.achievementYear}年${p.achievementMonth}月　${suspensionNote}</span>`;
+  if(p.remaining>0){
+    el.innerHTML=`キャンペーン条件達成まで：<strong>残り${p.remaining}か月</strong>　達成月：${p.achievementYear}年${p.achievementMonth}月<span class="sub">現時点までの休会期間は加味されています。</span>`;
+  }else{
+    el.innerHTML=`<strong>キャンペーン条件達成済み</strong>　達成月：${p.achievementYear}年${p.achievementMonth}月<span class="sub">現時点までの休会期間は加味されています。</span>`;
+  }
   el.classList.remove("hidden");
 }
 function renderSettlement(){
