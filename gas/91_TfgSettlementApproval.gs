@@ -158,11 +158,18 @@ function createTfgSettlement_(body){
     const now=new Date();
     const withdrawalDate=tfgSettlementWithdrawalDate_(now);
     const items=Array.isArray(body.items)?body.items:[];
+    const joinDate=String(body.joinDate||"").trim();
+    const plan=String(body.plan||"").trim().toUpperCase();
+    const legacyFlatPlan=joinDate&&joinDate<"2026-03-01"&&["DAY","NIGHT365"].indexOf(plan)>=0;
+    const legacyNormalMonthly=plan==="NIGHT365"?3300:(plan==="DAY"?4180:0);
     const paymentMethod=tfgSettlementNormalizePaymentMethod_(body.paymentMethod);
     if(!/^\d{6}$/.test(memberNo))throw new Error("会員番号は6桁の数字で入力してください。");
     if(!memberName||!/^\S+@\S+\.\S+$/.test(email)||!items.length)throw new Error("氏名・メール・精算明細が必要です。");
     const beforeFinalMonthCharge=tfgSettlementIsBeforeMonthlyCharge_(now);
-    const normalized=items.map(function(x){
+    const sourceItems=legacyFlatPlan
+      ? items.filter(function(x){return String((x&&x.label)||"").trim()!=="選べる特典";})
+      : items;
+    const normalized=sourceItems.map(function(x){
       let normal=Number(x.normal||0);
       let paid=Number(x.paid||0);
       if(!Number.isFinite(normal)||!Number.isFinite(paid)||normal<0||paid<0)throw new Error("精算明細の金額が不正です。");
@@ -173,6 +180,12 @@ function createTfgSettlement_(body){
       if(status==="休会"){
         normal=550;
         paid=550;
+        settlement=0;
+      }else if(legacyFlatPlan&&String(x.label||"").trim()==="初月会費"){
+        normal=paid;
+        settlement=0;
+      }else if(legacyFlatPlan&&String(x.label||"").trim()==="月会費"){
+        normal=legacyNormalMonthly;
         settlement=0;
       }else if(paymentSequence!==null&&paymentSequence>12){
         settlement=0;
