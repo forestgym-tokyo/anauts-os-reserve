@@ -257,7 +257,7 @@ function buildMemberPreviewHtml_(){
       <div style="background:linear-gradient(135deg,#0b3b2a,#0f5138);color:#fff;padding:28px 22px 34px">
         <div style="font-size:13px;font-weight:800">The Forest Gym</div>
         <h1 style="margin:18px 0 5px;font-size:27px">退会精算明細</h1>
-        <p style="margin:0;color:#dcebe4;font-size:13px">退会に伴う精算内容をご確認のうえ、本人確認と承認をお願いいたします。</p>
+        <p style="margin:0;color:#dcebe4;font-size:13px">退会に伴う精算内容をご確認のうえ、「この内容で承認する」または「キャンペーン条件達成まで見送る」を選択してください。</p>
       </div>
       <div style="padding:16px">
         <div style="background:#fff;border:1px solid #dce6e0;border-radius:18px;padding:20px;margin-bottom:14px">
@@ -294,6 +294,10 @@ function buildMemberPreviewHtml_(){
           <div style="padding:12px;background:#fafcfb;border:1px solid #e0e8e3;border-radius:12px;margin-bottom:12px">☐ ${bank?"振込確認ができない場合、退会手続きが完了しないことを理解しました。":"クレジットカード決済が完了しない場合、退会手続きが完了しないことを理解しました。"}</div>
           <button disabled style="width:100%;border:0;border-radius:13px;padding:16px;background:#0b3b2a;color:#fff;font-size:16px;font-weight:900;opacity:.5">下書きプレビューのため承認できません</button>
           <button disabled style="width:100%;border:2px solid #0b3b2a;border-radius:13px;padding:16px;background:#fff;color:#0b3b2a;font-size:16px;font-weight:900;opacity:.5;margin-top:8px">キャンペーン条件達成まで見送る</button>
+          <div style="margin-top:10px;padding:12px 13px;border-radius:11px;background:#fff8e8;border:1px solid #ead59d;color:#6f5310;font-size:12px;font-weight:700">
+            今回の退会申請は見送りとなり、キャンペーン条件達成時に自動で退会にはなりません。<br>
+            ※条件達成後に退会をご希望の場合は、再度退会申請のお申し出が必要です。
+          </div>
         </div>
       </div>
     </div>`;
