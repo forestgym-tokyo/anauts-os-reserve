@@ -4,7 +4,7 @@ const yen=n=>Number(n||0).toLocaleString("ja-JP")+"円";
 const planRates={
   REGULAR:{after202603:{normal:7480,campaign:4950},before202603:{normal:7260,campaign:4840}},
   DAY:{after202603:{normal:6050,campaign:4180},before202603:{normal:4180,campaign:4180}},
-  NIGHT365:{after202603:{normal:4950,campaign:3300},before202603:{normal:4950,campaign:3300}}
+  NIGHT365:{after202603:{normal:4950,campaign:3300},before202603:{normal:3300,campaign:3300}}
 };
 let current=null;
 let draft=null;
