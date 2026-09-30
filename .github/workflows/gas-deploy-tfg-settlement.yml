@@ -62,6 +62,8 @@ jobs:
           grep -q 'function getTfgSettlementMember_' .gas-live/91_TfgSettlementApproval.js
           grep -q 'case "getTfgSettlementMember"' .gas-live/99_Main.js
           grep -q 'function createTfgSettlement_' .gas-live/91_TfgSettlementApproval.js
+          grep -q 'function deferTfgSettlement_' .gas-live/91_TfgSettlementApproval.js
+          grep -q 'case "deferTfgSettlement"' .gas-live/99_Main.js
           echo "TFG settlement overlay verified."
 
       - name: Push preserved live source plus TFG settlement changes
