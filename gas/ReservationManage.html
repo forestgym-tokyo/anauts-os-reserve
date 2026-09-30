@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <style>
+    :root {
+      --bg: #f4f5f5;
+      --card: #ffffff;
+      --text: #171919;
+      --muted: #656a6a;
+      --line: #dfe3e3;
+      --primary: #111414;
+      --danger: #b42318;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        "Noto Sans JP",
+        sans-serif;
+    }
+
+    .wrap {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 24px 16px 48px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 22px;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      font-size: 22px;
+      margin: 0 0 20px;
+    }
+
+    h2 {
+      font-size: 17px;
+      margin: 0 0 14px;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 110px 1fr;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid #eef0f0;
+    }
+
+    .row:last-child {
+      border-bottom: 0;
+    }
+
+    .label {
+      color: var(--muted);
+    }
+
+    .value {
+      font-weight: 600;
+    }
+
+    .notice {
+      padding: 14px;
+      border-radius: 10px;
+      background: #f7f7f7;
+      line-height: 1.65;
+      margin: 14px 0;
+    }
+
+    .notice.warning {
+      background: #fff4e5;
+    }
+
+    .notice.danger {
+      background: #fff1f0;
+    }
+
+    button {
+      width: 100%;
+      border: 0;
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    button.primary {
+      background: var(--primary);
+      color: white;
+    }
+
+    button.secondary {
+      background: #e9ecec;
+      color: #1b1d1d;
+    }
+
+    button.danger {
+      background: var(--danger);
+      color: white;
+    }
+
+    button:disabled {
+      opacity: .45;
+      cursor: default;
+    }
+
+    input,
+    select {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #cfd4d4;
+      border-radius: 9px;
+      background: white;
+      font-size: 16px;
+      margin-top: 8px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .status {
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .small {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px 12px;
+      color: var(--muted);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+
+    <div id="adminBanner" class="card hidden" style="background:#eefaf2;border-color:#b7e4c7">
+      <strong>管理者用予約管理</strong>
+      <div class="small" style="margin-top:6px">管理通知メールから開いています。変更・キャンセルは管理者操作として記録されます。</div>
+    </div>
+
+    <div id="loading" class="card loading">
+      予約情報を読み込んでいます…
+    </div>
+
+    <div id="main" class="hidden">
+
+      <div class="card">
+        <h1>予約内容の確認・変更・キャンセル</h1>
+
+        <div id="statusText" class="status"></div>
+
+        <div class="row">
+          <div class="label">サービス</div>
+          <div id="serviceName" class="value"></div>
+        </div>
+
+        <div class="row">
+          <div class="label">日時</div>
+          <div id="dateTime" class="value"></div>
+        </div>
+
+        <div class="row">
+          <div class="label">担当</div>
+          <div id="staffName" class="value"></div>
+        </div>
+      </div>
+
+
+      <div id="changeCard" class="card hidden">
+        <h2>予約を変更する</h2>
+
+        <label>
+          変更日
+          <input
+            id="changeDate"
+            type="date"
+          >
+        </label>
+
+        <button
+          class="secondary"
+          onclick="loadSlots()"
+        >
+          空き時間を表示
+        </button>
+
+        <div
+          id="slotArea"
+          class="hidden"
+          style="margin-top:14px"
+        >
+          <label>
+            空き時間
+            <select
+              id="slotSelect"
+              onchange="updateTrainerSelection()"
+            ></select>
+          </label>
+
+          <div
+            id="trainerArea"
+            class="hidden"
+            style="margin-top:14px"
+          >
+            <label>
+              担当トレーナー
+              <select
+                id="trainerSelect"
+                onchange="updateChangeButtonState()"
+              ></select>
+            </label>
+
+            <div
+              id="trainerMessage"
+              class="small"
+              style="margin-top:8px"
+            ></div>
+          </div>
+
+          <button
+            id="changeSubmitButton"
+            class="primary"
+            onclick="submitChange()"
+          >
+            この日時に変更
+          </button>
+        </div>
+
+        <div
+          id="changeMessage"
+          class="small"
+          style="margin-top:12px"
+        ></div>
+      </div>
+
+
+      <div id="changeClosedCard" class="card hidden">
+        <h2>予約変更</h2>
+        <div class="notice">
+          予約変更受付期限を過ぎているため、オンラインでの変更はできません。
+        </div>
+      </div>
+
+
+      <div id="cancelCard" class="card hidden">
+        <h2>予約をキャンセルする</h2>
+
+        <div
+          id="cancelWarning"
+          class="notice warning hidden"
+        >
+          キャンセル受付期限を過ぎています。<br>
+          この予約をキャンセルした場合、1回分が消化となります。<br>
+          予約日時に受講される場合は、キャンセルせずそのままお越しください。
+        </div>
+
+        <button
+          class="danger"
+          onclick="openCancelConfirm()"
+        >
+          キャンセルする
+        </button>
+      </div>
+
+
+      <div id="cancelConfirmCard" class="card hidden">
+        <h2>キャンセルの確認</h2>
+
+        <div
+          id="cancelConfirmNormal"
+          class="notice"
+        >
+          この予約をキャンセルします。
+        </div>
+
+        <div
+          id="cancelConfirmLate"
+          class="notice warning hidden"
+        >
+          キャンセル受付期限を過ぎています。<br>
+          この予約をキャンセルした場合、1回分が消化となります。<br>
+          予約日時に受講される場合は、キャンセルせずそのままお越しください。
+        </div>
+
+        <button
+          class="secondary"
+          onclick="closeCancelConfirm()"
+        >
+          予約に戻る
+        </button>
+
+        <button
+          id="cancelSubmitButton"
+          class="danger"
+          onclick="submitCancel()"
+        >
+          キャンセルする
+        </button>
+      </div>
+
+
+      <div
+        id="resultCard"
+        class="card hidden"
+      >
+        <h2 id="resultTitle"></h2>
+        <div
+          id="resultMessage"
+          class="notice"
+        ></div>
+      </div>
+
+    </div>
+  </div>
+
+
+  <script>
+    const reservationId =
+      <?!= JSON.stringify(reservationId) ?>;
+
+    const token =
+      <?!= JSON.stringify(token) ?>;
+
+    const manageMode =
+      <?!= JSON.stringify(manageMode || "CUSTOMER") ?>;
+
+    const isAdminMode =
+      manageMode === "ADMIN";
+
+    let currentData = null;
+    let suppressChangeCardOnce = false;
+    let currentSlots = [];
+
+
+    function init() {
+
+      const runner =
+        google.script.run
+          .withSuccessHandler(
+            renderReservation
+          )
+          .withFailureHandler(
+            showFatalError
+          );
+
+      if (isAdminMode) {
+        runner.getAdminReservationManageData(
+          reservationId,
+          token
+        );
+      } else {
+        runner.getReservationManageData(
+          reservationId,
+          token
+        );
+      }
+    }
+
+
+    function renderReservation(data) {
+
+      currentData = data;
+
+      document
+        .getElementById("loading")
+        .classList.add("hidden");
+
+      document
+        .getElementById("main")
+        .classList.remove("hidden");
+
+      if (isAdminMode) {
+        document
+          .getElementById("adminBanner")
+          .classList.remove("hidden");
+      }
+
+      document
+        .getElementById("serviceName")
+        .textContent =
+          data.service_name || "-";
+
+      document
+        .getElementById("dateTime")
+        .textContent =
+          `${data.date} ${data.start_time}〜${data.end_time}`;
+
+      document
+        .getElementById("staffName")
+        .textContent =
+          data.staff_name || "-";
+
+      document
+        .getElementById("statusText")
+        .textContent =
+          statusLabel(data.status);
+
+
+      if (
+        data.status === "RESERVED" ||
+        data.status === "CONFIRMED"
+      ) {
+
+        if (data.can_change) {
+
+          if (suppressChangeCardOnce) {
+            suppressChangeCardOnce = false;
+          } else {
+            document
+              .getElementById("changeCard")
+              .classList.remove("hidden");
+
+            document
+              .getElementById("changeDate")
+              .value =
+                data.date;
+          }
+
+        } else {
+          document
+            .getElementById("changeClosedCard")
+            .classList.remove("hidden");
+        }
+
+        if (data.can_cancel) {
+
+          document
+            .getElementById("cancelCard")
+            .classList.remove("hidden");
+
+          if (
+            data.cancel_deadline_passed &&
+            data.is_personal
+          ) {
+
+            document
+              .getElementById("cancelWarning")
+              .classList.remove("hidden");
+          }
+        }
+      }
+    }
+
+
+    function statusLabel(status) {
+
+      const labels = {
+        RESERVED:
+          "予約済み",
+
+        CONFIRMED:
+          "予約済み",
+
+        CANCELLED:
+          "キャンセル済み",
+
+        CONSUMED:
+          "消化"
+      };
+
+      return labels[status] || status;
+    }
+
+
+    function loadSlots() {
+
+      const date =
+        document
+          .getElementById("changeDate")
+          .value;
+
+      if (!date) {
+        return;
+      }
+
+      currentSlots = [];
+
+      const trainerArea =
+        document.getElementById(
+          "trainerArea"
+        );
+
+      if (trainerArea) {
+        trainerArea.classList.add(
+          "hidden"
+        );
+      }
+
+      const message =
+        document
+          .getElementById("changeMessage");
+
+      message.textContent =
+        "空き時間を確認しています…";
+
+      google.script.run
+        .withSuccessHandler(
+          function(result) {
+
+            const area =
+              document
+                .getElementById("slotArea");
+
+            const select =
+              document
+                .getElementById("slotSelect");
+
+            select.innerHTML = "";
+
+            if (
+              !result.ok ||
+              !result.data ||
+              !Array.isArray(
+                result.data.slots
+              ) ||
+              result.data.slots.length === 0
+            ) {
+
+              area.classList.add(
+                "hidden"
+              );
+
+              message.textContent =
+                "選択した日に予約可能な時間はありません。";
+
+              return;
+            }
+
+            currentSlots =
+              result.data.slots;
+
+            currentSlots.forEach(
+              function(slot, index) {
+
+                const option =
+                  document.createElement(
+                    "option"
+                  );
+
+                option.value =
+                  String(index);
+
+                option.textContent =
+                  `${slot.start_time}〜${slot.end_time}`;
+
+                select.appendChild(
+                  option
+                );
+              }
+            );
+
+            area.classList.remove(
+              "hidden"
+            );
+
+            message.textContent = "";
+
+            updateTrainerSelection();
+          }
+        )
+        .withFailureHandler(
+          function(error) {
+            message.textContent =
+              error.message ||
+              "空き時間を取得できませんでした。";
+          }
+        )
+        [isAdminMode
+          ? "getAdminReservationManageSlots"
+          : "getReservationManageSlots"](
+          reservationId,
+          token,
+          date
+        );
+    }
+
+
+    function getSelectedSlot() {
+
+      const select =
+        document.getElementById(
+          "slotSelect"
+        );
+
+      if (
+        !select ||
+        select.value === ""
+      ) {
+        return null;
+      }
+
+      const index =
+        Number(
+          select.value
+        );
+
+      if (
+        !Number.isInteger(index) ||
+        index < 0 ||
+        index >= currentSlots.length
+      ) {
+        return null;
+      }
+
+      return currentSlots[index];
+    }
+
+
+    function trainerLabel(trainer) {
+
+      const name =
+        String(
+          trainer.display_name ||
+          trainer.staff_name ||
+          trainer.staff_code ||
+          ""
+        ).trim();
+
+      if (!name) {
+        return "";
+      }
+
+      return name.endsWith(
+        "トレーナー"
+      )
+        ? name
+        : name + "トレーナー";
+    }
+
+
+    function updateTrainerSelection() {
+
+      const area =
+        document.getElementById(
+          "trainerArea"
+        );
+
+      const select =
+        document.getElementById(
+          "trainerSelect"
+        );
+
+      const message =
+        document.getElementById(
+          "trainerMessage"
+        );
+
+      if (
+        !area ||
+        !select ||
+        !message
+      ) {
+        return;
+      }
+
+      select.innerHTML = "";
+      message.textContent = "";
+
+      if (
+        !currentData ||
+        !currentData.is_personal
+      ) {
+        area.classList.add(
+          "hidden"
+        );
+        updateChangeButtonState();
+        return;
+      }
+
+      const slot =
+        getSelectedSlot();
+
+      const candidates =
+        slot &&
+        Array.isArray(
+          slot.trainer_candidates
+        )
+          ? slot.trainer_candidates
+          : [];
+
+      area.classList.remove(
+        "hidden"
+      );
+
+      if (candidates.length === 0) {
+
+        const option =
+          document.createElement(
+            "option"
+          );
+
+        option.value = "";
+        option.textContent =
+          "対応可能なトレーナーがいません";
+
+        select.appendChild(
+          option
+        );
+
+        message.textContent =
+          "別の日時を選択してください。";
+
+        updateChangeButtonState();
+        return;
+      }
+
+      if (candidates.length === 1) {
+
+        const trainer =
+          candidates[0];
+
+        const option =
+          document.createElement(
+            "option"
+          );
+
+        option.value =
+          trainer.staff_code;
+
+        option.textContent =
+          trainerLabel(
+            trainer
+          );
+
+        select.appendChild(
+          option
+        );
+
+        select.value =
+          trainer.staff_code;
+
+        message.textContent =
+          "この日時は上記トレーナーが担当します。";
+
+        updateChangeButtonState();
+        return;
+      }
+
+      const placeholder =
+        document.createElement(
+          "option"
+        );
+
+      placeholder.value = "";
+      placeholder.textContent =
+        "担当トレーナーを選択してください";
+
+      select.appendChild(
+        placeholder
+      );
+
+      candidates.forEach(
+        function(trainer) {
+
+          const option =
+            document.createElement(
+              "option"
+            );
+
+          option.value =
+            trainer.staff_code;
+
+          option.textContent =
+            trainerLabel(
+              trainer
+            );
+
+          select.appendChild(
+            option
+          );
+        }
+      );
+
+      select.value = "";
+
+      message.textContent =
+        "この日時は複数のトレーナーが対応可能です。予約を確定する前に担当トレーナーを選択してください。";
+
+      updateChangeButtonState();
+    }
+
+
+    function updateChangeButtonState() {
+
+      const button =
+        document.getElementById(
+          "changeSubmitButton"
+        );
+
+      if (!button) {
+        return;
+      }
+
+      if (
+        !currentData ||
+        !currentData.is_personal
+      ) {
+        button.disabled = false;
+        return;
+      }
+
+      const trainerSelect =
+        document.getElementById(
+          "trainerSelect"
+        );
+
+      button.disabled =
+        !trainerSelect ||
+        !trainerSelect.value;
+    }
+
+
+    function submitChange() {
+
+      const date =
+        document
+          .getElementById("changeDate")
+          .value;
+
+      const selectedSlot =
+        getSelectedSlot();
+
+      const startTime =
+        selectedSlot
+          ? selectedSlot.start_time
+          : "";
+
+      const trainerCode =
+        currentData &&
+        currentData.is_personal
+          ? document
+              .getElementById(
+                "trainerSelect"
+              )
+              .value
+          : "";
+
+      if (
+        !date ||
+        !startTime
+      ) {
+        return;
+      }
+
+      if (
+        currentData &&
+        currentData.is_personal &&
+        !trainerCode
+      ) {
+        const changeMessage =
+          document.getElementById(
+            "changeMessage"
+          );
+
+        if (changeMessage) {
+          changeMessage.textContent =
+            "担当トレーナーを選択してください。";
+        }
+
+        return;
+      }
+
+      const changeButton =
+        document.getElementById(
+          "changeSubmitButton"
+        );
+
+      if (
+        changeButton &&
+        changeButton.disabled
+      ) {
+        return;
+      }
+
+      if (changeButton) {
+        changeButton.disabled = true;
+        changeButton.textContent =
+          "この日時に変更中…";
+      }
+
+      const changeMessage =
+        document.getElementById(
+          "changeMessage"
+        );
+
+      if (changeMessage) {
+        changeMessage.textContent =
+          "予約を変更しています…";
+      }
+
+      google.script.run
+        .withSuccessHandler(
+          function(result) {
+
+            if (!result.ok) {
+
+              if (changeButton) {
+                changeButton.disabled = false;
+                changeButton.textContent =
+                  "この日時に変更";
+              }
+
+              showResult(
+                "変更できませんでした",
+                result.message ||
+                "予約変更に失敗しました。"
+              );
+              return;
+            }
+
+            /*
+             * 変更完了直後の再描画では、
+             * 「この日時に変更」フォームを再表示しない。
+             */
+            suppressChangeCardOnce = true;
+
+            document
+              .getElementById(
+                "changeCard"
+              )
+              .classList.add(
+                "hidden"
+              );
+
+            showResult(
+              "予約を変更しました",
+              `${result.data.date} ${result.data.start_time}〜${result.data.end_time}` +
+              (
+                result.data.staff_name
+                  ? `\n担当: ${result.data.staff_name}`
+                  : ""
+              )
+            );
+
+            refresh();
+          }
+        )
+        .withFailureHandler(
+          function(error) {
+
+            if (changeButton) {
+              changeButton.disabled = false;
+              changeButton.textContent =
+                "この日時に変更";
+            }
+
+            showResult(
+              "変更できませんでした",
+              error.message ||
+              "予約変更に失敗しました。"
+            );
+          }
+        )
+        [isAdminMode
+          ? "updateReservationFromAdminManagePage"
+          : "updateReservationFromManagePage"]({
+          reservation_id:
+            reservationId,
+
+          token:
+            token,
+
+          date:
+            date,
+
+          start_time:
+            startTime,
+
+          staff_code:
+            trainerCode
+        });
+    }
+
+
+    function openCancelConfirm() {
+
+      const late =
+        !isAdminMode &&
+        currentData &&
+        currentData.cancel_deadline_passed &&
+        currentData.is_personal;
+
+      document
+        .getElementById(
+          "cancelConfirmNormal"
+        )
+        .classList.toggle(
+          "hidden",
+          !!late
+        );
+
+      document
+        .getElementById(
+          "cancelConfirmLate"
+        )
+        .classList.toggle(
+          "hidden",
+          !late
+        );
+
+      document
+        .getElementById(
+          "cancelConfirmCard"
+        )
+        .classList.remove(
+          "hidden"
+        );
+
+      document
+        .getElementById(
+          "cancelCard"
+        )
+        .classList.add(
+          "hidden"
+        );
+    }
+
+
+    function closeCancelConfirm() {
+
+      document
+        .getElementById(
+          "cancelConfirmCard"
+        )
+        .classList.add(
+          "hidden"
+        );
+
+      document
+        .getElementById(
+          "cancelCard"
+        )
+        .classList.remove(
+          "hidden"
+        );
+    }
+
+
+    function submitCancel() {
+
+      const cancelButton =
+        document.getElementById(
+          "cancelSubmitButton"
+        );
+
+      if (
+        cancelButton &&
+        cancelButton.disabled
+      ) {
+        return;
+      }
+
+      if (cancelButton) {
+        cancelButton.disabled = true;
+        cancelButton.textContent =
+          "キャンセル処理中…";
+      }
+
+      showResult(
+        "キャンセル処理中…",
+        "予約のキャンセル処理を行っています。しばらくお待ちください。"
+      );
+
+      google.script.run
+        .withSuccessHandler(
+          function(result) {
+
+            if (!result.ok) {
+
+              if (cancelButton) {
+                cancelButton.disabled = false;
+                cancelButton.textContent =
+                  "キャンセルする";
+              }
+
+              const code =
+                result && result.code
+                  ? String(result.code)
+                  : "";
+
+              const detail =
+                result &&
+                result.data &&
+                result.data.message
+                  ? String(result.data.message)
+                  : (
+                      result &&
+                      result.details &&
+                      result.details.message
+                        ? String(result.details.message)
+                        : ""
+                    );
+
+              let raw = "";
+              try {
+                raw = JSON.stringify(result);
+              } catch (e) {
+                raw = String(result || "");
+              }
+
+              showResult(
+                "キャンセルできませんでした",
+                (result.message ||
+                  "キャンセル処理に失敗しました。") +
+                (code
+                  ? "\nコード: " + code
+                  : "") +
+                (detail
+                  ? "\n詳細: " + detail
+                  : "") +
+                "\n応答: " + raw
+              );
+              return;
+            }
+
+            const consumed =
+              result.data &&
+              result.data.status ===
+                "CONSUMED";
+
+            showResult(
+              consumed
+                ? "キャンセルを受け付けました"
+                : "予約をキャンセルしました",
+
+              consumed
+                ? "キャンセル受付期限を過ぎているため、1回分が消化となりました。"
+                : "キャンセルが完了しました。"
+            );
+
+            refresh();
+          }
+        )
+        .withFailureHandler(
+          function(error) {
+
+            if (cancelButton) {
+              cancelButton.disabled = false;
+              cancelButton.textContent =
+                "キャンセルする";
+            }
+
+            showResult(
+              "キャンセルできませんでした",
+              error.message ||
+              "キャンセル処理に失敗しました。"
+            );
+          }
+        )
+        [isAdminMode
+          ? "cancelReservationFromAdminManagePage"
+          : "cancelReservationFromManagePage"]({
+          reservation_id:
+            reservationId,
+
+          token:
+            token,
+
+          /*
+           * 管理通知メール側に不要な固定文言を出さない。
+           * 管理者操作であることはcancelled_by=ADMIN側で記録する。
+           */
+          cancel_reason: ""
+        });
+    }
+
+    function showResult(
+      title,
+      message
+    ) {
+
+      document
+        .getElementById(
+          "resultTitle"
+        )
+        .textContent =
+          title;
+
+      document
+        .getElementById(
+          "resultMessage"
+        )
+        .textContent =
+          message;
+
+      document
+        .getElementById(
+          "resultCard"
+        )
+        .classList.remove(
+          "hidden"
+        );
+    }
+
+
+    function refresh() {
+
+      currentSlots = [];
+
+      const trainerArea =
+        document.getElementById(
+          "trainerArea"
+        );
+
+      if (trainerArea) {
+        trainerArea.classList.add(
+          "hidden"
+        );
+      }
+
+      document
+        .getElementById(
+          "changeCard"
+        )
+        .classList.add(
+          "hidden"
+        );
+
+      document
+        .getElementById(
+          "changeClosedCard"
+        )
+        .classList.add(
+          "hidden"
+        );
+
+      document
+        .getElementById(
+          "cancelCard"
+        )
+        .classList.add(
+          "hidden"
+        );
+
+      document
+        .getElementById(
+          "cancelConfirmCard"
+        )
+        .classList.add(
+          "hidden"
+        );
+
+      google.script.run
+        .withSuccessHandler(
+          renderReservation
+        )
+        .withFailureHandler(
+          showFatalError
+        )
+        [isAdminMode
+          ? "getAdminReservationManageData"
+          : "getReservationManageData"](
+          reservationId,
+          token
+        );
+    }
+
+
+    function showFatalError(error) {
+
+      document
+        .getElementById("loading")
+        .innerHTML =
+          "<strong>予約情報を表示できませんでした。</strong><br>" +
+          (
+            error.message ||
+            "URLをご確認ください。"
+          );
+    }
+
+
+    init();
+  </script>
+</body>
+</html>
