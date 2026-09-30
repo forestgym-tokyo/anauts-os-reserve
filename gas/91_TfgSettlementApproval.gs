@@ -221,10 +221,15 @@ function tfgSettlementCampaignProgress_(items,withdrawalDate){
   });
 
   const baseIndex=first.year*12+(first.month-1);
-  const achievementIndex=baseIndex+12+suspensionCount;
+  const baseAchievementIndex=baseIndex+12;
+  const achievementIndex=baseAchievementIndex+suspensionCount;
   const withdrawalIndex=Number(w[1])*12+(Number(w[2])-1);
+  const baseRemainingMonths=Math.max(0,baseAchievementIndex-withdrawalIndex);
+  const remainingMonths=Math.max(0,achievementIndex-withdrawalIndex);
   return{
-    remainingMonths:Math.max(0,achievementIndex-withdrawalIndex),
+    remainingMonths:remainingMonths,
+    baseRemainingMonths:baseRemainingMonths,
+    suspensionAddedMonths:Math.max(0,remainingMonths-baseRemainingMonths),
     achievementYear:Math.floor(achievementIndex/12),
     achievementMonth:(achievementIndex%12)+1,
     suspensionCount:suspensionCount
@@ -248,7 +253,11 @@ function sendTfgSettlementApproval_(body){
     const campaignProgress=tfgSettlementCampaignProgress_(fresh.items,fresh.withdrawalDate);
     const campaignProgressLine=campaignProgress
       ? (campaignProgress.remainingMonths>0
-          ? "キャンペーン条件達成まで：残り"+campaignProgress.remainingMonths+"か月（達成月："+campaignProgress.achievementYear+"年"+campaignProgress.achievementMonth+"月）"
+          ? "キャンペーン条件達成まで：残り"+campaignProgress.remainingMonths+"か月"
+            +(campaignProgress.suspensionCount>0
+              ?"（通常残り"+campaignProgress.baseRemainingMonths+"か月＋休会加算"+campaignProgress.suspensionAddedMonths+"か月）"
+              :"")
+            +"（達成月："+campaignProgress.achievementYear+"年"+campaignProgress.achievementMonth+"月）"
           : "キャンペーン条件：達成済み（達成月："+campaignProgress.achievementYear+"年"+campaignProgress.achievementMonth+"月）")
       : "";
     MailApp.sendEmail({
@@ -266,7 +275,9 @@ function sendTfgSettlementApproval_(body){
         "会員番号とご登録メールアドレスをご入力のうえ、内容をご確認ください。",
         "そのうえで「この内容で承認する」または「キャンペーン条件達成まで見送る」を選択してください。",
         campaignProgressLine,
-        campaignProgress?"※表示の達成月は、今後追加の休会がない場合の目安です。":"",
+        campaignProgress&&campaignProgress.suspensionCount>0
+          ?"※休会"+campaignProgress.suspensionCount+"か月分を、キャンペーン条件達成までの期間に加算しています。"
+          :(campaignProgress?"※表示の達成月は、今後休会がない場合の目安です。":""),
         "承認URLの有効期限："+Utilities.formatDate(tfgSettlementParseJst_(fresh.expiresAt),TFG_SETTLEMENT_CONFIG.TIMEZONE,"yyyy年M月d日 H:mm"),
         fresh.paymentMethod==="BANK_TRANSFER"?"お支払い方法：銀行振込":"お支払い方法：クレジットカード",
         "",
