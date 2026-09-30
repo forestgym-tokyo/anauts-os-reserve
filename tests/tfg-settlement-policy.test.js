@@ -93,3 +93,13 @@ test("member preview renders inline in admin",()=>{
   assert.match(adminSource,/buildMemberPreviewHtml_/);
   assert.match(adminSource,/scrollIntoView/);
 });
+
+
+test("pre-March-2026 DAY and NIGHT365 have no monthly campaign difference",()=>{
+  assert.match(adminSource,/DAY:\{after202603:\{normal:6050,campaign:4180\},before202603:\{normal:4180,campaign:4180\}\}/);
+  assert.match(adminSource,/NIGHT365:\{after202603:\{normal:4950,campaign:3300\},before202603:\{normal:3300,campaign:3300\}\}/);
+});
+
+test("pre-March-2026 DAY and NIGHT365 do not apply selectable benefits",()=>{
+  assert.match(adminSource,/joinDate<"2026-03-01"&&\(plan==="DAY"\|\|plan==="NIGHT365"\)\)return 0/);
+});
