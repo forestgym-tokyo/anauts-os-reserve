@@ -35,6 +35,9 @@ th{text-align:left;color:var(--muted);font-weight:700;background:#fbfcfb}
 .total-box{display:flex;align-items:end;justify-content:space-between;gap:16px;margin-top:17px;padding:17px 18px;background:#eef6f1;border:1px solid #cfe1d7;border-radius:14px}
 .total-box span{font-size:12px;color:#496258}
 .total-box strong{font-size:31px;color:var(--forest)}
+.campaign-remaining{margin-top:9px;padding:11px 13px;border-radius:11px;background:#f8fbf9;border:1px solid #dfe9e3;font-size:13px;color:#294b3b}
+.campaign-remaining strong{color:var(--forest);font-size:14px}
+.campaign-remaining .sub{display:block;margin-top:2px;color:var(--muted);font-size:11px}
 .payment{margin-top:16px;border-radius:15px;padding:17px 18px;border:2px solid}
 .payment.cardpay{border-color:#b8cde3;background:#f2f7fc}
 .payment.bankpay{border-color:#dbc98f;background:#fffaf0}
@@ -102,6 +105,7 @@ a{color:var(--forest2)}
         </table>
       </div>
       <div class="total-box"><span>今回のご精算金額</span><strong id="total">—</strong></div>
+      <div id="campaignRemaining" class="campaign-remaining hidden"></div>
 
       <div id="cardPayment" class="payment cardpay hidden">
         <div class="pay-head"><div class="pay-icon">💳</div><div>クレジットカードで決済</div></div>
@@ -135,7 +139,7 @@ a{color:var(--forest2)}
       <div class="check"><input id="c2" type="checkbox"><label id="c2Label" for="c2"></label></div>
       <div class="check"><input id="c3" type="checkbox"><label id="c3Label" for="c3"></label></div>
       <button id="approve" class="btn">この内容で承認する</button>
-      <button id="defer" class="btn btn-secondary">退会申請をキャンペーン条件達成まで見送る</button>
+      <button id="defer" class="btn btn-secondary">キャンペーン条件達成まで見送る</button>
       <div class="choice-note">
         <strong>退会申請を見送る場合のご注意</strong>
         今回の退会申請は見送りとなり、キャンペーン条件達成時に自動で退会にはなりません。<br>
@@ -181,10 +185,42 @@ const demoBase={
 };
 async function api(payload){const r=await fetch(GAS_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload)});if(!r.ok)throw new Error("HTTP "+r.status);return r.json()}
 function esc(v){return String(v).replace(/[&<>"']/g,s=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[s]))}
+function campaignProgress_(items,withdrawalDate){
+  const rows=Array.isArray(items)?items:[];
+  const first=rows.find(x=>String(x&&x.label||"").trim()==="初月会費"&&/(\d{4})年(\d{1,2})月/.test(String(x&&x.target||"")));
+  if(!first)return null;
+  const m=String(first.target||"").match(/(\d{4})年(\d{1,2})月/);
+  const w=String(withdrawalDate||"").match(/^(\d{4})-(\d{2})-/);
+  if(!m||!w)return null;
+
+  const suspensionCount=rows.filter(x=>String(x&&x.status||"").trim()==="休会").length;
+  const baseIndex=Number(m[1])*12+(Number(m[2])-1);
+  const achievementIndex=baseIndex+12+suspensionCount;
+  const withdrawalIndex=Number(w[1])*12+(Number(w[2])-1);
+  const remaining=Math.max(0,achievementIndex-withdrawalIndex);
+  const achievementYear=Math.floor(achievementIndex/12);
+  const achievementMonth=(achievementIndex%12)+1;
+  return{remaining,achievementYear,achievementMonth,suspensionCount};
+}
+function renderCampaignRemaining_(){
+  const el=$("campaignRemaining");
+  if(!el)return;
+  const p=campaignProgress_(settlement&&settlement.items,settlement&&settlement.withdrawalDate);
+  if(!p){el.classList.add("hidden");el.innerHTML="";return;}
+  const main=p.remaining>0
+    ? `キャンペーン条件達成まで <strong>残り${p.remaining}か月</strong>`
+    : `<strong>キャンペーン条件達成済み</strong>`;
+  const suspensionNote=p.suspensionCount>0
+    ? `現在登録されている休会${p.suspensionCount}か月を反映しています。今後さらに休会する場合は達成月が後ろ倒しになります。`
+    : "※今後休会がない場合";
+  el.innerHTML=`${main}<span class="sub">達成月：${p.achievementYear}年${p.achievementMonth}月　${suspensionNote}</span>`;
+  el.classList.remove("hidden");
+}
 function renderSettlement(){
   $("memberName").textContent=settlement.memberName+" 様";
   $("withdrawalDate").textContent=settlement.withdrawalDate||"—";
   $("total").textContent=yen(settlement.total);
+  renderCampaignRemaining_();
   $("items").innerHTML=(settlement.items||[]).map(x=>`<tr><td>${esc(x.target||"—")}</td><td>${esc(x.label||"")}</td><td class="num">${yen(x.paid)}</td><td class="num">${yen(x.normal)}</td><td class="num"><strong>${yen(x.settlement)}</strong></td></tr>`).join("");
   const bank=settlement.paymentMethod==="BANK_TRANSFER";
   $("cardPayment").classList.toggle("hidden",bank);
@@ -303,7 +339,7 @@ $("defer").addEventListener("click",async()=>{
     showDeferred(d.data&&d.data.deferredAt);
   }catch(e){
     msg.classList.add("error");msg.textContent=e.message;
-    btn.disabled=false;btn.textContent="退会申請をキャンペーン条件達成まで見送る";
+    btn.disabled=false;btn.textContent="キャンペーン条件達成まで見送る";
     $("approve").disabled=false;
   }
 });
