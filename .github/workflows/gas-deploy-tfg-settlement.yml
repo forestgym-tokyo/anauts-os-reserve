@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: 'Type DEPLOY_TFG_SETTLEMENT to update the live Apps Script source'
+        description: "Type DEPLOY_TFG_SETTLEMENT to update the live Apps Script source"
         required: true
         type: string
 
@@ -45,13 +45,8 @@ jobs:
           printf '%s' "$CLASPRC_JSON" > "$HOME/.clasprc.json"
           rm -rf .gas-live
           mkdir -p .gas-live
-          node <<'NODE'
-          const fs = require("fs");
-          const cfg = JSON.parse(process.env.CLASP_JSON);
-          if (!cfg.scriptId) throw new Error("CLASP_JSON.scriptId is missing");
-          fs.writeFileSync(".clasp.json", JSON.stringify({ scriptId: cfg.scriptId, rootDir: ".gas-live" }));
-          fs.writeFileSync(".claspignore", "node_modules/**\n.github/**\n");
-          NODE
+          node -e 'const fs=require("fs"); const cfg=JSON.parse(process.env.CLASP_JSON); if(!cfg.scriptId) throw new Error("CLASP_JSON.scriptId is missing"); fs.writeFileSync(".clasp.json", JSON.stringify({scriptId:cfg.scriptId,rootDir:".gas-live"}));'
+          printf '%s\n' 'node_modules/**' '.github/**' > .claspignore
 
       - name: Pull current live Apps Script source
         run: npx -y @google/clasp@3.4.1 pull
@@ -60,28 +55,7 @@ jobs:
         run: |
           test -f .gas-live/99_Main.js || (echo "Live 99_Main.js was not pulled" && exit 1)
           cp gas/91_TfgSettlementApproval.gs .gas-live/91_TfgSettlementApproval.js
-          node <<'NODE'
-          const fs = require("fs");
-          const path = ".gas-live/99_Main.js";
-          let src = fs.readFileSync(path, "utf8");
-          if (!src.includes('case "getTfgSettlementMember"')) {
-            const anchor = `      case "createTfgSettlement":
-        requireAuth_(body, ["ADMIN", "MANAGER"]);
-        return createTfgSettlement_(body);`;
-            const replacement = `      case "getTfgSettlementMember":
-        requireAuth_(body, ["ADMIN", "MANAGER"]);
-        return getTfgSettlementMember_(body);
-
-      case "createTfgSettlement":
-        requireAuth_(body, ["ADMIN", "MANAGER"]);
-        return createTfgSettlement_(body);`;
-            if (!src.includes(anchor)) {
-              throw new Error("Could not locate createTfgSettlement route in live 99_Main.js");
-            }
-            src = src.replace(anchor, replacement);
-            fs.writeFileSync(path, src);
-          }
-          NODE
+          node scripts/gas-tfg-settlement-overlay.mjs
 
       - name: Verify TFG settlement overlay
         run: |
