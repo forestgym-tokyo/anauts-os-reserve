@@ -321,9 +321,9 @@ async function send(){
   const btn=$("#settlementSend"); btn.disabled=true; btn.textContent="送信中…";
   try{
     const r=await apiPost({action:"sendTfgSettlementApproval",token});
-    show("会員へ承認依頼を送信しました。精算ID："+(r.data?.settlementId||draft.settlementId));
-  }catch(e){show(e.message||"承認依頼を送信できませんでした。",true)}
-  finally{btn.disabled=false;btn.textContent="会員へ承認依頼を送信"}
+    show("会員向け承認依頼メールをGmailの下書きに保存しました。内容を確認してGmailから送信してください。精算ID："+(r.data?.settlementId||draft.settlementId));
+  }catch(e){show(e.message||"承認依頼メールを下書き保存できませんでした。",true)}
+  finally{btn.disabled=false;btn.textContent="会員向けメールを下書き保存"}
 }
 let memberLookupTimer_=null;
 let memberLookupSeq_=0;
