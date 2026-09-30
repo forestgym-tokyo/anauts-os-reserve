@@ -251,44 +251,57 @@ function sendTfgSettlementApproval_(body){
           ? "キャンペーン条件達成まで：残り"+campaignProgress.remainingMonths+"か月（達成月："+campaignProgress.achievementYear+"年"+campaignProgress.achievementMonth+"月）"
           : "キャンペーン条件：達成済み（達成月："+campaignProgress.achievementYear+"年"+campaignProgress.achievementMonth+"月）")
       : "";
-    MailApp.sendEmail({
-      to:fresh.email,
-      subject:"【The Forest Gym】退会に伴う精算内容のご確認",
-      body:[
-        fresh.memberName+" 様",
-        "",
-        "The Forest Gymでございます。",
-        "精算内容をご確認いただくため、下記の専用URLへアクセスしてください。",
-        "精算金額との兼ね合いで、ご入会時のキャンペーン条件達成まで退会を見送る場合は、画面内の「キャンペーン条件達成まで見送る」をタップしてください。",
-        "",
-        approvalUrl,
-        "",
-        "会員番号とご登録メールアドレスをご入力のうえ、内容をご確認ください。",
-        "そのうえで「この内容で承認する」または「キャンペーン条件達成まで見送る」を選択してください。",
-        campaignProgressLine,
-        campaignProgress?"※表示の達成月は、今後追加の休会がない場合の目安です。":"",
-        "承認URLの有効期限："+Utilities.formatDate(tfgSettlementParseJst_(fresh.expiresAt),TFG_SETTLEMENT_CONFIG.TIMEZONE,"yyyy年M月d日 H:mm"),
-        fresh.paymentMethod==="BANK_TRANSFER"?"お支払い方法：銀行振込":"お支払い方法：クレジットカード",
-        "",
-        fresh.paymentMethod==="BANK_TRANSFER"?"【お振込先】":"",
-        fresh.paymentMethod==="BANK_TRANSFER"?(TFG_SETTLEMENT_CONFIG.BANK_NAME+" "+TFG_SETTLEMENT_CONFIG.BANK_BRANCH):"",
-        fresh.paymentMethod==="BANK_TRANSFER"?(TFG_SETTLEMENT_CONFIG.BANK_ACCOUNT_TYPE+" "+TFG_SETTLEMENT_CONFIG.BANK_ACCOUNT_NO):"",
-        fresh.paymentMethod==="BANK_TRANSFER"?TFG_SETTLEMENT_CONFIG.BANK_ACCOUNT_NAME:"",
-        fresh.paymentMethod==="BANK_TRANSFER"?"※口座振替会員様は、承認後に上記口座へのお振込みが必要です。":"",
-        "",
-        "※精算内容に相違がある場合は承認せず、info@theforestgym.comまでお問い合わせください。",
-        "",
-        "The Forest Gym"
-      ].join("\n"),
-      name:"The Forest Gym",
-      replyTo:TFG_SETTLEMENT_CONFIG.ADMIN_EMAIL
-    });
+    const draftBody=[
+      fresh.memberName+" 様",
+      "",
+      "The Forest Gymでございます。",
+      "精算内容をご確認いただくため、下記の専用URLへアクセスしてください。",
+      "精算金額との兼ね合いで、ご入会時のキャンペーン条件達成まで退会を見送る場合は、画面内の「キャンペーン条件達成まで見送る」をタップしてください。",
+      "",
+      approvalUrl,
+      "",
+      "会員番号とご登録メールアドレスをご入力のうえ、内容をご確認ください。",
+      "そのうえで「この内容で承認する」または「キャンペーン条件達成まで見送る」を選択してください。",
+      campaignProgressLine,
+      campaignProgress?"※表示の達成月は、今後追加の休会がない場合の目安です。":"",
+      "承認URLの有効期限："+Utilities.formatDate(tfgSettlementParseJst_(fresh.expiresAt),TFG_SETTLEMENT_CONFIG.TIMEZONE,"yyyy年M月d日 H:mm"),
+      fresh.paymentMethod==="BANK_TRANSFER"?"お支払い方法：銀行振込":"お支払い方法：クレジットカード",
+      "",
+      fresh.paymentMethod==="BANK_TRANSFER"?"【お振込先】":"",
+      fresh.paymentMethod==="BANK_TRANSFER"?(TFG_SETTLEMENT_CONFIG.BANK_NAME+" "+TFG_SETTLEMENT_CONFIG.BANK_BRANCH):"",
+      fresh.paymentMethod==="BANK_TRANSFER"?(TFG_SETTLEMENT_CONFIG.BANK_ACCOUNT_TYPE+" "+TFG_SETTLEMENT_CONFIG.BANK_ACCOUNT_NO):"",
+      fresh.paymentMethod==="BANK_TRANSFER"?TFG_SETTLEMENT_CONFIG.BANK_ACCOUNT_NAME:"",
+      fresh.paymentMethod==="BANK_TRANSFER"?"※口座振替会員様は、承認後に上記口座へのお振込みが必要です。":"",
+      "",
+      "※精算内容に相違がある場合は承認せず、info@theforestgym.comまでお問い合わせください。",
+      "",
+      "The Forest Gym"
+    ].join("\n");
+
+    const gmailDraft=GmailApp.createDraft(
+      fresh.email,
+      "【The Forest Gym】退会に伴う精算内容のご確認",
+      draftBody,
+      {
+        name:"The Forest Gym",
+        replyTo:TFG_SETTLEMENT_CONFIG.ADMIN_EMAIL
+      }
+    );
+
     if(fresh.status==="DRAFT")getTfgSettlementSheet_().getRange(fresh.row,11).setValue("PENDING");
     lock.releaseLock();locked=false;
-    return tfgSettlementJson_({ok:true,data:{settlementId:fresh.id,status:"PENDING",approvalUrl:approvalUrl}});
+    return tfgSettlementJson_({
+      ok:true,
+      data:{
+        settlementId:fresh.id,
+        status:"PENDING",
+        approvalUrl:approvalUrl,
+        gmailDraftId:gmailDraft.getId()
+      }
+    });
   }catch(e){
     if(locked){try{lock.releaseLock()}catch(_){}}
-    return tfgSettlementJson_({ok:false,code:"SEND_ERROR",message:e.message||"承認依頼メールを送信できませんでした。"});
+    return tfgSettlementJson_({ok:false,code:"SEND_ERROR",message:e.message||"承認依頼メールを下書き保存できませんでした。"});
   }
 }
 
