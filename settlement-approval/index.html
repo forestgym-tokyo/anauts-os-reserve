@@ -135,7 +135,7 @@ a{color:var(--forest2)}
 
     <section class="card">
       <div class="section-title"><span class="dot"></span><h2>確認・同意</h2></div>
-      <div class="check"><input id="c1" type="checkbox"><label for="c1">上記の精算内容および精算金額を確認しました。</label></div>
+      <div class="check"><input id="c1" type="checkbox"><label for="c1">上記の要精算内容および要精算金額を確認しました。</label></div>
       <div class="check"><input id="c2" type="checkbox"><label id="c2Label" for="c2"></label></div>
       <div class="check"><input id="c3" type="checkbox"><label id="c3Label" for="c3"></label></div>
       <button id="approve" class="btn">この内容で承認する</button>
@@ -227,8 +227,8 @@ function renderSettlement(){
   $("cardPayment").classList.toggle("hidden",bank);
   $("bankPayment").classList.toggle("hidden",!bank);
   $("c2Label").textContent=bank
-    ?"表示された精算金額を、承認後に指定口座へ一括で振り込むことに同意します。"
-    :"表示された精算金額を、登録済みクレジットカードで一括決済することに同意します。";
+    ?"表示された要精算金額を、承認後に指定口座へ一括で振り込むことに同意します。"
+    :"表示された要精算金額を、登録済みクレジットカードで一括決済することに同意します。";
   $("c3Label").textContent=bank
     ?"振込確認ができない場合、退会手続きが完了しないことを理解しました。"
     :"クレジットカード決済が完了しない場合、退会手続きが完了しないことを理解しました。";
