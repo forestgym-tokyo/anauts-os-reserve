@@ -144,7 +144,8 @@ function render(){
   current.items.forEach((x,i)=>{
     const tr=document.createElement("tr");
     const status=x.kind==="MONTH"?`<select data-status="${i}"><option value="通常"${x.status==="通常"?" selected":""}>通常</option><option value="休会"${x.status==="休会"?" selected":""}>休会</option></select>`:"—";
-    tr.innerHTML=`<td>${x.target}</td><td>${status}</td><td>${x.label}<div style="font-size:11px;color:#91a198">${x.note||""}</div></td><td class="num">${yen(x.paid)}</td><td class="num">${yen(x.normal)}</td><td class="num"><strong>${yen(x.settlement)}</strong></td>`;
+    const displayLabel=x.status==="休会"?"休会費":x.label;
+    tr.innerHTML=`<td>${x.target}</td><td>${status}</td><td>${displayLabel}<div style="font-size:11px;color:#91a198">${x.note||""}</div></td><td class="num">${yen(x.paid)}</td><td class="num">${yen(x.normal)}</td><td class="num"><strong>${yen(x.settlement)}</strong></td>`;
     body.append(tr);
   });
   body.querySelectorAll("[data-status]").forEach(sel=>sel.addEventListener("change",e=>{
@@ -158,10 +159,12 @@ function render(){
   $("#settlementDeadlineBadge").textContent="有効期限 "+current.expiry.toLocaleString("ja-JP",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"});
   const campaignText=current.campaignCompleted
     ?"12回の決済条件を満たしているため、キャンペーン差額の精算はありません。"
-    :`決済済み ${current.completedPayments}/12回。未達のためキャンペーン差額を精算します。`;
-  $("#settlementPaymentGuide").textContent=campaignText+" "+(current.paymentMethod==="BANK_TRANSFER"
-    ?"口座振替会員：承認後、みずほ銀行 新浦安支店 普通 1917298 A-nauts株式会社 へ振込が必要です。"
-    :"クレジットカードで精算します。");
+    :`決済済み ${current.completedPayments}/12回。`;
+  $("#settlementPaymentGuide").textContent=current.paymentMethod==="BANK_TRANSFER"
+    ?campaignText+(current.campaignCompleted?"":"未達のためキャンペーン差額を精算します。")+" 口座振替会員：承認後、みずほ銀行 新浦安支店 普通 1917298 A-nauts株式会社 へ振込が必要です。"
+    :(current.campaignCompleted
+      ?campaignText
+      :campaignText+"未達のためキャンペーン差額をご登録クレジットカードで精算します。");
   $("#settlementPreview").classList.remove("is-hidden");
   $("#settlementDraft").disabled=false;
   $("#settlementPreviewButton").disabled=false;
@@ -238,7 +241,7 @@ function buildMemberPreviewHtml_(){
   const rows=current.items.map(x=>`
     <tr>
       <td style="padding:10px 6px;border-bottom:1px solid #e2e9e5;font-size:12px">${escapePreview_(x.target||"—")}</td>
-      <td style="padding:10px 6px;border-bottom:1px solid #e2e9e5;font-size:12px">${escapePreview_(x.label||"")}</td>
+      <td style="padding:10px 6px;border-bottom:1px solid #e2e9e5;font-size:12px">${escapePreview_(x.status==="休会"?"休会費":(x.label||""))}</td>
       <td style="padding:10px 6px;border-bottom:1px solid #e2e9e5;font-size:12px;text-align:right;white-space:nowrap">${yen(x.paid)}</td>
       <td style="padding:10px 6px;border-bottom:1px solid #e2e9e5;font-size:12px;text-align:right;white-space:nowrap">${yen(x.normal)}</td>
       <td style="padding:10px 6px;border-bottom:1px solid #e2e9e5;font-size:12px;text-align:right;white-space:nowrap"><strong>${yen(x.settlement)}</strong></td>
@@ -252,7 +255,7 @@ function buildMemberPreviewHtml_(){
       </div>`
     : `<div style="margin-top:16px;border:2px solid #b8cde3;background:#f2f7fc;border-radius:15px;padding:17px 18px">
         <div style="font-weight:900;font-size:16px">💳 クレジットカードで決済</div>
-        <p style="font-size:13px;margin:8px 0 0">ご登録済みのクレジットカードへ、表示されている精算金額を一括で決済します。</p>
+        <p style="font-size:13px;margin:8px 0 0">表示されている要精算金額はご承認翌日に一括で決済されます。</p>
         <p style="font-size:14px;font-weight:900">お客様による振込作業は不要です。</p>
       </div>`;
   return `
@@ -277,10 +280,10 @@ function buildMemberPreviewHtml_(){
             <th style="padding:9px 6px;text-align:left;color:#66746d;font-size:12px">内容</th>
             <th style="padding:9px 6px;text-align:right;color:#66746d;font-size:12px">決済済</th>
             <th style="padding:9px 6px;text-align:right;color:#66746d;font-size:12px">通常価格</th>
-            <th style="padding:9px 6px;text-align:right;color:#66746d;font-size:12px">精算額</th>
+            <th style="padding:9px 6px;text-align:right;color:#66746d;font-size:12px">要精算額</th>
           </tr></thead><tbody>${rows}</tbody></table></div>
           <div style="display:flex;justify-content:space-between;align-items:end;margin-top:17px;padding:17px 18px;background:#eef6f1;border:1px solid #cfe1d7;border-radius:14px">
-            <span style="font-size:12px;color:#496258">今回のご精算金額</span><strong style="font-size:30px;color:#0b3b2a">${yen(total)}</strong>
+            <span style="font-size:12px;color:#496258">今回の要精算金額</span><strong style="font-size:30px;color:#0b3b2a">${yen(total)}</strong>
           </div>
           ${campaignProgressHtml}
           ${payment}
