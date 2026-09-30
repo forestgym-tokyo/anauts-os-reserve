@@ -828,7 +828,7 @@
       <label><span>会員番号</span><input id="settlementMemberNo" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="6桁"></label>
       <label><span>氏名</span><input id="settlementMemberName"></label>
       <label><span>登録メールアドレス</span><input id="settlementEmail" type="email"></label>
-      <label><span>入会日</span><input id="settlementJoinDate" type="date"></label>
+      <label><span>スタート日</span><input id="settlementJoinDate" type="date"></label>
       <label><span>会員プラン</span>
         <select id="settlementPlan">
           <option value="REGULAR">REGULAR</option>
@@ -846,7 +846,7 @@
       <label><span>初月決済額</span><input id="settlementFirstPaid" type="number" min="0" value="0"></label>
       <label><span>初月通常料金（日割り・自動計算）</span>
         <input id="settlementFirstNormal" type="number" min="0" value="0" readonly>
-        <small id="settlementFirstNormalHint" style="display:block;margin-top:6px;color:#91a198">入会日・プラン・初月決済額から自動計算します。</small>
+        <small id="settlementFirstNormalHint" style="display:block;margin-top:6px;color:#91a198">スタート日・プラン・初月決済額から自動計算します。</small>
       </label>
       <label><span>初期費用の決済額</span><input id="settlementInitialPaid" type="number" min="0" value="0"></label>
       <label><span>支払方法</span>
@@ -918,6 +918,6 @@
 <script src="./admin-questionnaire.js?v=20260906-tour-reply-history-v1" defer>
 </script>
 <script src="./admin-counseling-links.js?v=20260915-diet-counseling-v1" defer></script>
-<script src="./admin-settlement-v2.js?v=20261001-settlement-copy-v3" defer></script>
+<script src="./admin-settlement-v2.js?v=20261001-start-date-v4" defer></script>
 </body>
 </html>
