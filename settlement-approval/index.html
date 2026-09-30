@@ -195,12 +195,15 @@ function campaignProgress_(items,withdrawalDate){
 
   const suspensionCount=rows.filter(x=>String(x&&x.status||"").trim()==="休会").length;
   const baseIndex=Number(m[1])*12+(Number(m[2])-1);
-  const achievementIndex=baseIndex+12+suspensionCount;
+  const baseAchievementIndex=baseIndex+12;
+  const achievementIndex=baseAchievementIndex+suspensionCount;
   const withdrawalIndex=Number(w[1])*12+(Number(w[2])-1);
+  const baseRemaining=Math.max(0,baseAchievementIndex-withdrawalIndex);
   const remaining=Math.max(0,achievementIndex-withdrawalIndex);
+  const suspensionAdded=Math.max(0,remaining-baseRemaining);
   const achievementYear=Math.floor(achievementIndex/12);
   const achievementMonth=(achievementIndex%12)+1;
-  return{remaining,achievementYear,achievementMonth,suspensionCount};
+  return{remaining,baseRemaining,suspensionAdded,achievementYear,achievementMonth,suspensionCount};
 }
 function renderCampaignRemaining_(){
   const el=$("campaignRemaining");
@@ -210,10 +213,13 @@ function renderCampaignRemaining_(){
   const main=p.remaining>0
     ? `キャンペーン条件達成まで <strong>残り${p.remaining}か月</strong>`
     : `<strong>キャンペーン条件達成済み</strong>`;
+  const breakdown=p.suspensionCount>0
+    ? `（通常残り${p.baseRemaining}か月＋休会加算${p.suspensionAdded}か月）`
+    : "";
   const suspensionNote=p.suspensionCount>0
-    ? `現在登録されている休会${p.suspensionCount}か月を反映しています。今後さらに休会する場合は達成月が後ろ倒しになります。`
+    ? `休会${p.suspensionCount}か月分を条件達成までの期間に加算しています。`
     : "※今後休会がない場合";
-  el.innerHTML=`${main}<span class="sub">達成月：${p.achievementYear}年${p.achievementMonth}月　${suspensionNote}</span>`;
+  el.innerHTML=`${main}${breakdown}<span class="sub">達成月：${p.achievementYear}年${p.achievementMonth}月　${suspensionNote}</span>`;
   el.classList.remove("hidden");
 }
 function renderSettlement(){
