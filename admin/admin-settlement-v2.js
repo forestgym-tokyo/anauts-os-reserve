@@ -228,8 +228,9 @@ function buildMemberPreviewHtml_(){
   const campaignProgress=campaignProgressForPreview_(current.items,current.withdrawalDate);
   const campaignProgressHtml=campaignProgress
     ? `<div style="margin-top:9px;padding:11px 13px;border-radius:11px;background:#f8fbf9;border:1px solid #dfe9e3;font-size:13px;color:#294b3b">
-        ${campaignProgress.remaining>0?`キャンペーン条件達成まで <strong>残り${campaignProgress.remaining}か月</strong>`:"<strong>キャンペーン条件達成済み</strong>"}
-        <div style="margin-top:2px;color:#66746d;font-size:11px">達成月：${campaignProgress.year}年${campaignProgress.month}月　※今後追加の休会がない場合</div>
+        ${campaignProgress.remaining>0
+          ? `キャンペーン条件達成まで：<strong>残り${campaignProgress.remaining}か月</strong>（達成月：${campaignProgress.year}年${campaignProgress.month}月）<div style="margin-top:2px;color:#66746d;font-size:11px">※表示の達成月は、今後追加の休会がない場合の目安です。</div>`
+          : `<strong>キャンペーン条件達成済み</strong>（達成月：${campaignProgress.year}年${campaignProgress.month}月）`}
       </div>`
     : "";
   const rows=current.items.map(x=>`
