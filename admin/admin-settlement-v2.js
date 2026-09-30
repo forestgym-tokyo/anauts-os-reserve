@@ -294,7 +294,71 @@ async function send(){
   }catch(e){show(e.message||"承認依頼を送信できませんでした。",true)}
   finally{btn.disabled=false;btn.textContent="会員へ承認依頼を送信"}
 }
+let memberLookupTimer_=null;
+let memberLookupSeq_=0;
+
+function resetSettlementAfterMemberChange_(){
+  current=null;
+  draft=null;
+  $("#settlementPreview")?.classList.add("is-hidden");
+  $("#settlementInlineMemberPreview")?.classList.add("is-hidden");
+  if($("#settlementDraft"))$("#settlementDraft").disabled=true;
+  if($("#settlementPreviewButton"))$("#settlementPreviewButton").disabled=true;
+  if($("#settlementSend"))$("#settlementSend").disabled=true;
+}
+
+async function lookupSettlementMember_(){
+  const noEl=$("#settlementMemberNo");
+  const nameEl=$("#settlementMemberName");
+  const emailEl=$("#settlementEmail");
+  if(!noEl||!nameEl||!emailEl)return;
+
+  const memberNo=String(noEl.value||"").replace(/\D/g,"").slice(0,6);
+  noEl.value=memberNo;
+  if(!/^\d{6}$/.test(memberNo))return;
+
+  const seq=++memberLookupSeq_;
+  try{
+    if(typeof apiPost!=="function")throw new Error("管理APIを読み込めませんでした。");
+    const r=await apiPost({action:"getTfgSettlementMember",memberNo});
+    if(seq!==memberLookupSeq_||String(noEl.value||"")!==memberNo)return;
+    const memberName=String(r.data?.memberName||"").trim();
+    const email=String(r.data?.email||"").trim();
+    if(!memberName||!email)throw new Error("会員マスターの氏名またはメールアドレスを取得できませんでした。");
+    nameEl.value=memberName;
+    emailEl.value=email;
+    show("会員番号から氏名・登録メールアドレスを自動取得しました。");
+  }catch(e){
+    if(seq!==memberLookupSeq_||String(noEl.value||"")!==memberNo)return;
+    nameEl.value="";
+    emailEl.value="";
+    show(e.message||"会員情報を取得できませんでした。",true);
+  }
+}
+
+function scheduleSettlementMemberLookup_(immediate){
+  const noEl=$("#settlementMemberNo");
+  const nameEl=$("#settlementMemberName");
+  const emailEl=$("#settlementEmail");
+  if(!noEl||!nameEl||!emailEl)return;
+
+  const memberNo=String(noEl.value||"").replace(/\D/g,"").slice(0,6);
+  if(noEl.value!==memberNo)noEl.value=memberNo;
+  clearTimeout(memberLookupTimer_);
+  resetSettlementAfterMemberChange_();
+
+  if(!/^\d{6}$/.test(memberNo)){
+    memberLookupSeq_++;
+    nameEl.value="";
+    emailEl.value="";
+    return;
+  }
+  memberLookupTimer_=setTimeout(lookupSettlementMember_,immediate?0:180);
+}
+
 function initSettlementUi_(){
+  $("#settlementMemberNo")?.addEventListener("input",()=>scheduleSettlementMemberLookup_(false));
+  $("#settlementMemberNo")?.addEventListener("blur",()=>scheduleSettlementMemberLookup_(true));
   $("#settlementCalculate")?.addEventListener("click",calc);
   ["input","change","keyup","blur"].forEach(evt=>$("#settlementFirstPaid")?.addEventListener(evt,refreshFirstNormal_));
   ["change","input"].forEach(evt=>{
