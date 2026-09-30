@@ -182,6 +182,8 @@ async function createDraft(){
       memberNo:current.memberNo,
       memberName:current.memberName,
       email:current.email,
+      joinDate:current.joinDate,
+      plan:current.plan,
       paymentMethod:current.paymentMethod,
       items:current.items.map(x=>({target:x.target,label:x.label,paid:x.paid,normal:x.normal,settlement:x.settlement,note:x.note,status:x.status||"",paymentSequence:x.paymentSequence||null,isFinalMonth:!!x.isFinalMonth}))
     };
