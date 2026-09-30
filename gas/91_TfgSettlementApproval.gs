@@ -368,6 +368,193 @@ function getTfgSettlement_(body){
   }catch(e){return tfgSettlementJson_({ok:false,code:"GET_ERROR",message:e.message||"精算内容を取得できませんでした。"});}
 }
 
+function tfgSettlementMailEscHtml_(value){
+  return String(value==null?"":value)
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#39;");
+}
+
+function tfgSettlementConsentTexts_(paymentMethod){
+  const bank=tfgSettlementNormalizePaymentMethod_(paymentMethod)==="BANK_TRANSFER";
+  return[
+    "上記の要精算内容および要精算金額を確認しました。",
+    bank
+      ?"表示された要精算金額を、承認後に指定口座へ一括で振り込むことに同意します。"
+      :"表示された要精算金額を、登録済みクレジットカードで一括決済することに同意します。",
+    bank
+      ?"振込確認ができない場合、退会手続きが完了しないことを理解しました。"
+      :"クレジットカード決済が完了しない場合、退会手続きが完了しないことを理解しました。"
+  ];
+}
+
+function tfgSettlementItemLabel_(item){
+  return String((item&&item.status)||"").trim()==="休会"?"休会費":String((item&&item.label)||"");
+}
+
+function tfgSettlementSendApprovalConfirmation_(row,now){
+  const items=Array.isArray(row.items)?row.items:[];
+  const consents=tfgSettlementConsentTexts_(row.paymentMethod);
+  const itemLines=items.map(function(item){
+    return[
+      String(item.target||"—"),
+      tfgSettlementItemLabel_(item),
+      "決済済："+Number(item.paid||0).toLocaleString("ja-JP")+"円",
+      "通常価格："+Number(item.normal||0).toLocaleString("ja-JP")+"円",
+      "要精算額："+Number(item.settlement||0).toLocaleString("ja-JP")+"円"
+    ].join(" / ");
+  });
+  const paymentGuide=tfgSettlementNormalizePaymentMethod_(row.paymentMethod)==="BANK_TRANSFER"
+    ?[
+        "お支払い方法：銀行振込",
+        "みずほ銀行 新浦安支店",
+        "普通 1917298",
+        "A-nauts株式会社",
+        "※承認後、上記口座へのお振込みが必要です。"
+      ]
+    :[
+        "お支払い方法：クレジットカード",
+        "表示されている要精算金額はご承認翌日に一括で決済されます。"
+      ];
+
+  const body=[
+    row.memberName+" 様",
+    "",
+    "The Forest Gymでございます。",
+    "退会に伴う要精算内容のご承認を受け付けました。",
+    "以下の明細および確認事項3項目について、会員様ご本人による確認・同意が完了しております。",
+    "",
+    "受付日時："+now,
+    "退会予定："+row.withdrawalDate,
+    "",
+    "【承認済みの要精算明細】"
+  ].concat(itemLines).concat([
+    "",
+    "今回の要精算金額："+Number(row.total||0).toLocaleString("ja-JP")+"円",
+    ""
+  ]).concat(paymentGuide).concat([
+    "",
+    "【ご確認・同意済みの事項】",
+    "✓ "+consents[0],
+    "✓ "+consents[1],
+    "✓ "+consents[2],
+    "",
+    "このメールはお手続き内容の控えとして保管してください。",
+    "",
+    "The Forest Gym"
+  ]).join("\n");
+
+  const rowsHtml=items.map(function(item){
+    return "<tr>"
+      +"<td style='padding:8px;border-bottom:1px solid #e3e8e5'>"+tfgSettlementMailEscHtml_(item.target||"—")+"</td>"
+      +"<td style='padding:8px;border-bottom:1px solid #e3e8e5'>"+tfgSettlementMailEscHtml_(tfgSettlementItemLabel_(item))+"</td>"
+      +"<td style='padding:8px;border-bottom:1px solid #e3e8e5;text-align:right'>"+Number(item.paid||0).toLocaleString("ja-JP")+"円</td>"
+      +"<td style='padding:8px;border-bottom:1px solid #e3e8e5;text-align:right'>"+Number(item.normal||0).toLocaleString("ja-JP")+"円</td>"
+      +"<td style='padding:8px;border-bottom:1px solid #e3e8e5;text-align:right;font-weight:700'>"+Number(item.settlement||0).toLocaleString("ja-JP")+"円</td>"
+      +"</tr>";
+  }).join("");
+
+  const bank=tfgSettlementNormalizePaymentMethod_(row.paymentMethod)==="BANK_TRANSFER";
+  const paymentHtml=bank
+    ?"<p><strong>お支払い方法：銀行振込</strong><br>みずほ銀行 新浦安支店<br>普通 1917298<br>A-nauts株式会社<br><span style='font-size:13px'>※承認後、上記口座へのお振込みが必要です。</span></p>"
+    :"<p><strong>お支払い方法：クレジットカード</strong><br>表示されている要精算金額はご承認翌日に一括で決済されます。</p>";
+
+  const htmlBody=[
+    "<div style='font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Noto Sans JP,Arial,sans-serif;color:#17231d;line-height:1.75;font-size:14px'>",
+    "<p>"+tfgSettlementMailEscHtml_(row.memberName)+" 様</p>",
+    "<p>The Forest Gymでございます。<br>退会に伴う要精算内容のご承認を受け付けました。<br>以下の明細および確認事項3項目について、会員様ご本人による確認・同意が完了しております。</p>",
+    "<p>受付日時："+tfgSettlementMailEscHtml_(now)+"<br>退会予定："+tfgSettlementMailEscHtml_(row.withdrawalDate)+"</p>",
+    "<p style='font-weight:700'>【承認済みの要精算明細】</p>",
+    "<table style='width:100%;border-collapse:collapse;font-size:13px'><thead><tr>"
+      +"<th style='padding:8px;text-align:left;border-bottom:2px solid #cfd9d3'>対象</th>"
+      +"<th style='padding:8px;text-align:left;border-bottom:2px solid #cfd9d3'>内容</th>"
+      +"<th style='padding:8px;text-align:right;border-bottom:2px solid #cfd9d3'>決済済</th>"
+      +"<th style='padding:8px;text-align:right;border-bottom:2px solid #cfd9d3'>通常価格</th>"
+      +"<th style='padding:8px;text-align:right;border-bottom:2px solid #cfd9d3'>要精算額</th>"
+      +"</tr></thead><tbody>"+rowsHtml+"</tbody></table>",
+    "<p style='font-size:18px;font-weight:700'>今回の要精算金額："+Number(row.total||0).toLocaleString("ja-JP")+"円</p>",
+    paymentHtml,
+    "<p style='font-weight:700'>【ご確認・同意済みの事項】</p>",
+    "<p>✓ "+tfgSettlementMailEscHtml_(consents[0])+"<br>✓ "+tfgSettlementMailEscHtml_(consents[1])+"<br>✓ "+tfgSettlementMailEscHtml_(consents[2])+"</p>",
+    "<p>このメールはお手続き内容の控えとして保管してください。</p>",
+    "<p>The Forest Gym</p>",
+    "</div>"
+  ].join("");
+
+  GmailApp.sendEmail(
+    row.email,
+    "【The Forest Gym】退会精算内容の承認を受け付けました",
+    body,
+    {
+      bcc:TFG_SETTLEMENT_CONFIG.ADMIN_EMAIL,
+      name:"The Forest Gym",
+      replyTo:TFG_SETTLEMENT_CONFIG.ADMIN_EMAIL,
+      htmlBody:htmlBody
+    }
+  );
+}
+
+function tfgSettlementSendDeferredConfirmation_(row,now){
+  const progress=tfgSettlementCampaignProgress_(row.items,row.withdrawalDate);
+  const progressLine=progress&&progress.remainingMonths>0
+    ?"キャンペーン条件達成まで：残り"+progress.remainingMonths+"か月　達成月："+progress.achievementYear+"年"+progress.achievementMonth+"月"
+    :"";
+  const body=[
+    row.memberName+" 様",
+    "",
+    "The Forest Gymでございます。",
+    "キャンペーン条件達成まで、今回の退会申請を見送るお手続きを受け付けました。",
+    "",
+    "受付日時："+now,
+    "当初退会予定："+row.withdrawalDate,
+    progressLine,
+    progressLine?"現時点までの休会期間は加味されています。":"",
+    "",
+    "【重要】",
+    "・今回の見送りにより、退会申請のご予約がある場合はキャンセルとなります。",
+    "・キャンペーン条件達成時に自動的に退会となることはありません。",
+    "・キャンペーン条件達成後に退会をご希望の場合は、改めて退会申請が必要です。",
+    "",
+    "このメールはお手続き内容の控えとして保管してください。",
+    "",
+    "The Forest Gym"
+  ].filter(function(line){return line!==""||true;}).join("\n");
+
+  const progressHtml=progressLine
+    ?"<p><strong>"+tfgSettlementMailEscHtml_(progressLine)+"</strong><br><span style='font-size:13px;color:#5f6d66'>現時点までの休会期間は加味されています。</span></p>"
+    :"";
+  const htmlBody=[
+    "<div style='font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Noto Sans JP,Arial,sans-serif;color:#17231d;line-height:1.8;font-size:14px'>",
+    "<p>"+tfgSettlementMailEscHtml_(row.memberName)+" 様</p>",
+    "<p>The Forest Gymでございます。<br>キャンペーン条件達成まで、今回の退会申請を見送るお手続きを受け付けました。</p>",
+    "<p>受付日時："+tfgSettlementMailEscHtml_(now)+"<br>当初退会予定："+tfgSettlementMailEscHtml_(row.withdrawalDate)+"</p>",
+    progressHtml,
+    "<div style='margin:18px 0;padding:14px 16px;background:#fff8e8;border:1px solid #ead59d;border-radius:10px'>",
+    "<strong>【重要】</strong><br>",
+    "・今回の見送りにより、退会申請のご予約がある場合はキャンセルとなります。<br>",
+    "・キャンペーン条件達成時に自動的に退会となることはありません。<br>",
+    "・キャンペーン条件達成後に退会をご希望の場合は、改めて退会申請が必要です。",
+    "</div>",
+    "<p>このメールはお手続き内容の控えとして保管してください。</p>",
+    "<p>The Forest Gym</p>",
+    "</div>"
+  ].join("");
+
+  GmailApp.sendEmail(
+    row.email,
+    "【The Forest Gym】退会申請の見送りを受け付けました",
+    body,
+    {
+      bcc:TFG_SETTLEMENT_CONFIG.ADMIN_EMAIL,
+      name:"The Forest Gym",
+      replyTo:TFG_SETTLEMENT_CONFIG.ADMIN_EMAIL,
+      htmlBody:htmlBody
+    }
+  );
+}
+
 function approveTfgSettlement_(body){
   const lock=LockService.getScriptLock(); let locked=false;
   try{
@@ -386,7 +573,7 @@ function approveTfgSettlement_(body){
     const sh=getTfgSettlementSheet_();
     sh.getRange(row.row,11,1,5).setValues([["APPROVED",now,memberNo,email,"本人端末WEB承認"]]);
     lock.releaseLock();locked=false;
-    try{MailApp.sendEmail({to:TFG_SETTLEMENT_CONFIG.ADMIN_EMAIL,subject:"【精算承認済み】"+row.memberName+" 様",body:[row.memberName+" 様の精算内容が会員端末から承認されました。","", "精算ID："+row.id,"会員番号："+row.memberNo,"精算金額："+Number(row.total).toLocaleString("ja-JP")+"円","支払方法："+tfgSettlementPaymentLabel_(row.paymentMethod),"承認日時："+now].join("\n"),name:"The Forest Gym"});}catch(mailError){console.error(mailError);}
+    try{tfgSettlementSendApprovalConfirmation_(row,now);}catch(mailError){console.error(mailError);}
     return tfgSettlementJson_({ok:true,data:{approvedAt:now}});
   }catch(e){if(locked){try{lock.releaseLock()}catch(_){}}return tfgSettlementJson_({ok:false,code:"APPROVE_ERROR",message:e.message||"承認処理に失敗しました。"});}
 }
@@ -417,23 +604,7 @@ function deferTfgSettlement_(body){
     sh.getRange(row.row,18,1,2).setValues([[now,"キャンペーン条件達成まで退会申請を見送り"]]);
     lock.releaseLock();locked=false;
 
-    try{
-      MailApp.sendEmail({
-        to:TFG_SETTLEMENT_CONFIG.ADMIN_EMAIL,
-        subject:"【退会申請見送り】"+row.memberName+" 様",
-        body:[
-          row.memberName+" 様が、キャンペーン条件達成まで今回の退会申請を見送りました。",
-          "",
-          "精算ID："+row.id,
-          "会員番号："+row.memberNo,
-          "当初退会予定："+row.withdrawalDate,
-          "受付日時："+now,
-          "",
-          "※キャンペーン条件達成後に退会を希望される場合は、会員様から再度退会申請のお申し出が必要です。"
-        ].join("\n"),
-        name:"The Forest Gym"
-      });
-    }catch(mailError){console.error(mailError);}
+    try{tfgSettlementSendDeferredConfirmation_(row,now);}catch(mailError){console.error(mailError);}
 
     return tfgSettlementJson_({ok:true,data:{deferredAt:now,status:"DEFERRED"}});
   }catch(e){
