@@ -60,56 +60,60 @@ function getTfgSettlementMember_(body){
   }
 }
 
+function getTfgSettlementMemberMasterSpreadsheet_(){
+  const props=PropertiesService.getScriptProperties();
+  const configuredId=String(props.getProperty("TFG_MEMBER_MASTER_ID")||"").trim();
+  if(configuredId){
+    return SpreadsheetApp.openById(configuredId);
+  }
+
+  const files=DriveApp.getFilesByName("TFG_Master");
+  while(files.hasNext()){
+    const file=files.next();
+    if(file.getMimeType()===MimeType.GOOGLE_SHEETS){
+      return SpreadsheetApp.openById(file.getId());
+    }
+  }
+  throw new Error("TFG_Master がGoogle Driveに見つかりません。");
+}
+
 function findTfgSettlementMemberByNo_(memberNo){
-  const ss=SpreadsheetApp.getActiveSpreadsheet();
-  if(!ss)throw new Error("会員マスターのスプレッドシートに紐づいたApps Scriptで使用してください。");
+  const ss=getTfgSettlementMemberMasterSpreadsheet_();
+  const props=PropertiesService.getScriptProperties();
+  const configuredSheet=String(props.getProperty("TFG_MEMBER_MASTER_SHEET_NAME")||"master").trim();
+  const sh=ss.getSheetByName(configuredSheet);
+  if(!sh)throw new Error("TFG_Master の会員シート「"+configuredSheet+"」が見つかりません。");
 
-  const preferredNames=["TFG_MASTER","会員マスター","会員MASTER","会員"];
-  const allSheets=ss.getSheets();
-  const ordered=[];
-  preferredNames.forEach(function(name){
-    const sh=ss.getSheetByName(name);
-    if(sh&&ordered.indexOf(sh)<0)ordered.push(sh);
-  });
-  allSheets.forEach(function(sh){
-    if(ordered.indexOf(sh)<0)ordered.push(sh);
-  });
+  const lastRow=sh.getLastRow(),lastCol=sh.getLastColumn();
+  if(lastRow<2||lastCol<2)return null;
 
-  for(let s=0;s<ordered.length;s++){
-    const sh=ordered[s];
-    const sheetName=String(sh.getName()||"").trim();
-    if(["精算承認","休会申請","退会申請","休会URL発行"].indexOf(sheetName)>=0)continue;
-    const lastRow=sh.getLastRow(),lastCol=sh.getLastColumn();
-    if(lastRow<2||lastCol<2)continue;
-
-    const headerScanRows=Math.min(5,lastRow);
-    const head=sh.getRange(1,1,headerScanRows,lastCol).getDisplayValues();
-    let headerRow=-1,cols=null;
-    for(let r=0;r<head.length;r++){
-      const detected=tfgSettlementDetectMemberColumns_(head[r]);
-      if(detected.memberNo>=0&&detected.email>=0&&(detected.name>=0||(detected.lastName>=0&&detected.firstName>=0))){
-        headerRow=r+1;
-        cols=detected;
-        break;
-      }
+  const headerScanRows=Math.min(5,lastRow);
+  const head=sh.getRange(1,1,headerScanRows,lastCol).getDisplayValues();
+  let headerRow=-1,cols=null;
+  for(let r=0;r<head.length;r++){
+    const detected=tfgSettlementDetectMemberColumns_(head[r]);
+    if(detected.memberNo>=0&&detected.email>=0&&(detected.name>=0||(detected.lastName>=0&&detected.firstName>=0))){
+      headerRow=r+1;
+      cols=detected;
+      break;
     }
-    if(headerRow<0)continue;
+  }
+  if(headerRow<0)throw new Error("TFG_Master の見出し（memberNo / name / email）を確認できません。");
 
-    const dataRows=lastRow-headerRow;
-    if(dataRows<=0)continue;
-    const values=sh.getRange(headerRow+1,1,dataRows,lastCol).getDisplayValues();
-    for(let i=0;i<values.length;i++){
-      const row=values[i];
-      const rowMemberNo=String(row[cols.memberNo]||"").replace(/\D/g,"");
-      if(rowMemberNo!==memberNo)continue;
-      const email=String(row[cols.email]||"").trim().toLowerCase();
-      let memberName=cols.name>=0?String(row[cols.name]||"").trim():"";
-      if(!memberName){
-        memberName=(String(row[cols.lastName]||"").trim()+" "+String(row[cols.firstName]||"").trim()).trim();
-      }
-      if(!memberName||!email)throw new Error("会員マスターの氏名またはメールアドレスが未登録です。");
-      return{memberNo:rowMemberNo,memberName:memberName,email:email};
+  const dataRows=lastRow-headerRow;
+  if(dataRows<=0)return null;
+  const values=sh.getRange(headerRow+1,1,dataRows,lastCol).getDisplayValues();
+  for(let i=0;i<values.length;i++){
+    const row=values[i];
+    const rowMemberNo=String(row[cols.memberNo]||"").replace(/\D/g,"");
+    if(rowMemberNo!==memberNo)continue;
+    const email=String(row[cols.email]||"").trim().toLowerCase();
+    let memberName=cols.name>=0?String(row[cols.name]||"").trim():"";
+    if(!memberName){
+      memberName=(String(row[cols.lastName]||"").trim()+" "+String(row[cols.firstName]||"").trim()).trim();
     }
+    if(!memberName||!email)throw new Error("TFG_Master の氏名またはメールアドレスが未登録です。");
+    return{memberNo:rowMemberNo,memberName:memberName,email:email};
   }
   return null;
 }
