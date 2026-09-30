@@ -20,10 +20,124 @@ function tfgSettlementDoPost_(body){
   switch(action){
     case "getTfgSettlement": return getTfgSettlement_(body);
     case "approveTfgSettlement": return approveTfgSettlement_(body);
+    case "getTfgSettlementMember": return getTfgSettlementMember_(body);
     case "createTfgSettlement": return createTfgSettlement_(body);
     case "sendTfgSettlementApproval": return sendTfgSettlementApproval_(body);
     default:return tfgSettlementJson_({ok:false,code:"ACTION_NOT_FOUND",message:"指定されたactionは存在しません。"});
   }
+}
+
+/**
+ * 管理画面の精算書作成で、会員番号から氏名・登録メールを取得する。
+ * 99_Main.gs 側で ADMIN / MANAGER 認証を必須にする。
+ */
+function getTfgSettlementMember_(body){
+  try{
+    const memberNo=String((body&&body.memberNo)||"").replace(/\D/g,"");
+    if(!/^\d{6}$/.test(memberNo))throw new Error("会員番号は6桁の数字で入力してください。");
+    const member=findTfgSettlementMemberByNo_(memberNo);
+    if(!member){
+      return tfgSettlementJson_({
+        ok:false,
+        code:"MEMBER_NOT_FOUND",
+        message:"該当する会員番号が会員マスターに見つかりません。"
+      });
+    }
+    return tfgSettlementJson_({
+      ok:true,
+      data:{
+        memberNo:member.memberNo,
+        memberName:member.memberName,
+        email:member.email
+      }
+    });
+  }catch(e){
+    return tfgSettlementJson_({
+      ok:false,
+      code:"MEMBER_LOOKUP_ERROR",
+      message:e.message||"会員情報を取得できませんでした。"
+    });
+  }
+}
+
+function findTfgSettlementMemberByNo_(memberNo){
+  const ss=SpreadsheetApp.getActiveSpreadsheet();
+  if(!ss)throw new Error("会員マスターのスプレッドシートに紐づいたApps Scriptで使用してください。");
+
+  const preferredNames=["TFG_MASTER","会員マスター","会員MASTER","会員"];
+  const allSheets=ss.getSheets();
+  const ordered=[];
+  preferredNames.forEach(function(name){
+    const sh=ss.getSheetByName(name);
+    if(sh&&ordered.indexOf(sh)<0)ordered.push(sh);
+  });
+  allSheets.forEach(function(sh){
+    if(ordered.indexOf(sh)<0)ordered.push(sh);
+  });
+
+  for(let s=0;s<ordered.length;s++){
+    const sh=ordered[s];
+    const sheetName=String(sh.getName()||"").trim();
+    if(["精算承認","休会申請","退会申請","休会URL発行"].indexOf(sheetName)>=0)continue;
+    const lastRow=sh.getLastRow(),lastCol=sh.getLastColumn();
+    if(lastRow<2||lastCol<2)continue;
+
+    const headerScanRows=Math.min(5,lastRow);
+    const head=sh.getRange(1,1,headerScanRows,lastCol).getDisplayValues();
+    let headerRow=-1,cols=null;
+    for(let r=0;r<head.length;r++){
+      const detected=tfgSettlementDetectMemberColumns_(head[r]);
+      if(detected.memberNo>=0&&detected.email>=0&&(detected.name>=0||(detected.lastName>=0&&detected.firstName>=0))){
+        headerRow=r+1;
+        cols=detected;
+        break;
+      }
+    }
+    if(headerRow<0)continue;
+
+    const dataRows=lastRow-headerRow;
+    if(dataRows<=0)continue;
+    const values=sh.getRange(headerRow+1,1,dataRows,lastCol).getDisplayValues();
+    for(let i=0;i<values.length;i++){
+      const row=values[i];
+      const rowMemberNo=String(row[cols.memberNo]||"").replace(/\D/g,"");
+      if(rowMemberNo!==memberNo)continue;
+      const email=String(row[cols.email]||"").trim().toLowerCase();
+      let memberName=cols.name>=0?String(row[cols.name]||"").trim():"";
+      if(!memberName){
+        memberName=(String(row[cols.lastName]||"").trim()+" "+String(row[cols.firstName]||"").trim()).trim();
+      }
+      if(!memberName||!email)throw new Error("会員マスターの氏名またはメールアドレスが未登録です。");
+      return{memberNo:rowMemberNo,memberName:memberName,email:email};
+    }
+  }
+  return null;
+}
+
+function tfgSettlementDetectMemberColumns_(headers){
+  const normalized=headers.map(tfgSettlementNormalizeHeader_);
+  return{
+    memberNo:tfgSettlementFindHeader_(normalized,["会員番号","会員no","会員id","memberno","membernumber"]),
+    name:tfgSettlementFindHeader_(normalized,["氏名","名前","会員氏名","お名前","name"]),
+    lastName:tfgSettlementFindHeader_(normalized,["氏名(姓)","姓","苗字","lastname","familyname"]),
+    firstName:tfgSettlementFindHeader_(normalized,["氏名(名)","名","firstname","givenname"]),
+    email:tfgSettlementFindHeader_(normalized,["メールアドレス","登録メールアドレス","メール","email","e-mail"])
+  };
+}
+function tfgSettlementFindHeader_(headers,candidates){
+  for(let i=0;i<candidates.length;i++){
+    const idx=headers.indexOf(tfgSettlementNormalizeHeader_(candidates[i]));
+    if(idx>=0)return idx;
+  }
+  return -1;
+}
+function tfgSettlementNormalizeHeader_(value){
+  return String(value||"")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s　]/g,"")
+    .replace(/[（）]/g,function(ch){return ch==="（"?"(":")";})
+    .replace(/[._-]/g,"");
 }
 
 /**
