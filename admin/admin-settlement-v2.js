@@ -48,7 +48,7 @@ function refreshFirstNormal_(){
   if(!planEl||!joinEl||!paidEl||!normalEl)return;
   if(!joinEl.value){
     normalEl.value="0";
-    if(hintEl)hintEl.textContent="入会日を入力すると自動計算します。";
+    if(hintEl)hintEl.textContent="スタート日を入力すると自動計算します。";
     return;
   }
   const rate=rateFor(planEl.value,joinEl.value);
@@ -87,7 +87,7 @@ function calc(){
   const initialPaid=Number($("#settlementInitialPaid").value||0);
   const paymentMethod=$("#settlementPaymentMethod").value;
   if(!/^\d{6}$/.test(memberNo)){show("会員番号は6桁の数字で入力してください。",true);return}
-  if(!memberName||!email||!joinDate){show("氏名・メールアドレス・入会日を入力してください。",true);return}
+  if(!memberName||!email||!joinDate){show("氏名・メールアドレス・スタート日を入力してください。",true);return}
   const cut=cutoffInfo(),months=monthsBetween(joinDate,cut.withdrawalDate);
   const items=[];
   items.push({target:"—",label:"初期費用",paid:initialPaid,normal:8800,settlement:Math.max(0,8800-initialPaid),note:"入会金・事務手数料",kind:"INITIAL",basePaid:initialPaid,baseNormal:8800});
@@ -234,7 +234,7 @@ function buildMemberPreviewHtml_(){
   const campaignProgressHtml=campaignProgress
     ? `<div style="margin-top:9px;padding:11px 13px;border-radius:11px;background:#f8fbf9;border:1px solid #dfe9e3;font-size:13px;color:#294b3b">
         ${campaignProgress.remaining>0
-          ? `キャンペーン条件達成まで：<strong>残り${campaignProgress.remaining}か月</strong>（達成月：${campaignProgress.year}年${campaignProgress.month}月）<div style="margin-top:2px;color:#66746d;font-size:11px">※表示の達成月は、今後追加の休会がない場合の目安です。</div>`
+          ? `キャンペーン条件達成まで：<strong>残り${campaignProgress.remaining}か月</strong>　達成月：${campaignProgress.year}年${campaignProgress.month}月<div style="margin-top:2px;color:#66746d;font-size:11px">現時点までの休会期間は加味されています。</div>`
           : `<strong>キャンペーン条件達成済み</strong>（達成月：${campaignProgress.year}年${campaignProgress.month}月）`}
       </div>`
     : "";
