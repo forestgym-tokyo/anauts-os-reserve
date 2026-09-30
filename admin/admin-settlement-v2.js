@@ -295,8 +295,8 @@ function buildMemberPreviewHtml_(){
         </div>
         <div style="background:#fff;border:1px solid #dce6e0;border-radius:18px;padding:20px">
           <h2 style="font-size:17px;margin:0 0 14px">確認・同意</h2>
-          <div style="padding:12px;background:#fafcfb;border:1px solid #e0e8e3;border-radius:12px;margin-bottom:10px">☐ 上記の精算内容および精算金額を確認しました。</div>
-          <div style="padding:12px;background:#fafcfb;border:1px solid #e0e8e3;border-radius:12px;margin-bottom:10px">☐ ${bank?"表示された精算金額を、承認後に指定口座へ一括で振り込むことに同意します。":"表示された精算金額を、登録済みクレジットカードで一括決済することに同意します。"}</div>
+          <div style="padding:12px;background:#fafcfb;border:1px solid #e0e8e3;border-radius:12px;margin-bottom:10px">☐ 上記の要精算内容および要精算金額を確認しました。</div>
+          <div style="padding:12px;background:#fafcfb;border:1px solid #e0e8e3;border-radius:12px;margin-bottom:10px">☐ ${bank?"表示された要精算金額を、承認後に指定口座へ一括で振り込むことに同意します。":"表示された要精算金額を、登録済みクレジットカードで一括決済することに同意します。"}</div>
           <div style="padding:12px;background:#fafcfb;border:1px solid #e0e8e3;border-radius:12px;margin-bottom:12px">☐ ${bank?"振込確認ができない場合、退会手続きが完了しないことを理解しました。":"クレジットカード決済が完了しない場合、退会手続きが完了しないことを理解しました。"}</div>
           <button disabled style="width:100%;border:0;border-radius:13px;padding:16px;background:#0b3b2a;color:#fff;font-size:16px;font-weight:900;opacity:.5">下書きプレビューのため承認できません</button>
           <button disabled style="width:100%;border:2px solid #0b3b2a;border-radius:13px;padding:16px;background:#fff;color:#0b3b2a;font-size:16px;font-weight:900;opacity:.5;margin-top:8px">キャンペーン条件達成まで見送る</button>
