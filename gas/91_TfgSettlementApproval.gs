@@ -20,6 +20,7 @@ function tfgSettlementDoPost_(body){
   switch(action){
     case "getTfgSettlement": return getTfgSettlement_(body);
     case "approveTfgSettlement": return approveTfgSettlement_(body);
+    case "deferTfgSettlement": return deferTfgSettlement_(body);
     case "getTfgSettlementMember": return getTfgSettlementMember_(body);
     case "createTfgSettlement": return createTfgSettlement_(body);
     case "sendTfgSettlementApproval": return sendTfgSettlementApproval_(body);
@@ -258,8 +259,8 @@ function getTfgSettlement_(body){
     const row=findTfgSettlementByToken_(body&&body.token);
     if(!row)throw new Error("この承認URLは無効です。");
     if(row.status==="SUPERSEDED")throw new Error("この承認URLは再発行により無効になりました。最新の精算書をご確認ください。");
-    if(row.status!=="APPROVED" && tfgSettlementParseJst_(row.expiresAt).getTime()<Date.now())throw new Error("精算条件が更新されたため、この承認URLは無効になりました。最新の精算書をご確認ください。");
-    return tfgSettlementJson_({ok:true,data:{settlementId:row.id,memberName:row.memberName,withdrawalDate:row.withdrawalDate,items:row.items,total:row.total,status:row.status,approvedAt:row.approvedAt,paymentMethod:row.paymentMethod,paymentNote:row.paymentNote,bank:row.paymentMethod==="BANK_TRANSFER"?{bankName:TFG_SETTLEMENT_CONFIG.BANK_NAME,branch:TFG_SETTLEMENT_CONFIG.BANK_BRANCH,accountType:TFG_SETTLEMENT_CONFIG.BANK_ACCOUNT_TYPE,accountNo:TFG_SETTLEMENT_CONFIG.BANK_ACCOUNT_NO,accountName:TFG_SETTLEMENT_CONFIG.BANK_ACCOUNT_NAME}:null}});
+    if(["APPROVED","DEFERRED"].indexOf(row.status)<0 && tfgSettlementParseJst_(row.expiresAt).getTime()<Date.now())throw new Error("精算条件が更新されたため、この承認URLは無効になりました。最新の精算書をご確認ください。");
+    return tfgSettlementJson_({ok:true,data:{settlementId:row.id,memberName:row.memberName,withdrawalDate:row.withdrawalDate,items:row.items,total:row.total,status:row.status,approvedAt:row.approvedAt,deferredAt:row.deferredAt,paymentMethod:row.paymentMethod,paymentNote:row.paymentNote,bank:row.paymentMethod==="BANK_TRANSFER"?{bankName:TFG_SETTLEMENT_CONFIG.BANK_NAME,branch:TFG_SETTLEMENT_CONFIG.BANK_BRANCH,accountType:TFG_SETTLEMENT_CONFIG.BANK_ACCOUNT_TYPE,accountNo:TFG_SETTLEMENT_CONFIG.BANK_ACCOUNT_NO,accountName:TFG_SETTLEMENT_CONFIG.BANK_ACCOUNT_NAME}:null}});
   }catch(e){return tfgSettlementJson_({ok:false,code:"GET_ERROR",message:e.message||"精算内容を取得できませんでした。"});}
 }
 
@@ -286,12 +287,63 @@ function approveTfgSettlement_(body){
   }catch(e){if(locked){try{lock.releaseLock()}catch(_){}}return tfgSettlementJson_({ok:false,code:"APPROVE_ERROR",message:e.message||"承認処理に失敗しました。"});}
 }
 
+function deferTfgSettlement_(body){
+  const lock=LockService.getScriptLock(); let locked=false;
+  try{
+    const memberNo=String(body.memberNo||"").replace(/\D/g,"");
+    const email=String(body.email||"").trim().toLowerCase();
+    if(!/^\d{6}$/.test(memberNo))throw new Error("会員番号は6桁の数字で入力してください。");
+    if(!/^\S+@\S+\.\S+$/.test(email))throw new Error("登録メールアドレスを入力してください。");
+
+    lock.waitLock(10000);locked=true;
+    const row=findTfgSettlementByToken_(body&&body.token);
+    if(!row)throw new Error("この承認URLは無効です。");
+    if(row.status==="DEFERRED"){
+      lock.releaseLock();locked=false;
+      return tfgSettlementJson_({ok:true,data:{deferredAt:row.deferredAt,alreadyDeferred:true}});
+    }
+    if(row.status==="APPROVED")throw new Error("この精算書はすでに承認済みです。");
+    if(row.status!=="PENDING")throw new Error("この承認URLは無効になりました。最新の精算書をご確認ください。");
+    if(tfgSettlementParseJst_(row.expiresAt).getTime()<Date.now())throw new Error("精算条件が更新されたため、この承認URLは無効になりました。最新の精算書をご確認ください。");
+    if(memberNo!==row.memberNo||email!==row.email)throw new Error("会員番号または登録メールアドレスが一致しません。");
+
+    const now=Utilities.formatDate(new Date(),TFG_SETTLEMENT_CONFIG.TIMEZONE,"yyyy-MM-dd HH:mm:ss");
+    const sh=getTfgSettlementSheet_();
+    sh.getRange(row.row,11).setValue("DEFERRED");
+    sh.getRange(row.row,18,1,2).setValues([[now,"キャンペーン条件達成まで退会申請を見送り"]]);
+    lock.releaseLock();locked=false;
+
+    try{
+      MailApp.sendEmail({
+        to:TFG_SETTLEMENT_CONFIG.ADMIN_EMAIL,
+        subject:"【退会申請見送り】"+row.memberName+" 様",
+        body:[
+          row.memberName+" 様が、キャンペーン条件達成まで今回の退会申請を見送りました。",
+          "",
+          "精算ID："+row.id,
+          "会員番号："+row.memberNo,
+          "当初退会予定："+row.withdrawalDate,
+          "受付日時："+now,
+          "",
+          "※キャンペーン条件達成後に退会を希望される場合は、会員様から再度退会申請のお申し出が必要です。"
+        ].join("\n"),
+        name:"The Forest Gym"
+      });
+    }catch(mailError){console.error(mailError);}
+
+    return tfgSettlementJson_({ok:true,data:{deferredAt:now,status:"DEFERRED"}});
+  }catch(e){
+    if(locked){try{lock.releaseLock()}catch(_){}}
+    return tfgSettlementJson_({ok:false,code:"DEFER_ERROR",message:e.message||"退会申請の見送り受付に失敗しました。"});
+  }
+}
+
 function getTfgSettlementSheet_(){
   const ss=SpreadsheetApp.getActiveSpreadsheet();
   if(!ss)throw new Error("会員マスターのスプレッドシートに紐づいたApps Scriptで使用してください。");
   let sh=ss.getSheetByName(TFG_SETTLEMENT_CONFIG.SHEET_NAME);
   if(!sh)sh=ss.insertSheet(TFG_SETTLEMENT_CONFIG.SHEET_NAME);
-  const headers=["精算ID","作成日時","会員番号","氏名","登録メール","退会予定","明細JSON","精算合計","トークンHASH","有効期限","ステータス","承認日時","承認会員番号","承認メール","承認方法","支払方法","支払案内"];
+  const headers=["精算ID","作成日時","会員番号","氏名","登録メール","退会予定","明細JSON","精算合計","トークンHASH","有効期限","ステータス","承認日時","承認会員番号","承認メール","承認方法","支払方法","支払案内","見送り受付日時","見送り理由"];
   if(sh.getLastRow()===0){sh.appendRow(headers);sh.setFrozenRows(1);}
   else if(sh.getLastColumn()<headers.length){sh.getRange(1,1,1,headers.length).setValues([headers]);}
   return sh;
@@ -309,7 +361,7 @@ function invalidatePreviousPendingTfgSettlements_(sheet,memberNo,keepId){
 function findTfgSettlementByToken_(token){
   token=String(token||"").trim();if(!token)return null;
   const hash=tfgSettlementHash_(token),sh=getTfgSettlementSheet_(),v=sh.getDataRange().getDisplayValues();
-  for(let i=1;i<v.length;i++){if(v[i][8]===hash)return{row:i+1,id:v[i][0],memberNo:v[i][2],memberName:v[i][3],email:String(v[i][4]||"").toLowerCase(),withdrawalDate:v[i][5],items:JSON.parse(v[i][6]||"[]"),total:Number(v[i][7]||0),expiresAt:v[i][9],status:v[i][10],approvedAt:v[i][11],paymentMethod:tfgSettlementNormalizePaymentMethod_(v[i][15]),paymentNote:String(v[i][16]||"")};}
+  for(let i=1;i<v.length;i++){if(v[i][8]===hash)return{row:i+1,id:v[i][0],memberNo:v[i][2],memberName:v[i][3],email:String(v[i][4]||"").toLowerCase(),withdrawalDate:v[i][5],items:JSON.parse(v[i][6]||"[]"),total:Number(v[i][7]||0),expiresAt:v[i][9],status:v[i][10],approvedAt:v[i][11],paymentMethod:tfgSettlementNormalizePaymentMethod_(v[i][15]),paymentNote:String(v[i][16]||""),deferredAt:String(v[i][17]||""),deferReason:String(v[i][18]||"")};}
   return null;
 }
 
