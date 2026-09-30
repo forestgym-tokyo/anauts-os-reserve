@@ -211,9 +211,9 @@ function renderCampaignRemaining_(){
   const p=campaignProgress_(settlement&&settlement.items,settlement&&settlement.withdrawalDate);
   if(!p){el.classList.add("hidden");el.innerHTML="";return;}
   if(p.remaining>0){
-    el.innerHTML=`キャンペーン条件達成まで：<strong>残り${p.remaining}か月</strong>　達成月：${p.achievementYear}年${p.achievementMonth}月<span class="sub">現時点までの休会期間は加味されています。</span>`;
+    el.innerHTML=`キャンペーン条件達成まで：<strong>残り${p.remaining}か月</strong>　達成月：${p.achievementYear}年${p.achievementMonth}月<span class="sub">休会がある場合、現時点までの休会期間は加味されています。</span>`;
   }else{
-    el.innerHTML=`<strong>キャンペーン条件達成済み</strong>　達成月：${p.achievementYear}年${p.achievementMonth}月<span class="sub">現時点までの休会期間は加味されています。</span>`;
+    el.innerHTML=`<strong>キャンペーン条件達成済み</strong>　達成月：${p.achievementYear}年${p.achievementMonth}月<span class="sub">休会がある場合、現時点までの休会期間は加味されています。</span>`;
   }
   el.classList.remove("hidden");
 }
