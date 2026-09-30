@@ -7,7 +7,7 @@ const TFG_SETTLEMENT_CONFIG=Object.freeze({
   TIMEZONE:"Asia/Tokyo",
   SHEET_NAME:"精算承認",
   ADMIN_EMAIL:"info@theforestgym.com",
-  APPROVAL_BASE_URL:"https://forestgym-tokyo.github.io/anauts-os-reserve/settlement-approval/",
+  APPROVAL_BASE_URL:"https://forestgym-tokyo.github.io/anauts-os-reserve/settlement-approval/index.html",
   BANK_NAME:"みずほ銀行",
   BANK_BRANCH:"新浦安支店",
   BANK_ACCOUNT_TYPE:"普通",
