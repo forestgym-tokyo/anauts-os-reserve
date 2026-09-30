@@ -261,7 +261,7 @@ function sendTfgSettlementApproval_(body){
     const campaignProgress=tfgSettlementCampaignProgress_(fresh.items,fresh.withdrawalDate);
     const campaignProgressLine=campaignProgress
       ? (campaignProgress.remainingMonths>0
-          ? "キャンペーン条件達成まで：残り"+campaignProgress.remainingMonths+"か月（達成月："+campaignProgress.achievementYear+"年"+campaignProgress.achievementMonth+"月）"
+          ? "キャンペーン条件達成まで：残り"+campaignProgress.remainingMonths+"か月　達成月："+campaignProgress.achievementYear+"年"+campaignProgress.achievementMonth+"月"
           : "キャンペーン条件：達成済み（達成月："+campaignProgress.achievementYear+"年"+campaignProgress.achievementMonth+"月）")
       : "";
     const expiryText=Utilities.formatDate(tfgSettlementParseJst_(fresh.expiresAt),TFG_SETTLEMENT_CONFIG.TIMEZONE,"yyyy年M月d日 H:mm");
@@ -280,7 +280,7 @@ function sendTfgSettlementApproval_(body){
       "「この内容で承認する」または「キャンペーン条件達成まで見送る」を選択してください。",
       "",
       campaignProgressLine,
-      campaignProgress?"※表示の達成月は、今後追加の休会がない場合の目安です。":"",
+      campaignProgress?"現時点までの休会期間は加味されています。":"",
       "承認URLの有効期限："+expiryText,
       paymentText,
       "",
@@ -312,7 +312,7 @@ function sendTfgSettlementApproval_(body){
       : '';
     const campaignHtml=campaignProgressLine
       ? '<p style="margin:18px 0 0;font-weight:700">'+escHtml(campaignProgressLine)+'</p>'
-        +(campaignProgress?'<p style="margin:4px 0 16px;font-size:13px;color:#5f6d66">※表示の達成月は、今後追加の休会がない場合の目安です。</p>':'')
+        +(campaignProgress?'<p style="margin:4px 0 16px;font-size:13px;color:#5f6d66">現時点までの休会期間は加味されています。</p>':'')
       : '';
     const draftHtml=[
       '<div style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Noto Sans JP,Arial,sans-serif;color:#17231d;line-height:1.8;font-size:14px">',
