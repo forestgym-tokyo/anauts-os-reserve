@@ -234,7 +234,7 @@ function buildMemberPreviewHtml_(){
   const campaignProgressHtml=campaignProgress
     ? `<div style="margin-top:9px;padding:11px 13px;border-radius:11px;background:#f8fbf9;border:1px solid #dfe9e3;font-size:13px;color:#294b3b">
         ${campaignProgress.remaining>0
-          ? `キャンペーン条件達成まで：<strong>残り${campaignProgress.remaining}か月</strong>　達成月：${campaignProgress.year}年${campaignProgress.month}月<div style="margin-top:2px;color:#66746d;font-size:11px">現時点までの休会期間は加味されています。</div>`
+          ? `キャンペーン条件達成まで：<strong>残り${campaignProgress.remaining}か月</strong>　達成月：${campaignProgress.year}年${campaignProgress.month}月<div style="margin-top:2px;color:#66746d;font-size:11px">休会がある場合、現時点までの休会期間は加味されています。</div>`
           : `<strong>キャンペーン条件達成済み</strong>（達成月：${campaignProgress.year}年${campaignProgress.month}月）`}
       </div>`
     : "";
