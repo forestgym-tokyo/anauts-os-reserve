@@ -100,16 +100,16 @@ a{color:var(--forest2)}
       <div class="section-title"><span class="dot"></span><h2>精算明細</h2></div>
       <div class="table-scroll">
         <table>
-          <thead><tr><th>対象</th><th>内容</th><th class="num">決済済</th><th class="num">通常価格</th><th class="num">精算額</th></tr></thead>
+          <thead><tr><th>対象</th><th>内容</th><th class="num">決済済</th><th class="num">通常価格</th><th class="num">要精算額</th></tr></thead>
           <tbody id="items"></tbody>
         </table>
       </div>
-      <div class="total-box"><span>今回のご精算金額</span><strong id="total">—</strong></div>
+      <div class="total-box"><span>今回の要精算金額</span><strong id="total">—</strong></div>
       <div id="campaignRemaining" class="campaign-remaining hidden"></div>
 
       <div id="cardPayment" class="payment cardpay hidden">
         <div class="pay-head"><div class="pay-icon">💳</div><div>クレジットカードで決済</div></div>
-        <p class="pay-lead">ご登録済みのクレジットカードへ、表示されている精算金額を一括で決済します。</p>
+        <p class="pay-lead">表示されている要精算金額はご承認翌日に一括で決済されます。</p>
         <p class="pay-important">お客様による振込作業は不要です。</p>
       </div>
 
@@ -227,7 +227,7 @@ function renderSettlement(){
   $("withdrawalDate").textContent=settlement.withdrawalDate||"—";
   $("total").textContent=yen(settlement.total);
   renderCampaignRemaining_();
-  $("items").innerHTML=(settlement.items||[]).map(x=>`<tr><td>${esc(x.target||"—")}</td><td>${esc(x.label||"")}</td><td class="num">${yen(x.paid)}</td><td class="num">${yen(x.normal)}</td><td class="num"><strong>${yen(x.settlement)}</strong></td></tr>`).join("");
+  $("items").innerHTML=(settlement.items||[]).map(x=>`<tr><td>${esc(x.target||"—")}</td><td>${esc(x.status==="休会"?"休会費":(x.label||""))}</td><td class="num">${yen(x.paid)}</td><td class="num">${yen(x.normal)}</td><td class="num"><strong>${yen(x.settlement)}</strong></td></tr>`).join("");
   const bank=settlement.paymentMethod==="BANK_TRANSFER";
   $("cardPayment").classList.toggle("hidden",bank);
   $("bankPayment").classList.toggle("hidden",!bank);
