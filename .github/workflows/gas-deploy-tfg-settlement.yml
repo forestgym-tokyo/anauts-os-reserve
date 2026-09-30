@@ -1,0 +1,94 @@
+name: GAS Deploy TFG Settlement (safe)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type DEPLOY_TFG_SETTLEMENT to update the live Apps Script source'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require explicit confirmation
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          test "$CONFIRM" = "DEPLOY_TFG_SETTLEMENT" || (echo "Confirmation mismatch. Deployment cancelled." && exit 1)
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Validate clasp secrets
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+          CLASP_JSON: ${{ secrets.CLASP_JSON }}
+        run: |
+          test -n "$CLASPRC_JSON" || (echo "CLASPRC_JSON is missing" && exit 1)
+          test -n "$CLASP_JSON" || (echo "CLASP_JSON is missing" && exit 1)
+
+      - name: Prepare clasp credentials and isolated live snapshot
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+          CLASP_JSON: ${{ secrets.CLASP_JSON }}
+        run: |
+          printf '%s' "$CLASPRC_JSON" > "$HOME/.clasprc.json"
+          rm -rf .gas-live
+          mkdir -p .gas-live
+          node <<'NODE'
+          const fs = require("fs");
+          const cfg = JSON.parse(process.env.CLASP_JSON);
+          if (!cfg.scriptId) throw new Error("CLASP_JSON.scriptId is missing");
+          fs.writeFileSync(".clasp.json", JSON.stringify({ scriptId: cfg.scriptId, rootDir: ".gas-live" }));
+          fs.writeFileSync(".claspignore", "node_modules/**\n.github/**\n");
+          NODE
+
+      - name: Pull current live Apps Script source
+        run: npx -y @google/clasp@3.4.1 pull
+
+      - name: Overlay TFG settlement module and API route
+        run: |
+          test -f .gas-live/99_Main.js || (echo "Live 99_Main.js was not pulled" && exit 1)
+          cp gas/91_TfgSettlementApproval.gs .gas-live/91_TfgSettlementApproval.js
+          node <<'NODE'
+          const fs = require("fs");
+          const path = ".gas-live/99_Main.js";
+          let src = fs.readFileSync(path, "utf8");
+          if (!src.includes('case "getTfgSettlementMember"')) {
+            const anchor = `      case "createTfgSettlement":
+        requireAuth_(body, ["ADMIN", "MANAGER"]);
+        return createTfgSettlement_(body);`;
+            const replacement = `      case "getTfgSettlementMember":
+        requireAuth_(body, ["ADMIN", "MANAGER"]);
+        return getTfgSettlementMember_(body);
+
+      case "createTfgSettlement":
+        requireAuth_(body, ["ADMIN", "MANAGER"]);
+        return createTfgSettlement_(body);`;
+            if (!src.includes(anchor)) {
+              throw new Error("Could not locate createTfgSettlement route in live 99_Main.js");
+            }
+            src = src.replace(anchor, replacement);
+            fs.writeFileSync(path, src);
+          }
+          NODE
+
+      - name: Verify TFG settlement overlay
+        run: |
+          grep -q 'function getTfgSettlementMember_' .gas-live/91_TfgSettlementApproval.js
+          grep -q 'case "getTfgSettlementMember"' .gas-live/99_Main.js
+          grep -q 'function createTfgSettlement_' .gas-live/91_TfgSettlementApproval.js
+          echo "TFG settlement overlay verified."
+
+      - name: Push preserved live source plus TFG settlement changes
+        run: npx -y @google/clasp@3.4.1 push --force
