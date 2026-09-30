@@ -280,7 +280,7 @@ function sendTfgSettlementApproval_(body){
       "「この内容で承認する」または「キャンペーン条件達成まで見送る」を選択してください。",
       "",
       campaignProgressLine,
-      campaignProgress?"現時点までの休会期間は加味されています。":"",
+      campaignProgress?"休会がある場合、現時点までの休会期間は加味されています。":"",
       "承認URLの有効期限："+expiryText,
       paymentText,
       "",
@@ -312,7 +312,7 @@ function sendTfgSettlementApproval_(body){
       : '';
     const campaignHtml=campaignProgressLine
       ? '<p style="margin:18px 0 0;font-weight:700">'+escHtml(campaignProgressLine)+'</p>'
-        +(campaignProgress?'<p style="margin:4px 0 16px;font-size:13px;color:#5f6d66">現時点までの休会期間は加味されています。</p>':'')
+        +(campaignProgress?'<p style="margin:4px 0 16px;font-size:13px;color:#5f6d66">休会がある場合、現時点までの休会期間は加味されています。</p>':'')
       : '';
     const draftHtml=[
       '<div style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Noto Sans JP,Arial,sans-serif;color:#17231d;line-height:1.8;font-size:14px">',
@@ -510,7 +510,7 @@ function tfgSettlementSendDeferredConfirmation_(row,now){
     "受付日時："+now,
     "当初退会予定："+row.withdrawalDate,
     progressLine,
-    progressLine?"現時点までの休会期間は加味されています。":"",
+    progressLine?"休会がある場合、現時点までの休会期間は加味されています。":"",
     "",
     "【重要】",
     "・今回の見送りにより、退会申請のご予約がある場合はキャンセルとなります。",
@@ -523,7 +523,7 @@ function tfgSettlementSendDeferredConfirmation_(row,now){
   ].filter(function(line){return line!==""||true;}).join("\n");
 
   const progressHtml=progressLine
-    ?"<p><strong>"+tfgSettlementMailEscHtml_(progressLine)+"</strong><br><span style='font-size:13px;color:#5f6d66'>現時点までの休会期間は加味されています。</span></p>"
+    ?"<p><strong>"+tfgSettlementMailEscHtml_(progressLine)+"</strong><br><span style='font-size:13px;color:#5f6d66'>休会がある場合、現時点までの休会期間は加味されています。</span></p>"
     :"";
   const htmlBody=[
     "<div style='font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Noto Sans JP,Arial,sans-serif;color:#17231d;line-height:1.8;font-size:14px'>",
