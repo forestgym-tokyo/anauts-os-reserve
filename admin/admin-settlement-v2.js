@@ -177,7 +177,7 @@ function show(text,isError=false){
 }
 async function createDraft(){
   if(!current)return;
-  const btn=$("#settlementDraft"); btn.disabled=true; btn.textContent="下書き保存中…";
+  const btn=$("#settlementDraft"); btn.disabled=true; btn.textContent="作成中…";
   try{
     if(typeof apiPost!=="function")throw new Error("管理APIを読み込めませんでした。");
     const payload={
@@ -198,10 +198,27 @@ async function createDraft(){
     if(fallback&&fallbackText){fallbackText.value=draft.approvalUrl;fallback.classList.remove("is-hidden");}
     if(previewLink){previewLink.href=previewUrl;previewLink.classList.remove("is-hidden");}
     $("#settlementPreviewButton").disabled=!draft.approvalUrl;
-    $("#settlementSend").disabled=!draft.approvalUrl;
-    show("下書きを保存し、承認URLを発行しました。会員にはまだ送信していません。精算ID："+draft.settlementId);
-  }catch(e){show(e.message||"下書きを保存できませんでした。",true)}
-  finally{btn.disabled=false;btn.textContent="下書き保存・URL発行"}
+
+    const sendBtn=$("#settlementSend");
+    try{
+      const token=draftToken();
+      if(!token)throw new Error("承認URLのトークンを確認できません。");
+      const mailResult=await apiPost({action:"sendTfgSettlementApproval",token});
+      draft.gmailDraftId=mailResult.data?.gmailDraftId||"";
+      if(sendBtn){
+        sendBtn.disabled=true;
+        sendBtn.textContent="Gmail下書き作成済み";
+      }
+      show("承認URLを発行し、会員向けメールをGmailの下書きに保存しました。内容を確認してGmailから送信してください。精算ID："+draft.settlementId);
+    }catch(mailError){
+      if(sendBtn){
+        sendBtn.disabled=false;
+        sendBtn.textContent="Gmail下書きを再作成";
+      }
+      show("精算書と承認URLは作成しましたが、Gmail下書きの作成に失敗しました。再作成ボタンを押してください。"+(mailError?.message?" "+mailError.message:""),true);
+    }
+  }catch(e){show(e.message||"精算書を作成できませんでした。",true)}
+  finally{btn.disabled=false;btn.textContent="Gmail下書きを作成・URL発行"}
 }
 function draftToken(){
   try{return new URL(draft?.approvalUrl||"",location.href).searchParams.get("token")||""}catch(_){return ""}
@@ -323,12 +340,16 @@ async function send(){
   if(!draft?.approvalUrl)return;
   const token=draftToken();
   if(!token){show("承認URLのトークンを確認できません。下書きを作り直してください。",true);return}
-  const btn=$("#settlementSend"); btn.disabled=true; btn.textContent="送信中…";
+  const btn=$("#settlementSend"); btn.disabled=true; btn.textContent="下書き作成中…";
   try{
     const r=await apiPost({action:"sendTfgSettlementApproval",token});
+    draft.gmailDraftId=r.data?.gmailDraftId||"";
     show("会員向け承認依頼メールをGmailの下書きに保存しました。内容を確認してGmailから送信してください。精算ID："+(r.data?.settlementId||draft.settlementId));
+    btn.textContent="Gmail下書き作成済み";
   }catch(e){show(e.message||"承認依頼メールを下書き保存できませんでした。",true)}
-  finally{btn.disabled=false;btn.textContent="会員向けメールを下書き保存"}
+  finally{
+    if(!draft?.gmailDraftId){btn.disabled=false;btn.textContent="Gmail下書きを再作成"}
+  }
 }
 let memberLookupTimer_=null;
 let memberLookupSeq_=0;
