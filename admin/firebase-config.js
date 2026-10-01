@@ -21,30 +21,31 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   const primaryUrl = String(API_URL || "").trim();
-  const workspaceUrl = primaryUrl.replace(
-    "https://script.google.com/macros/s/",
-    "https://script.google.com/a/theforestgym.com/macros/s/"
+  const configuredUrl = String(window.ANAUTS_API_URL || "").trim();
+
+  /*
+   * Googleの複数アカウント同時ログイン時、Workspace専用の
+   * /a/theforestgym.com/macros/s/... 経由はアカウント選択状態に左右され、
+   * fetch が失敗することがある。
+   *
+   * 公開Webアプリは標準 /macros/s/... URL で正常に応答するため、
+   * 管理画面は標準URLを最優先かつ既定とし、過去にsessionStorageへ
+   * 保存されたWorkspace URLや旧デプロイURLは再利用しない。
+   */
+  const apiUrls = Array.from(
+    new Set([primaryUrl, configuredUrl].filter(Boolean))
   );
 
-  let rememberedUrl = "";
   try {
-    rememberedUrl = String(
+    const rememberedUrl = String(
       window.sessionStorage.getItem("anauts_admin_api_url") || ""
     ).trim();
+    if (rememberedUrl && !apiUrls.includes(rememberedUrl)) {
+      window.sessionStorage.removeItem("anauts_admin_api_url");
+    }
   } catch (_) {
-    rememberedUrl = "";
+    // sessionStorageが利用できない環境でも標準URLで継続する。
   }
-
-  const apiUrls = Array.from(
-    new Set(
-      [
-        rememberedUrl,
-        workspaceUrl,
-        String(window.ANAUTS_API_URL || "").trim(),
-        primaryUrl
-      ].filter(Boolean)
-    )
-  );
 
   // GASは起動直後や混雑時に20秒を超えることがある。
   // 20秒で打ち切ると、正常な応答が返る直前に予定一覧などのGETが失敗する。
