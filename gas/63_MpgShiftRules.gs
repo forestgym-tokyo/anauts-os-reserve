@@ -24,7 +24,9 @@ const MPG_SHIFT_SERVICE_CODES_ = Object.freeze([
 const MPG_SHIFT_STAFF_CODE_ = "KAWAKAMI";
 const MPG_SHIFT_YACHIYO_STORE_CODE_ = "YACHIYO";
 const MPG_SHIFT_SOGA_STORE_CODE_ = "SOGA";
+const MPG_SHIFT_HEAD_OFFICE_STORE_CODE_ = "HEAD_OFFICE";
 const MPG_SHIFT_TRAVEL_MINUTES_ = 150;
+const MPG_SHIFT_HEAD_OFFICE_TRAVEL_MINUTES_ = 150;
 const MPG_SHIFT_SLOT_MINUTES_ = 45;
 const MPG_SHIFT_DAY_START_MINUTES_ = 10 * 60 + 15;
 const MPG_SHIFT_DAY_END_MINUTES_ = 20 * 60 + 45;
@@ -473,6 +475,163 @@ function mpgIsActive_(value) {
   return ["TRUE", "1", "YES", "ON", "RESERVED", "CONFIRMED"].includes(text);
 }
 
+function mpgReservationDate_(row) {
+  return typeof normalizeReservationScheduleDate_ === "function"
+    ? normalizeReservationScheduleDate_(row && (row.reservation_date || row.date))
+    : formatShiftDate_(row && (row.reservation_date || row.date));
+}
+
+function mpgReservationTime_(value) {
+  return typeof normalizeReservationTime_ === "function"
+    ? normalizeReservationTime_(value)
+    : formatShiftTime_(value);
+}
+
+function mpgIsActiveReservationRow_(row) {
+  const status = String(row && row.status || "").trim().toUpperCase();
+  return status !== "CANCELLED" &&
+    status !== "CANCELED" &&
+    status !== "CANCEL";
+}
+
+/**
+ * 川上の別拠点予約との移動時間競合を探す。
+ * candidateと既存予約の間にbufferMinutes以上の間隔がない場合は競合。
+ */
+function mpgFindKawakamiReservationTravelConflict_(
+  dateText,
+  startTime,
+  endTime,
+  otherStoreCode,
+  bufferMinutes,
+  excludeReservationId
+) {
+  const date = String(dateText || "").trim();
+  const candidateStart = mpgTimeToMinutes_(startTime);
+  const candidateEnd = mpgTimeToMinutes_(endTime);
+  const storeCode = String(otherStoreCode || "").trim().toUpperCase();
+  const excludedId = String(excludeReservationId || "").trim();
+  const buffer = Math.max(0, Number(bufferMinutes || 0));
+
+  if (
+    !date ||
+    !Number.isFinite(candidateStart) ||
+    !Number.isFinite(candidateEnd) ||
+    !storeCode
+  ) {
+    return null;
+  }
+
+  const rows = getSheetData(APP_CONFIG.SHEETS.RESERVATIONS);
+  return rows.find(function (row) {
+    if (!mpgIsActiveReservationRow_(row)) return false;
+    if (
+      String(row.staff_code || "").trim().toUpperCase() !==
+      MPG_SHIFT_STAFF_CODE_
+    ) return false;
+    if (
+      String(row.store_code || "").trim().toUpperCase() !==
+      storeCode
+    ) return false;
+    if (
+      excludedId &&
+      String(row.reservation_id || "").trim() === excludedId
+    ) return false;
+    if (mpgReservationDate_(row) !== date) return false;
+
+    const otherStart = mpgTimeToMinutes_(
+      mpgReservationTime_(row.start_time)
+    );
+    const otherEnd = mpgTimeToMinutes_(
+      mpgReservationTime_(row.end_time)
+    );
+    if (
+      !Number.isFinite(otherStart) ||
+      !Number.isFinite(otherEnd)
+    ) return false;
+
+    return candidateStart < otherEnd + buffer &&
+      candidateEnd > otherStart - buffer;
+  }) || null;
+}
+
+function mpgFindHeadOfficeTravelConflict_(
+  dateText,
+  startTime,
+  endTime,
+  excludeReservationId
+) {
+  return mpgFindKawakamiReservationTravelConflict_(
+    dateText,
+    startTime,
+    endTime,
+    MPG_SHIFT_HEAD_OFFICE_STORE_CODE_,
+    MPG_SHIFT_HEAD_OFFICE_TRAVEL_MINUTES_,
+    excludeReservationId
+  );
+}
+
+function mpgFindMpgTravelConflictForHeadOffice_(
+  dateText,
+  startTime,
+  endTime,
+  excludeReservationId
+) {
+  return mpgFindKawakamiReservationTravelConflict_(
+    dateText,
+    startTime,
+    endTime,
+    MPG_SHIFT_STORE_CODE_,
+    MPG_SHIFT_HEAD_OFFICE_TRAVEL_MINUTES_,
+    excludeReservationId
+  );
+}
+
+function filterMpgSlotsAgainstHeadOfficeReservations_(
+  dateText,
+  slots
+) {
+  return (Array.isArray(slots) ? slots : []).filter(function (slot) {
+    return !mpgFindHeadOfficeTravelConflict_(
+      dateText,
+      slot && slot.start_time,
+      slot && slot.end_time,
+      ""
+    );
+  });
+}
+
+function validateMpgHeadOfficeTravelForReservation_(
+  dateText,
+  startTime,
+  endTime,
+  excludeReservationId
+) {
+  const conflict = mpgFindHeadOfficeTravelConflict_(
+    dateText,
+    startTime,
+    endTime,
+    excludeReservationId
+  );
+
+  if (!conflict) {
+    return { ok: true, code: "", message: "", detail: null };
+  }
+
+  return {
+    ok: false,
+    code: "MPG_HEAD_OFFICE_TRAVEL_CONFLICT",
+    message: "本社予定との移動時間（2時間30分）を確保できないため、この時間は予約できません。",
+    detail: {
+      travel_minutes: MPG_SHIFT_HEAD_OFFICE_TRAVEL_MINUTES_,
+      conflicting_reservation_id:
+        String(conflict.reservation_id || "").trim(),
+      conflicting_store_code:
+        MPG_SHIFT_HEAD_OFFICE_STORE_CODE_
+    }
+  };
+}
+
 function mpgReservationKeySet_() {
   const rows = getSheetData(APP_CONFIG.SHEETS.RESERVATIONS);
   const keys = new Set();
@@ -520,6 +679,13 @@ function mpgBlockedIntervalForShift_(shift) {
   const start = mpgTimeToMinutes_(shift.start_time);
   const end = mpgTimeToMinutes_(shift.end_time);
   if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+
+  // HEAD_OFFICEの勤務枠とMPG枠は同時に持てる。
+  // 実際にどちらかへ予約が入った時点で、150分の移動バッファを
+  // 予約可否判定に適用して反対側の空き枠を消す。
+  if (shift.store_code === MPG_SHIFT_HEAD_OFFICE_STORE_CODE_) {
+    return null;
+  }
 
   if (shift.store_code === MPG_SHIFT_YACHIYO_STORE_CODE_) {
     return {
