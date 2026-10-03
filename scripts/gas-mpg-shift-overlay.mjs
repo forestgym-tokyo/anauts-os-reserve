@@ -201,6 +201,156 @@ function getAvailabilityShifts_(
     1,
     "29 diagnostics store scope"
   );
+
+  replaceOnce_(
+    file,
+`      const memberValidation =
+        validateReservationMemberMaster_({
+          memberNo:
+            memberNo,
+          customerEmail:
+            customerEmail
+        });`,
+`      const memberValidation =
+        String(serviceCode || "").trim().toUpperCase() === "MPG_TRAINING_SUPPORT45" &&
+        typeof validateMpgReservationMemberMaster_ === "function"
+          ? validateMpgReservationMemberMaster_({
+              memberNo:
+                memberNo,
+              customerEmail:
+                customerEmail
+            })
+          : validateReservationMemberMaster_({
+              memberNo:
+                memberNo,
+              customerEmail:
+                customerEmail
+            });`,
+    "29 MPG member master"
+  );
+
+  replaceOnce_(
+    file,
+`      customerEmail =
+        normalizeReservationText_(
+          verifiedMember.email
+        );
+    }
+
+    /*
+     * サービスに設定された担当可能roleを取得`,
+`      customerEmail =
+        normalizeReservationText_(
+          verifiedMember.email
+        );
+    }
+
+    if (
+      String(serviceCode || "").trim().toUpperCase() ===
+        "MPG_TRAINING_SUPPORT45" &&
+      typeof validateMpgTrainingMonthlyBookingLimit_ ===
+        "function"
+    ) {
+      const mpgMonthlyLimit =
+        validateMpgTrainingMonthlyBookingLimit_(
+          memberNo,
+          targetDate,
+          ""
+        );
+
+      if (!mpgMonthlyLimit.ok) {
+        return errorResponse(
+          mpgMonthlyLimit.message,
+          mpgMonthlyLimit.code,
+          mpgMonthlyLimit.detail
+        );
+      }
+    }
+
+    /*
+     * サービスに設定された担当可能roleを取得`,
+    "29 MPG monthly booking limit"
+  );
+
+  replaceOnce_(
+    file,
+`    "TRAINING_SUPPORT45",
+    "PROCEDURE",`,
+`    "TRAINING_SUPPORT45",
+    "MPG_TRAINING_SUPPORT45",
+    "PROCEDURE",`,
+    "29 MPG member name rule"
+  );
+
+  write_(file);
+}
+
+// 32_UpdateReservation: preserve MPG store scope and monthly booking limit on reschedule.
+{
+  const file = read_("32_UpdateReservation.gs.js");
+
+  replaceOnce_(
+    file,
+`    const serviceCode = normalizeReservationText_(reservation.service_code);
+    const service = getAvailabilityService_(serviceCode);
+
+    /*
+     * サービスに設定された担当可能roleを取得`,
+`    const serviceCode = normalizeReservationText_(reservation.service_code);
+    const service = getAvailabilityService_(serviceCode);
+
+    if (
+      String(serviceCode || "").trim().toUpperCase() ===
+        "MPG_TRAINING_SUPPORT45" &&
+      typeof validateMpgTrainingMonthlyBookingLimit_ ===
+        "function"
+    ) {
+      const mpgMonthlyLimit =
+        validateMpgTrainingMonthlyBookingLimit_(
+          reservation.member_no,
+          targetDate,
+          reservationId
+        );
+
+      if (!mpgMonthlyLimit.ok) {
+        return errorResponse(
+          mpgMonthlyLimit.message,
+          mpgMonthlyLimit.code,
+          mpgMonthlyLimit.detail
+        );
+      }
+    }
+
+    /*
+     * サービスに設定された担当可能roleを取得`,
+    "32 MPG monthly booking limit"
+  );
+
+  replaceOnce_(
+    file,
+`    const staffMap =
+      getActiveStaffMap_(
+        providerRoles
+      );`,
+`    const staffMap =
+      getActiveStaffMap_(
+        providerRoles,
+        service
+      );`,
+    "32 service permission scope"
+  );
+
+  replaceOnce_(
+    file,
+`    let shifts = getAvailabilityShifts_(targetDate, staffMap);`,
+`    let shifts = getAvailabilityShifts_(
+      targetDate,
+      staffMap,
+      service.store_code
+    );`,
+    "32 MPG store scope"
+  );
+
   write_(file);
 }
 
