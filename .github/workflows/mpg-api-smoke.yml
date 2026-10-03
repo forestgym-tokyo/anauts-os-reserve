@@ -55,12 +55,12 @@ jobs:
           test -f .gas-live/28_Availability.gs.js
           test -f .gas-live/29_Reservation.gs.js
           test -f .gas-live/32_UpdateReservation.gs.js
-          test -f .gas-live/88_DietCounselingWorkflow.gs.js
+          test -f .gas-live/88_DietCounselingWorkflow.js
           node scripts/gas-mpg-shift-overlay.mjs
           grep -q 'filterMpgSlotsAgainstHeadOfficeReservations_' .gas-live/28_Availability.gs.js
           grep -q 'validateMpgHeadOfficeTravelForReservation_' .gas-live/29_Reservation.gs.js
           grep -q 'validateMpgHeadOfficeTravelForReservation_' .gas-live/32_UpdateReservation.gs.js
-          grep -q 'mpgFindMpgTravelConflictForHeadOffice_' .gas-live/88_DietCounselingWorkflow.gs.js
+          grep -q 'mpgFindMpgTravelConflictForHeadOffice_' .gas-live/88_DietCounselingWorkflow.js
           echo "Live overlay dry-run OK"
 
       - name: List and probe Apps Script deployments
