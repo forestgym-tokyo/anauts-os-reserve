@@ -1260,6 +1260,58 @@ function importStaffShifts(body) {
       );
     }
 
+    /*
+     * 一括登録でも、MPGの確定予約がある時間帯へ
+     * 川上の八千代/9ROUNDシフトを上書きしない。
+     */
+    if (
+      typeof mpgReservedConflictsForIncomingShift_ ===
+      "function"
+    ) {
+      const mpgReservedConflicts = [];
+
+      validation.validRows.forEach(
+        row => {
+          const conflicts =
+            mpgReservedConflictsForIncomingShift_(
+              row.staff_code,
+              row.store_code,
+              row.date,
+              row.start_time,
+              row.end_time
+            );
+
+          conflicts.forEach(
+            conflict => {
+              mpgReservedConflicts.push({
+                incoming_store_code:
+                  row.store_code,
+                date:
+                  conflict.date,
+                start_time:
+                  conflict.start_time,
+                end_time:
+                  conflict.end_time
+              });
+            }
+          );
+        }
+      );
+
+      if (
+        mpgReservedConflicts.length > 0
+      ) {
+        return errorResponse(
+          "MPGに確定予約があるため、競合する川上の他店舗シフトを一括登録できません。",
+          "MPG_RESERVED_CONFLICT",
+          {
+            conflicts:
+              mpgReservedConflicts
+          }
+        );
+      }
+    }
+
     const sheet =
      getSheet(
         APP_CONFIG.SHEETS.STAFF_SHIFTS
@@ -1505,6 +1557,19 @@ function importStaffShifts(body) {
     }
 
 
+    let mpgReconcileResult = null;
+
+    if (
+      typeof reconcileKawakamiMpgShifts_ ===
+      "function"
+    ) {
+      mpgReconcileResult =
+        reconcileKawakamiMpgShifts_({
+          month:
+            validation.targetMonth
+        });
+    }
+
     return successResponse({
 
       mode:
@@ -1520,7 +1585,19 @@ function importStaffShifts(body) {
         disabledCount,
 
       inserted_count:
-        insertRows.length
+        insertRows.length,
+
+      mpg_removed_count:
+        Number(
+          mpgReconcileResult &&
+          mpgReconcileResult.removed_count ||
+          0
+        ),
+
+      mpg_reserved_conflicts:
+        mpgReconcileResult &&
+        mpgReconcileResult.reserved_conflicts ||
+        []
     });
 
   } catch (error) {
