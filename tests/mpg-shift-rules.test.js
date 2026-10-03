@@ -193,3 +193,66 @@ test("MPG availability keeps the 10:15 anchored 45-minute grid", () => {
   assert.match(source, /slotAnchorAt/);
   assert.match(source, /service\.store_code/);
 });
+
+
+test("HEAD_OFFICE shifts coexist with MPG until an actual booking, then use 150-minute travel", () => {
+  const context = mpgContext_();
+
+  assert.equal(
+    context.mpgSlotConflict_(
+      { start_time: "19:15", end_time: "20:00" },
+      { store_code: "HEAD_OFFICE", start_time: "19:00", end_time: "23:00" }
+    ),
+    false,
+    "本社勤務枠だけではMPG枠を消さない"
+  );
+
+  context.APP_CONFIG = { SHEETS: { RESERVATIONS: "reservations" } };
+  context.normalizeReservationScheduleDate_ = value => String(value || "");
+  context.normalizeReservationTime_ = value => String(value || "");
+  context.getSheetData = () => [
+    {
+      reservation_id: "hq-1",
+      store_code: "HEAD_OFFICE",
+      staff_code: "KAWAKAMI",
+      reservation_date: "2026-10-05",
+      start_time: "19:00",
+      end_time: "20:00",
+      status: "RESERVED"
+    }
+  ];
+
+  assert.ok(
+    context.mpgFindHeadOfficeTravelConflict_(
+      "2026-10-05",
+      "19:15",
+      "20:00",
+      ""
+    ),
+    "本社予約が入った後はMPGの競合枠を消す"
+  );
+
+  assert.equal(
+    context.mpgFindHeadOfficeTravelConflict_(
+      "2026-10-05",
+      "15:30",
+      "16:15",
+      ""
+    ),
+    null,
+    "本社19:00予約の2時間30分前より前に終了するMPG枠は許可する"
+  );
+});
+
+test("HEAD_OFFICE counseling ignores unbooked MPG shifts but blocks actual MPG reservations", () => {
+  const counseling = read("gas/88_DietCounselingWorkflow.js");
+  const availability = read("gas/28_Availability.gs.js");
+  const reservation = read("gas/29_Reservation.gs.js");
+  const update = read("gas/32_UpdateReservation.gs.js");
+
+  assert.match(counseling, /normalizeDietCounselingCode_\(shift && shift\.store_code\) !== "MPG"/);
+  assert.match(counseling, /mpgFindMpgTravelConflictForHeadOffice_/);
+  assert.match(availability, /filterMpgSlotsAgainstHeadOfficeReservations_/);
+  assert.match(reservation, /validateMpgHeadOfficeTravelForReservation_/);
+  assert.match(update, /validateMpgHeadOfficeTravelForReservation_/);
+});
