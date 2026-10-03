@@ -91,9 +91,25 @@ test("MPG automation is wired into the admin API and UI", () => {
   const reservation = read("gas/29_Reservation.gs.js");
 
   assert.match(main, /case "generateKawakamiMpgShifts"/);
-  assert.match(config, /admin-mpg-shifts\.js\?v=20261003-mpg-shift-v1/);
+  assert.match(config, /admin-mpg-shifts\.js\?v=20261003-mpg-services-v2/);
   assert.match(ui, /48時間/);
   assert.match(ui, /2時間30分/);
   assert.match(availability, /getAvailabilityShifts_\(\s*targetDate,\s*staffMap,\s*service\.store_code/);
   assert.match(reservation, /getAvailabilityShifts_\(\s*targetDate,\s*staffMap,\s*service\.store_code/);
+});
+
+
+test("MPG tour and training share the MPG store and 45-minute service grid", () => {
+  const rules = read("gas/63_MpgShiftRules.gs");
+  const reserve = read("assets/js/reserve.js");
+  const availability = read("gas/28_Availability.gs.js");
+
+  assert.match(rules, /MPG_SHIFT_STORE_CODE_ = "MPG"/);
+  assert.match(rules, /MPG_TOUR_SERVICE_CODE_ = "MPG_TOUR45"/);
+  assert.match(rules, /MPG_SHIFT_SERVICE_CODES_/);
+  assert.match(rules, /duration: MPG_SHIFT_SLOT_MINUTES_/);
+  assert.match(rules, /slot_interval_minutes: MPG_SHIFT_SLOT_MINUTES_/);
+  assert.match(reserve, /"mpg-tour"/);
+  assert.match(reserve, /serviceCode: "MPG_TOUR45"/);
+  assert.match(availability, /MPG_TOUR45:\s*"can_tour"/);
 });
