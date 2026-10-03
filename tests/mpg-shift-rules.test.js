@@ -91,7 +91,7 @@ test("MPG automation is wired into the admin API and UI", () => {
   const reservation = read("gas/29_Reservation.gs.js");
 
   assert.match(main, /case "generateKawakamiMpgShifts"/);
-  assert.match(config, /admin-mpg-shifts\.js\?v=20261003-mpg-services-v2/);
+  assert.match(config, /admin-mpg-shifts\.js\?v=20261003-mpg-trigger-v3/);
   assert.match(ui, /48時間/);
   assert.match(ui, /2時間30分/);
   assert.match(availability, /getAvailabilityShifts_\(\s*targetDate,\s*staffMap,\s*service\.store_code/);
@@ -112,4 +112,16 @@ test("MPG tour and training share the MPG store and 45-minute service grid", () 
   assert.match(reserve, /"mpg-tour"/);
   assert.match(reserve, /serviceCode: "MPG_TOUR45"/);
   assert.match(availability, /MPG_TOUR45:\s*"can_tour"/);
+});
+
+
+test("MPG trigger authorization is non-blocking and availability enforces the 48-hour fallback", () => {
+  const rules = read("gas/63_MpgShiftRules.gs");
+  const availability = read("gas/28_Availability.gs.js");
+
+  assert.match(rules, /function setupMpgShiftCleanupTrigger/);
+  assert.match(rules, /cleanup_trigger_ready = false/);
+  assert.match(rules, /cleanupUnbookedMpgShifts\(\)/);
+  assert.match(availability, /normalizedStoreCode === "MPG"/);
+  assert.match(availability, /cleanupUnbookedMpgShifts\(\)/);
 });
