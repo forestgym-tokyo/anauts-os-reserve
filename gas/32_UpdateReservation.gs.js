@@ -272,6 +272,32 @@ function updateReservation(params, operationOptions) {
     const startAt = createAvailabilityDateTime_(targetDate, startTime);
     const endAt = new Date(startAt.getTime() + durationMinutes * 60000);
 
+    if (
+      /^MPG_/.test(
+        String(serviceCode || "")
+          .trim()
+          .toUpperCase()
+      ) &&
+      typeof validateMpgHeadOfficeTravelForReservation_ ===
+        "function"
+    ) {
+      const mpgTravelValidation =
+        validateMpgHeadOfficeTravelForReservation_(
+          targetDate,
+          startTime,
+          formatReservationTime_(endAt),
+          reservationId
+        );
+
+      if (!mpgTravelValidation.ok) {
+        return errorResponse(
+          mpgTravelValidation.message,
+          mpgTravelValidation.code,
+          mpgTravelValidation.detail
+        );
+      }
+    }
+
     /*
      * 現在の予約に対する変更期限チェック
      */
