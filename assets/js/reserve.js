@@ -72,6 +72,12 @@ const ROUTES = {
     mode: "FIXED",
     serviceCode: "MPG_TRAINING_SUPPORT45"
   },
+  "mpg-tour": {
+    title: "My Private Gym 見学",
+    lead: "My Private Gymの見学予約（45分）です。",
+    mode: "FIXED",
+    serviceCode: "MPG_TOUR45"
+  },
   unsubscribe: {
     title: "退会手続き",
     lead: "退会手続きのご来店予約です。",
@@ -453,7 +459,8 @@ function configureCustomerForm() {
     ).toUpperCase();
 
   const isTour =
-    code === "TOUR";
+    code === "TOUR" ||
+    code === "MPG_TOUR45";
 
   const isCounsel =
     code === "COUNSEL";
