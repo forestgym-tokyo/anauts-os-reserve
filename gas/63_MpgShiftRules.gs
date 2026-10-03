@@ -29,6 +29,9 @@ const MPG_SHIFT_SLOT_MINUTES_ = 45;
 const MPG_SHIFT_DAY_START_MINUTES_ = 10 * 60 + 15;
 const MPG_SHIFT_DAY_END_MINUTES_ = 20 * 60 + 45;
 const MPG_SHIFT_UNRESERVED_CUTOFF_HOURS_ = 48;
+const MPG_RESERVATION_MEMBER_MASTER_ID_ = "1-m6EtfX4XJT4uonkiX1eYxeynsX3ep9Uzk8eixU7FQk";
+const MPG_RESERVATION_MEMBER_MASTER_SHEET_ = "MPG_20260830";
+const MPG_TRAINING_MONTHLY_LIMIT_ = 4;
 
 // 0=Sun ... 6=Sat. These are the agreed recurring MPG windows.
 const MPG_SHIFT_WEEKLY_WINDOWS_ = {
@@ -86,9 +89,17 @@ function ensureMpgServiceConfiguration_() {
       service_code: config.service_code,
       store_code: MPG_SHIFT_STORE_CODE_,
       service_name: config.service_name,
+      category: config.category,
       form_type: config.form_type,
       duration: MPG_SHIFT_SLOT_MINUTES_,
+      calendar_code: config.calendar_code,
+      provider_role: config.provider_role,
+      booking_min_hours: config.booking_min_hours,
+      change_limit_hours: config.change_limit_hours,
+      cancel_limit_hours: config.cancel_limit_hours,
+      public_days: 30,
       slot_interval_minutes: MPG_SHIFT_SLOT_MINUTES_,
+      mail_account_code: config.mail_account_code,
       public: true,
       active: true
     });
@@ -124,7 +135,14 @@ function ensureMpgServiceConfiguration_() {
       service_code: MPG_SHIFT_SERVICE_CODE_,
       service_name: String(trainingExisting.service_name || "").trim() ||
         "My Private Gym トレーニングサポート",
+      category: "TRAINING_SUPPORT",
       form_type: "MEMBER",
+      calendar_code: "TFG_MAIN",
+      provider_role: "STAFF",
+      booking_min_hours: 3,
+      change_limit_hours: 3,
+      cancel_limit_hours: 3,
+      mail_account_code: "GMAIL01",
       permission_column: "can_training_support"
     }
   );
@@ -136,7 +154,14 @@ function ensureMpgServiceConfiguration_() {
       service_code: MPG_TOUR_SERVICE_CODE_,
       service_name: String(tourExisting.service_name || "").trim() ||
         "My Private Gym 見学",
+      category: "VISIT",
       form_type: "VISITOR",
+      calendar_code: "TFG_MAIN",
+      provider_role: "STAFF",
+      booking_min_hours: 1.5,
+      change_limit_hours: 3,
+      cancel_limit_hours: 3,
+      mail_account_code: "GMAIL01",
       permission_column: "can_tour"
     }
   );
@@ -213,6 +238,181 @@ function ensureMpgServiceHours_() {
       }));
     }
   });
+}
+
+
+function normalizeMpgReservationMemberNo_(value) {
+  return String(value || "").trim().toUpperCase().replace(/\s+/g, "");
+}
+
+function getMpgReservationMemberMasterSheet_() {
+  const props = PropertiesService.getScriptProperties();
+  const spreadsheetId = String(
+    props.getProperty("MPG_MEMBER_MASTER_ID") ||
+    MPG_RESERVATION_MEMBER_MASTER_ID_
+  ).trim();
+  const configuredSheet = String(
+    props.getProperty("MPG_MEMBER_MASTER_SHEET_NAME") ||
+    MPG_RESERVATION_MEMBER_MASTER_SHEET_
+  ).trim();
+
+  const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+  return spreadsheet.getSheetByName(configuredSheet) || spreadsheet.getSheets()[0];
+}
+
+function validateMpgReservationMemberMaster_(values) {
+  values = values || {};
+  const memberNo = normalizeMpgReservationMemberNo_(values.memberNo);
+  const customerEmail = String(values.customerEmail || "").trim().toLowerCase();
+  const sheet = getMpgReservationMemberMasterSheet_();
+  const data = sheet.getDataRange().getValues();
+
+  if (data.length <= 1) {
+    return {
+      ok: false,
+      code: "MEMBER_NOT_FOUND",
+      message: "会員番号が確認できません。",
+      detail: { member_no: memberNo }
+    };
+  }
+
+  const headers = data[0].map(function (value) {
+    return String(value || "").trim();
+  });
+  const index = {};
+  headers.forEach(function (header, i) {
+    if (header) index[header] = i;
+  });
+
+  ["会員番号", "氏名（姓）", "氏名（名）", "メールアドレス", "契約ステータス"]
+    .forEach(function (header) {
+      if (index[header] === undefined) {
+        throw new Error("MPG会員マスターに必要な列がありません: " + header);
+      }
+    });
+
+  let found = null;
+  data.slice(1).some(function (row) {
+    if (
+      normalizeMpgReservationMemberNo_(row[index["会員番号"]]) ===
+      memberNo
+    ) {
+      found = row;
+      return true;
+    }
+    return false;
+  });
+
+  if (!found) {
+    return {
+      ok: false,
+      code: "MEMBER_NOT_FOUND",
+      message: "会員番号が確認できません。",
+      detail: { member_no: memberNo }
+    };
+  }
+
+  const status = String(found[index["契約ステータス"]] || "").trim();
+  if (status !== "契約中") {
+    return {
+      ok: false,
+      code: "MEMBER_INACTIVE",
+      message: "現在有効な会員番号ではありません。",
+      detail: { member_no: memberNo, status: status }
+    };
+  }
+
+  const masterEmail = String(found[index["メールアドレス"]] || "").trim().toLowerCase();
+  if (!masterEmail || masterEmail !== customerEmail) {
+    return {
+      ok: false,
+      code: "MEMBER_EMAIL_MISMATCH",
+      message: "会員番号とメールアドレスが一致しません。",
+      detail: { member_no: memberNo }
+    };
+  }
+
+  const lastName = String(found[index["氏名（姓）"]] || "").trim();
+  const firstName = String(found[index["氏名（名）"]] || "").trim();
+  const name = (lastName + " " + firstName).trim();
+
+  return {
+    ok: true,
+    code: "",
+    message: "",
+    detail: null,
+    member: {
+      memberNo: memberNo,
+      name: name,
+      email: String(found[index["メールアドレス"]] || "").trim(),
+      status: status
+    }
+  };
+}
+
+function validateMpgTrainingMonthlyBookingLimit_(memberNo, targetDate, excludeReservationId) {
+  const normalizedMemberNo = normalizeMpgReservationMemberNo_(memberNo);
+  const month = String(targetDate || "").trim().slice(0, 7);
+  const excludedId = String(excludeReservationId || "").trim();
+
+  if (!/^\d{4}-\d{2}$/.test(month)) {
+    return {
+      ok: false,
+      code: "INVALID_RESERVATION_DATE",
+      message: "予約日を確認できません。",
+      detail: { date: targetDate }
+    };
+  }
+
+  const rows = getSheetData(APP_CONFIG.SHEETS.RESERVATIONS);
+  const inactiveStatuses = ["CANCELLED", "CANCELED", "CANCEL"];
+  let count = 0;
+
+  rows.forEach(function (row) {
+    const serviceCode = String(row.service_code || "").trim().toUpperCase();
+    if (serviceCode !== MPG_SHIFT_SERVICE_CODE_) return;
+
+    const reservationId = String(row.reservation_id || "").trim();
+    if (excludedId && reservationId === excludedId) return;
+
+    const rowMemberNo = normalizeMpgReservationMemberNo_(row.member_no);
+    if (rowMemberNo !== normalizedMemberNo) return;
+
+    const status = String(row.status || "").trim().toUpperCase();
+    if (inactiveStatuses.indexOf(status) >= 0) return;
+
+    const date = typeof normalizeReservationScheduleDate_ === "function"
+      ? normalizeReservationScheduleDate_(row.reservation_date || row.date)
+      : formatShiftDate_(row.reservation_date || row.date);
+
+    if (String(date || "").slice(0, 7) === month) count += 1;
+  });
+
+  if (count >= MPG_TRAINING_MONTHLY_LIMIT_) {
+    return {
+      ok: false,
+      code: "MPG_MONTHLY_BOOKING_LIMIT",
+      message: "トレーニングサポートは1会員につき月4回までご予約いただけます。",
+      detail: {
+        member_no: normalizedMemberNo,
+        month: month,
+        current_count: count,
+        limit: MPG_TRAINING_MONTHLY_LIMIT_
+      }
+    };
+  }
+
+  return {
+    ok: true,
+    code: "",
+    message: "",
+    detail: {
+      member_no: normalizedMemberNo,
+      month: month,
+      current_count: count,
+      remaining_count: MPG_TRAINING_MONTHLY_LIMIT_ - count
+    }
+  };
 }
 
 function mpgTimeToMinutes_(value) {
