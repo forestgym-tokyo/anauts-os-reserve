@@ -243,7 +243,39 @@ function getAvailabilityShifts_(
 
   replaceOnce_(
     file,
-`function roundUpAvailabilityTime_(
+`    const slots =
+      buildAvailabilitySlots_({`,
+`    let slots =
+      buildAvailabilitySlots_({`,
+    "28 mutable MPG slots"
+  );
+
+  replaceOnce_(
+    file,
+`      });
+
+    return successResponse({`,
+`      });
+
+    if (
+      String(service.store_code || "")
+        .trim()
+        .toUpperCase() === "MPG" &&
+      typeof filterMpgSlotsAgainstHeadOfficeReservations_ === "function"
+    ) {
+      slots = filterMpgSlotsAgainstHeadOfficeReservations_(
+        targetDate,
+        slots
+      );
+    }
+
+    return successResponse({`,
+    "28 MPG head office availability filter"
+  );
+
+  replaceOnce_(
+    file,
+`function roundUpAvailabilityTime_(`
   value,
   intervalMinutes
 ) {
@@ -411,6 +443,55 @@ function roundUpAvailabilityTimeFromAnchor_(
 
   replaceOnce_(
     file,
+`    const endAt =
+      new Date(
+        startAt.getTime() +
+        durationMinutes * 60000
+      );
+
+    /*
+     * 予約公開期間チェック
+     */`,
+`    const endAt =
+      new Date(
+        startAt.getTime() +
+        durationMinutes * 60000
+      );
+
+    if (
+      /^MPG_/.test(
+        String(serviceCode || "")
+          .trim()
+          .toUpperCase()
+      ) &&
+      typeof validateMpgHeadOfficeTravelForReservation_ ===
+        "function"
+    ) {
+      const mpgTravelValidation =
+        validateMpgHeadOfficeTravelForReservation_(
+          targetDate,
+          startTime,
+          formatReservationTime_(endAt),
+          ""
+        );
+
+      if (!mpgTravelValidation.ok) {
+        return errorResponse(
+          mpgTravelValidation.message,
+          mpgTravelValidation.code,
+          mpgTravelValidation.detail
+        );
+      }
+    }
+
+    /*
+     * 予約公開期間チェック
+     */`,
+    "29 MPG head office travel validation"
+  );
+
+  replaceOnce_(
+    file,
 `    "TRAINING_SUPPORT45",
     "PROCEDURE",`,
 `    "TRAINING_SUPPORT45",
@@ -465,6 +546,49 @@ function roundUpAvailabilityTimeFromAnchor_(
 
   replaceOnce_(
     file,
+`    const startAt = createAvailabilityDateTime_(targetDate, startTime);
+    const endAt = new Date(startAt.getTime() + durationMinutes * 60000);
+
+    /*
+     * 現在の予約に対する変更期限チェック
+     */`,
+`    const startAt = createAvailabilityDateTime_(targetDate, startTime);
+    const endAt = new Date(startAt.getTime() + durationMinutes * 60000);
+
+    if (
+      /^MPG_/.test(
+        String(serviceCode || "")
+          .trim()
+          .toUpperCase()
+      ) &&
+      typeof validateMpgHeadOfficeTravelForReservation_ ===
+        "function"
+    ) {
+      const mpgTravelValidation =
+        validateMpgHeadOfficeTravelForReservation_(
+          targetDate,
+          startTime,
+          formatReservationTime_(endAt),
+          reservationId
+        );
+
+      if (!mpgTravelValidation.ok) {
+        return errorResponse(
+          mpgTravelValidation.message,
+          mpgTravelValidation.code,
+          mpgTravelValidation.detail
+        );
+      }
+    }
+
+    /*
+     * 現在の予約に対する変更期限チェック
+     */`,
+    "32 MPG head office travel validation"
+  );
+
+  replaceOnce_(
+    file,
 `    const staffMap =
       getActiveStaffMap_(
         providerRoles
@@ -486,6 +610,67 @@ function roundUpAvailabilityTimeFromAnchor_(
       service.store_code
     );`,
     "32 MPG store scope"
+  );
+
+  write_(file);
+}
+
+// 88_DietCounselingWorkflow: keep HEAD_OFFICE and MPG shifts concurrent
+// and apply the same 150-minute travel rule only after an MPG reservation exists.
+{
+  const file = read_("88_DietCounselingWorkflow.gs.js");
+
+  replaceOnce_(
+    file,
+`        return isDietCounselingHeadOfficeAssignmentAllowed_(
+          snapshot, staffCode, date, start, end
+        );`,
+`        return isDietCounselingHeadOfficeAssignmentAllowed_(
+          snapshot, staffCode, date, start, end, excludedReservationId
+        );`,
+    "88 head office assignment exclude reservation"
+  );
+
+  replaceOnce_(
+    file,
+`function isDietCounselingHeadOfficeAssignmentAllowed_(
+  snapshot, staffCode, date, start, end
+) {`,
+`function isDietCounselingHeadOfficeAssignmentAllowed_(
+  snapshot, staffCode, date, start, end, excludedReservationId
+) {`,
+    "88 head office signature"
+  );
+
+  replaceOnce_(
+    file,
+`  const officeStoreCode = getDietCounselingOfficeStoreCode_();
+  const shiftEnds = (snapshot.shifts || []).filter(function (shift) {`,
+`  if (
+    typeof mpgFindMpgTravelConflictForHeadOffice_ === "function" &&
+    mpgFindMpgTravelConflictForHeadOffice_(
+      date,
+      start,
+      end,
+      excludedReservationId || ""
+    )
+  ) {
+    return false;
+  }
+
+  const officeStoreCode = getDietCounselingOfficeStoreCode_();
+  const shiftEnds = (snapshot.shifts || []).filter(function (shift) {`,
+    "88 MPG reservation travel conflict"
+  );
+
+  replaceOnce_(
+    file,
+`      normalizeDietCounselingDate_(shift && shift.date) === date &&
+      normalizeDietCounselingCode_(shift && shift.store_code) !== officeStoreCode;`,
+`      normalizeDietCounselingDate_(shift && shift.date) === date &&
+      normalizeDietCounselingCode_(shift && shift.store_code) !== officeStoreCode &&
+      normalizeDietCounselingCode_(shift && shift.store_code) !== "MPG";`,
+    "88 ignore unbooked MPG shift"
   );
 
   write_(file);
