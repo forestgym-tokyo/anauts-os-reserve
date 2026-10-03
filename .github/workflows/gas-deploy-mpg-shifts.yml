@@ -57,7 +57,7 @@ jobs:
           test -f .gas-live/28_Availability.gs.js || (echo "Live 28_Availability.js was not pulled" && exit 1)
           test -f .gas-live/29_Reservation.gs.js || (echo "Live 29_Reservation.js was not pulled" && exit 1)
           test -f .gas-live/32_UpdateReservation.gs.js || (echo "Live 32_UpdateReservation.js was not pulled" && exit 1)
-          test -f .gas-live/88_DietCounselingWorkflow.gs.js || (echo "Live 88_DietCounselingWorkflow.js was not pulled" && exit 1)
+          test -f .gas-live/88_DietCounselingWorkflow.js || (echo "Live 88_DietCounselingWorkflow.js was not pulled" && exit 1)
           test -f .gas-live/99_Main.js || (echo "Live 99_Main.js was not pulled" && exit 1)
           cp gas/63_MpgShiftRules.gs .gas-live/63_MpgShiftRules.js
           node scripts/gas-mpg-shift-overlay.mjs
@@ -86,8 +86,8 @@ jobs:
           grep -q 'validateMpgHeadOfficeTravelForReservation_' .gas-live/29_Reservation.gs.js
           grep -q 'MPG_TRAINING_SUPPORT45' .gas-live/32_UpdateReservation.gs.js
           grep -q 'validateMpgHeadOfficeTravelForReservation_' .gas-live/32_UpdateReservation.gs.js
-          grep -q 'mpgFindMpgTravelConflictForHeadOffice_' .gas-live/88_DietCounselingWorkflow.gs.js
-          grep -q 'normalizeDietCounselingCode_(shift && shift.store_code) !== "MPG"' .gas-live/88_DietCounselingWorkflow.gs.js
+          grep -q 'mpgFindMpgTravelConflictForHeadOffice_' .gas-live/88_DietCounselingWorkflow.js
+          grep -q 'normalizeDietCounselingCode_(shift && shift.store_code) !== "MPG"' .gas-live/88_DietCounselingWorkflow.js
           grep -q 'service.store_code' .gas-live/32_UpdateReservation.gs.js
           grep -q 'MPG_TRAINING_MONTHLY_LIMIT_ = 4' .gas-live/63_MpgShiftRules.js
           grep -q 'case "generateKawakamiMpgShifts"' .gas-live/99_Main.js
