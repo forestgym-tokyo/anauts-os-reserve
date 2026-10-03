@@ -699,6 +699,14 @@ function doPost(e) {
           body
         );
 
+      case "generateKawakamiMpgShifts":
+        requireDirectShiftEditPermission_(
+          body
+        );
+        return generateKawakamiMpgShifts(
+          body
+        );
+
       case "saveStaffShift":
         requireDirectShiftEditPermission_(
           body
