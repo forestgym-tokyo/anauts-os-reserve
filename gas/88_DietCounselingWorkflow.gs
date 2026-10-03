@@ -445,7 +445,7 @@ function getDietCounselingAssignments_(
         if (!baseEligible) return false;
         if (location !== officeStoreCode) return true;
         return isDietCounselingHeadOfficeAssignmentAllowed_(
-          snapshot, staffCode, date, start, end
+          snapshot, staffCode, date, start, end, excludedReservationId
         );
       })
       .map(function (shift) { return normalizeDietCounselingCode_(shift.store_code); }));
@@ -463,7 +463,7 @@ function getDietCounselingAssignments_(
 }
 
 function isDietCounselingHeadOfficeAssignmentAllowed_(
-  snapshot, staffCode, date, start, end
+  snapshot, staffCode, date, start, end, excludedReservationId
 ) {
   if (!isDietCounselingOnlineOnlyWeekday_(date)) return false;
 
@@ -479,12 +479,25 @@ function isDietCounselingHeadOfficeAssignmentAllowed_(
     endMinutes > dayEnd
   ) return false;
 
+  if (
+    typeof mpgFindMpgTravelConflictForHeadOffice_ === "function" &&
+    mpgFindMpgTravelConflictForHeadOffice_(
+      date,
+      start,
+      end,
+      excludedReservationId || ""
+    )
+  ) {
+    return false;
+  }
+
   const officeStoreCode = getDietCounselingOfficeStoreCode_();
   const shiftEnds = (snapshot.shifts || []).filter(function (shift) {
     return isDietCounselingActive_(shift && shift.active) &&
       normalizeDietCounselingCode_(shift && shift.staff_code) === staffCode &&
       normalizeDietCounselingDate_(shift && shift.date) === date &&
-      normalizeDietCounselingCode_(shift && shift.store_code) !== officeStoreCode;
+      normalizeDietCounselingCode_(shift && shift.store_code) !== officeStoreCode &&
+      normalizeDietCounselingCode_(shift && shift.store_code) !== "MPG";
   }).map(function (shift) {
     return dietCounselingMinutes_(shift && shift.end_time);
   }).filter(isFinite);
