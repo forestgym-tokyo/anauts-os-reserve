@@ -1076,7 +1076,19 @@ function refreshTourWeekAfterReservation_() {
 async function fetchWeekSlotsRange_(dates) {
   if (!selectedService || !Array.isArray(dates) || !dates.length) return null;
 
-  const isTour = String(selectedService.service_code || "").toUpperCase() === "TOUR";
+  const serviceCode =
+    String(selectedService.service_code || "")
+      .trim()
+      .toUpperCase();
+  const isTour = serviceCode === "TOUR";
+  const isMpgService =
+    serviceCode === "MPG_TOUR45" ||
+    serviceCode === "MPG_TRAINING_SUPPORT45";
+
+  // MPGは店舗別シフトを厳密に見るため、週次一括APIではなく
+  // 日別の最新シフト判定を使う。古い週次キャッシュで全枠が
+  // 空扱いになることを防ぐ。
+  if (isMpgService) return null;
 
   const url = new URL(API_URL);
   url.searchParams.set("action", "getAvailableSlotsRange");
@@ -1215,10 +1227,20 @@ async function fetchSlotsWithLimit_(dates, requestVersion) {
     }
   }
 
-  const isTour = String(selectedService && selectedService.service_code || "").toUpperCase() === "TOUR";
-  const workerCount = isTour || typeof window.ANAUTS_FETCH_WEEK_SLOTS === "function"
-    ? Math.min(2, dates.length)
-    : dates.length;
+  const workerServiceCode =
+    String(selectedService && selectedService.service_code || "")
+      .trim()
+      .toUpperCase();
+  const isTour = workerServiceCode === "TOUR";
+  const isMpgService =
+    workerServiceCode === "MPG_TOUR45" ||
+    workerServiceCode === "MPG_TRAINING_SUPPORT45";
+  const workerCount =
+    isTour ||
+    isMpgService ||
+    typeof window.ANAUTS_FETCH_WEEK_SLOTS === "function"
+      ? Math.min(2, dates.length)
+      : dates.length;
   await Promise.all(Array.from({ length: workerCount }, () => worker_()));
   return pending;
 }
