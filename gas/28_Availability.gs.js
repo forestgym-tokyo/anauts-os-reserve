@@ -339,7 +339,7 @@ function getAvailableSlots(params) {
     /*
      * 空き枠生成
      */
-    const slots =
+    let slots =
       buildAvailabilitySlots_({
         targetDate: targetDate,
         durationMinutes: durationMinutes,
@@ -358,6 +358,18 @@ function getAvailableSlots(params) {
             ? serviceHours[0].start_at
             : null
       });
+
+    if (
+      String(service.store_code || "")
+        .trim()
+        .toUpperCase() === "MPG" &&
+      typeof filterMpgSlotsAgainstHeadOfficeReservations_ === "function"
+    ) {
+      slots = filterMpgSlotsAgainstHeadOfficeReservations_(
+        targetDate,
+        slots
+      );
+    }
 
     return successResponse({
       service_code: serviceCode,
