@@ -232,7 +232,8 @@ function getAvailableSlots(params) {
     let rawShifts =
       getAvailabilityShifts_(
         targetDate,
-        staffMap
+        staffMap,
+        service.store_code
       );
 
     if (requestedStaffCode) {
@@ -744,22 +745,36 @@ function normalizeAvailabilityBoolean_(
  *
  * @param {string} targetDate
  * @param {Map<string, Object>} staffMap
+ * @param {string=} storeCode
  * @returns {Array<Object>}
  */
 function getAvailabilityShifts_(
   targetDate,
-  staffMap
+  staffMap,
+  storeCode
 ) {
 
   const rows = getSheetData(
     APP_CONFIG.SHEETS.STAFF_SHIFTS
   );
 
+  const normalizedStoreCode =
+    String(storeCode || "")
+      .trim()
+      .toUpperCase();
+
   return rows
     .filter(row =>
       row.active === true &&
       staffMap.has(
         String(row.staff_code || "")
+      ) &&
+      (
+        !normalizedStoreCode ||
+        String(row.store_code || "")
+          .trim()
+          .toUpperCase() ===
+          normalizedStoreCode
       ) &&
       formatAvailabilityDate_(
         row.date

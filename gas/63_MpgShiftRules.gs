@@ -1,0 +1,567 @@
+/**
+ * ============================================================
+ * A-nauts OS Reserve
+ * My Private Gym / KAWAKAMI shift automation
+ * ============================================================
+ *
+ * Rules:
+ * - MPG slots are 45 minutes from 10:15 through 20:45.
+ * - YACHIYO requires a 150-minute travel buffer before and after.
+ * - SOGA (9ROUND) requires no travel buffer, but overlapping MPG slots
+ *   are removed automatically.
+ * - Unreserved MPG slots are removed once they are within 48 hours.
+ * - Reserved MPG slots are never auto-removed; a conflicting incoming
+ *   non-MPG shift is rejected instead.
+ */
+
+const MPG_SHIFT_SERVICE_CODE_ = "MPG_TRAINING_SUPPORT45";
+const MPG_SHIFT_STAFF_CODE_ = "KAWAKAMI";
+const MPG_SHIFT_YACHIYO_STORE_CODE_ = "YACHIYO";
+const MPG_SHIFT_SOGA_STORE_CODE_ = "SOGA";
+const MPG_SHIFT_TRAVEL_MINUTES_ = 150;
+const MPG_SHIFT_SLOT_MINUTES_ = 45;
+const MPG_SHIFT_DAY_START_MINUTES_ = 10 * 60 + 15;
+const MPG_SHIFT_DAY_END_MINUTES_ = 20 * 60 + 45;
+const MPG_SHIFT_UNRESERVED_CUTOFF_HOURS_ = 48;
+
+// 0=Sun ... 6=Sat. These are the agreed recurring MPG windows.
+const MPG_SHIFT_WEEKLY_WINDOWS_ = {
+  0: ["18:00", "21:00"],
+  1: ["19:00", "21:00"],
+  2: ["10:00", "13:00"],
+  3: ["19:00", "21:00"],
+  4: ["10:00", "13:00"]
+};
+
+let MPG_STORE_CODE_CACHE_ = "";
+
+function getMpgStoreCode_() {
+  if (MPG_STORE_CODE_CACHE_) return MPG_STORE_CODE_CACHE_;
+
+  const rows = getSheetData(APP_CONFIG.SHEETS.SERVICES);
+  const service = rows.find(function (row) {
+    return String(row.service_code || "").trim().toUpperCase() === MPG_SHIFT_SERVICE_CODE_;
+  });
+
+  const storeCode = String(service && service.store_code || "").trim().toUpperCase();
+  if (!storeCode) {
+    throw new Error("MPG_TRAINING_SUPPORT45 の store_code が設定されていません。");
+  }
+
+  MPG_STORE_CODE_CACHE_ = storeCode;
+  return storeCode;
+}
+
+function mpgTimeToMinutes_(value) {
+  const match = String(value || "").trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return NaN;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+function mpgMinutesToTime_(minutes) {
+  const value = Number(minutes);
+  if (!Number.isFinite(value)) return "";
+  const hour = Math.floor(value / 60);
+  const minute = value % 60;
+  return String(hour).padStart(2, "0") + ":" + String(minute).padStart(2, "0");
+}
+
+function mpgDateTime_(dateText, timeText) {
+  const d = String(dateText || "").split("-").map(Number);
+  const t = String(timeText || "").split(":").map(Number);
+  return new Date(d[0], d[1] - 1, d[2], t[0], t[1], 0, 0);
+}
+
+function mpgSlotGrid_() {
+  const slots = [];
+  for (
+    let start = MPG_SHIFT_DAY_START_MINUTES_;
+    start + MPG_SHIFT_SLOT_MINUTES_ <= MPG_SHIFT_DAY_END_MINUTES_;
+    start += MPG_SHIFT_SLOT_MINUTES_
+  ) {
+    slots.push({
+      start_time: mpgMinutesToTime_(start),
+      end_time: mpgMinutesToTime_(start + MPG_SHIFT_SLOT_MINUTES_)
+    });
+  }
+  return slots;
+}
+
+function mpgMonthRange_(month) {
+  const text = String(month || "").trim();
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(text)) {
+    throw new Error("対象月は yyyy-MM 形式で指定してください。");
+  }
+  const parts = text.split("-").map(Number);
+  const lastDay = new Date(parts[0], parts[1], 0).getDate();
+  return {
+    month: text,
+    first: text + "-01",
+    last: text + "-" + String(lastDay).padStart(2, "0"),
+    year: parts[0],
+    monthNumber: parts[1],
+    lastDay: lastDay
+  };
+}
+
+function mpgIsActive_(value) {
+  if (value === true) return true;
+  const text = String(value == null ? "" : value).trim().toUpperCase();
+  return ["TRUE", "1", "YES", "ON", "RESERVED", "CONFIRMED"].includes(text);
+}
+
+function mpgReservationKeySet_() {
+  const rows = getSheetData(APP_CONFIG.SHEETS.RESERVATIONS);
+  const keys = new Set();
+
+  rows.forEach(function (row) {
+    const serviceCode = String(row.service_code || "").trim().toUpperCase();
+    if (serviceCode !== MPG_SHIFT_SERVICE_CODE_) return;
+
+    const status = String(row.status || "").trim().toUpperCase();
+    if (status === "CANCELLED" || status === "CANCELED") return;
+
+    const staffCode = String(row.staff_code || "").trim().toUpperCase();
+    if (staffCode && staffCode !== MPG_SHIFT_STAFF_CODE_) return;
+
+    const date = typeof normalizeReservationScheduleDate_ === "function"
+      ? normalizeReservationScheduleDate_(row.reservation_date || row.date)
+      : formatShiftDate_(row.reservation_date || row.date);
+    const start = typeof normalizeReservationTime_ === "function"
+      ? normalizeReservationTime_(row.start_time)
+      : formatShiftTime_(row.start_time);
+
+    if (date && start) keys.add(date + "|" + start);
+  });
+
+  return keys;
+}
+
+function mpgShiftRows_() {
+  return getSheetData(APP_CONFIG.SHEETS.STAFF_SHIFTS);
+}
+
+function mpgNormalizeShiftRow_(row) {
+  return {
+    shift_id: String(row.shift_id || "").trim(),
+    staff_code: String(row.staff_code || "").trim().toUpperCase(),
+    store_code: String(row.store_code || "").trim().toUpperCase(),
+    date: formatShiftDate_(row.date),
+    start_time: formatShiftTime_(row.start_time),
+    end_time: formatShiftTime_(row.end_time),
+    active: normalizeShiftBoolean_(row.active)
+  };
+}
+
+function mpgBlockedIntervalForShift_(shift) {
+  const start = mpgTimeToMinutes_(shift.start_time);
+  const end = mpgTimeToMinutes_(shift.end_time);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+
+  if (shift.store_code === MPG_SHIFT_YACHIYO_STORE_CODE_) {
+    return {
+      start: start - MPG_SHIFT_TRAVEL_MINUTES_,
+      end: end + MPG_SHIFT_TRAVEL_MINUTES_,
+      reason: "YACHIYO_TRAVEL"
+    };
+  }
+
+  return {
+    start: start,
+    end: end,
+    reason: shift.store_code === MPG_SHIFT_SOGA_STORE_CODE_ ? "SOGA" : "OTHER"
+  };
+}
+
+function mpgSlotConflict_(slot, otherShift) {
+  const slotStart = mpgTimeToMinutes_(slot.start_time);
+  const slotEnd = mpgTimeToMinutes_(slot.end_time);
+  const block = mpgBlockedIntervalForShift_(otherShift);
+  if (!block) return false;
+  return slotStart < block.end && slotEnd > block.start;
+}
+
+function mpgExternalShiftsByDate_(month) {
+  const mpgStoreCode = getMpgStoreCode_();
+  const map = new Map();
+
+  mpgShiftRows_()
+    .map(mpgNormalizeShiftRow_)
+    .filter(function (row) {
+      return row.active &&
+        row.staff_code === MPG_SHIFT_STAFF_CODE_ &&
+        row.store_code !== mpgStoreCode &&
+        row.date.slice(0, 7) === month;
+    })
+    .forEach(function (row) {
+      if (!map.has(row.date)) map.set(row.date, []);
+      map.get(row.date).push(row);
+    });
+
+  return map;
+}
+
+function mpgWeeklyWindowForDate_(dateText) {
+  const parts = String(dateText || "").split("-").map(Number);
+  const date = new Date(parts[0], parts[1] - 1, parts[2], 12, 0, 0, 0);
+  return MPG_SHIFT_WEEKLY_WINDOWS_[date.getDay()] || null;
+}
+
+function mpgExpectedSlotsForDate_(dateText) {
+  const window = mpgWeeklyWindowForDate_(dateText);
+  if (!window) return [];
+
+  const windowStart = mpgTimeToMinutes_(window[0]);
+  const windowEnd = mpgTimeToMinutes_(window[1]);
+
+  return mpgSlotGrid_().filter(function (slot) {
+    const start = mpgTimeToMinutes_(slot.start_time);
+    const end = mpgTimeToMinutes_(slot.end_time);
+    return start >= windowStart && end <= windowEnd;
+  });
+}
+
+function mpgGetShiftSheetTable_() {
+  const sheet = getSheet(APP_CONFIG.SHEETS.STAFF_SHIFTS);
+  const values = sheet.getDataRange().getValues();
+  if (!values.length) throw new Error("staff_shiftsシートにヘッダーがありません。");
+  const headers = values[0].map(function (value) { return String(value).trim(); });
+  return { sheet: sheet, values: values, headers: headers };
+}
+
+function mpgSetShiftRowsInactive_(rowNumbers, table) {
+  if (!rowNumbers.length) return 0;
+  table = table || mpgGetShiftSheetTable_();
+
+  const activeIndex = table.headers.indexOf("active");
+  const updatedIndex = table.headers.indexOf("updated_at");
+  if (activeIndex < 0) throw new Error("staff_shiftsにactive列がありません。");
+
+  const now = new Date();
+  rowNumbers.forEach(function (rowNumber) {
+    table.sheet.getRange(rowNumber, activeIndex + 1).setValue(false);
+    if (updatedIndex >= 0) {
+      table.sheet.getRange(rowNumber, updatedIndex + 1).setValue(now);
+    }
+  });
+  return rowNumbers.length;
+}
+
+function mpgReservedConflictsForIncomingShift_(staffCode, storeCode, date, startTime, endTime) {
+  const normalizedStaff = String(staffCode || "").trim().toUpperCase();
+  const incomingStore = String(storeCode || "").trim().toUpperCase();
+  const mpgStoreCode = getMpgStoreCode_();
+
+  if (normalizedStaff !== MPG_SHIFT_STAFF_CODE_ || !incomingStore || incomingStore === mpgStoreCode) {
+    return [];
+  }
+
+  const incoming = {
+    store_code: incomingStore,
+    start_time: formatShiftTime_(startTime),
+    end_time: formatShiftTime_(endTime)
+  };
+  const reservations = mpgReservationKeySet_();
+
+  return mpgShiftRows_()
+    .map(mpgNormalizeShiftRow_)
+    .filter(function (row) {
+      return row.active &&
+        row.staff_code === MPG_SHIFT_STAFF_CODE_ &&
+        row.store_code === mpgStoreCode &&
+        row.date === date &&
+        mpgSlotConflict_(row, incoming) &&
+        reservations.has(row.date + "|" + row.start_time);
+    });
+}
+
+function mpgAssertIncomingShiftCanReplaceMpg_(staffCode, storeCode, date, startTime, endTime) {
+  const conflicts = mpgReservedConflictsForIncomingShift_(
+    staffCode, storeCode, date, startTime, endTime
+  );
+  if (!conflicts.length) return;
+
+  const first = conflicts[0];
+  throw new Error(
+    "MPG_RESERVED_CONFLICT::" +
+    first.date + "::" + first.start_time + "::" + String(storeCode || "").trim().toUpperCase()
+  );
+}
+
+function mpgCanIgnoreExistingMpgOverlap_(staffCode, incomingStoreCode, existingStoreCode) {
+  const mpgStoreCode = getMpgStoreCode_();
+  return String(staffCode || "").trim().toUpperCase() === MPG_SHIFT_STAFF_CODE_ &&
+    String(incomingStoreCode || "").trim().toUpperCase() !== mpgStoreCode &&
+    String(existingStoreCode || "").trim().toUpperCase() === mpgStoreCode;
+}
+
+function mpgDeactivateConflictsForIncomingShift_(staffCode, storeCode, date, startTime, endTime) {
+  const normalizedStaff = String(staffCode || "").trim().toUpperCase();
+  const incomingStore = String(storeCode || "").trim().toUpperCase();
+  const mpgStoreCode = getMpgStoreCode_();
+
+  if (normalizedStaff !== MPG_SHIFT_STAFF_CODE_ || !incomingStore || incomingStore === mpgStoreCode) {
+    return { removed_count: 0 };
+  }
+
+  mpgAssertIncomingShiftCanReplaceMpg_(staffCode, storeCode, date, startTime, endTime);
+
+  const incoming = {
+    store_code: incomingStore,
+    start_time: formatShiftTime_(startTime),
+    end_time: formatShiftTime_(endTime)
+  };
+  const table = mpgGetShiftSheetTable_();
+  const headers = table.headers;
+  const rowNumbers = [];
+
+  table.values.slice(1).forEach(function (valuesRow, index) {
+    const row = {};
+    headers.forEach(function (header, column) { row[header] = valuesRow[column]; });
+    const normalized = mpgNormalizeShiftRow_(row);
+    if (
+      normalized.active &&
+      normalized.staff_code === MPG_SHIFT_STAFF_CODE_ &&
+      normalized.store_code === mpgStoreCode &&
+      normalized.date === date &&
+      mpgSlotConflict_(normalized, incoming)
+    ) {
+      rowNumbers.push(index + 2);
+    }
+  });
+
+  return { removed_count: mpgSetShiftRowsInactive_(rowNumbers, table) };
+}
+
+function reconcileKawakamiMpgShifts_(options) {
+  options = options || {};
+  const month = mpgMonthRange_(options.month).month;
+  const mpgStoreCode = getMpgStoreCode_();
+  const reservations = mpgReservationKeySet_();
+  const externalByDate = mpgExternalShiftsByDate_(month);
+  const table = mpgGetShiftSheetTable_();
+  const rowNumbers = [];
+  const reservedConflicts = [];
+
+  table.values.slice(1).forEach(function (valuesRow, index) {
+    const row = {};
+    table.headers.forEach(function (header, column) { row[header] = valuesRow[column]; });
+    const normalized = mpgNormalizeShiftRow_(row);
+
+    if (
+      !normalized.active ||
+      normalized.staff_code !== MPG_SHIFT_STAFF_CODE_ ||
+      normalized.store_code !== mpgStoreCode ||
+      normalized.date.slice(0, 7) !== month
+    ) {
+      return;
+    }
+
+    const blockers = externalByDate.get(normalized.date) || [];
+    if (!blockers.some(function (other) { return mpgSlotConflict_(normalized, other); })) {
+      return;
+    }
+
+    if (reservations.has(normalized.date + "|" + normalized.start_time)) {
+      reservedConflicts.push({
+        date: normalized.date,
+        start_time: normalized.start_time,
+        end_time: normalized.end_time
+      });
+      return;
+    }
+
+    rowNumbers.push(index + 2);
+  });
+
+  return {
+    removed_count: mpgSetShiftRowsInactive_(rowNumbers, table),
+    reserved_conflicts: reservedConflicts
+  };
+}
+
+function generateKawakamiMpgShiftsInternal_(month) {
+  const range = mpgMonthRange_(month);
+  const mpgStoreCode = getMpgStoreCode_();
+  const reservations = mpgReservationKeySet_();
+  const externalByDate = mpgExternalShiftsByDate_(range.month);
+  const table = mpgGetShiftSheetTable_();
+  const now = new Date();
+
+  const staffRows = getSheetData(APP_CONFIG.SHEETS.STAFF);
+  const kawakami = staffRows.find(function (row) {
+    return String(row.staff_code || "").trim().toUpperCase() === MPG_SHIFT_STAFF_CODE_ &&
+      normalizeShiftBoolean_(row.active);
+  });
+  if (!kawakami) throw new Error("KAWAKAMI の有効なスタッフ登録がありません。");
+
+  const activeExistingKeys = new Set();
+  const deactivateRows = [];
+
+  table.values.slice(1).forEach(function (valuesRow, index) {
+    const row = {};
+    table.headers.forEach(function (header, column) { row[header] = valuesRow[column]; });
+    const normalized = mpgNormalizeShiftRow_(row);
+
+    if (
+      !normalized.active ||
+      normalized.staff_code !== MPG_SHIFT_STAFF_CODE_ ||
+      normalized.store_code !== mpgStoreCode ||
+      normalized.date.slice(0, 7) !== range.month
+    ) {
+      return;
+    }
+
+    const key = normalized.date + "|" + normalized.start_time;
+    if (reservations.has(key)) {
+      activeExistingKeys.add(key);
+    } else {
+      deactivateRows.push(index + 2);
+    }
+  });
+
+  const disabledCount = mpgSetShiftRowsInactive_(deactivateRows, table);
+  const insertRecords = [];
+  const blocked = [];
+
+  for (let day = 1; day <= range.lastDay; day += 1) {
+    const date = range.month + "-" + String(day).padStart(2, "0");
+    const blockers = externalByDate.get(date) || [];
+
+    mpgExpectedSlotsForDate_(date).forEach(function (slot) {
+      const key = date + "|" + slot.start_time;
+      if (activeExistingKeys.has(key)) return;
+
+      const slotStartAt = mpgDateTime_(date, slot.start_time);
+      if (slotStartAt.getTime() <= now.getTime()) return;
+
+      const conflict = blockers.find(function (other) {
+        return mpgSlotConflict_(slot, other);
+      });
+
+      if (conflict) {
+        blocked.push({
+          date: date,
+          start_time: slot.start_time,
+          end_time: slot.end_time,
+          by_store: conflict.store_code
+        });
+        return;
+      }
+
+      insertRecords.push({
+        shift_id: createShiftId_(MPG_SHIFT_STAFF_CODE_, date),
+        staff_code: MPG_SHIFT_STAFF_CODE_,
+        store_code: mpgStoreCode,
+        date: date,
+        start_time: slot.start_time,
+        end_time: slot.end_time,
+        active: true,
+        created_at: now,
+        updated_at: now
+      });
+    });
+  }
+
+  const insertRows = insertRecords.map(function (record) {
+    return table.headers.map(function (header) {
+      return Object.prototype.hasOwnProperty.call(record, header) ? record[header] : "";
+    });
+  });
+
+  if (insertRows.length) {
+    table.sheet.getRange(
+      table.sheet.getLastRow() + 1,
+      1,
+      insertRows.length,
+      table.headers.length
+    ).setValues(insertRows);
+  }
+
+  const reconciled = reconcileKawakamiMpgShifts_({ month: range.month });
+
+  return {
+    month: range.month,
+    store_code: mpgStoreCode,
+    staff_code: MPG_SHIFT_STAFF_CODE_,
+    disabled_count: disabledCount,
+    inserted_count: insertRows.length,
+    blocked_count: blocked.length,
+    blocked: blocked,
+    reserved_conflicts: reconciled.reserved_conflicts || []
+  };
+}
+
+function ensureMpgShiftCleanupTrigger_() {
+  const handler = "cleanupUnbookedMpgShifts";
+  const exists = ScriptApp.getProjectTriggers().some(function (trigger) {
+    return trigger.getHandlerFunction() === handler;
+  });
+
+  if (!exists) {
+    ScriptApp.newTrigger(handler)
+      .timeBased()
+      .everyHours(1)
+      .create();
+  }
+
+  return !exists;
+}
+
+function generateKawakamiMpgShifts(body) {
+  body = body || {};
+  const month = String(body.month || Utilities.formatDate(new Date(), APP_CONFIG.TIMEZONE, "yyyy-MM")).trim();
+  const result = generateKawakamiMpgShiftsInternal_(month);
+  result.cleanup_trigger_created = ensureMpgShiftCleanupTrigger_();
+
+  // Apply the 48-hour rule immediately as well as hourly thereafter.
+  const cleanup = cleanupUnbookedMpgShifts();
+  result.cleanup_removed_count = cleanup.removed_count || 0;
+  result.cleanup_reserved_count = cleanup.reserved_count || 0;
+
+  return successResponse(result);
+}
+
+function cleanupUnbookedMpgShifts() {
+  const mpgStoreCode = getMpgStoreCode_();
+  const reservations = mpgReservationKeySet_();
+  const table = mpgGetShiftSheetTable_();
+  const now = new Date();
+  const cutoff = new Date(
+    now.getTime() + MPG_SHIFT_UNRESERVED_CUTOFF_HOURS_ * 60 * 60 * 1000
+  );
+  const rowNumbers = [];
+  let reservedCount = 0;
+
+  table.values.slice(1).forEach(function (valuesRow, index) {
+    const row = {};
+    table.headers.forEach(function (header, column) { row[header] = valuesRow[column]; });
+    const normalized = mpgNormalizeShiftRow_(row);
+
+    if (
+      !normalized.active ||
+      normalized.staff_code !== MPG_SHIFT_STAFF_CODE_ ||
+      normalized.store_code !== mpgStoreCode
+    ) {
+      return;
+    }
+
+    const startAt = mpgDateTime_(normalized.date, normalized.start_time);
+    if (startAt.getTime() > cutoff.getTime()) return;
+
+    if (reservations.has(normalized.date + "|" + normalized.start_time)) {
+      reservedCount += 1;
+      return;
+    }
+
+    rowNumbers.push(index + 2);
+  });
+
+  const removedCount = mpgSetShiftRowsInactive_(rowNumbers, table);
+
+  return {
+    removed_count: removedCount,
+    reserved_count: reservedCount,
+    cutoff_at: Utilities.formatDate(cutoff, APP_CONFIG.TIMEZONE, "yyyy-MM-dd'T'HH:mm:ss")
+  };
+}

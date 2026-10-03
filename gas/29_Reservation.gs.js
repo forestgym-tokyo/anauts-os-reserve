@@ -429,7 +429,8 @@ function createReservation(params) {
     let rawShifts =
       getAvailabilityShifts_(
         targetDate,
-        staffMap
+        staffMap,
+        service.store_code
       );
 
     if (requestedStaffCode) {
@@ -2999,7 +3000,8 @@ function testCreateReservationServiceRules() {
   const rawShifts =
     getAvailabilityShifts_(
       targetDate,
-      staffMap
+      staffMap,
+      service.store_code
     );
 
   const effectiveShifts =

@@ -415,6 +415,28 @@ function saveStaffShift(body) {
         "active"
       );
 
+    const storeCodeIndex =
+      headers.indexOf(
+        "store_code"
+      );
+
+    /*
+     * 川上のMPG確定予約がある枠は、後から入れる他店舗シフトで
+     * 自動削除しない。先に競合を検知して保存自体を止める。
+     */
+    if (
+      typeof mpgAssertIncomingShiftCanReplaceMpg_ ===
+      "function"
+    ) {
+      mpgAssertIncomingShiftCanReplaceMpg_(
+        staffCode,
+        resolvedStoreCode,
+        date,
+        startTime,
+        endTime
+      );
+    }
+
     existingRows.forEach(
       (row, index) => {
 
@@ -484,6 +506,27 @@ function saveStaffShift(body) {
             existingStart;
 
         if (overlaps) {
+          const existingStoreCode =
+            storeCodeIndex >= 0
+              ? String(
+                  row[
+                    storeCodeIndex
+                  ] || ""
+                ).trim()
+              : "";
+
+          if (
+            typeof mpgCanIgnoreExistingMpgOverlap_ ===
+              "function" &&
+            mpgCanIgnoreExistingMpgOverlap_(
+              staffCode,
+              resolvedStoreCode,
+              existingStoreCode
+            )
+          ) {
+            return;
+          }
+
           throw new Error(
             "SHIFT_OVERLAP"
           );
@@ -609,6 +652,29 @@ function saveStaffShift(body) {
     }
 
 
+    let mpgRemovedCount = 0;
+
+    if (
+      typeof mpgDeactivateConflictsForIncomingShift_ ===
+      "function"
+    ) {
+      const mpgResult =
+        mpgDeactivateConflictsForIncomingShift_(
+          staffCode,
+          resolvedStoreCode,
+          date,
+          startTime,
+          endTime
+        );
+
+      mpgRemovedCount =
+        Number(
+          mpgResult &&
+          mpgResult.removed_count ||
+          0
+        );
+    }
+
     return successResponse({
       shift_id:
         finalShiftId,
@@ -631,6 +697,9 @@ function saveStaffShift(body) {
       active:
         true,
 
+      mpg_removed_count:
+        mpgRemovedCount,
+
       mode:
         updateRowNumber === -1
           ? "CREATE"
@@ -638,6 +707,32 @@ function saveStaffShift(body) {
     });
 
   } catch (error) {
+
+  if (
+    String(
+      error.message || ""
+    ).indexOf(
+      "MPG_RESERVED_CONFLICT::"
+    ) === 0
+  ) {
+    const parts =
+      String(
+        error.message
+      ).split("::");
+
+    return errorResponse(
+      "MPGに確定予約があるため、この時間帯には他店舗シフトを登録できません。",
+      "MPG_RESERVED_CONFLICT",
+      {
+        date:
+          parts[1] || "",
+        start_time:
+          parts[2] || "",
+        incoming_store_code:
+          parts[3] || ""
+      }
+    );
+  }
 
   if (
     error.message ===
@@ -1165,6 +1260,58 @@ function importStaffShifts(body) {
       );
     }
 
+    /*
+     * 一括登録でも、MPGの確定予約がある時間帯へ
+     * 川上の八千代/9ROUNDシフトを上書きしない。
+     */
+    if (
+      typeof mpgReservedConflictsForIncomingShift_ ===
+      "function"
+    ) {
+      const mpgReservedConflicts = [];
+
+      validation.validRows.forEach(
+        row => {
+          const conflicts =
+            mpgReservedConflictsForIncomingShift_(
+              row.staff_code,
+              row.store_code,
+              row.date,
+              row.start_time,
+              row.end_time
+            );
+
+          conflicts.forEach(
+            conflict => {
+              mpgReservedConflicts.push({
+                incoming_store_code:
+                  row.store_code,
+                date:
+                  conflict.date,
+                start_time:
+                  conflict.start_time,
+                end_time:
+                  conflict.end_time
+              });
+            }
+          );
+        }
+      );
+
+      if (
+        mpgReservedConflicts.length > 0
+      ) {
+        return errorResponse(
+          "MPGに確定予約があるため、競合する川上の他店舗シフトを一括登録できません。",
+          "MPG_RESERVED_CONFLICT",
+          {
+            conflicts:
+              mpgReservedConflicts
+          }
+        );
+      }
+    }
+
     const sheet =
      getSheet(
         APP_CONFIG.SHEETS.STAFF_SHIFTS
@@ -1410,6 +1557,19 @@ function importStaffShifts(body) {
     }
 
 
+    let mpgReconcileResult = null;
+
+    if (
+      typeof reconcileKawakamiMpgShifts_ ===
+      "function"
+    ) {
+      mpgReconcileResult =
+        reconcileKawakamiMpgShifts_({
+          month:
+            validation.targetMonth
+        });
+    }
+
     return successResponse({
 
       mode:
@@ -1425,7 +1585,19 @@ function importStaffShifts(body) {
         disabledCount,
 
       inserted_count:
-        insertRows.length
+        insertRows.length,
+
+      mpg_removed_count:
+        Number(
+          mpgReconcileResult &&
+          mpgReconcileResult.removed_count ||
+          0
+        ),
+
+      mpg_reserved_conflicts:
+        mpgReconcileResult &&
+        mpgReconcileResult.reserved_conflicts ||
+        []
     });
 
   } catch (error) {
