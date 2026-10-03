@@ -68,7 +68,7 @@ const ROUTES = {
   },
   "mpg-training-support": {
     title: "My Private Gym トレーニングサポート",
-    lead: "My Private Gym会員様向けトレーニングサポート（45分）のご予約です。",
+    lead: "My Private Gym会員様向けトレーニングサポート（45分）のご予約です。1会員につき月4回までご予約いただけます。",
     mode: "FIXED",
     serviceCode: "MPG_TRAINING_SUPPORT45"
   },
@@ -628,6 +628,19 @@ function configureMemberNumberInput_() {
     "placeholder",
     isMpgTrainingSupport ? "例：MPG341114" : "例：108035"
   );
+
+  el.memberNo.oninput = () => {
+    if (isMpgTrainingSupport) {
+      el.memberNo.value =
+        el.memberNo.value
+          .toUpperCase()
+          .replace(/[^A-Z0-9]/g, "")
+          .slice(0, 9);
+    } else {
+      el.memberNo.value =
+        el.memberNo.value.replace(/\D/g, "");
+    }
+  };
 }
 
 function hasCounselMemberNo_() {
