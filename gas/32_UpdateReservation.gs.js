@@ -203,6 +203,28 @@ function updateReservation(params, operationOptions) {
     const serviceCode = normalizeReservationText_(reservation.service_code);
     const service = getAvailabilityService_(serviceCode);
 
+    if (
+      String(serviceCode || "").trim().toUpperCase() ===
+        "MPG_TRAINING_SUPPORT45" &&
+      typeof validateMpgTrainingMonthlyBookingLimit_ ===
+        "function"
+    ) {
+      const mpgMonthlyLimit =
+        validateMpgTrainingMonthlyBookingLimit_(
+          reservation.member_no,
+          targetDate,
+          reservationId
+        );
+
+      if (!mpgMonthlyLimit.ok) {
+        return errorResponse(
+          mpgMonthlyLimit.message,
+          mpgMonthlyLimit.code,
+          mpgMonthlyLimit.detail
+        );
+      }
+    }
+
     /*
      * サービスに設定された担当可能roleを取得
      *
@@ -418,10 +440,15 @@ function updateReservation(params, operationOptions) {
      */
     const staffMap =
       getActiveStaffMap_(
-        providerRoles
+        providerRoles,
+        service
       );
 
-    let shifts = getAvailabilityShifts_(targetDate, staffMap);
+    let shifts = getAvailabilityShifts_(
+      targetDate,
+      staffMap,
+      service.store_code
+    );
     if (requestedStaffCode) {
       shifts = shifts.filter(function(shift) {
         return shift.staff_code === requestedStaffCode;
