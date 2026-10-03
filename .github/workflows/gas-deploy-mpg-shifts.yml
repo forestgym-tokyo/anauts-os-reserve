@@ -53,9 +53,9 @@ jobs:
 
       - name: Overlay MPG shift automation
         run: |
-          test -f .gas-live/24_StaffShift.js || (echo "Live 24_StaffShift.js was not pulled" && exit 1)
-          test -f .gas-live/28_Availability.js || (echo "Live 28_Availability.js was not pulled" && exit 1)
-          test -f .gas-live/29_Reservation.js || (echo "Live 29_Reservation.js was not pulled" && exit 1)
+          test -f .gas-live/24_StaffShift.gs.js || (echo "Live 24_StaffShift.js was not pulled" && exit 1)
+          test -f .gas-live/28_Availability.gs.js || (echo "Live 28_Availability.js was not pulled" && exit 1)
+          test -f .gas-live/29_Reservation.gs.js || (echo "Live 29_Reservation.js was not pulled" && exit 1)
           test -f .gas-live/99_Main.js || (echo "Live 99_Main.js was not pulled" && exit 1)
           cp gas/63_MpgShiftRules.gs .gas-live/63_MpgShiftRules.js
           node scripts/gas-mpg-shift-overlay.mjs
@@ -65,9 +65,9 @@ jobs:
           grep -q 'function generateKawakamiMpgShifts' .gas-live/63_MpgShiftRules.js
           grep -q 'MPG_SHIFT_TRAVEL_MINUTES_ = 150' .gas-live/63_MpgShiftRules.js
           grep -q 'MPG_SHIFT_UNRESERVED_CUTOFF_HOURS_ = 48' .gas-live/63_MpgShiftRules.js
-          grep -q 'mpgAssertIncomingShiftCanReplaceMpg_' .gas-live/24_StaffShift.js
-          grep -q 'service.store_code' .gas-live/28_Availability.js
-          grep -q 'service.store_code' .gas-live/29_Reservation.js
+          grep -q 'mpgAssertIncomingShiftCanReplaceMpg_' .gas-live/24_StaffShift.gs.js
+          grep -q 'service.store_code' .gas-live/28_Availability.gs.js
+          grep -q 'service.store_code' .gas-live/29_Reservation.gs.js
           grep -q 'case "generateKawakamiMpgShifts"' .gas-live/99_Main.js
           echo "MPG shift overlay verified."
 
