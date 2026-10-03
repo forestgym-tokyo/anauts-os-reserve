@@ -125,3 +125,48 @@ test("MPG trigger authorization is non-blocking and availability enforces the 48
   assert.match(availability, /normalizedStoreCode === "MPG"/);
   assert.match(availability, /cleanupUnbookedMpgShifts\(\)/);
 });
+
+
+test("MPG training support enforces four bookings per member per calendar month", () => {
+  const context = mpgContext_();
+  context.APP_CONFIG = { SHEETS: { RESERVATIONS: "reservations" } };
+  context.normalizeReservationScheduleDate_ = value => String(value || "");
+  context.getSheetData = () => [
+    { reservation_id: "1", service_code: "MPG_TRAINING_SUPPORT45", member_no: "MPG341114", reservation_date: "2026-10-02", status: "CONFIRMED" },
+    { reservation_id: "2", service_code: "MPG_TRAINING_SUPPORT45", member_no: "mpg341114", reservation_date: "2026-10-09", status: "RESERVED" },
+    { reservation_id: "3", service_code: "MPG_TRAINING_SUPPORT45", member_no: "MPG341114", reservation_date: "2026-10-16", status: "COMPLETED" },
+    { reservation_id: "4", service_code: "MPG_TRAINING_SUPPORT45", member_no: "MPG341114", reservation_date: "2026-10-23", status: "RESERVED" },
+    { reservation_id: "5", service_code: "MPG_TRAINING_SUPPORT45", member_no: "MPG341114", reservation_date: "2026-10-30", status: "CANCELLED" }
+  ];
+
+  const blocked = context.validateMpgTrainingMonthlyBookingLimit_(
+    "MPG341114",
+    "2026-10-25",
+    ""
+  );
+  assert.equal(blocked.ok, false);
+  assert.equal(blocked.code, "MPG_MONTHLY_BOOKING_LIMIT");
+  assert.equal(blocked.detail.current_count, 4);
+
+  const reschedule = context.validateMpgTrainingMonthlyBookingLimit_(
+    "MPG341114",
+    "2026-10-25",
+    "4"
+  );
+  assert.equal(reschedule.ok, true);
+  assert.equal(reschedule.detail.current_count, 3);
+});
+
+test("MPG reservation code uses MPG member master and store-scoped rescheduling", () => {
+  const reservation = read("gas/29_Reservation.gs.js");
+  const update = read("gas/32_UpdateReservation.gs.js");
+  const reserveUi = read("assets/js/reserve.js");
+
+  assert.match(reservation, /validateMpgReservationMemberMaster_/);
+  assert.match(reservation, /validateMpgTrainingMonthlyBookingLimit_/);
+  assert.match(reservation, /"MPG_TRAINING_SUPPORT45"/);
+  assert.match(update, /validateMpgTrainingMonthlyBookingLimit_/);
+  assert.match(update, /service\.store_code/);
+  assert.match(reserveUi, /MPG\\d\{6\}/);
+  assert.match(reserveUi, /MPG_MONTHLY_BOOKING_LIMIT/);
+});
