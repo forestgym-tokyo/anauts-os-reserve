@@ -41,6 +41,28 @@ jobs:
           echo "===== clasp run getAvailableSlots MPG_TOUR45 2026-10-08 ====="
           npx -y @google/clasp@3.4.1 run getAvailableSlots --params '[{"service_code":"MPG_TOUR45","date":"2026-10-08"}]' || true
 
+      - name: Dry-run live MPG overlay
+        env:
+          CLASP_JSON: ${{ secrets.CLASP_JSON }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .gas-live
+          mkdir -p .gas-live
+          node -e 'const fs=require("fs"); const cfg=JSON.parse(process.env.CLASP_JSON); if(!cfg.scriptId) throw new Error("scriptId missing"); fs.writeFileSync(".clasp.json", JSON.stringify({scriptId:cfg.scriptId,rootDir:".gas-live"}));'
+          npx -y @google/clasp@3.4.1 pull
+          test -f .gas-live/24_StaffShift.gs.js
+          test -f .gas-live/28_Availability.gs.js
+          test -f .gas-live/29_Reservation.gs.js
+          test -f .gas-live/32_UpdateReservation.gs.js
+          test -f .gas-live/88_DietCounselingWorkflow.gs.js
+          node scripts/gas-mpg-shift-overlay.mjs
+          grep -q 'filterMpgSlotsAgainstHeadOfficeReservations_' .gas-live/28_Availability.gs.js
+          grep -q 'validateMpgHeadOfficeTravelForReservation_' .gas-live/29_Reservation.gs.js
+          grep -q 'validateMpgHeadOfficeTravelForReservation_' .gas-live/32_UpdateReservation.gs.js
+          grep -q 'mpgFindMpgTravelConflictForHeadOffice_' .gas-live/88_DietCounselingWorkflow.gs.js
+          echo "Live overlay dry-run OK"
+
       - name: List and probe Apps Script deployments
         shell: bash
         run: |
