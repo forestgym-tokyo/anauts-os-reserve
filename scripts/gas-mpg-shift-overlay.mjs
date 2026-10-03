@@ -275,7 +275,7 @@ function getAvailabilityShifts_(
 
   replaceOnce_(
     file,
-`function roundUpAvailabilityTime_(`
+`function roundUpAvailabilityTime_(
   value,
   intervalMinutes
 ) {
