@@ -56,8 +56,20 @@ function replaceAllRequired_(file, before, after, minimum, label) {
     "28 MPG service permission map"
   );
 
-  replaceOnce_(
-    file,
+  const hasStoreScopedShiftFilter =
+    file.src.includes(
+      `function getAvailabilityShifts_(
+  targetDate,
+  staffMap,
+  storeCode
+)`
+    ) &&
+    file.src.includes("normalizedStoreCode") &&
+    file.src.includes("String(row.store_code || \"\")");
+
+  if (!hasStoreScopedShiftFilter) {
+    replaceOnce_(
+      file,
 ` * @param {Map<string, Object>} staffMap
  * @returns {Array<Object>}
  */
@@ -116,8 +128,9 @@ function getAvailabilityShifts_(
         row.date
       ) === targetDate
     )`,
-    "28 getAvailabilityShifts store filter"
-  );
+      "28 getAvailabilityShifts store filter"
+    );
+  }
 
   replaceOnce_(
     file,
