@@ -14,7 +14,13 @@
  *   non-MPG shift is rejected instead.
  */
 
+const MPG_SHIFT_STORE_CODE_ = "MPG";
 const MPG_SHIFT_SERVICE_CODE_ = "MPG_TRAINING_SUPPORT45";
+const MPG_TOUR_SERVICE_CODE_ = "MPG_TOUR45";
+const MPG_SHIFT_SERVICE_CODES_ = Object.freeze([
+  MPG_SHIFT_SERVICE_CODE_,
+  MPG_TOUR_SERVICE_CODE_
+]);
 const MPG_SHIFT_STAFF_CODE_ = "KAWAKAMI";
 const MPG_SHIFT_YACHIYO_STORE_CODE_ = "YACHIYO";
 const MPG_SHIFT_SOGA_STORE_CODE_ = "SOGA";
@@ -33,23 +39,180 @@ const MPG_SHIFT_WEEKLY_WINDOWS_ = {
   4: ["10:00", "13:00"]
 };
 
-let MPG_STORE_CODE_CACHE_ = "";
-
 function getMpgStoreCode_() {
-  if (MPG_STORE_CODE_CACHE_) return MPG_STORE_CODE_CACHE_;
+  return MPG_SHIFT_STORE_CODE_;
+}
 
-  const rows = getSheetData(APP_CONFIG.SHEETS.SERVICES);
-  const service = rows.find(function (row) {
-    return String(row.service_code || "").trim().toUpperCase() === MPG_SHIFT_SERVICE_CODE_;
-  });
-
-  const storeCode = String(service && service.store_code || "").trim().toUpperCase();
-  if (!storeCode) {
-    throw new Error("MPG_TRAINING_SUPPORT45 の store_code が設定されていません。");
+function ensureMpgServiceConfiguration_() {
+  const sheet = getSheet(APP_CONFIG.SHEETS.SERVICES);
+  const values = sheet.getDataRange().getValues();
+  if (!values.length) {
+    throw new Error("servicesシートにヘッダーがありません。");
   }
 
-  MPG_STORE_CODE_CACHE_ = storeCode;
-  return storeCode;
+  const headers = values[0].map(function (value) {
+    return String(value || "").trim();
+  });
+  const codeIndex = headers.indexOf("service_code");
+  if (codeIndex < 0) {
+    throw new Error("servicesシートにservice_code列がありません。");
+  }
+
+  function findRow_(serviceCode) {
+    const index = values.slice(1).findIndex(function (row) {
+      return String(row[codeIndex] || "").trim().toUpperCase() === serviceCode;
+    });
+    return index >= 0 ? index + 2 : 0;
+  }
+
+  function rowObject_(rowNumber) {
+    if (!rowNumber) return {};
+    const raw = values[rowNumber - 1] || [];
+    const obj = {};
+    headers.forEach(function (header, index) {
+      if (header) obj[header] = raw[index];
+    });
+    return obj;
+  }
+
+  const trainingRow = findRow_(MPG_SHIFT_SERVICE_CODE_);
+  const trainingExisting = rowObject_(trainingRow);
+  const tourRow = findRow_(MPG_TOUR_SERVICE_CODE_);
+  const tourExisting = rowObject_(tourRow);
+  const template = Object.assign({}, trainingExisting);
+
+  function writeService_(rowNumber, existing, config) {
+    const record = Object.assign({}, template, existing, {
+      service_code: config.service_code,
+      store_code: MPG_SHIFT_STORE_CODE_,
+      service_name: config.service_name,
+      form_type: config.form_type,
+      duration: MPG_SHIFT_SLOT_MINUTES_,
+      slot_interval_minutes: MPG_SHIFT_SLOT_MINUTES_,
+      public: true,
+      active: true
+    });
+
+    if (!String(record.brand_code || "").trim()) {
+      record.brand_code = "MPG";
+    }
+    if (!String(record.category || "").trim()) {
+      record.category = "GENERAL";
+    }
+    if (!Number(record.public_days || 0)) {
+      record.public_days = 30;
+    }
+    if (config.permission_column) {
+      record.permission_column = config.permission_column;
+    }
+
+    const row = headers.map(function (header) {
+      return Object.prototype.hasOwnProperty.call(record, header) ? record[header] : "";
+    });
+
+    if (rowNumber) {
+      sheet.getRange(rowNumber, 1, 1, headers.length).setValues([row]);
+    } else {
+      sheet.appendRow(row);
+    }
+  }
+
+  writeService_(
+    trainingRow,
+    trainingExisting,
+    {
+      service_code: MPG_SHIFT_SERVICE_CODE_,
+      service_name: String(trainingExisting.service_name || "").trim() ||
+        "My Private Gym トレーニングサポート",
+      form_type: "MEMBER",
+      permission_column: "can_training_support"
+    }
+  );
+
+  writeService_(
+    tourRow,
+    tourExisting,
+    {
+      service_code: MPG_TOUR_SERVICE_CODE_,
+      service_name: String(tourExisting.service_name || "").trim() ||
+        "My Private Gym 見学",
+      form_type: "VISITOR",
+      permission_column: "can_tour"
+    }
+  );
+
+  ensureMpgServiceHours_();
+
+  return {
+    store_code: MPG_SHIFT_STORE_CODE_,
+    service_codes: MPG_SHIFT_SERVICE_CODES_.slice(),
+    duration_minutes: MPG_SHIFT_SLOT_MINUTES_,
+    interval_minutes: MPG_SHIFT_SLOT_MINUTES_
+  };
+}
+
+function ensureMpgServiceHours_() {
+  const sheet = getSheet(APP_CONFIG.SHEETS.SERVICE_HOURS);
+  const values = sheet.getDataRange().getValues();
+  if (!values.length) {
+    throw new Error("service_hoursシートにヘッダーがありません。");
+  }
+
+  const headers = values[0].map(function (value) {
+    return String(value || "").trim();
+  });
+  const required = ["service_code", "day_of_week", "start_time", "end_time", "active"];
+  required.forEach(function (header) {
+    if (headers.indexOf(header) < 0) {
+      throw new Error("service_hoursに必要な列がありません: " + header);
+    }
+  });
+
+  const codeIndex = headers.indexOf("service_code");
+  const dayIndex = headers.indexOf("day_of_week");
+  const startIndex = headers.indexOf("start_time");
+  const endIndex = headers.indexOf("end_time");
+  const activeIndex = headers.indexOf("active");
+  const wantedStart = mpgMinutesToTime_(MPG_SHIFT_DAY_START_MINUTES_);
+  const wantedEnd = mpgMinutesToTime_(MPG_SHIFT_DAY_END_MINUTES_);
+
+  MPG_SHIFT_SERVICE_CODES_.forEach(function (serviceCode) {
+    let exactRow = 0;
+
+    values.slice(1).forEach(function (row, index) {
+      const rowCode = String(row[codeIndex] || "").trim().toUpperCase();
+      if (rowCode !== serviceCode) return;
+
+      const day = String(row[dayIndex] || "").trim().toUpperCase();
+      const start = typeof formatServiceHourTime_ === "function"
+        ? formatServiceHourTime_(row[startIndex])
+        : String(row[startIndex] || "").trim();
+      const end = typeof formatServiceHourTime_ === "function"
+        ? formatServiceHourTime_(row[endIndex])
+        : String(row[endIndex] || "").trim();
+      const rowNumber = index + 2;
+
+      if (day === "ALL" && start === wantedStart && end === wantedEnd) {
+        exactRow = rowNumber;
+        sheet.getRange(rowNumber, activeIndex + 1).setValue(true);
+      } else {
+        sheet.getRange(rowNumber, activeIndex + 1).setValue(false);
+      }
+    });
+
+    if (!exactRow) {
+      const record = {
+        service_code: serviceCode,
+        day_of_week: "ALL",
+        start_time: wantedStart,
+        end_time: wantedEnd,
+        active: true
+      };
+      sheet.appendRow(headers.map(function (header) {
+        return Object.prototype.hasOwnProperty.call(record, header) ? record[header] : "";
+      }));
+    }
+  });
 }
 
 function mpgTimeToMinutes_(value) {
@@ -116,7 +279,7 @@ function mpgReservationKeySet_() {
 
   rows.forEach(function (row) {
     const serviceCode = String(row.service_code || "").trim().toUpperCase();
-    if (serviceCode !== MPG_SHIFT_SERVICE_CODE_) return;
+    if (MPG_SHIFT_SERVICE_CODES_.indexOf(serviceCode) < 0) return;
 
     const status = String(row.status || "").trim().toUpperCase();
     if (status === "CANCELLED" || status === "CANCELED") return;
@@ -510,8 +673,10 @@ function ensureMpgShiftCleanupTrigger_() {
 
 function generateKawakamiMpgShifts(body) {
   body = body || {};
+  const serviceConfig = ensureMpgServiceConfiguration_();
   const month = String(body.month || Utilities.formatDate(new Date(), APP_CONFIG.TIMEZONE, "yyyy-MM")).trim();
   const result = generateKawakamiMpgShiftsInternal_(month);
+  result.service_configuration = serviceConfig;
   result.cleanup_trigger_created = ensureMpgShiftCleanupTrigger_();
 
   // Apply the 48-hour rule immediately as well as hourly thereafter.
