@@ -660,6 +660,10 @@ function getAvailabilityPermissionColumn_(
       "can_unsubscribe",
     TRAINING_SUPPORT45:
       "can_training_support",
+    MPG_TRAINING_SUPPORT45:
+      "can_training_support",
+    MPG_TOUR45:
+      "can_tour",
     NINE_ROUND:
       "can_9round",
     "9ROUND":
