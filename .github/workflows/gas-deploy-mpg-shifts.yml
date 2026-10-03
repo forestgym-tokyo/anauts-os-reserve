@@ -72,6 +72,8 @@ jobs:
           grep -q 'function setupMpgShiftCleanupTrigger' .gas-live/63_MpgShiftRules.js
           grep -q 'cleanup_trigger_ready' .gas-live/63_MpgShiftRules.js
           grep -q 'normalizedStoreCode === "MPG"' .gas-live/28_Availability.gs.js
+          grep -q 'roundUpAvailabilityTimeFromAnchor_' .gas-live/28_Availability.gs.js
+          grep -q 'slotAnchorAt' .gas-live/28_Availability.gs.js
           grep -q 'MPG_TOUR45' .gas-live/28_Availability.gs.js
           grep -q 'mpgAssertIncomingShiftCanReplaceMpg_' .gas-live/24_StaffShift.gs.js
           grep -q 'service.store_code' .gas-live/28_Availability.gs.js
