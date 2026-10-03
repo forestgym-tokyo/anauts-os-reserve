@@ -430,8 +430,8 @@ function createReservation(params) {
       getAvailabilityShifts_(
         targetDate,
         staffMap,
-      service.store_code
-    );
+        service.store_code
+      );
 
     if (requestedStaffCode) {
       rawShifts = rawShifts.filter(shift =>
