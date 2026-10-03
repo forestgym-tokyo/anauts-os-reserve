@@ -1,0 +1,83 @@
+/*
+ * My Private Gym reservation theme
+ * Shared reservation layout, black x Tiffany blue palette.
+ */
+body.mpg-page{
+  --bg:#050607;
+  --panel:#0b0d0f;
+  --panel2:#111519;
+  --line:#284c4b;
+  --text:#f7fbfb;
+  --muted:#a9bcbc;
+  --accent:#81d8d0;
+  --accent2:#b5f1ec;
+  --danger:#ffb0aa;
+  --danger-bg:#321817;
+  background:
+    radial-gradient(circle at top,rgba(129,216,208,.17),transparent 34rem),
+    linear-gradient(180deg,#050607 0%,#080a0c 100%);
+}
+body.mpg-page .card{
+  border-color:rgba(129,216,208,.24);
+  background:linear-gradient(180deg,rgba(15,18,21,.98),rgba(7,9,11,.98));
+  box-shadow:0 18px 42px rgba(0,0,0,.22);
+}
+body.mpg-page .step-num,
+body.mpg-page .complete-mark{
+  background:var(--accent);
+  color:#061110;
+}
+body.mpg-page .service-card{
+  border-color:rgba(129,216,208,.24);
+  background:#090c0e;
+}
+body.mpg-page .service-card.is-selected{
+  border-color:var(--accent);
+  background:rgba(129,216,208,.12);
+  color:var(--accent2);
+}
+body.mpg-page .week-button,
+body.mpg-page .button-secondary{
+  border-color:rgba(129,216,208,.28);
+  background:#101417;
+}
+body.mpg-page .button-primary{
+  background:linear-gradient(135deg,var(--accent2),var(--accent));
+  color:#061110;
+  box-shadow:0 10px 24px rgba(129,216,208,.16);
+}
+body.mpg-page .day-row,
+body.mpg-page .selected-summary{
+  border-color:rgba(129,216,208,.18);
+  background:#080b0d;
+}
+body.mpg-page .slot-button{
+  border:1px solid rgba(129,216,208,.42);
+  background:#0a0e10;
+  color:var(--text);
+}
+body.mpg-page .slot-button:hover{
+  border-color:var(--accent);
+  background:rgba(129,216,208,.08);
+}
+body.mpg-page .slot-button.is-selected{
+  border-color:var(--accent);
+  background:var(--accent);
+  color:#061110;
+}
+body.mpg-page input,
+body.mpg-page textarea{
+  border-color:rgba(129,216,208,.28);
+  background:#080b0d;
+}
+body.mpg-page input:focus,
+body.mpg-page textarea:focus{
+  border-color:var(--accent);
+  box-shadow:0 0 0 3px rgba(129,216,208,.16);
+}
+body.mpg-page .eyebrow{
+  color:var(--accent);
+}
+body.mpg-page a{
+  color:var(--accent2);
+}
