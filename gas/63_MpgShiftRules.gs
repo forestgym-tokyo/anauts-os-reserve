@@ -671,15 +671,39 @@ function ensureMpgShiftCleanupTrigger_() {
   return !exists;
 }
 
+function setupMpgShiftCleanupTrigger() {
+  const created = ensureMpgShiftCleanupTrigger_();
+  return {
+    ok: true,
+    created: created,
+    handler: "cleanupUnbookedMpgShifts"
+  };
+}
+
 function generateKawakamiMpgShifts(body) {
   body = body || {};
   const serviceConfig = ensureMpgServiceConfiguration_();
   const month = String(body.month || Utilities.formatDate(new Date(), APP_CONFIG.TIMEZONE, "yyyy-MM")).trim();
   const result = generateKawakamiMpgShiftsInternal_(month);
   result.service_configuration = serviceConfig;
-  result.cleanup_trigger_created = ensureMpgShiftCleanupTrigger_();
 
-  // Apply the 48-hour rule immediately as well as hourly thereafter.
+  // Web app execution may not yet have script.scriptapp consent.
+  // Shift generation must still complete; the one-time trigger can be
+  // authorized separately from the Apps Script editor.
+  try {
+    result.cleanup_trigger_created = ensureMpgShiftCleanupTrigger_();
+    result.cleanup_trigger_ready = true;
+  } catch (triggerError) {
+    result.cleanup_trigger_created = false;
+    result.cleanup_trigger_ready = false;
+    result.cleanup_trigger_error = String(
+      triggerError && triggerError.message || triggerError || ""
+    );
+  }
+
+  // Apply the 48-hour rule immediately. The availability/reservation path
+  // also performs the same cleanup as a safety net until the hourly trigger
+  // has been authorized.
   const cleanup = cleanupUnbookedMpgShifts();
   result.cleanup_removed_count = cleanup.removed_count || 0;
   result.cleanup_reserved_count = cleanup.reserved_count || 0;
