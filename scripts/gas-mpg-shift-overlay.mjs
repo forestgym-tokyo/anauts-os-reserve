@@ -43,6 +43,21 @@ function replaceAllRequired_(file, before, after, minimum, label) {
 
   replaceOnce_(
     file,
+`    TRAINING_SUPPORT45:
+      "can_training_support",
+    NINE_ROUND:`,
+`    TRAINING_SUPPORT45:
+      "can_training_support",
+    MPG_TRAINING_SUPPORT45:
+      "can_training_support",
+    MPG_TOUR45:
+      "can_tour",
+    NINE_ROUND:`,
+    "28 MPG service permission map"
+  );
+
+  replaceOnce_(
+    file,
 ` * @param {Map<string, Object>} staffMap
  * @returns {Array<Object>}
  */
