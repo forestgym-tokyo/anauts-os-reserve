@@ -30,6 +30,17 @@ jobs:
           printf '%s' "$CLASPRC_JSON" > "$HOME/.clasprc.json"
           printf '%s' "$CLASP_JSON" > .clasp.json
 
+      - name: Run Apps Script functions via clasp
+        shell: bash
+        run: |
+          set -uo pipefail
+          echo "===== clasp run health ====="
+          npx -y @google/clasp@3.4.1 run health || true
+          echo "===== clasp run getAvailableSlots MPG_TOUR45 2026-10-06 ====="
+          npx -y @google/clasp@3.4.1 run getAvailableSlots --params '[{"service_code":"MPG_TOUR45","date":"2026-10-06"}]' || true
+          echo "===== clasp run getAvailableSlots MPG_TOUR45 2026-10-08 ====="
+          npx -y @google/clasp@3.4.1 run getAvailableSlots --params '[{"service_code":"MPG_TOUR45","date":"2026-10-08"}]' || true
+
       - name: List and probe Apps Script deployments
         shell: bash
         run: |
