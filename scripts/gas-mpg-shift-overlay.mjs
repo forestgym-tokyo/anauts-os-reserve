@@ -167,6 +167,130 @@ function getAvailabilityShifts_(
     "28 MPG 48-hour cleanup hook"
   );
 
+  replaceOnce_(
+    file,
+`      buildAvailabilitySlots_({
+        targetDate: targetDate,
+        durationMinutes: durationMinutes,
+        intervalMinutes: intervalMinutes,
+        shifts: shifts,
+        busyPeriods: busyPeriods,
+        requestedStaffCode:
+          requestedStaffCode,
+        bookingOpenAt:
+          bookingOpenAt
+      });`,
+`      buildAvailabilitySlots_({
+        targetDate: targetDate,
+        durationMinutes: durationMinutes,
+        intervalMinutes: intervalMinutes,
+        shifts: shifts,
+        busyPeriods: busyPeriods,
+        requestedStaffCode:
+          requestedStaffCode,
+        bookingOpenAt:
+          bookingOpenAt,
+        slotAnchorAt:
+          String(service.store_code || "")
+            .trim()
+            .toUpperCase() === "MPG" &&
+          serviceHours.length > 0
+            ? serviceHours[0].start_at
+            : null
+      });`,
+    "28 MPG slot anchor call"
+  );
+
+  replaceOnce_(
+    file,
+`  let cursor =
+    roundUpAvailabilityTime_(
+      earliestStart,
+      intervalMinutes
+    );`,
+`  const slotAnchorAt =
+    options.slotAnchorAt instanceof Date &&
+    !isNaN(options.slotAnchorAt.getTime())
+      ? options.slotAnchorAt
+      : null;
+
+  let cursor =
+    slotAnchorAt
+      ? roundUpAvailabilityTimeFromAnchor_(
+          earliestStart,
+          intervalMinutes,
+          slotAnchorAt
+        )
+      : roundUpAvailabilityTime_(
+          earliestStart,
+          intervalMinutes
+        );`,
+    "28 MPG slot anchor cursor"
+  );
+
+  replaceOnce_(
+    file,
+`function roundUpAvailabilityTime_(
+  value,
+  intervalMinutes
+) {
+
+  const intervalMs =
+    intervalMinutes * 60000;
+
+  return new Date(
+    Math.ceil(
+      value.getTime() /
+      intervalMs
+    ) * intervalMs
+  );
+}`,
+`function roundUpAvailabilityTime_(
+  value,
+  intervalMinutes
+) {
+
+  const intervalMs =
+    intervalMinutes * 60000;
+
+  return new Date(
+    Math.ceil(
+      value.getTime() /
+      intervalMs
+    ) * intervalMs
+  );
+}
+
+function roundUpAvailabilityTimeFromAnchor_(
+  value,
+  intervalMinutes,
+  anchorAt
+) {
+
+  const intervalMs =
+    intervalMinutes * 60000;
+
+  const offset =
+    value.getTime() -
+    anchorAt.getTime();
+
+  if (offset <= 0) {
+    return new Date(
+      anchorAt.getTime()
+    );
+  }
+
+  return new Date(
+    anchorAt.getTime() +
+    Math.ceil(
+      offset /
+      intervalMs
+    ) * intervalMs
+  );
+}`,
+    "28 MPG slot anchor helper"
+  );
+
   write_(file);
 }
 
