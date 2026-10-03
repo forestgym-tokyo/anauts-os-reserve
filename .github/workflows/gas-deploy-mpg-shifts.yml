@@ -73,3 +73,17 @@ jobs:
 
       - name: Push preserved live source plus MPG changes
         run: npx -y @google/clasp@3.4.1 push --force
+
+      - name: Update the existing web-app deployment
+        shell: bash
+        run: |
+          DEPLOYMENT_ID="$(node - <<'NODE'
+          const fs = require("fs");
+          const src = fs.readFileSync("assets/js/reserve.js", "utf8");
+          const match = src.match(/script\.google\.com\/macros\/s\/([^/]+)\/exec/);
+          if (!match) throw new Error("Could not resolve the current web-app deployment ID");
+          process.stdout.write(match[1]);
+          NODE
+          )"
+          test -n "$DEPLOYMENT_ID" || (echo "Deployment ID is empty" && exit 1)
+          npx -y @google/clasp@3.4.1 update-deployment "$DEPLOYMENT_ID" -d "MPG Kawakami shift automation"
