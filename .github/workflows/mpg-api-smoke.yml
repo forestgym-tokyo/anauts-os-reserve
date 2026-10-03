@@ -12,15 +12,52 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     steps:
-      - name: Check MPG availability API
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Prepare clasp credentials
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+          CLASP_JSON: ${{ secrets.CLASP_JSON }}
+        run: |
+          test -n "$CLASPRC_JSON"
+          test -n "$CLASP_JSON"
+          printf '%s' "$CLASPRC_JSON" > "$HOME/.clasprc.json"
+          printf '%s' "$CLASP_JSON" > .clasp.json
+
+      - name: List and probe Apps Script deployments
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
+          npx -y @google/clasp@3.4.1 deployments | tee /tmp/deployments.txt
+          grep -oE 'AKfycb[A-Za-z0-9_-]+' /tmp/deployments.txt | sort -u > /tmp/ids.txt || true
+          echo "Deployment IDs:"
+          cat /tmp/ids.txt || true
+          while read -r id; do
+            [ -n "$id" ] || continue
+            url="https://script.google.com/macros/s/$id/exec?action=getServices&_=$(date +%s)"
+            code="$(curl -sSL -o /tmp/body.txt -w '%{http_code}' --max-time 60 "$url" || true)"
+            echo "===== $id HTTP $code ====="
+            head -c 1200 /tmp/body.txt || true
+            echo
+          done < /tmp/ids.txt
+
+      - name: Check configured MPG availability URL
+        shell: bash
+        run: |
+          set -uo pipefail
           API='https://script.google.com/macros/s/AKfycbyvpQRxRpMRFpaQHtBar77dViCqPl-hdFW-2yMdozhN8RHtwcrFiNEM9cvEbny4x9q0/exec'
           for service in MPG_TOUR45 MPG_TRAINING_SUPPORT45; do
             for date in 2026-10-06 2026-10-08; do
               echo "===== $service $date ====="
-              curl -fsSL --retry 2 --max-time 60                 "$API?action=getAvailableSlots&service_code=$service&date=$date&_=$(date +%s)"
+              code="$(curl -sSL -o /tmp/body.txt -w '%{http_code}' --max-time 60                 "$API?action=getAvailableSlots&service_code=$service&date=$date&_=$(date +%s)" || true)"
+              echo "HTTP $code"
+              head -c 5000 /tmp/body.txt || true
               echo
             done
           done
