@@ -290,6 +290,32 @@ function createReservation(params) {
         durationMinutes * 60000
       );
 
+    if (
+      /^MPG_/.test(
+        String(serviceCode || "")
+          .trim()
+          .toUpperCase()
+      ) &&
+      typeof validateMpgHeadOfficeTravelForReservation_ ===
+        "function"
+    ) {
+      const mpgTravelValidation =
+        validateMpgHeadOfficeTravelForReservation_(
+          targetDate,
+          startTime,
+          formatReservationTime_(endAt),
+          ""
+        );
+
+      if (!mpgTravelValidation.ok) {
+        return errorResponse(
+          mpgTravelValidation.message,
+          mpgTravelValidation.code,
+          mpgTravelValidation.detail
+        );
+      }
+    }
+
     /*
      * 予約公開期間チェック
      */
