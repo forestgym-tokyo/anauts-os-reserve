@@ -165,12 +165,20 @@ function createReservation(params) {
     if (customerType === "MEMBER") {
 
       const memberValidation =
-        validateReservationMemberMaster_({
-          memberNo:
-            memberNo,
-          customerEmail:
-            customerEmail
-        });
+        String(serviceCode || "").trim().toUpperCase() === "MPG_TRAINING_SUPPORT45" &&
+        typeof validateMpgReservationMemberMaster_ === "function"
+          ? validateMpgReservationMemberMaster_({
+              memberNo:
+                memberNo,
+              customerEmail:
+                customerEmail
+            })
+          : validateReservationMemberMaster_({
+              memberNo:
+                memberNo,
+              customerEmail:
+                customerEmail
+            });
 
       if (!memberValidation.ok) {
         return errorResponse(
@@ -192,6 +200,28 @@ function createReservation(params) {
         normalizeReservationText_(
           verifiedMember.email
         );
+    }
+
+    if (
+      String(serviceCode || "").trim().toUpperCase() ===
+        "MPG_TRAINING_SUPPORT45" &&
+      typeof validateMpgTrainingMonthlyBookingLimit_ ===
+        "function"
+    ) {
+      const mpgMonthlyLimit =
+        validateMpgTrainingMonthlyBookingLimit_(
+          memberNo,
+          targetDate,
+          ""
+        );
+
+      if (!mpgMonthlyLimit.ok) {
+        return errorResponse(
+          mpgMonthlyLimit.message,
+          mpgMonthlyLimit.code,
+          mpgMonthlyLimit.detail
+        );
+      }
     }
 
     /*
@@ -1397,6 +1427,7 @@ function isReservationCustomerNameRequired_(
 
   if ([
     "TRAINING_SUPPORT45",
+    "MPG_TRAINING_SUPPORT45",
     "PROCEDURE",
     "UNSUBSCRIBE",
     "MEAL_PLANNING"
