@@ -102,7 +102,7 @@
       '<p class="eyebrow">MY PRIVATE GYM SHIFT</p>',
       '<h2>川上一郎 MPGシフト</h2>',
       '<p style="margin:6px 0 0;color:#91a198;font-size:12px;line-height:1.8">',
-      '45分枠（10:15〜20:45）。八千代勤務の前後は2時間30分を確保し、9ROUND勤務時間はMPG枠から除外します。未予約枠は開始48時間前に自動削除します。',
+      '見学・トレーニングサポートとも45分枠（10:15〜20:45）。八千代勤務の前後は2時間30分を確保し、9ROUND勤務時間はMPG枠から除外します。未予約枠は開始48時間前に自動削除します。',
       '</p></div></div>',
       '<div style="padding:20px 22px;display:grid;gap:14px">',
       '<label style="display:grid;gap:7px"><span style="font-size:12px;font-weight:800;color:#aab6ad">対象月</span>',
@@ -110,7 +110,7 @@
       '<button id="mpgShiftGenerate" class="primary-button" type="button">MPGシフトを自動作成</button>',
       '<div id="mpgShiftMessage" class="form-message is-hidden"></div>',
       '<div style="font-size:12px;line-height:1.8;color:#9ba79f">',
-      '基本枠：月・水 19:00〜21:00／火・木 10:00〜13:00／日 18:00〜21:00。10:15起点の45分グリッドに完全に入る枠を作成します。確定予約があるMPG枠は自動削除しません。',
+      '基本枠：月・水 19:00〜21:00／火・木 10:00〜13:00／日 18:00〜21:00。見学・トレーニングサポートは同じ45分枠を使用します。10:15起点の45分グリッドに完全に入る枠を作成し、どちらかに確定予約がある枠は自動削除しません。',
       '</div></div>'
     ].join("");
 
