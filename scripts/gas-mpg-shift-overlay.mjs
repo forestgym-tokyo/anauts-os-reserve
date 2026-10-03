@@ -25,7 +25,7 @@ function replaceAllRequired_(file, before, after, minimum, label) {
 
 // 28_Availability: only shifts from the service's own store may create availability.
 {
-  const file = read_("28_Availability.js");
+  const file = read_("28_Availability.gs.js");
 
   replaceOnce_(
     file,
@@ -109,7 +109,7 @@ function getAvailabilityShifts_(
 
 // 29_Reservation: reservation validation must use the same store-scoped shifts.
 {
-  const file = read_("29_Reservation.js");
+  const file = read_("29_Reservation.gs.js");
   replaceAllRequired_(
     file,
 `getAvailabilityShifts_(
@@ -144,7 +144,7 @@ function getAvailabilityShifts_(
 // 24_StaffShift: protect reserved MPG slots and remove unreserved MPG
 // conflicts when YACHIYO/SOGA shifts are saved/imported.
 {
-  const file = read_("24_StaffShift.js");
+  const file = read_("24_StaffShift.gs.js");
 
   replaceOnce_(
     file,
