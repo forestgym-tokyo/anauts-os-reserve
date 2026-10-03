@@ -68,7 +68,10 @@
         "他店舗勤務で除外 " + Number(data.blocked_count || 0) + "枠、" +
         "48時間ルールで削除 " + Number(data.cleanup_removed_count || 0) + "枠" +
         (reservedConflicts ? "、確定予約との競合 " + reservedConflicts + "件（自動削除せず保護）" : "") +
-        "。",
+        "。" +
+        (data.cleanup_trigger_ready === false
+          ? " 48時間ルールは予約画面・予約検証時にも自動適用します。時間トリガーは初回のみGAS側で権限承認が必要です。"
+          : ""),
         false
       );
     }catch(error){
