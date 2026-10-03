@@ -231,7 +231,7 @@ document.addEventListener("DOMContentLoaded", function () {
     "./admin-auto-reassign-enforce.js?v=20260920-head-office-counsel-v2",
     "./admin-daily-report.js?v=20260903-daily-save-required-v5",
     "./admin-soga-shifts.js?v=20260926-a4-shift-print-v1",
-    "./admin-mpg-shifts.js?v=20261003-mpg-services-v2"
+    "./admin-mpg-shifts.js?v=20261003-mpg-trigger-v3"
   ];
   var started = false;
 
