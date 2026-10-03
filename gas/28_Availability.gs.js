@@ -349,7 +349,14 @@ function getAvailableSlots(params) {
         requestedStaffCode:
           requestedStaffCode,
         bookingOpenAt:
-          bookingOpenAt
+          bookingOpenAt,
+        slotAnchorAt:
+          String(service.store_code || "")
+            .trim()
+            .toUpperCase() === "MPG" &&
+          serviceHours.length > 0
+            ? serviceHours[0].start_at
+            : null
       });
 
     return successResponse({
@@ -1346,11 +1353,23 @@ function buildAvailabilitySlots_(
       )
     );
 
+  const slotAnchorAt =
+    options.slotAnchorAt instanceof Date &&
+    !isNaN(options.slotAnchorAt.getTime())
+      ? options.slotAnchorAt
+      : null;
+
   let cursor =
-    roundUpAvailabilityTime_(
-      earliestStart,
-      intervalMinutes
-    );
+    slotAnchorAt
+      ? roundUpAvailabilityTimeFromAnchor_(
+          earliestStart,
+          intervalMinutes,
+          slotAnchorAt
+        )
+      : roundUpAvailabilityTime_(
+          earliestStart,
+          intervalMinutes
+        );
 
   const slots = [];
 
@@ -1546,6 +1565,46 @@ function roundUpAvailabilityTime_(
   return new Date(
     Math.ceil(
       value.getTime() /
+      intervalMs
+    ) * intervalMs
+  );
+}
+
+
+/**
+ * サービス固有の開始基準に合わせて切り上げる。
+ *
+ * 45分間隔は24時間を割り切らないため、Unix epoch基準で丸めると
+ * 10:15開始のMPG枠が10:30へずれて全枠消える。
+ *
+ * @param {Date} value
+ * @param {number} intervalMinutes
+ * @param {Date} anchorAt
+ * @returns {Date}
+ */
+function roundUpAvailabilityTimeFromAnchor_(
+  value,
+  intervalMinutes,
+  anchorAt
+) {
+
+  const intervalMs =
+    intervalMinutes * 60000;
+
+  const offset =
+    value.getTime() -
+    anchorAt.getTime();
+
+  if (offset <= 0) {
+    return new Date(
+      anchorAt.getTime()
+    );
+  }
+
+  return new Date(
+    anchorAt.getTime() +
+    Math.ceil(
+      offset /
       intervalMs
     ) * intervalMs
   );
