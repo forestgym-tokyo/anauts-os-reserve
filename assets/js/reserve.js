@@ -572,11 +572,23 @@ function configureCustomerForm() {
 
   if (el.memberNo) {
     el.memberNo.oninput = () => {
-      el.memberNo.value =
-        el.memberNo.value.replace(
-          /\D/g,
-          ""
-        );
+      const code = String(
+        selectedService && selectedService.service_code || ""
+      ).trim().toUpperCase();
+
+      if (code === "MPG_TRAINING_SUPPORT45") {
+        el.memberNo.value =
+          el.memberNo.value
+            .toUpperCase()
+            .replace(/[^A-Z0-9]/g, "")
+            .slice(0, 9);
+      } else {
+        el.memberNo.value =
+          el.memberNo.value.replace(
+            /\D/g,
+            ""
+          );
+      }
     };
   }
 
@@ -592,10 +604,30 @@ function configureCustomerForm() {
 function configureMemberNumberInput_() {
   if (!el.memberNo) return;
 
-  el.memberNo.setAttribute("inputmode", "numeric");
-  el.memberNo.setAttribute("pattern", "[0-9]{6}");
-  el.memberNo.setAttribute("maxlength", "6");
+  const code = String(
+    selectedService && selectedService.service_code || ""
+  ).trim().toUpperCase();
+
+  const isMpgTrainingSupport =
+    code === "MPG_TRAINING_SUPPORT45";
+
+  el.memberNo.setAttribute(
+    "inputmode",
+    isMpgTrainingSupport ? "text" : "numeric"
+  );
+  el.memberNo.setAttribute(
+    "pattern",
+    isMpgTrainingSupport ? "MPG[0-9]{6}" : "[0-9]{6}"
+  );
+  el.memberNo.setAttribute(
+    "maxlength",
+    isMpgTrainingSupport ? "9" : "6"
+  );
   el.memberNo.setAttribute("autocomplete", "off");
+  el.memberNo.setAttribute(
+    "placeholder",
+    isMpgTrainingSupport ? "例：MPG341114" : "例：108035"
+  );
 }
 
 function hasCounselMemberNo_() {
@@ -1437,9 +1469,15 @@ async function submitReservation(event) {
   const name = nameRequired
     ? nameParts.fullName
     : "";
-  const isTour = serviceCode === "TOUR";
+  const isTour =
+    serviceCode === "TOUR" ||
+    serviceCode === "MPG_TOUR45";
   const isCounsel = serviceCode === "COUNSEL";
-  const isTrainingSupport = serviceCode === "TRAINING_SUPPORT45";
+  const isTrainingSupport =
+    serviceCode === "TRAINING_SUPPORT45" ||
+    serviceCode === "MPG_TRAINING_SUPPORT45";
+  const isMpgTrainingSupport =
+    serviceCode === "MPG_TRAINING_SUPPORT45";
   const addressParts = getAddressParts_();
 
   if ((customerType === "MEMBER" || isTrainingSupport) && !memberNo) {
@@ -1447,8 +1485,19 @@ async function submitReservation(event) {
     return;
   }
 
-  if ((customerType === "MEMBER" || isTrainingSupport) && !/^\d{6}$/.test(memberNo)) {
-    showError("会員番号は6桁の数字で入力してください。");
+  if (
+    (customerType === "MEMBER" || isTrainingSupport) &&
+    (
+      isMpgTrainingSupport
+        ? !/^MPG\d{6}$/i.test(memberNo)
+        : !/^\d{6}$/.test(memberNo)
+    )
+  ) {
+    showError(
+      isMpgTrainingSupport
+        ? "会員番号は「MPG＋6桁の数字」で入力してください。"
+        : "会員番号は6桁の数字で入力してください。"
+    );
     return;
   }
 
@@ -1583,7 +1632,8 @@ function userMessage(result) {
     PERSONAL_TRAINER_REQUIRED: "担当トレーナーを確認できませんでした。空き状況を更新し、日時を選び直してください。",
     SLOT_NOT_AVAILABLE: "選択した時間は埋まりました。空き状況を更新してください。",
     CUSTOMER_TYPE_REQUIRED: "会員または非会員を選択してください。",
-    CUSTOMER_PHONE_REQUIRED: "電話番号を入力してください。"
+    CUSTOMER_PHONE_REQUIRED: "電話番号を入力してください。",
+    MPG_MONTHLY_BOOKING_LIMIT: "トレーニングサポートは1会員につき月4回までご予約いただけます。"
   };
 
   return messages[result.code] || result.message || "予約に失敗しました。";
