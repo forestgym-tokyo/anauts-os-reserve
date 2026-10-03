@@ -1,6 +1,6 @@
 const API_URL = "https://script.google.com/macros/s/AKfycbyvpQRxRpMRfpaQHtBar77dViCqPl-hdFW-2yMdozhN8RHtwcrFiNEM9cvEbny4x9q0/exec";
 const DAYS = 7;
-const SERVICES_SESSION_CACHE_KEY = "anauts-reserve-services-v1";
+const SERVICES_SESSION_CACHE_KEY = "anauts-reserve-services-v2";
 const SERVICES_SESSION_CACHE_MS = 5 * 60 * 1000;
 const TOUR_RANGE_TIMEOUT_MS = 45000;
 const TOUR_RANGE_MAX_ATTEMPTS = 3;
