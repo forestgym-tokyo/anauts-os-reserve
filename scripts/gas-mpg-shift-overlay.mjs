@@ -618,7 +618,7 @@ function roundUpAvailabilityTimeFromAnchor_(
 // 88_DietCounselingWorkflow: keep HEAD_OFFICE and MPG shifts concurrent
 // and apply the same 150-minute travel rule only after an MPG reservation exists.
 {
-  const file = read_("88_DietCounselingWorkflow.gs.js");
+  const file = read_("88_DietCounselingWorkflow.js");
 
   replaceOnce_(
     file,
