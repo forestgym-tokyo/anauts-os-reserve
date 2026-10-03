@@ -1,0 +1,26 @@
+name: MPG API Smoke
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/mpg-api-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check MPG availability API
+        shell: bash
+        run: |
+          set -euo pipefail
+          API='https://script.google.com/macros/s/AKfycbyvpQRxRpMRFpaQHtBar77dViCqPl-hdFW-2yMdozhN8RHtwcrFiNEM9cvEbny4x9q0/exec'
+          for service in MPG_TOUR45 MPG_TRAINING_SUPPORT45; do
+            for date in 2026-10-06 2026-10-08; do
+              echo "===== $service $date ====="
+              curl -fsSL --retry 2 --max-time 60                 "$API?action=getAvailableSlots&service_code=$service&date=$date&_=$(date +%s)"
+              echo
+            done
+          done
