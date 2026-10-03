@@ -170,3 +170,26 @@ test("MPG reservation code uses MPG member master and store-scoped rescheduling"
   assert.match(reserveUi, /MPG\\d\{6\}/);
   assert.match(reserveUi, /MPG_MONTHLY_BOOKING_LIMIT/);
 });
+
+
+test("MPG availability keeps the 10:15 anchored 45-minute grid", () => {
+  const source = read("gas/28_Availability.gs.js");
+  const fn = new Function(
+    source + "; return { roundUpAvailabilityTimeFromAnchor_ };"
+  )();
+
+  const anchor = new Date("2026-10-06T10:15:00+09:00");
+  const exact = new Date("2026-10-06T10:15:00+09:00");
+  const later = new Date("2026-10-06T10:16:00+09:00");
+
+  assert.equal(
+    fn.roundUpAvailabilityTimeFromAnchor_(exact, 45, anchor).toISOString(),
+    exact.toISOString()
+  );
+  assert.equal(
+    fn.roundUpAvailabilityTimeFromAnchor_(later, 45, anchor).toISOString(),
+    new Date("2026-10-06T11:00:00+09:00").toISOString()
+  );
+  assert.match(source, /slotAnchorAt/);
+  assert.match(source, /service\.store_code/);
+});
