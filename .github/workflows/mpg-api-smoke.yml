@@ -52,12 +52,20 @@ jobs:
         run: |
           set -uo pipefail
           API='https://script.google.com/macros/s/AKfycbyvpQRxRpMRFpaQHtBar77dViCqPl-hdFW-2yMdozhN8RHtwcrFiNEM9cvEbny4x9q0/exec'
-          for service in MPG_TOUR45 MPG_TRAINING_SUPPORT45; do
-            for date in 2026-10-06 2026-10-08; do
-              echo "===== $service $date ====="
-              code="$(curl -sSL -o /tmp/body.txt -w '%{http_code}' --max-time 60                 "$API?action=getAvailableSlots&service_code=$service&date=$date&_=$(date +%s)" || true)"
-              echo "HTTP $code"
-              head -c 5000 /tmp/body.txt || true
-              echo
-            done
+          tests=(
+            'action=getServices'
+            'action=getServices&date=2026-10-06'
+            'action=getAvailableSlots'
+            'action=getAvailableSlots&service_code=MPG_TOUR45'
+            'action=getAvailableSlots&date=2026-10-06'
+            'action=getAvailableSlots&service_code=MPG_TOUR45&date=2026-10-06'
+            'action=getAvailableSlots&service_code=MPG_TRAINING_SUPPORT45&date=2026-10-06'
+            'action=getAvailableSlots&service_code=MPG_TOUR45&date=2026-10-08'
+          )
+          for query in "${tests[@]}"; do
+            echo "===== $query ====="
+            code="$(curl -sSL -o /tmp/body.txt -w '%{http_code}' --max-time 60 "$API?$query&_=$(date +%s)" || true)"
+            echo "HTTP $code"
+            head -c 1400 /tmp/body.txt || true
+            echo
           done
