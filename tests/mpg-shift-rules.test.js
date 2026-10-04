@@ -44,24 +44,25 @@ test("MPG recurring windows snap to the 10:15 45-minute grid", () => {
     { start_time: "20:00", end_time: "20:45" }
   ]);
   assert.deepEqual(tuesday, [
-    { start_time: "10:15", end_time: "11:00" },
     { start_time: "11:00", end_time: "11:45" },
-    { start_time: "11:45", end_time: "12:30" }
+    { start_time: "11:45", end_time: "12:30" },
+    { start_time: "12:30", end_time: "13:15" },
+    { start_time: "13:15", end_time: "14:00" }
   ]);
 });
 
-test("YACHIYO blocks MPG with a 150-minute travel buffer", () => {
+test("YACHIYO blocks MPG with a 120-minute travel buffer", () => {
   const context = mpgContext_();
 
   assert.equal(context.mpgSlotConflict_(
     { start_time: "13:15", end_time: "14:00" },
     { store_code: "YACHIYO", start_time: "16:00", end_time: "20:00" }
-  ), true);
+  ), false);
 
   assert.equal(context.mpgSlotConflict_(
-    { start_time: "12:30", end_time: "13:15" },
+    { start_time: "14:00", end_time: "14:45" },
     { store_code: "YACHIYO", start_time: "16:00", end_time: "20:00" }
-  ), false);
+  ), true);
 
   assert.equal(context.mpgSlotConflict_(
     { start_time: "18:30", end_time: "19:15" },
