@@ -272,3 +272,14 @@ test("MPG availability no longer runs cleanup synchronously on every read", () =
   assert.doesNotMatch(availability, /cleanupUnbookedMpgShifts\(\);/);
   assert.match(read("gas/63_MpgShiftRules.gs"), /MPG_SHIFT_UNRESERVED_CUTOFF_HOURS_/);
 });
+
+
+test("MPG uses weekly range availability instead of forced daily requests", () => {
+  const reserveUi = read("assets/js/reserve.js");
+  assert.match(reserveUi, /action", "getAvailableSlotsRange"/);
+  assert.doesNotMatch(
+    reserveUi,
+    /if \(isMpgService\) return null;/,
+    "MPG should use one weekly HTTP request before daily fallback"
+  );
+});
