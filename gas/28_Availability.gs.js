@@ -782,17 +782,6 @@ function getAvailabilityShifts_(
       .trim()
       .toUpperCase();
 
-  if (
-    normalizedStoreCode === "MPG" &&
-    typeof cleanupUnbookedMpgShifts === "function"
-  ) {
-    try {
-      cleanupUnbookedMpgShifts();
-    } catch (_) {
-      // Availability must remain readable even if cleanup itself fails.
-    }
-  }
-
   const rows = getSheetData(
     APP_CONFIG.SHEETS.STAFF_SHIFTS
   );
