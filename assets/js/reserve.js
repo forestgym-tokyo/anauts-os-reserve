@@ -108,6 +108,11 @@ const el = {
   reservationForm: document.querySelector("#reservationForm"),
   customerTypeField: document.querySelector("#customerTypeField"),
   memberNoField: document.querySelector("#memberNoField"),
+  memberNumberHelpButton: document.querySelector("#memberNumberHelpButton"),
+  memberNumberHelpPanel: document.querySelector("#memberNumberHelpPanel"),
+  memberNumberLookupEmail: document.querySelector("#memberNumberLookupEmail"),
+  memberNumberLookupSendButton: document.querySelector("#memberNumberLookupSendButton"),
+  memberNumberLookupStatus: document.querySelector("#memberNumberLookupStatus"),
   nameField: document.querySelector("#nameField"),
   phoneField: document.querySelector("#phoneField"),
   postalField: document.querySelector("#postalField"),
@@ -716,6 +721,7 @@ function configureMemberNumberInput_() {
 
   if (isMpgTrainingSupport) {
     restoreMpgTrainingDefaults_();
+    setupMpgMemberNumberReminder_();
 
     if (el.customerEmail) {
       el.customerEmail.oninput =
@@ -723,6 +729,140 @@ function configureMemberNumberInput_() {
       el.customerEmail.onchange =
         saveMpgTrainingDefaults_;
     }
+  }
+}
+
+
+function setupMpgMemberNumberReminder_() {
+  if (
+    !el.memberNumberHelpButton ||
+    !el.memberNumberHelpPanel ||
+    !el.memberNumberLookupEmail ||
+    !el.memberNumberLookupSendButton
+  ) {
+    return;
+  }
+
+  if (el.memberNumberHelpButton.dataset.bound === "1") {
+    return;
+  }
+
+  el.memberNumberHelpButton.dataset.bound = "1";
+
+  el.memberNumberHelpButton.addEventListener("click", () => {
+    const willOpen =
+      el.memberNumberHelpPanel.classList.contains("is-hidden");
+
+    el.memberNumberHelpPanel.classList.toggle("is-hidden", !willOpen);
+
+    if (willOpen) {
+      const currentEmail = String(
+        (el.customerEmail && el.customerEmail.value) || ""
+      ).trim();
+
+      const savedEmail = readMpgTrainingDefaults_().email;
+
+      if (!String(el.memberNumberLookupEmail.value || "").trim()) {
+        el.memberNumberLookupEmail.value =
+          currentEmail || savedEmail || "";
+      }
+
+      el.memberNumberLookupEmail.focus();
+    }
+  });
+
+  el.memberNumberLookupSendButton.addEventListener(
+    "click",
+    sendMpgMemberNumberReminder_
+  );
+
+  el.memberNumberLookupEmail.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      sendMpgMemberNumberReminder_();
+    }
+  });
+}
+
+function setMpgMemberNumberReminderStatus_(message, isError) {
+  if (!el.memberNumberLookupStatus) return;
+
+  el.memberNumberLookupStatus.textContent =
+    String(message || "");
+
+  el.memberNumberLookupStatus.classList.toggle(
+    "member-number-help-error",
+    !!isError
+  );
+}
+
+async function sendMpgMemberNumberReminder_() {
+  if (
+    !el.memberNumberLookupEmail ||
+    !el.memberNumberLookupSendButton
+  ) {
+    return;
+  }
+
+  const email = String(
+    el.memberNumberLookupEmail.value || ""
+  ).trim();
+
+  if (
+    !email ||
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  ) {
+    setMpgMemberNumberReminderStatus_(
+      "メールアドレスを正しく入力してください。",
+      true
+    );
+    el.memberNumberLookupEmail.focus();
+    return;
+  }
+
+  setMpgMemberNumberReminderStatus_("送信しています…", false);
+  el.memberNumberLookupSendButton.disabled = true;
+
+  try {
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8"
+      },
+      body: JSON.stringify({
+        action: "sendMpgMemberNumberReminder",
+        email: email
+      })
+    });
+
+    const result = await response.json();
+
+    if (!result.ok) {
+      throw new Error(
+        result.message ||
+        "会員番号メールを送信できませんでした。"
+      );
+    }
+
+    if (el.customerEmail) {
+      el.customerEmail.value = email;
+      saveMpgTrainingDefaults_();
+    }
+
+    setMpgMemberNumberReminderStatus_(
+      result.message ||
+      "入力したメールアドレスが登録情報と一致する場合、会員番号をメールでお送りしました。",
+      false
+    );
+
+  } catch (error) {
+    setMpgMemberNumberReminderStatus_(
+      error.message ||
+      "送信中にエラーが発生しました。時間をおいて再度お試しください。",
+      true
+    );
+  } finally {
+    el.memberNumberLookupSendButton.disabled = false;
   }
 }
 
