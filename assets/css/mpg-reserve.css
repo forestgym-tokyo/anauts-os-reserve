@@ -81,3 +81,47 @@ body.mpg-page .eyebrow{
 body.mpg-page a{
   color:var(--accent2);
 }
+
+
+/* MPG member-number reminder */
+body.mpg-page .member-number-help{
+  display:inline-flex;
+  align-items:center;
+  margin-top:10px;
+  padding:0;
+  border:0;
+  background:transparent;
+  color:var(--accent2);
+  font:inherit;
+  font-weight:700;
+  text-decoration:underline;
+  text-underline-offset:3px;
+  cursor:pointer;
+}
+body.mpg-page .member-number-help-panel{
+  margin-top:12px;
+  padding:14px;
+  border:1px solid rgba(129,216,208,.24);
+  border-radius:12px;
+  background:#080b0d;
+}
+body.mpg-page .member-number-help-panel label{
+  display:block;
+  margin-bottom:7px;
+  color:var(--muted);
+  font-size:.92rem;
+}
+body.mpg-page .member-number-help-panel input{
+  width:100%;
+  box-sizing:border-box;
+  margin-bottom:10px;
+}
+body.mpg-page .member-number-help-panel .button{
+  width:100%;
+}
+body.mpg-page .member-number-help-panel .status{
+  margin:10px 0 0;
+}
+body.mpg-page .member-number-help-panel .member-number-help-error{
+  color:var(--danger);
+}
