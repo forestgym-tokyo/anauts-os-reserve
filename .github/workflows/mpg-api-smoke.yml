@@ -55,11 +55,16 @@ jobs:
           test -f .gas-live/28_Availability.gs.js
           test -f .gas-live/29_Reservation.gs.js
           test -f .gas-live/32_UpdateReservation.gs.js
+          test -f .gas-live/40_ReservationMail.gs.js
           test -f .gas-live/88_DietCounselingWorkflow.js
+          node --check scripts/gas-mpg-shift-overlay.mjs
           node scripts/gas-mpg-shift-overlay.mjs
           grep -q 'filterMpgSlotsAgainstHeadOfficeReservations_' .gas-live/28_Availability.gs.js
+          ! grep -q 'cleanupUnbookedMpgShifts();' .gas-live/28_Availability.gs.js
           grep -q 'validateMpgHeadOfficeTravelForReservation_' .gas-live/29_Reservation.gs.js
           grep -q 'validateMpgHeadOfficeTravelForReservation_' .gas-live/32_UpdateReservation.gs.js
+          grep -q '#81d8d0' .gas-live/40_ReservationMail.gs.js
+          grep -q 'MPG_TRAINING_SUPPORT45' .gas-live/40_ReservationMail.gs.js
           grep -q 'mpgFindMpgTravelConflictForHeadOffice_' .gas-live/88_DietCounselingWorkflow.js
           echo "Live overlay dry-run OK"
 
