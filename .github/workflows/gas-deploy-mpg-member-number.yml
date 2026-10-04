@@ -2,13 +2,6 @@ name: GAS Deploy MPG Member Number (safe)
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - "gas/93_MpgMemberNumberReminder.gs"
-      - "scripts/gas-mpg-member-number-overlay.mjs"
-      - ".github/workflows/gas-deploy-mpg-member-number.yml"
 
 permissions:
   contents: read
