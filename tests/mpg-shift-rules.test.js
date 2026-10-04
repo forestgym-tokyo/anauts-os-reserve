@@ -167,8 +167,10 @@ test("MPG reservation code uses MPG member master and store-scoped rescheduling"
   assert.match(reservation, /"MPG_TRAINING_SUPPORT45"/);
   assert.match(update, /validateMpgTrainingMonthlyBookingLimit_/);
   assert.match(update, /service\.store_code/);
-  assert.match(reserveUi, /MPG\\d\{6\}/);
+  assert.match(reserveUi, /"placeholder",\s*isMpgTrainingSupport \? "例：123456"/);
+  assert.match(reserveUi, /!\/\^\\d\{6\}\$\/\.test\(memberNo\)/);
   assert.match(reserveUi, /MPG_MONTHLY_BOOKING_LIMIT/);
+  assert.match(reserveUi, /isMpgService\s*\? Math\.min\(4, dates\.length\)/);
 });
 
 
@@ -255,4 +257,17 @@ test("HEAD_OFFICE counseling ignores unbooked MPG shifts but blocks actual MPG r
   assert.match(availability, /filterMpgSlotsAgainstHeadOfficeReservations_/);
   assert.match(reservation, /validateMpgHeadOfficeTravelForReservation_/);
   assert.match(update, /validateMpgHeadOfficeTravelForReservation_/);
+});
+
+
+test("MPG member-number normalization accepts legacy prefix but returns six digits", () => {
+  const context = mpgContext_();
+  assert.equal(context.normalizeMpgReservationMemberNo_("123456"), "123456");
+  assert.equal(context.normalizeMpgReservationMemberNo_("MPG123456"), "123456");
+});
+
+test("MPG availability no longer runs cleanup synchronously on every read", () => {
+  const availability = read("gas/28_Availability.gs.js");
+  assert.doesNotMatch(availability, /cleanupUnbookedMpgShifts\(\);/);
+  assert.match(read("gas/63_MpgShiftRules.gs"), /MPG_SHIFT_UNRESERVED_CUTOFF_HOURS_/);
 });
