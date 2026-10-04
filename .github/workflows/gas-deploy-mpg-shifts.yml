@@ -66,7 +66,7 @@ jobs:
       - name: Verify MPG overlay
         run: |
           grep -q 'function generateKawakamiMpgShifts' .gas-live/63_MpgShiftRules.js
-          grep -q 'MPG_SHIFT_TRAVEL_MINUTES_ = 150' .gas-live/63_MpgShiftRules.js
+          grep -q 'MPG_SHIFT_TRAVEL_MINUTES_ = 120' .gas-live/63_MpgShiftRules.js
           grep -q 'MPG_SHIFT_HEAD_OFFICE_TRAVEL_MINUTES_ = 150' .gas-live/63_MpgShiftRules.js
           grep -q 'MPG_SHIFT_UNRESERVED_CUTOFF_HOURS_ = 48' .gas-live/63_MpgShiftRules.js
           grep -q 'MPG_SHIFT_STORE_CODE_ = "MPG"' .gas-live/63_MpgShiftRules.js
