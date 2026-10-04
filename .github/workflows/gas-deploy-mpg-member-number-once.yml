@@ -8,7 +8,7 @@ on:
       - ".github/workflows/gas-deploy-mpg-member-number-once.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   deploy:
@@ -111,3 +111,14 @@ ${needle}`;
           curl -fsSL --max-time 60 -H 'Content-Type: text/plain;charset=utf-8' -d "$BODY" "$API" | tee /tmp/result.json
           node -e 'const fs=require("fs"); const r=JSON.parse(fs.readFileSync("/tmp/result.json","utf8")); if(r.ok!==true) { console.error(r); process.exit(1); }'
           echo "Public endpoint smoke test OK."
+
+
+      - name: Record successful deployment
+        shell: bash
+        run: |
+          printf '%s\n' "MPG member-number reminder deployed successfully" > mpg-member-number-deploy-ok.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mpg-member-number-deploy-ok.txt
+          git commit -m "Record MPG member-number deployment success"
+          git push
