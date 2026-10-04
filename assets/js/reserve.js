@@ -601,6 +601,80 @@ function configureCustomerForm() {
   }
 }
 
+const MPG_TRAINING_DEFAULTS_KEY_ =
+  "anauts-mpg-training-defaults-v1";
+
+function readMpgTrainingDefaults_() {
+  try {
+    const saved = JSON.parse(
+      localStorage.getItem(
+        MPG_TRAINING_DEFAULTS_KEY_
+      ) || "null"
+    );
+
+    if (!saved || typeof saved !== "object") {
+      return { memberNo: "", email: "" };
+    }
+
+    return {
+      memberNo: String(saved.memberNo || "")
+        .replace(/\D/g, "")
+        .slice(-6),
+      email: String(saved.email || "")
+        .trim()
+        .slice(0, 254)
+    };
+  } catch (_) {
+    return { memberNo: "", email: "" };
+  }
+}
+
+function saveMpgTrainingDefaults_() {
+  try {
+    const memberNo = String(
+      (el.memberNo && el.memberNo.value) || ""
+    )
+      .replace(/\D/g, "")
+      .slice(0, 6);
+
+    const email = String(
+      (el.customerEmail && el.customerEmail.value) || ""
+    )
+      .trim()
+      .slice(0, 254);
+
+    localStorage.setItem(
+      MPG_TRAINING_DEFAULTS_KEY_,
+      JSON.stringify({
+        memberNo: memberNo,
+        email: email
+      })
+    );
+  } catch (_) {
+    // localStorageが使えない環境では通常入力を継続する。
+  }
+}
+
+function restoreMpgTrainingDefaults_() {
+  const saved = readMpgTrainingDefaults_();
+
+  if (
+    el.memberNo &&
+    !String(el.memberNo.value || "").trim() &&
+    /^\d{6}$/.test(saved.memberNo)
+  ) {
+    el.memberNo.value = saved.memberNo;
+  }
+
+  if (
+    el.customerEmail &&
+    !String(el.customerEmail.value || "").trim() &&
+    saved.email
+  ) {
+    el.customerEmail.value = saved.email;
+  }
+}
+
 function configureMemberNumberInput_() {
   if (!el.memberNo) return;
 
@@ -634,7 +708,22 @@ function configureMemberNumberInput_() {
       el.memberNo.value
         .replace(/\D/g, "")
         .slice(0, 6);
+
+    if (isMpgTrainingSupport) {
+      saveMpgTrainingDefaults_();
+    }
   };
+
+  if (isMpgTrainingSupport) {
+    restoreMpgTrainingDefaults_();
+
+    if (el.customerEmail) {
+      el.customerEmail.oninput =
+        saveMpgTrainingDefaults_;
+      el.customerEmail.onchange =
+        saveMpgTrainingDefaults_;
+    }
+  }
 }
 
 function hasCounselMemberNo_() {
