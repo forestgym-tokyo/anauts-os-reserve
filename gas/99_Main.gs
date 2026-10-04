@@ -514,6 +514,11 @@ function doPost(e) {
       case "deferTfgSettlement":
         return deferTfgSettlement_(body);
 
+      case "sendMpgMemberNumberReminder":
+        return sendMpgMemberNumberReminder_(
+          body
+        );
+
       case "verifyMpgSuspensionMember":
         return verifyMpgSuspensionMember_(
           body
