@@ -140,22 +140,6 @@ function getAvailabilityShifts_(
   storeCode
 ) {
 
-  const rows = getSheetData(
-    APP_CONFIG.SHEETS.STAFF_SHIFTS
-  );
-
-  const normalizedStoreCode =
-    String(storeCode || "")
-      .trim()
-      .toUpperCase();
-
-  return rows`,
-`function getAvailabilityShifts_(
-  targetDate,
-  staffMap,
-  storeCode
-) {
-
   const normalizedStoreCode =
     String(storeCode || "")
       .trim()
@@ -177,7 +161,23 @@ function getAvailabilityShifts_(
   );
 
   return rows`,
-    "28 MPG 48-hour cleanup hook"
+`function getAvailabilityShifts_(
+  targetDate,
+  staffMap,
+  storeCode
+) {
+
+  const normalizedStoreCode =
+    String(storeCode || "")
+      .trim()
+      .toUpperCase();
+
+  const rows = getSheetData(
+    APP_CONFIG.SHEETS.STAFF_SHIFTS
+  );
+
+  return rows`,
+    "28 remove synchronous MPG cleanup"
   );
 
   replaceOnce_(
@@ -992,6 +992,83 @@ function roundUpAvailabilityTimeFromAnchor_(
     "24 bulk import MPG result"
   );
 
+  write_(file);
+}
+
+// 40_ReservationMail: Tiffany blue customer manage button for MPG.
+{
+  const file = read_("40_ReservationMail.gs.js");
+
+  const customerStart =
+    file.src.indexOf(
+      "function buildReservationCustomerHtmlBody_("
+    );
+
+  if (customerStart < 0) {
+    throw new Error("Overlay anchor not found: 40 customer html function");
+  }
+
+  const prefix = file.src.slice(0, customerStart);
+  const customerFile = {
+    path: file.path,
+    src: file.src.slice(customerStart)
+  };
+
+  replaceOnce_(
+    customerFile,
+`  const allowedEvents = [
+    "RESERVATION_CREATED",
+    "RESERVATION_UPDATED",
+    "RESERVATION_RESTORED"
+  ];
+
+  const escapedBody =`,
+`  const allowedEvents = [
+    "RESERVATION_CREATED",
+    "RESERVATION_UPDATED",
+    "RESERVATION_RESTORED"
+  ];
+
+  const actionButtonBackground =
+    serviceCode === "MPG_TRAINING_SUPPORT45"
+      ? "#81d8d0"
+      : "#178447";
+
+  const actionButtonColor =
+    serviceCode === "MPG_TRAINING_SUPPORT45"
+      ? "#111111"
+      : "#ffffff";
+
+  const escapedBody =`,
+    "40 MPG Tiffany button colors"
+  );
+
+  replaceOnce_(
+    customerFile,
+`          'background:#178447;' +
+          'color:#ffffff;' +
+          'text-decoration:none;' +
+          'font-size:15px;' +
+          'font-weight:700;' +
+          'line-height:1.4;' +
+          'padding:14px 22px;' +
+          'border-radius:8px;' +
+        '">' +
+          '予約を変更・キャンセル' +`,
+`          'background:' + actionButtonBackground + ';' +
+          'color:' + actionButtonColor + ';' +
+          'text-decoration:none;' +
+          'font-size:15px;' +
+          'font-weight:700;' +
+          'line-height:1.4;' +
+          'padding:14px 22px;' +
+          'border-radius:8px;' +
+        '">' +
+          '予約を変更・キャンセル' +`,
+    "40 MPG Tiffany customer action button"
+  );
+
+  file.src = prefix + customerFile.src;
   write_(file);
 }
 
