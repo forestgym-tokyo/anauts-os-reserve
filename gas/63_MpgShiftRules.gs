@@ -244,7 +244,7 @@ function ensureMpgServiceHours_() {
 
 
 function normalizeMpgReservationMemberNo_(value) {
-  return String(value || "").trim().toUpperCase().replace(/\s+/g, "");
+  return String(value || "").replace(/\D/g, "").slice(-6);
 }
 
 function getMpgReservationMemberMasterSheet_() {
@@ -266,6 +266,16 @@ function validateMpgReservationMemberMaster_(values) {
   values = values || {};
   const memberNo = normalizeMpgReservationMemberNo_(values.memberNo);
   const customerEmail = String(values.customerEmail || "").trim().toLowerCase();
+
+  if (!/^\d{6}$/.test(memberNo)) {
+    return {
+      ok: false,
+      code: "INVALID_MEMBER_NO",
+      message: "会員番号は6桁の数字で入力してください。",
+      detail: { member_no: memberNo }
+    };
+  }
+
   const sheet = getMpgReservationMemberMasterSheet_();
   const data = sheet.getDataRange().getValues();
 
@@ -504,7 +514,8 @@ function mpgFindKawakamiReservationTravelConflict_(
   endTime,
   otherStoreCode,
   bufferMinutes,
-  excludeReservationId
+  excludeReservationId,
+  reservationRows
 ) {
   const date = String(dateText || "").trim();
   const candidateStart = mpgTimeToMinutes_(startTime);
@@ -522,7 +533,9 @@ function mpgFindKawakamiReservationTravelConflict_(
     return null;
   }
 
-  const rows = getSheetData(APP_CONFIG.SHEETS.RESERVATIONS);
+  const rows = Array.isArray(reservationRows)
+    ? reservationRows
+    : getSheetData(APP_CONFIG.SHEETS.RESERVATIONS);
   return rows.find(function (row) {
     if (!mpgIsActiveReservationRow_(row)) return false;
     if (
@@ -591,12 +604,36 @@ function filterMpgSlotsAgainstHeadOfficeReservations_(
   dateText,
   slots
 ) {
+  const reservationRows =
+    getSheetData(APP_CONFIG.SHEETS.RESERVATIONS);
+  const cutoffAt =
+    new Date(
+      new Date().getTime() +
+      MPG_SHIFT_UNRESERVED_CUTOFF_HOURS_ * 60 * 60 * 1000
+    );
+
   return (Array.isArray(slots) ? slots : []).filter(function (slot) {
-    return !mpgFindHeadOfficeTravelConflict_(
+    const startTime = slot && slot.start_time;
+    const endTime = slot && slot.end_time;
+    const startAt = mpgDateTime_(dateText, startTime);
+
+    // 48時間以内に入った未予約枠は、時間トリガーの実行待ちでも表示しない。
+    if (
+      startAt instanceof Date &&
+      !isNaN(startAt.getTime()) &&
+      startAt.getTime() <= cutoffAt.getTime()
+    ) {
+      return false;
+    }
+
+    return !mpgFindKawakamiReservationTravelConflict_(
       dateText,
-      slot && slot.start_time,
-      slot && slot.end_time,
-      ""
+      startTime,
+      endTime,
+      MPG_SHIFT_HEAD_OFFICE_STORE_CODE_,
+      MPG_SHIFT_HEAD_OFFICE_TRAVEL_MINUTES_,
+      "",
+      reservationRows
     );
   });
 }
