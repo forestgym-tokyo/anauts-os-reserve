@@ -46,26 +46,7 @@ jobs:
           grep -R -q 'function getMpgMemberMasterSheet_' .gas-live || (echo "MPG member master helper is missing from live source" && exit 1)
           grep -R -q 'function normalizeMpgEmail_' .gas-live || (echo "MPG email helper is missing from live source" && exit 1)
           cp gas/93_MpgMemberNumberReminder.gs .gas-live/93_MpgMemberNumberReminder.js
-          node <<'NODE'
-          const fs = require("fs");
-          const path = ".gas-live/99_Main.js";
-          let src = fs.readFileSync(path, "utf8");
-          if (!src.includes('case "sendMpgMemberNumberReminder"')) {
-            const needle = `      case "verifyMpgSuspensionMember":
-        return verifyMpgSuspensionMember_(
-          body
-        );`;
-            if (!src.includes(needle)) throw new Error("verifyMpgSuspensionMember dispatch point not found in live 99_Main.js");
-            const insert = `      case "sendMpgMemberNumberReminder":
-        return sendMpgMemberNumberReminder_(
-          body
-        );
-
-${needle}`;
-            src = src.replace(needle, insert);
-            fs.writeFileSync(path, src);
-          }
-          NODE
+          node scripts/gas-mpg-member-number-overlay.mjs
 
       - name: Verify overlay
         shell: bash
