@@ -372,6 +372,16 @@ function buildReservationAdminHtmlBody_(
     "RESERVATION_RESTORED"
   ];
 
+  const actionButtonBackground =
+    serviceCode === "MPG_TRAINING_SUPPORT45"
+      ? "#81d8d0"
+      : "#178447";
+
+  const actionButtonColor =
+    serviceCode === "MPG_TRAINING_SUPPORT45"
+      ? "#111111"
+      : "#ffffff";
+
   const escapedBody =
     escapeReservationMailHtml_(
       String(
@@ -403,8 +413,8 @@ function buildReservationAdminHtmlBody_(
           escapedUrl +
         '" style="' +
           'display:inline-block;' +
-          'background:#178447;' +
-          'color:#ffffff;' +
+          'background:' + actionButtonBackground + ';' +
+          'color:' + actionButtonColor + ';' +
           'text-decoration:none;' +
           'font-size:15px;' +
           'font-weight:700;' +
