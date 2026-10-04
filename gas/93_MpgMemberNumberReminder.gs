@@ -16,15 +16,16 @@ const MPG_MEMBER_NUMBER_REMINDER_CONFIG = Object.freeze({
 
 function sendMpgMemberNumberReminder_(body) {
   try {
-    const email = normalizeMpgEmail_(
-      (body && body.email) || ""
-    );
+    const email =
+      normalizeMpgMemberNumberReminderEmail_(
+        (body && body.email) || ""
+      );
 
     if (
       !email ||
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
     ) {
-      return mpgJson_({
+      return mpgMemberNumberReminderJson_({
         ok: false,
         code: "INVALID_EMAIL",
         message: "メールアドレスを正しく入力してください。"
@@ -37,7 +38,7 @@ function sendMpgMemberNumberReminder_(body) {
       createMpgMemberNumberReminderKey_(email);
 
     if (cache.get(cacheKey)) {
-      return mpgJson_({
+      return mpgMemberNumberReminderJson_({
         ok: true,
         message:
           MPG_MEMBER_NUMBER_REMINDER_CONFIG.GENERIC_MESSAGE
@@ -45,7 +46,7 @@ function sendMpgMemberNumberReminder_(body) {
     }
 
     const members =
-      findMpgMembersByEmail_(email);
+      findMpgMembersByReminderEmail_(email);
 
     if (members.length > 0) {
       sendMpgMemberNumberReminderMail_(
@@ -60,7 +61,7 @@ function sendMpgMemberNumberReminder_(body) {
       MPG_MEMBER_NUMBER_REMINDER_CONFIG.CACHE_SECONDS
     );
 
-    return mpgJson_({
+    return mpgMemberNumberReminderJson_({
       ok: true,
       message:
         MPG_MEMBER_NUMBER_REMINDER_CONFIG.GENERIC_MESSAGE
@@ -72,7 +73,7 @@ function sendMpgMemberNumberReminder_(body) {
       error
     );
 
-    return mpgJson_({
+    return mpgMemberNumberReminderJson_({
       ok: false,
       code:
         "MPG_MEMBER_NUMBER_REMINDER_ERROR",
@@ -82,12 +83,21 @@ function sendMpgMemberNumberReminder_(body) {
   }
 }
 
-function findMpgMembersByEmail_(email) {
+function findMpgMembersByReminderEmail_(email) {
+  if (
+    typeof getMpgReservationMemberMasterSheet_ !==
+    "function"
+  ) {
+    throw new Error(
+      "MPG会員マスター接続関数が見つかりません。"
+    );
+  }
+
   const normalizedEmail =
-    normalizeMpgEmail_(email);
+    normalizeMpgMemberNumberReminderEmail_(email);
 
   const sheet =
-    getMpgMemberMasterSheet_();
+    getMpgReservationMemberMasterSheet_();
 
   const values =
     sheet.getDataRange().getDisplayValues();
@@ -103,20 +113,21 @@ function findMpgMembersByEmail_(email) {
 
   const index = {};
   headers.forEach(function(header, i) {
-    index[header] = i;
+    if (header) index[header] = i;
   });
 
-  ["会員番号", "メールアドレス"].forEach(
-    function(header) {
-      if (typeof index[header] !== "number") {
-        throw new Error(
-          "MPG会員マスターに必要な列「" +
-          header +
-          "」がありません。"
-        );
-      }
+  [
+    "会員番号",
+    "メールアドレス"
+  ].forEach(function(header) {
+    if (typeof index[header] !== "number") {
+      throw new Error(
+        "MPG会員マスターに必要な列「" +
+        header +
+        "」がありません。"
+      );
     }
-  );
+  });
 
   const lastNameIndex =
     index["氏名（姓）"];
@@ -135,7 +146,7 @@ function findMpgMembersByEmail_(email) {
     const row = values[rowIndex];
 
     const masterEmail =
-      normalizeMpgEmail_(
+      normalizeMpgMemberNumberReminderEmail_(
         row[index["メールアドレス"]]
       );
 
@@ -144,7 +155,7 @@ function findMpgMembersByEmail_(email) {
     }
 
     const memberNo =
-      normalizeMpgMemberNo_(
+      normalizeMpgMemberNumberReminderMemberNo_(
         row[index["会員番号"]]
       );
 
@@ -172,6 +183,25 @@ function findMpgMembersByEmail_(email) {
   }
 
   return members;
+}
+
+function normalizeMpgMemberNumberReminderMemberNo_(
+  value
+) {
+  const match =
+    String(value || "")
+      .trim()
+      .match(/(\d{6})$/);
+
+  return match ? match[1] : "";
+}
+
+function normalizeMpgMemberNumberReminderEmail_(
+  value
+) {
+  return String(value || "")
+    .trim()
+    .toLowerCase();
 }
 
 function sendMpgMemberNumberReminderMail_(
@@ -229,4 +259,14 @@ function createMpgMemberNumberReminderKey_(
     .base64EncodeWebSafe(digest)
     .replace(/=+$/g, "")
     .slice(0, 32);
+}
+
+function mpgMemberNumberReminderJson_(payload) {
+  return ContentService
+    .createTextOutput(
+      JSON.stringify(payload || {})
+    )
+    .setMimeType(
+      ContentService.MimeType.JSON
+    );
 }
