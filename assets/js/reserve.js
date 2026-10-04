@@ -613,33 +613,27 @@ function configureMemberNumberInput_() {
 
   el.memberNo.setAttribute(
     "inputmode",
-    isMpgTrainingSupport ? "text" : "numeric"
+    "numeric"
   );
   el.memberNo.setAttribute(
     "pattern",
-    isMpgTrainingSupport ? "MPG[0-9]{6}" : "[0-9]{6}"
+    "[0-9]{6}"
   );
   el.memberNo.setAttribute(
     "maxlength",
-    isMpgTrainingSupport ? "9" : "6"
+    "6"
   );
   el.memberNo.setAttribute("autocomplete", "off");
   el.memberNo.setAttribute(
     "placeholder",
-    isMpgTrainingSupport ? "例：MPG341114" : "例：108035"
+    isMpgTrainingSupport ? "例：123456" : "例：108035"
   );
 
   el.memberNo.oninput = () => {
-    if (isMpgTrainingSupport) {
-      el.memberNo.value =
-        el.memberNo.value
-          .toUpperCase()
-          .replace(/[^A-Z0-9]/g, "")
-          .slice(0, 9);
-    } else {
-      el.memberNo.value =
-        el.memberNo.value.replace(/\D/g, "");
-    }
+    el.memberNo.value =
+      el.memberNo.value
+        .replace(/\D/g, "")
+        .slice(0, 6);
   };
 }
 
@@ -1236,11 +1230,14 @@ async function fetchSlotsWithLimit_(dates, requestVersion) {
     workerServiceCode === "MPG_TOUR45" ||
     workerServiceCode === "MPG_TRAINING_SUPPORT45";
   const workerCount =
-    isTour ||
-    isMpgService ||
-    typeof window.ANAUTS_FETCH_WEEK_SLOTS === "function"
-      ? Math.min(2, dates.length)
-      : dates.length;
+    isMpgService
+      ? Math.min(4, dates.length)
+      : (
+          isTour ||
+          typeof window.ANAUTS_FETCH_WEEK_SLOTS === "function"
+            ? Math.min(2, dates.length)
+            : dates.length
+        );
   await Promise.all(Array.from({ length: workerCount }, () => worker_()));
   return pending;
 }
