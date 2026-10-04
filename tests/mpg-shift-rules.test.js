@@ -283,3 +283,13 @@ test("MPG uses weekly range availability instead of forced daily requests", () =
     "MPG should use one weekly HTTP request before daily fallback"
   );
 });
+
+
+test("MPG training support remembers member number and email in browser", () => {
+  const reserveUi = read("assets/js/reserve.js");
+  assert.match(reserveUi, /anauts-mpg-training-defaults-v1/);
+  assert.match(reserveUi, /restoreMpgTrainingDefaults_/);
+  assert.match(reserveUi, /saveMpgTrainingDefaults_/);
+  assert.match(reserveUi, /localStorage\.setItem/);
+  assert.match(reserveUi, /localStorage\.getItem/);
+});
