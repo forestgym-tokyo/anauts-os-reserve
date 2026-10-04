@@ -1079,11 +1079,9 @@ async function fetchWeekSlotsRange_(dates) {
     serviceCode === "MPG_TOUR45" ||
     serviceCode === "MPG_TRAINING_SUPPORT45";
 
-  // MPGは店舗別シフトを厳密に見るため、週次一括APIではなく
-  // 日別の最新シフト判定を使う。古い週次キャッシュで全枠が
-  // 空扱いになることを防ぐ。
-  if (isMpgService) return null;
-
+  // MPGも世代管理付きの週次一括APIを使う。
+  // 予約・シフト更新時はキャッシュ世代が切り替わり、
+  // 予約確定時にも最新状態を再検証するため、日別HTTPを7本送る必要はない。
   const url = new URL(API_URL);
   url.searchParams.set("action", "getAvailableSlotsRange");
   url.searchParams.set("service_code", selectedService.service_code);
