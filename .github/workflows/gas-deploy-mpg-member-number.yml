@@ -2,6 +2,13 @@ name: GAS Deploy MPG Member Number (safe)
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "gas/93_MpgMemberNumberReminder.gs"
+      - "scripts/gas-mpg-member-number-overlay.mjs"
+      - ".github/workflows/gas-deploy-mpg-member-number.yml"
 
 permissions:
   contents: read
@@ -43,8 +50,7 @@ jobs:
         shell: bash
         run: |
           test -f .gas-live/99_Main.js || (echo "Live 99_Main.js was not pulled" && exit 1)
-          grep -R -q 'function getMpgMemberMasterSheet_' .gas-live || (echo "MPG member master helper is missing from live source" && exit 1)
-          grep -R -q 'function normalizeMpgEmail_' .gas-live || (echo "MPG email helper is missing from live source" && exit 1)
+          grep -R -q 'function getMpgReservationMemberMasterSheet_' .gas-live || (echo "Live MPG reservation member master helper is missing" && exit 1)
           cp gas/93_MpgMemberNumberReminder.gs .gas-live/93_MpgMemberNumberReminder.js
           node scripts/gas-mpg-member-number-overlay.mjs
 
