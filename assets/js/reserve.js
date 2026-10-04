@@ -1585,7 +1585,12 @@ async function submitReservation(event) {
       date: selectedSlot.date,
       start_time: selectedSlot.start_time,
       customer_type: customerType,
-      member_no: memberNo,
+      // MPGは画面上は6桁の数字だけを入力。既存会員マスターとの互換性のため
+      // API送信時のみ内部的にMPG接頭辞を補う。
+      member_no:
+        isMpgTrainingSupport
+          ? "MPG" + memberNo
+          : memberNo,
       customer_name: name,
       customer_last_name:
         nameRequired
