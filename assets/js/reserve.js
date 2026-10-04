@@ -1519,17 +1519,9 @@ async function submitReservation(event) {
 
   if (
     (customerType === "MEMBER" || isTrainingSupport) &&
-    (
-      isMpgTrainingSupport
-        ? !/^MPG\d{6}$/i.test(memberNo)
-        : !/^\d{6}$/.test(memberNo)
-    )
+    !/^\d{6}$/.test(memberNo)
   ) {
-    showError(
-      isMpgTrainingSupport
-        ? "会員番号は「MPG＋6桁の数字」で入力してください。"
-        : "会員番号は6桁の数字で入力してください。"
-    );
+    showError("会員番号は6桁の数字で入力してください。");
     return;
   }
 
@@ -1665,7 +1657,8 @@ function userMessage(result) {
     SLOT_NOT_AVAILABLE: "選択した時間は埋まりました。空き状況を更新してください。",
     CUSTOMER_TYPE_REQUIRED: "会員または非会員を選択してください。",
     CUSTOMER_PHONE_REQUIRED: "電話番号を入力してください。",
-    MPG_MONTHLY_BOOKING_LIMIT: "トレーニングサポートは1会員につき月4回までご予約いただけます。"
+    MPG_MONTHLY_BOOKING_LIMIT: "トレーニングサポートは1会員につき月4回までご予約いただけます。",
+    INVALID_MEMBER_NO: "会員番号は6桁の数字で入力してください。"
   };
 
   return messages[result.code] || result.message || "予約に失敗しました。";
