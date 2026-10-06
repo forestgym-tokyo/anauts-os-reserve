@@ -1859,6 +1859,12 @@ async function submitReservation(event) {
 
     if (isTour) {
       updateTourCacheAfterReservation_(selectedSlot);
+
+      if (typeof window.gtag === "function") {
+        window.gtag("event", "visit_reservation_complete", {
+          service_code: serviceCode
+        });
+      }
     }
 
     el.submitButton.disabled = false;
