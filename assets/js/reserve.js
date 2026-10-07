@@ -1861,8 +1861,14 @@ async function submitReservation(event) {
       updateTourCacheAfterReservation_(selectedSlot);
 
       if (typeof window.gtag === "function") {
+        const clickParams = new URLSearchParams(window.location.search);
         window.gtag("event", "visit_reservation_complete", {
-          service_code: serviceCode
+          service_code: serviceCode,
+          reservation_id: result.data.reservation_id || "",
+          traffic_source: clickParams.get("utm_source") || "",
+          traffic_medium: clickParams.get("utm_medium") || "",
+          traffic_campaign: clickParams.get("utm_campaign") || "",
+          has_google_click_id: Boolean(clickParams.get("gclid") || clickParams.get("gbraid") || clickParams.get("wbraid"))
         });
       }
     }
