@@ -238,8 +238,7 @@ function tfwIsSameApplication_(record, data) {
     tfwText_(x[11], 40) === data.campaign &&
     tfwText_(x[12], 80) === data.plan &&
     tfwDateForComparison_(x[13]) === data.startDate &&
-    tfwText_(x[14], 100) === tfwText_(
-      data.campaign === "利用する" ? data.benefit : "特典なし", 100);
+    tfwText_(x[14], 100) === data.benefit;
 }
 function tfwAttribution_(body) {
   const a = body.adAttribution && typeof body.adAttribution === "object"
