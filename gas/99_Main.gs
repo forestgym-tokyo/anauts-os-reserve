@@ -192,6 +192,10 @@ function doGet(e) {
 
     switch (action) {
 
+      // Anonymous, short-lived receipt for public WEB membership submissions.
+      case "tfgWebJoinStatus":
+        return tfwWebEnrollmentStatus_(params);
+
       case "health":
         return health();
 
@@ -486,6 +490,11 @@ function doPost(e) {
       ).trim();
 
     switch (action) {
+
+      // Public enrollment flow. Disabled by default via script property.
+      // Uses the SAME ScriptLock as tour enrollment to protect member numbers.
+      case "submitTfgWebMembership":
+        return tfwSubmitWebEnrollment_(body);
 
       /*
        * =====================================================
