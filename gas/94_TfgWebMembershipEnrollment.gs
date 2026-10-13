@@ -134,7 +134,8 @@ function tfwValidate_(body) {
   }
   return {
     id: id, name: fullName, email: email, plan: plan, campaign: campaign,
-    startDate: startDate, paymentUrl: paymentUrl
+    startDate: startDate, paymentUrl: paymentUrl,
+    benefit: tfwText_(body.benefit, 100)
   };
 }
 
@@ -234,8 +235,11 @@ function tfwIsSameApplication_(record, data) {
   const x = record.values;
   return tfwNorm_((x[1] || "") + " " + (x[2] || "")) === tfwNorm_(data.name) &&
     tfwEmail_(x[7]) === data.email &&
+    tfwText_(x[11], 40) === data.campaign &&
     tfwText_(x[12], 80) === data.plan &&
-    tfwDateForComparison_(x[13]) === data.startDate;
+    tfwDateForComparison_(x[13]) === data.startDate &&
+    tfwText_(x[14], 100) === tfwText_(
+      data.campaign === "利用する" ? data.benefit : "特典なし", 100);
 }
 function tfwAttribution_(body) {
   const a = body.adAttribution && typeof body.adAttribution === "object"
@@ -361,6 +365,12 @@ function tfwSubmitWebEnrollment_(body) {
       }
       const previousMaster = tfwPreviousMaster_(master, identity.id);
       if (previousMaster) {
+        // An old application cannot reactivate a withdrawn membership number.
+        // Re-enrollment must use a distinct application ID and a new free row.
+        if (tfwText_(previousMaster.row[master.col.status], 30).toUpperCase() !== "ACT") {
+          throw tfwError_("WITHDRAWN_APPLICATION_ID",
+            "退会済みの受付IDは再利用できません。新たにお申し込みください。");
+        }
         if (tfwNorm_(previousMaster.row[master.col.name]) !== tfwNorm_(identity.name) ||
             tfwEmail_(previousMaster.row[master.col.email]) !== identity.email) {
           throw tfwError_("APPLICATION_ID_CONFLICT", "同じIDが別の会員情報と紐づいています。");
