@@ -236,6 +236,40 @@ test("invalid payment domain is rejected", () => {
   assert.equal(r.code,"INVALID_PAYMENT_URL");
 });
 
+test("campaign changed under one ID is rejected instead of mismatched billing", () => {
+  const h = setup(), id = "tfg-test-000011";
+  h.send(request(id));
+  const r = h.send({
+    ...request(id),
+    campaign: "利用しない",
+    paymentUrl: "https://getsugaku-panda.jp/subscription/apply/17679"
+  });
+  assert.equal(r.ok, false);
+  assert.equal(r.code, "APPLICATION_ID_CONFLICT");
+});
+
+test("withdrawn first application cannot replay its former member number", () => {
+  const h = setup(), id = "tfg-test-000012";
+  h.send(request(id));
+  h.master.rows[4][3] = ""; // Real-life withdrawal happens after registration.
+  const old = h.send(request(id));
+  assert.equal(old.ok, false);
+  assert.equal(old.code, "WITHDRAWN_APPLICATION_ID");
+  const next = h.send(request("tfg-test-000013"));
+  assert.equal(next.ok, true);
+  assert.equal(h.master.rows[4][3], "");
+  assert.equal(h.master.rows[3][3], "ACT");
+});
+
+test("Google Sheets date cell does not break same-ID retry", () => {
+  const h = setup(), id = "tfg-test-000014";
+  h.send(request(id));
+  h.form.rows[1][13] = new Date("2026-10-20T00:00:00.000Z");
+  const retry = h.send(request(id));
+  assert.equal(retry.ok, true);
+  assert.equal(retry.duplicate, true);
+});
+
 test("anonymous status response carries no customer PII or member number", () => {
   const h=setup();
   h.send(request("tfg-test-000010"));
