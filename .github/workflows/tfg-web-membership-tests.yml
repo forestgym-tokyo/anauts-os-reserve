@@ -1,0 +1,28 @@
+name: TFG WEB membership safety tests
+
+on:
+  pull_request:
+    paths:
+      - 'gas/94_TfgWebMembershipEnrollment.gs'
+      - 'gas/99_Main.gs'
+      - 'tests/tfg-web-membership.test.cjs'
+      - '.github/workflows/tfg-web-membership-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  membership-issuer-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax check
+        run: |
+          node --check < gas/94_TfgWebMembershipEnrollment.gs
+          node --check < gas/99_Main.gs
+      - name: Test idempotency and re-enrollment
+        run: node --test tests/tfg-web-membership.test.cjs
