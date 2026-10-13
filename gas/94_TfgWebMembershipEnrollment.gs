@@ -224,12 +224,18 @@ function tfwFreeMasterRow_(master) {
   }
   throw tfwError_("NO_MEMBER_NUMBER", "空き会員番号がありません。");
 }
+function tfwDateForComparison_(value) {
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    return Utilities.formatDate(value, "Asia/Tokyo", "yyyy-MM-dd");
+  }
+  return tfwText_(value, 40).replace(/\//g, "-");
+}
 function tfwIsSameApplication_(record, data) {
   const x = record.values;
   return tfwNorm_((x[1] || "") + " " + (x[2] || "")) === tfwNorm_(data.name) &&
     tfwEmail_(x[7]) === data.email &&
     tfwText_(x[12], 80) === data.plan &&
-    tfwText_(x[13], 40) === data.startDate;
+    tfwDateForComparison_(x[13]) === data.startDate;
 }
 function tfwAttribution_(body) {
   const a = body.adAttribution && typeof body.adAttribution === "object"
@@ -290,6 +296,11 @@ function tfwSendAdminNotice_(body, memberNo) {
     "メール: " + String(body.email || ""),
     "会員種別: " + String(body.plan || ""),
     "スタート日: " + String(body.startDate || ""),
+    "初回請求予定額: " + String(body.firstTotal || ""),
+    "キャンペーン: " + String(body.campaign || ""),
+    "特典: " + String(body.benefit || ""),
+    "決済申込みURL: " + String(body.paymentUrl || ""),
+    "顔写真URL: " + String(body.facePhotoUrl || ""),
     "申込みID: " + String(body.applicationId || "")
   ].join("\n");
   try {
