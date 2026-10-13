@@ -22,7 +22,7 @@ jobs:
           node-version: '22'
       - name: Syntax check
         run: |
-          node --check gas/94_TfgWebMembershipEnrollment.gs
-          node --check gas/99_Main.gs
+          node --check < gas/94_TfgWebMembershipEnrollment.gs
+          node --check < gas/99_Main.gs
       - name: Test idempotency and re-enrollment
         run: node --test tests/tfg-web-membership.test.cjs
