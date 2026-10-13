@@ -351,6 +351,7 @@ function tfwSubmitWebEnrollment_(body) {
     lock.waitLock(30000); // Shared with A-nauts OS tour enrollments.
     let assigned = "";
     let duplicate = false;
+    let shouldNotify = false;
     try {
       const form = tfwFormSheet_();
       const master = tfwMasterData_();
@@ -366,6 +367,8 @@ function tfwSubmitWebEnrollment_(body) {
         }
         assigned = tfwText_(previousMaster.row[master.col.memberNo], 40);
         duplicate = true;
+        shouldNotify = !existingForm ||
+          tfwText_(existingForm.values[TFW_FORM_STATUS_COL - 1], 30) !== "登録済";
       } else if (existingForm && tfwText_(existingForm.values[TFW_FORM_MEMBER_COL - 1], 40)) {
         // Legacy rows from an earlier deployment may have member numbers
         // without master notes. Do not allocate another number automatically.
@@ -379,6 +382,7 @@ function tfwSubmitWebEnrollment_(body) {
         }
         const free = tfwFreeMasterRow_(master);
         assigned = tfwCommitMaster_(master, body, identity, free);
+        shouldNotify = true;
       }
       if (!existingForm) {
         form.appendRow(tfwNewFormRow_(body, identity));
@@ -390,7 +394,7 @@ function tfwSubmitWebEnrollment_(body) {
       lock.releaseLock();
     }
     tfwCacheResult_(identity.id, {ok:true, duplicate: duplicate});
-    if (!duplicate) tfwSendAdminNotice_(body, assigned);
+    if (shouldNotify) tfwSendAdminNotice_(body, assigned);
     return tfwJson_({ok:true, duplicate:duplicate});
   } catch (err) {
     const code = err && err.tfwCode ? err.tfwCode : "REGISTRATION_ERROR";
