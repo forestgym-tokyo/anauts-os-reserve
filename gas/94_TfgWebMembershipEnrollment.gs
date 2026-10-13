@@ -293,7 +293,7 @@ function tfwRecordMember_(sheet, formRow, memberNo, id) {
 function tfwSendAdminNotice_(body, memberNo) {
   const message = [
     "WEB入会フォームを受け付け、A-nauts OSで会員番号を割り当てました。",
-    "※決済完了ではありません。決済確認まで広告CVに計上しないでください。",
+    "※広告CVは月額パンダの申込受付通知との照合後に計上します。翌日の初月日割決済完了は待ちません。",
     "会員番号: " + memberNo,
     "氏名: " + [body.lastName || "", body.firstName || ""].join(" "),
     "メール: " + String(body.email || ""),
