@@ -226,7 +226,7 @@ function tfwFreeMasterRow_(master) {
   throw tfwError_("NO_MEMBER_NUMBER", "空き会員番号がありません。");
 }
 function tfwDateForComparison_(value) {
-  if (value instanceof Date && !isNaN(value.getTime())) {
+  if (Object.prototype.toString.call(value) === "[object Date]" && !isNaN(value.getTime())) {
     return Utilities.formatDate(value, "Asia/Tokyo", "yyyy-MM-dd");
   }
   return tfwText_(value, 40).replace(/\//g, "-");
