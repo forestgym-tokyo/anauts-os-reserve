@@ -121,7 +121,7 @@ function environment(options = {}) {
   vm.createContext(context);
   vm.runInContext(read("9round-booking/gas/Booking.gs"), context);
   if (options.realStaffAuth) vm.runInContext(read("9round-booking/gas/StaffAuth.gs"), context);
-  if (!options.noSetup) context.setup9RoundBookingStorage();
+  if (!options.noSetup) context.setup9RoundBookingStorage_();
   function call(action, body = {}) { const result = context.round9BookingApi_(action, body); assert.equal(locked, false, "lock must be released on all paths"); return plain(result); }
   function login(i = 0) {
     const email = "member" + i + "@example.invalid";
@@ -383,4 +383,59 @@ test("imported names cannot inject spreadsheet formulas", () => {
   const token = e.login();
   assert.equal(reserve(e, token).ok, true);
   assert.ok(e.data.sheets.get("nr_bookings").rows[1][7].startsWith("'="));
+});
+
+test("GAS-hosted pages use the authenticated HTML transport without a cross-origin fetch", async () => {
+  let request, callback, reply = { ok: true, data: { date: day, slots: [] } };
+  const runner = {
+    withSuccessHandler(fn) { callback = fn; return this; },
+    withFailureHandler() { return this; },
+    nineRoundBookingRequest(body) { request = body; callback(reply); }
+  };
+  const c = {
+    window: { ANAUTS_ROUND9_BOOKING: { apiUrl: "google.script.run" } },
+    google: { script: { run: runner } }, setTimeout, clearTimeout, Intl, Date,
+    fetch() { throw Error("A private GAS page must not make an unauthenticated cross-origin request"); }
+  };
+  vm.runInNewContext(read("9round-booking/api.js"), c);
+  assert.equal((await c.window.NineRoundBookingApi("get9RoundWorkoutSlots", { session_token: "test-token" })).date, day);
+  assert.equal(request.action, "get9RoundWorkoutSlots"); assert.equal(request.session_token, "test-token");
+  reply = { ok: false, code: "SESSION_EXPIRED", message: "再確認" };
+  await assert.rejects(c.window.NineRoundBookingApi("get9RoundWorkoutSlots", {}), error => error.code === "SESSION_EXPIRED");
+});
+
+test("HTML RPC applies the same backend dispatcher and rejects malformed bodies", () => {
+  const c = {
+    round9BookingApi_: (action, body) => ({ getContent: () => JSON.stringify({ ok: false, code: "SESSION_EXPIRED", action, marker: body.marker }) })
+  };
+  vm.createContext(c); vm.runInContext(read("9round-booking/gas/WebApp.gs"), c);
+  const result = c.nineRoundBookingRequest({ action: "get9RoundWorkoutSlots", marker: "same-auth-path" });
+  assert.equal(result.code, "SESSION_EXPIRED"); assert.equal(result.marker, "same-auth-path");
+  assert.equal(c.nineRoundBookingRequest(null).code, "INVALID_REQUEST");
+});
+
+test("generated GAS pages contain local assets, correctly ordered scripts, and valid JavaScript", () => {
+  for (const file of ["Member.html", "Staff.html"]) {
+    const html = read("9round-booking/gas/" + file);
+    assert.doesNotMatch(html, /<script src=|<link rel="stylesheet"/);
+    assert.ok(html.includes("<?!= configJson ?>"));
+    const scripts = Array.from(html.matchAll(/<script>([\s\S]*?)<\/script>/g), m => m[1]);
+    assert.ok(scripts.length >= 3);
+    for (const script of scripts) new vm.Script(script.replace("<?!= configJson ?>", '{"apiUrl":"google.script.run","firebaseApiKey":""}'));
+    assert.ok(html.indexOf("</main>") < html.indexOf("<script>"), "inline scripts must run after the forms exist");
+  }
+});
+
+test("development bootstrap cannot recreate configured storage or run with production settings", () => {
+  for (const properties of [
+    { ROUND9_BOOKING_ENV: "production" },
+    { ROUND9_BOOKING_SPREADSHEET_ID: "already-configured" },
+    { ROUND9_BOOKING_MEMBER_MASTER_ID: "already-configured" },
+    { ROUND9_BOOKING_STAFF_DIRECTORY_ID: "already-configured" }
+  ]) {
+    const c = { PropertiesService: { getScriptProperties: () => ({ getProperties: () => properties }) },
+      SpreadsheetApp: { create() { assert.fail("existing storage must never be recreated"); } } };
+    vm.createContext(c); vm.runInContext(read("9round-booking/gas/Development.gs"), c);
+    assert.throws(() => c.initialize9RoundBookingDevelopment());
+  }
 });

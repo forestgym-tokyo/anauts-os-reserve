@@ -58,7 +58,7 @@ function nrBookingConfig_() {
 }
 
 /** Editor-only initialization. Run only against a new development data sheet. */
-function setup9RoundBookingStorage() {
+function setup9RoundBookingStorage_() {
   const config = nrBookingConfig_();
   return nrBookingLocked_(function () {
     const ss = SpreadsheetApp.openById(config.dataId);

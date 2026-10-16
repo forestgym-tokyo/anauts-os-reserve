@@ -2,7 +2,7 @@
 
 開発ブランチ：feature/9round-member-booking
 
-**本番未反映・GAS未デプロイです。** config.jsのAPI URLは空で、サーバー側も明示設定するまで停止します。既存A-nauts GAS・既存デプロイ・シート・トリガーは変更しません。
+**本番未反映です。** config.jsのAPI URLは空で、静的ページは本番APIに接続しません。別プロジェクト「9ROUND Booking DEV - isolated」にコードと画面を保存しました。既存A-nauts GAS・既存デプロイ・シート・トリガーは変更しません。
 
 ## 構成
 
@@ -64,16 +64,21 @@
 
 ## 独立開発環境の設定
 
-以下の設定作業は未実施です。本番Script ID・本番の予約データを使わず、別の開発環境で確認します。
+開発用GAS：[9ROUND Booking DEV - isolated](https://script.google.com/home/projects/1bMtNarNVT3JKIDA-w_vmWKD-jfaODvBRtEL6qNCQF3HQkg_qsl4yVifq/edit)。コード・会員画面・スタッフ画面と、テスト宛先・Firebase公開Web APIキーを保存しました。初回実行のGoogle認証待ちで、テストデータの初期化・実メール確認は未完了です。
 
-1. 新規の独立Apps Scriptプロジェクト、予約データ用スプレッドシート、テスト会員マスター、テスト用スタッフ名簿を用意します。
-2. 会員マスターの必要列は「会員番号」「名前」「メールアドレス」「会員ステータス」です。有効状態はok／契約中／active／actです。
-3. スタッフ名簿にはauth_users（email, staff_code, permission, active）とstaff（staff_code, store_code, active、必要に応じてcan_9round）を用意します。
-4. 新規GASに下表のScript Propertiesを設定します。
-5. 新規GASへ、このディレクトリー内のgas/だけを配置します。リポジトリ直下の既存gas/や既存clasp設定は使いません。
-6. 新規GASでsetup9RoundBookingStorage()を1回実行します。予約用の5シートだけを作成し、会員マスター・スタッフ名簿には書き込みません。
-7. 新規開発GASのWebアプリURLと既存Firebaseの公開Web APIキーを、ブランチのconfig.jsに設定します。本番URLへの自動フォールバックはありません。
-8. テスト用メール・会員・スタッフだけで実機確認します。最終確認前にmainへのマージ・本番デプロイを実行しません。
+1. 新規の独立Apps Scriptプロジェクトを使います。リポジトリ直下の既存gas/や既存clasp設定は使いません。
+2. 次のコマンドで、静的ページからGAS用のMember.html・Staff.htmlを再生成します。
+
+       node scripts/build-9round-gas-pages.mjs
+
+3. このディレクトリーのgas/内のソースとHTMLを新規GASへ配置します。
+4. 開発時はROUND9_BOOKING_TEST_EMAILSに自身が受信できるメールを1件、ROUND9_BOOKING_FIREBASE_API_KEYに既存Firebaseの公開Web APIキーを設定します。
+5. initialize9RoundBookingDevelopmentを実行すると、新しい予約データ・架空会員マスター・架空スタッフ名簿の3スプレッドシートを作成します。会員は9000000の開発テスト会員だけで、実会員マスターはコピーしません。設定済みプロジェクト・production設定での再初期化は拒否します。既存シートへ書き込みません。
+6. マニフェストのアクセスはMYSELF（自分のみ）です。テストデプロイのURLで?page=memberまたは?page=staffを開いて確認します。
+7. GAS内の画面はgoogle.script.runで同じ認証済みAPI処理を呼ぶため、非公開の開発デプロイを使えます。GitHub PagesやA-nautsの本番反映は不要です。
+8. 最終確認前にmainへのマージ・本番デプロイ・一般公開を実行しません。
+
+手動で接続先を構成する場合のプロパティ一覧です。予約用5シートの作成はsetup9RoundBookingStorage_が担当し、開発初期化から呼び出します。
 
 | Script Property | 設定 |
 | --- | --- |
@@ -94,7 +99,7 @@
 
     node --test tests/9round-booking.test.js
 
-新機能の20件が成功しています。GASサービスのローカルテスト実装で、定員・再送・取消・ブロック・認証・権限・体験枠・データ分離を検証しています。実際のGASデプロイ先・実メール・実会員データでの確認は未実施です。
+新機能の24件が成功しています。GASサービスのローカルテスト実装で、定員・再送・取消・ブロック・認証・権限・体験枠・データ分離を検証しています。実際のGASデプロイ先・実メール・実会員データでの確認は未実施です。
 
 ローカルのテストデータとGASテスト実装を接続したChromiumで、会員のメール確認→予約→取消、満員・ブロックの選択不可、管理者のブロック／解除、体験枠作成、一般スタッフの管理操作非表示、A-nautsの閲覧専用連携、ログアウト時の情報消去を確認しています。320／390／1024／1280pxで横にはみ出さず、ブラウザー例外もありません。
 

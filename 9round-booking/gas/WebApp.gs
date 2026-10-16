@@ -1,6 +1,24 @@
 /** Entry point for a NEW standalone Apps Script project, never the A-nauts project. */
-function doGet() {
+function doGet(e) {
+  const page = String(e && e.parameter && e.parameter.page || "");
+  if (page === "member" || page === "staff") {
+    const template = HtmlService.createTemplateFromFile(page === "staff" ? "Staff" : "Member");
+    template.configJson = JSON.stringify({
+      apiUrl: "google.script.run",
+      firebaseApiKey: PropertiesService.getScriptProperties().getProperty("ROUND9_BOOKING_FIREBASE_API_KEY") || "",
+      requestTimeoutMs: 30000
+    });
+    return template.evaluate()
+      .setTitle(page === "staff" ? "予約管理 | 9ROUND アリオ蘇我店" : "ワークアウト予約 | 9ROUND アリオ蘇我店")
+      .addMetaTag("viewport", "width=device-width,initial-scale=1,viewport-fit=cover");
+  }
   return successResponse({ app: "9ROUND Booking", status: "ok" });
+}
+
+/** HTML-service transport; the exact same server-side authentication is applied. */
+function nineRoundBookingRequest(body) {
+  if (!body || Array.isArray(body) || typeof body !== "object") return { ok: false, code: "INVALID_REQUEST", message: "リクエスト形式を確認してください。" };
+  return JSON.parse(round9BookingApi_(String(body.action || "").trim(), body).getContent());
 }
 
 function doPost(e) {
