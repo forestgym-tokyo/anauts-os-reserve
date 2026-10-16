@@ -42,7 +42,7 @@ const server = http.createServer((req, res) => {
   if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, "index.html");
   if (!fs.existsSync(file)) { res.writeHead(404); res.end(); return; }
   const type = { ".html": "text/html;charset=utf-8", ".js": "text/javascript;charset=utf-8", ".css": "text/css;charset=utf-8", ".png": "image/png" }[path.extname(file)] || "text/plain";
-  res.writeHead(200, { "Content-Type": type }); res.end(fs.readFileSync(file));
+  res.writeHead(200, { "Content-Type": type, ...(url.searchParams.has("cameraBlocked") ? { "Permissions-Policy": "camera=()" } : {}) }); res.end(fs.readFileSync(file));
 });
 async function checkOverflow(page, label) {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, label + " horizontal overflow");
@@ -220,6 +220,17 @@ async function main() {
     assert.equal(await viewer.page.locator("#nrAppBoard").isVisible(), false);
     assert.equal((await viewer.page.locator("body").textContent()).includes("テスト会員1"), false);
 
+    const blockedCamera = await context();
+    await blockedCamera.page.goto(origin + "/9round-booking/staff/?cameraBlocked=1");
+    await blockedCamera.page.locator("#staffEmail").fill("staff@example.invalid");
+    await blockedCamera.page.locator("#staffPassword").fill("test-password");
+    await blockedCamera.page.locator("#staffSignIn").click();
+    await blockedCamera.page.locator("#nrCameraAvailability").waitFor({ state: "visible" });
+    assert.equal(await blockedCamera.page.locator("#nrCameraStart").isVisible(), false);
+    assert.equal(await blockedCamera.page.locator("#nrQrImage").isEnabled(), true);
+    assert.equal(await blockedCamera.page.locator("#nrQrInput").isEnabled(), true);
+    await blockedCamera.ctx.close();
+
     const normalStaff = await context();
     await normalStaff.page.goto(origin + "/9round-booking/staff/");
     await normalStaff.page.locator("#staffEmail").fill("staff@example.invalid");
@@ -235,7 +246,7 @@ async function main() {
     assert.equal(await member.page.locator("#authPanel").isVisible(), true);
     assert.equal(await member.page.evaluate(() => sessionStorage.getItem("nr_booking_session_v1")), null);
     assert.deepEqual(errors, []);
-    console.log(JSON.stringify({ status: "passed", checks: ["member email ownership flow", "11 slots / counts only", "full and blocked cannot book", "tap reserve / cancel", "email change and cancel links require explicit authenticated action", "atomic change to another slot", "real QR image decoding and attendance registration", "USB reader and duplicate attendance", "camera fallback", "future dates cannot register attendance", "mail failure preserves reservation and managers retry", "block/unblock preserves reservations", "trial creation", "independent staff roles", "A-nauts is read-only", "logout clears identities", "no horizontal overflow at 320/390/1024/1280px", "no browser exceptions"], apiCalls: actions.length }));
+    console.log(JSON.stringify({ status: "passed", checks: ["member email ownership flow", "11 slots / counts only", "full and blocked cannot book", "tap reserve / cancel", "email change and cancel links require explicit authenticated action", "atomic change to another slot", "real QR image decoding and attendance registration", "USB reader and duplicate attendance", "camera fallback", "blocked camera policy keeps photo and reader available", "future dates cannot register attendance", "mail failure preserves reservation and managers retry", "block/unblock preserves reservations", "trial creation", "independent staff roles", "A-nauts is read-only", "logout clears identities", "no horizontal overflow at 320/390/1024/1280px", "no browser exceptions"], apiCalls: actions.length }));
   } finally { await browser.close(); server.close(); }
 }
 main().catch(error => { console.error(error); server.close(); process.exitCode = 1; });
