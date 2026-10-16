@@ -1,5 +1,5 @@
 /**
- * Editor-only development bootstrap. Private to google.script.run clients.
+ * Guarded development bootstrap, selected from the Apps Script editor.
  * Before running, set ROUND9_BOOKING_TEST_EMAILS to ONE address you control.
  * Always creates new synthetic-data spreadsheets; never copies live member data.
  */
@@ -54,4 +54,13 @@ function initialize9RoundBookingDevelopment_() {
   // Test fixtures and links only; never log secrets, codes, or tokens.
   console.log(JSON.stringify({ environment: "development", reservationData: data.getUrl(),
     testMembers: master.getUrl(), testStaff: directory.getUrl(), emailSent: false }));
+}
+
+/** Add only missing dedicated tables; preserve all existing test bookings. */
+function upgrade9RoundBookingDevelopment() {
+  const config = nrBookingConfig_();
+  if (config.environment !== "development") throw new Error("開発用の更新は本番環境では実行できません。");
+  setup9RoundBookingStorage_();
+  nrBookingNotificationConfig_(config);
+  console.log(JSON.stringify({ environment: "development", upgraded: true, existingBookingsPreserved: true, emailSent: false }));
 }

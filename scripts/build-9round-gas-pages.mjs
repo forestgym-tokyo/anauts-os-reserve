@@ -12,9 +12,13 @@ for (const [source, target] of [["index.html", "Member.html"], ["staff/index.htm
   const scripts = [];
   html = html.replace(/<script src="([^"]+)" defer><\/script>/g, (_, relative) => {
     const resolved = path.resolve(path.dirname(file), relative);
-    const content = path.basename(resolved) === "config.js"
+    let content = path.basename(resolved) === "config.js"
       ? "window.ANAUTS_ROUND9_BOOKING = <?!= configJson ?>;"
       : fs.readFileSync(resolved, "utf8");
+    if (["qrcode.min.js", "jsqr.min.js"].includes(path.basename(resolved))) {
+      const license = path.join(path.dirname(resolved), path.basename(resolved).replace(".min.js", "-LICENSE.txt"));
+      content = "/*!\n" + fs.readFileSync(license, "utf8") + "\n*/\n" + content;
+    }
     scripts.push("<script>\n" + content.replace(/<\/script/gi, "<\\/script") + "\n</script>");
     return "";
   });

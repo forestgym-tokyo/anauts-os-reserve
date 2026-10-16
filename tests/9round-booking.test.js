@@ -72,6 +72,8 @@ function environment(options = {}) {
     ROUND9_BOOKING_MEMBER_MASTER_SHEET: "Members", ROUND9_BOOKING_SECRET: "test-only-signing-secret-with-at-least-32-characters",
     ROUND9_BOOKING_TEST_EMAILS: Array.from({ length: 8 }, (_, i) => "member" + i + "@example.invalid").concat(["admin", "manager", "staff", "other", "inactive"].map(s => s + "@example.invalid")).join(","),
     ROUND9_BOOKING_FIREBASE_API_KEY: "test-firebase-key", ROUND9_BOOKING_STAFF_DIRECTORY_ID: directory.id,
+    ROUND9_BOOKING_MEMBER_URL: "https://example.invalid/booking/?page=member",
+    ROUND9_BOOKING_ADMIN_EMAILS: "admin@example.invalid",
     ...options.properties
   };
   const users = {
@@ -120,6 +122,7 @@ function environment(options = {}) {
   };
   vm.createContext(context);
   vm.runInContext(read("9round-booking/gas/Booking.gs"), context);
+  vm.runInContext(read("9round-booking/gas/Workflows.gs"), context);
   if (options.realStaffAuth) vm.runInContext(read("9round-booking/gas/StaffAuth.gs"), context);
   if (!options.noSetup) context.setup9RoundBookingStorage_();
   function call(action, body = {}) { const result = context.round9BookingApi_(action, body); assert.equal(locked, false, "lock must be released on all paths"); return plain(result); }
@@ -311,7 +314,7 @@ test("date/time validation uses Japan time and rejects past, out-of-range and ma
   }
   assert.equal(e.call("get9RoundWorkoutSlots", { session_token: token, date: "2026-12-31" }).code, "DATE_OUT_OF_RANGE");
   e.setNow("2026-10-17T01:15:00Z"); // 10:15 JST: the first session has started.
-  assert.equal(reserve(e, token, "DAILY:2026-10-17:10:15", "2026-10-17").code, "SLOT_STARTED");
+  assert.equal(reserve(e, token, "DAILY:2026-10-17:10:15", "2026-10-17").code, "DEADLINE_PASSED");
   assert.equal(reserve(e, token, "DAILY:2026-10-18:14:00").code, "INVALID_SLOT");
   e.setNow("2026-10-17T15:01:00Z"); // 00:01 JST the next day.
   assert.equal(plain(e.context.nrBookingRange_({ days: 30 })).from, "2026-10-18");
@@ -438,4 +441,189 @@ test("development bootstrap cannot recreate configured storage or run with produ
     vm.createContext(c); vm.runInContext(read("9round-booking/gas/Development.gs"), c);
     assert.throws(() => c.initialize9RoundBookingDevelopment());
   }
+});
+
+test("booking, change and cancellation accept exactly one hour before start and reject one millisecond later", () => {
+  const today = "2026-10-17", first = "DAILY:" + today + ":10:15";
+  const e = environment(), token = e.login();
+  e.advance(15 * 60000); // 09:15 JST, exactly one hour before 10:15.
+  const booking = reserve(e, token, first, today);
+  assert.equal(booking.ok, true, JSON.stringify(booking));
+  assert.equal(e.call("get9RoundWorkoutSlots", { session_token: token, date: today }).data.slots[0].can_cancel, true);
+  assert.equal(e.call("cancel9RoundWorkoutBooking", { session_token: token, booking_id: booking.data.booking_id }).ok, true);
+  const late = environment(), member = late.login(), original = reserve(late, member, first, today).data.booking_id;
+  late.advance(15 * 60000 + 1);
+  assert.equal(late.call("cancel9RoundWorkoutBooking", { session_token: member, booking_id: original }).code, "DEADLINE_PASSED");
+  assert.equal(late.call("reschedule9RoundWorkoutBooking", { session_token: member, booking_id: original, date: today, slot_id: "DAILY:" + today + ":11:00" }).code, "DEADLINE_PASSED");
+  const other = late.login(1);
+  assert.equal(reserve(late, other, first, today).code, "DEADLINE_PASSED");
+  const slot = late.call("get9RoundWorkoutSlots", { session_token: member, date: today }).data.slots[0];
+  assert.equal(slot.can_cancel, false); assert.equal(slot.can_change, false);
+  assert.equal(slot.booked_count, 1);
+});
+
+test("confirmation and management mails are separate, escape HTML, and contain only authenticated email-action links", () => {
+  const e = environment(); e.master.sheets.get("Members").rows[1][1] = '<b>会員&名</b>';
+  const token = e.login(), before = e.sent.length, id = reserve(e, token).data.booking_id;
+  assert.equal(e.sent.length, before + 2);
+  const memberMail = e.sent[before], adminMail = e.sent[before + 1];
+  assert.equal(memberMail.to, "member0@example.invalid"); assert.equal(adminMail.to, "admin@example.invalid");
+  assert.match(memberMail.htmlBody, /&lt;b&gt;会員&amp;名&lt;\/b&gt;/);
+  assert.match(memberMail.htmlBody, /予約を変更する/); assert.match(memberMail.htmlBody, /予約をキャンセルする/);
+  assert.doesNotMatch(memberMail.htmlBody, /session_token|NR9:|<b>会員/);
+  const link = new URL(memberMail.body.match(/予約をキャンセルする:\n([^\n]+)/)[1]);
+  assert.equal(link.searchParams.get("booking_id"), id); assert.equal(link.searchParams.get("intent"), "cancel");
+  assert.match(adminMail.body, /会員番号: 1000000/); assert.doesNotMatch(adminMail.body, /booking_id=|session_token/);
+  const again = reserve(e, token);
+  assert.equal(again.data.already_booked, true); assert.equal(e.sent.length, before + 2);
+  e.call("cancel9RoundWorkoutBooking", { session_token: token, booking_id: id });
+  assert.equal(e.sent.length, before + 4); assert.match(e.sent.at(-2).subject, /予約取消/);
+  e.call("cancel9RoundWorkoutBooking", { session_token: token, booking_id: id });
+  assert.equal(e.sent.length, before + 4);
+});
+
+test("free-mail failures preserve bookings and durable pending messages can be retried by managers only", () => {
+  const e = environment(), token = e.login(); e.mailFailure(true);
+  const result = reserve(e, token);
+  assert.equal(result.ok, true); assert.equal(result.data.notification_pending, true);
+  assert.equal(e.call("get9RoundWorkoutSlots", { session_token: token, date: day }).data.slots[0].is_booked, true);
+  assert.equal(e.call("get9RoundBookingBoard", { id_token: "admin", date: day }).data.pending_notifications, 2);
+  assert.equal(e.call("retry9RoundBookingNotifications", { id_token: "staff" }).code, "FORBIDDEN");
+  e.mailFailure(false);
+  const retried = e.call("retry9RoundBookingNotifications", { id_token: "manager" });
+  assert.equal(retried.data.sent, 2); assert.equal(retried.data.pending, 0);
+  assert.equal(e.call("retry9RoundBookingNotifications", { id_token: "admin" }).data.sent, 0);
+});
+
+test("development mail safeguards apply to new notifications and to queued retries", () => {
+  const e = environment(), token = e.login();
+  e.properties.ROUND9_BOOKING_ADMIN_EMAILS = "unapproved@example.invalid";
+  assert.equal(reserve(e, token).code, "BOOKING_CONFIGURATION");
+  assert.equal(e.data.sheets.get("nr_bookings").rows.length, 1);
+  e.properties.ROUND9_BOOKING_ADMIN_EMAILS = "admin@example.invalid";
+  e.mailFailure(true); reserve(e, token); e.mailFailure(false);
+  e.data.sheets.get("nr_mail").rows[1][4] = "unapproved@example.invalid";
+  const before = e.sent.length, retry = e.call("retry9RoundBookingNotifications", { id_token: "admin" });
+  assert.equal(retry.data.sent, 1); assert.equal(retry.data.pending, 1);
+  assert.ok(e.sent.slice(before).every(m => m.to !== "unapproved@example.invalid"));
+});
+
+test("rescheduling checks ownership and capacity before replacing the original reservation", () => {
+  const e = environment(), tokens = Array.from({ length: 6 }, (_, i) => e.login(i));
+  const old = reserve(e, tokens[0]).data.booking_id, next = "DAILY:" + day + ":11:00";
+  for (const t of tokens.slice(1, 5)) reserve(e, t, next);
+  const payload = { booking_id: old, date: day, slot_id: next };
+  assert.equal(e.call("reschedule9RoundWorkoutBooking", { ...payload, session_token: tokens[5] }).code, "BOOKING_NOT_FOUND");
+  assert.equal(e.call("reschedule9RoundWorkoutBooking", { ...payload, session_token: tokens[0] }).code, "SLOT_FULL");
+  let own = e.call("get9RoundMemberBookings", { session_token: tokens[0] }).data.bookings;
+  assert.equal(own.length, 1); assert.equal(own[0].booking_id, old); assert.equal(own[0].status, "CONFIRMED");
+  const third = "DAILY:" + day + ":11:45";
+  e.call("set9RoundWorkoutBlock", { id_token: "admin", date: day, slot_id: third, blocked: true });
+  assert.equal(e.call("reschedule9RoundWorkoutBooking", { ...payload, slot_id: third, session_token: tokens[0] }).code, "SLOT_BLOCKED");
+  e.call("set9RoundWorkoutBlock", { id_token: "admin", date: day, slot_id: third, blocked: false });
+  const before = e.sent.length;
+  const changed = e.call("reschedule9RoundWorkoutBooking", { ...payload, slot_id: third, session_token: tokens[0] });
+  assert.equal(changed.ok, true, JSON.stringify(changed)); assert.notEqual(changed.data.booking_id, old);
+  own = e.call("get9RoundMemberBookings", { session_token: tokens[0], booking_id: old }).data.bookings;
+  assert.equal(own.find(b => b.booking_id === old).status, "RESCHEDULED");
+  assert.equal(own.find(b => b.booking_id === changed.data.booking_id).status, "CONFIRMED");
+  assert.equal(e.sent.length, before + 2); assert.match(e.sent[before].subject, /予約変更/); assert.match(e.sent[before].body, /変更前:/);
+  assert.equal(e.call("reschedule9RoundWorkoutBooking", { ...payload, slot_id: third, session_token: tokens[0] }).data.already_changed, true);
+  assert.equal(e.sent.length, before + 2);
+  assert.equal(e.call("cancel9RoundWorkoutBooking", { session_token: tokens[0], booking_id: old }).code, "BOOKING_UNAVAILABLE");
+});
+
+test("a change also enforces the new slot's one-hour deadline and cannot merge two existing reservations", () => {
+  const e = environment(), token = e.login(), today = "2026-10-17";
+  const old = reserve(e, token, "DAILY:" + today + ":11:00", today).data.booking_id;
+  e.advance(15 * 60000 + 1);
+  assert.equal(e.call("reschedule9RoundWorkoutBooking", { session_token: token, booking_id: old, date: today, slot_id: "DAILY:" + today + ":10:15" }).code, "DEADLINE_PASSED");
+  reserve(e, token, "DAILY:" + today + ":11:45", today);
+  assert.equal(e.call("reschedule9RoundWorkoutBooking", { session_token: token, booking_id: old, date: today, slot_id: "DAILY:" + today + ":11:45" }).code, "ALREADY_BOOKED");
+});
+
+test("mail booking IDs never authenticate another member or expose their reservation", () => {
+  const e = environment(), first = e.login(), second = e.login(1), id = reserve(e, first).data.booking_id;
+  assert.equal(e.call("get9RoundMemberBookings", { booking_id: id }).code, "SESSION_EXPIRED");
+  assert.deepEqual(e.call("get9RoundMemberBookings", { session_token: second, booking_id: id }).data.bookings, []);
+  assert.equal(e.call("cancel9RoundWorkoutBooking", { session_token: second, booking_id: id }).code, "BOOKING_NOT_FOUND");
+});
+
+test("each member gets a stable opaque QR; reissue revokes the old QR and no raw pass is stored", () => {
+  const e = environment(), token = e.login(), second = e.login(1);
+  assert.equal(e.call("get9RoundMemberPass").code, "SESSION_EXPIRED");
+  const qr = e.call("get9RoundMemberPass", { session_token: token }).data.qr_text;
+  assert.match(qr, /^NR9:[a-f0-9]{64}$/);
+  assert.equal(e.call("get9RoundMemberPass", { session_token: token }).data.qr_text, qr);
+  assert.notEqual(e.call("get9RoundMemberPass", { session_token: second }).data.qr_text, qr);
+  assert.equal(JSON.stringify(e.data.sheets.get("nr_passes").rows).includes(qr), false);
+  const fresh = e.call("rotate9RoundMemberPass", { session_token: token }).data.qr_text;
+  assert.notEqual(fresh, qr);
+  assert.equal(e.call("checkIn9RoundMember", { id_token: "staff", qr_text: qr, date: "2026-10-17", slot_id: "DAILY:2026-10-17:10:15" }).code, "INVALID_QR");
+});
+
+test("only an eligible staff scan of today's reserved slot marks attendance, once, while retaining capacity", () => {
+  const e = environment({ realStaffAuth: true }), token = e.login(), today = "2026-10-17", slot = "DAILY:" + today + ":10:15";
+  const id = reserve(e, token, slot, today).data.booking_id;
+  const qr = e.call("get9RoundMemberPass", { session_token: token }).data.qr_text;
+  const payload = { date: today, slot_id: slot, qr_text: qr };
+  for (const id_token of ["", "other", "inactive"]) assert.equal(e.call("checkIn9RoundMember", { ...payload, id_token }).ok, false);
+  assert.equal(e.call("checkIn9RoundMember", { ...payload, id_token: "staff", date: day }).code, "CHECKIN_DATE");
+  assert.equal(e.call("checkIn9RoundMember", { ...payload, id_token: "staff", slot_id: "DAILY:" + today + ":11:00" }).code, "NO_RESERVATION");
+  const checkin = e.call("checkIn9RoundMember", { ...payload, id_token: "staff" });
+  assert.equal(checkin.ok, true, JSON.stringify(checkin)); assert.equal(checkin.data.already_attended, false);
+  assert.equal(e.call("checkIn9RoundMember", { ...payload, id_token: "manager" }).data.already_attended, true);
+  assert.equal(e.data.sheets.get("nr_attendance").rows.length, 2);
+  const board = e.call("get9RoundBookingBoard", { id_token: "staff", date: today }).data;
+  assert.equal(board.slots[0].members[0].attended, true); assert.equal(board.slots[0].booked_count, 1);
+  const publicSlot = e.call("get9RoundWorkoutSlots", { session_token: token, date: today }).data.slots[0];
+  assert.equal(publicSlot.attended, true); assert.equal(publicSlot.can_cancel, false); assert.equal(publicSlot.can_change, false);
+  assert.equal(e.call("cancel9RoundWorkoutBooking", { session_token: token, booking_id: id }).code, "ALREADY_ATTENDED");
+  assert.equal(e.call("reschedule9RoundWorkoutBooking", { session_token: token, booking_id: id, date: today, slot_id: "DAILY:" + today + ":11:00" }).code, "ALREADY_ATTENDED");
+});
+
+test("QR scans reject cancelled bookings, inactive membership, changed registered email and forged passes", () => {
+  const e = environment(), token = e.login(), today = "2026-10-17", slot = "DAILY:" + today + ":10:15";
+  const id = reserve(e, token, slot, today).data.booking_id;
+  const qr = e.call("get9RoundMemberPass", { session_token: token }).data.qr_text;
+  const payload = { id_token: "staff", date: today, slot_id: slot, qr_text: qr };
+  e.master.sheets.get("Members").rows[1][3] = "kyukai";
+  assert.equal(e.call("checkIn9RoundMember", payload).code, "MEMBER_UNAVAILABLE");
+  e.master.sheets.get("Members").rows[1][3] = "ok"; e.master.sheets.get("Members").rows[1][2] = "changed@example.invalid";
+  assert.equal(e.call("checkIn9RoundMember", payload).code, "MEMBER_UNAVAILABLE");
+  e.master.sheets.get("Members").rows[1][2] = "member0@example.invalid";
+  assert.equal(e.call("checkIn9RoundMember", { ...payload, qr_text: "NR9:" + "0".repeat(64) }).code, "INVALID_QR");
+  e.call("cancel9RoundWorkoutBooking", { session_token: token, booking_id: id });
+  assert.equal(e.call("checkIn9RoundMember", payload).code, "NO_RESERVATION");
+});
+
+test("bundled QR encoder produces a real image that the offline scanner decodes", () => {
+  const qrcode = require("../9round-booking/vendor/qrcode.min.js");
+  const jsQR = require("../9round-booking/vendor/jsqr.min.js");
+  const text = "NR9:" + "a12b34c56d78e90f".repeat(4);
+  const qr = qrcode(0, "M"); qr.addData(text); qr.make();
+  const modules = qr.getModuleCount(), cell = 5, width = (modules + 8) * cell;
+  const pixels = new Uint8ClampedArray(width * width * 4).fill(255);
+  for (let row = 0; row < modules; row++) for (let col = 0; col < modules; col++) if (qr.isDark(row, col)) {
+    for (let y = 0; y < cell; y++) for (let x = 0; x < cell; x++) {
+      const offset = (((row + 4) * cell + y) * width + (col + 4) * cell + x) * 4;
+      pixels[offset] = pixels[offset + 1] = pixels[offset + 2] = 0;
+    }
+  }
+  assert.equal(jsQR(pixels, width, width, { inversionAttempts: "dontInvert" }).data, text);
+});
+
+test("development upgrade adds only missing tables and preserves existing reservations", () => {
+  const e = environment(), token = e.login(); reserve(e, token);
+  const before = plain(e.data.sheets.get("nr_bookings").rows);
+  for (const name of ["nr_passes", "nr_attendance", "nr_changes", "nr_mail"]) e.data.sheets.delete(name);
+  vm.runInContext(read("9round-booking/gas/Development.gs"), e.context);
+  e.context.upgrade9RoundBookingDevelopment();
+  assert.deepEqual(plain(e.data.sheets.get("nr_bookings").rows), before);
+  for (const name of ["nr_passes", "nr_attendance", "nr_changes", "nr_mail"]) assert.equal(e.data.sheets.get(name).rows.length, 1);
+  const count = e.writes.length; e.context.upgrade9RoundBookingDevelopment();
+  assert.equal(e.writes.length, count);
+  e.properties.ROUND9_BOOKING_ENV = "production";
+  assert.throws(() => e.context.upgrade9RoundBookingDevelopment(), /開発用/);
+  assert.equal(e.writes.length, count);
 });

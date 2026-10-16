@@ -9,13 +9,18 @@ const NR_BOOKING = Object.freeze({
   minutes: 45,
   otpMinutes: 10,
   sessionHours: 6,
+  cutoffMinutes: 60,
   attempts: 5,
   tables: {
     challenges: ["challenge_id", "email_hash", "code_hash", "member_no", "created_at", "expires_at", "attempts", "status"],
     sessions: ["token_hash", "member_no", "email_hash", "created_at", "expires_at", "status"],
     bookings: ["booking_id", "kind", "slot_id", "date", "start_time", "end_time", "member_no", "member_name", "created_at", "status", "cancelled_at"],
     trials: ["slot_id", "kind", "date", "start_time", "end_time", "capacity", "title", "status", "created_by", "updated_at"],
-    blocks: ["slot_id", "date", "start_time", "status", "updated_by", "updated_at"]
+    blocks: ["slot_id", "date", "start_time", "status", "updated_by", "updated_at"],
+    passes: ["pass_id", "member_no", "email_hash", "token_hash", "created_at", "status"],
+    attendance: ["booking_id", "member_no", "checked_in_at", "staff_code", "status"],
+    changes: ["old_booking_id", "new_booking_id", "new_slot_id", "created_at"],
+    mail: ["event_id", "booking_id", "event_type", "recipient_role", "recipient", "payload_json", "status", "created_at", "sent_at", "attempts", "last_error"]
   }
 });
 
@@ -300,15 +305,19 @@ function nrGet9RoundSlots_(config, body) {
   const date = nrBookingRequireDate_(config, body.date);
   const rows = nrBookingRows_(config, "bookings");
   const blocks = nrBookingRows_(config, "blocks");
+  const attendance = nrBookingRows_(config, "attendance");
   const slots = nrBookingDailySlots_(date).map(function (slot) {
     const mine = rows.find(function (r) { return r.slot_id === slot.slot_id && r.member_no === auth.member.no && r.status === "CONFIRMED"; });
     const count = nrBookingCount_(rows, slot.slot_id);
-    const future = Date.parse(date + "T" + slot.start_time + ":00+09:00") > Date.now();
+    const withinDeadline = nrBookingBeforeDeadline_(slot);
+    const attended = !!mine && attendance.some(function (a) { return a.booking_id === mine.booking_id && a.status === "ATTENDED"; });
     const blocked = blocks.some(function (b) { return b.slot_id === slot.slot_id && b.status === "BLOCKED"; });
     // Explicit projection: no other member's identity ever enters this response.
     return { slot_id: slot.slot_id, kind: slot.kind, start_time: slot.start_time, end_time: slot.end_time,
       capacity: 4, booked_count: count, is_booked: !!mine, booking_id: mine ? mine.booking_id : "",
-      blocked: blocked, available: future && count < 4 && !mine && !blocked, can_cancel: future && !!mine };
+      blocked: blocked, available: withinDeadline && count < 4 && !mine && !blocked,
+      can_cancel: withinDeadline && !!mine && !attended, can_change: withinDeadline && !!mine && !attended,
+      attended: attended, deadline: nrBookingDeadline_(slot) };
   });
   return { date: date, range: nrBookingRange_(config), slots: slots };
 }
@@ -324,21 +333,22 @@ function nrCreate9RoundBooking_(config, body) {
       return r.slot_id === slot.slot_id && r.member_no === auth.member.no && r.status === "CONFIRMED";
     });
     if (mine) return { booking_id: mine.booking_id, already_booked: true };
+    nrBookingNotificationConfig_(config);
     if (nrBookingRows_(config, "blocks").some(function (r) { return r.slot_id === slot.slot_id && r.status === "BLOCKED"; })) {
       nrBookingError_("SLOT_BLOCKED", "この枠は予約受付を停止しています。他の枠をお選びください。");
     }
-    if (Date.parse(date + "T" + slot.start_time + ":00+09:00") <= Date.now()) {
-      nrBookingError_("SLOT_STARTED", "開始時刻を過ぎた枠は予約できません。");
-    }
+    nrBookingRequireDeadline_(slot);
     if (nrBookingCount_(rows, slot.slot_id) >= 4) nrBookingError_("SLOT_FULL", "この枠は満員になりました。他の枠をお選びください。");
     const id = nrBookingOpaque_();
-    nrBookingWrite_(config, "bookings", {
+    const booking = {
       booking_id: id, kind: "DAILY", slot_id: slot.slot_id, date: date,
       start_time: slot.start_time, end_time: slot.end_time,
       member_no: auth.member.no, member_name: auth.member.name,
       created_at: new Date().toISOString(), status: "CONFIRMED", cancelled_at: ""
-    });
-    return { booking_id: id, already_booked: false };
+    };
+    nrBookingWrite_(config, "bookings", booking);
+    return { booking_id: id, already_booked: false,
+      notification_pending: nrBookingNotify_(config, "CONFIRMED", booking, auth.member) };
   });
 }
 
@@ -350,11 +360,12 @@ function nrCancel9RoundBooking_(config, body) {
     });
     if (!row) nrBookingError_("BOOKING_NOT_FOUND", "ご本人の予約を確認できません。");
     if (row.status === "CANCELLED") return { cancelled: true };
-    if (Date.parse(row.date + "T" + row.start_time + ":00+09:00") <= Date.now()) nrBookingError_("SLOT_STARTED", "開始時刻を過ぎた予約は取り消しできません。");
+    nrBookingRequireMutable_(config, row);
+    nrBookingNotificationConfig_(config);
     row.status = "CANCELLED";
     row.cancelled_at = new Date().toISOString();
     nrBookingWrite_(config, "bookings", row, row._row);
-    return { cancelled: true };
+    return { cancelled: true, notification_pending: nrBookingNotify_(config, "CANCELLED", row, auth.member) };
   });
 }
 
@@ -380,15 +391,23 @@ function nrGet9RoundBoard_(config, body) {
   const date = nrBookingDate_(body.date);
   const rows = nrBookingRows_(config, "bookings");
   const blocks = nrBookingRows_(config, "blocks");
+  const attendance = nrBookingRows_(config, "attendance");
   const trials = nrBookingRows_(config, "trials").filter(function (r) { return r.date === date; });
   const slots = nrBookingDailySlots_(date).concat(trials);
-  return { date: date, can_manage: ["ADMIN", "MANAGER"].indexOf(auth.permission) >= 0, slots: slots.map(function (slot) {
+  const canManage = ["ADMIN", "MANAGER"].indexOf(auth.permission) >= 0;
+  return { date: date, can_manage: canManage,
+    pending_notifications: canManage ? nrBookingRows_(config, "mail").filter(function (m) { return m.status !== "SENT"; }).length : 0,
+    slots: slots.map(function (slot) {
     return { slot_id: slot.slot_id, kind: slot.kind, date: date, title: slot.title || "デイリーワークアウト",
       start_time: slot.start_time, end_time: slot.end_time, capacity: Number(slot.capacity),
       status: slot.kind === "DAILY" && blocks.some(function (b) { return b.slot_id === slot.slot_id && b.status === "BLOCKED"; }) ? "BLOCKED" : slot.status,
       booked_count: nrBookingCount_(rows, slot.slot_id),
       members: rows.filter(function (r) { return r.slot_id === slot.slot_id && r.status === "CONFIRMED"; })
-        .map(function (r) { return { booking_id: r.booking_id, member_no: r.member_no, name: r.member_name }; })
+        .map(function (r) {
+          const checkin = attendance.find(function (a) { return a.booking_id === r.booking_id && a.status === "ATTENDED"; });
+          return { booking_id: r.booking_id, member_no: r.member_no, name: r.member_name,
+            attended: !!checkin, checked_in_at: checkin ? checkin.checked_in_at : "" };
+        })
     };
   }).sort(function (a, b) { return a.start_time.localeCompare(b.start_time) || a.kind.localeCompare(b.kind); }) };
 }
@@ -454,7 +473,7 @@ function nrSave9RoundTrial_(config, body) {
   });
 }
 
-/** All new endpoints use POST; tokens and member identifiers never go in a URL. */
+/** All state changes use POST. Email links only carry an opaque booking ID. */
 function round9BookingApi_(action, body) {
   try {
     const config = nrBookingConfig_();
@@ -464,6 +483,12 @@ function round9BookingApi_(action, body) {
       get9RoundWorkoutSlots: nrGet9RoundSlots_,
       create9RoundWorkoutBooking: nrCreate9RoundBooking_,
       cancel9RoundWorkoutBooking: nrCancel9RoundBooking_,
+      reschedule9RoundWorkoutBooking: nrReschedule9RoundBooking_,
+      get9RoundMemberBookings: nrGet9RoundMemberBookings_,
+      get9RoundMemberPass: nrGet9RoundMemberPass_,
+      rotate9RoundMemberPass: nrRotate9RoundMemberPass_,
+      checkIn9RoundMember: nrCheckIn9RoundMember_,
+      retry9RoundBookingNotifications: nrRetry9RoundNotifications_,
       logout9RoundBooking: nrLogout9RoundBooking_,
       get9RoundBookingBoard: nrGet9RoundBoard_,
       save9RoundTrialSlot: nrSave9RoundTrial_,

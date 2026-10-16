@@ -6,6 +6,8 @@ function doGet(e) {
     template.configJson = JSON.stringify({
       apiUrl: "google.script.run",
       firebaseApiKey: PropertiesService.getScriptProperties().getProperty("ROUND9_BOOKING_FIREBASE_API_KEY") || "",
+      initialBookingId: /^[a-f0-9]{64}$/.test(String(e.parameter.booking_id || "")) ? String(e.parameter.booking_id) : "",
+      initialIntent: ["cancel", "change"].indexOf(String(e.parameter.intent || "")) >= 0 ? String(e.parameter.intent) : "",
       requestTimeoutMs: 30000
     });
     return template.evaluate()

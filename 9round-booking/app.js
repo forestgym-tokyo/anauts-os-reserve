@@ -2,6 +2,7 @@
   "use strict";
   const q = function (s) { return document.querySelector(s); };
   const api = window.NineRoundBookingApi;
+  const tools = window.NineRoundMemberTools;
   const storageKey = "nr_booking_session_v1";
   let token = "", challenge = "", busy = false, sequence = 0;
   let range = { from: window.NineRoundTokyoDate(), to: "" };
@@ -23,6 +24,7 @@
     q("#stepDate").removeAttribute("aria-current");
     q(value ? "#stepDate" : "#stepVerify").setAttribute("aria-current", "step");
     if (!value) { q("#slotList").replaceChildren(); q("#code").value = ""; }
+    tools.authenticate(value ? token : "");
   }
   function handleError(error) {
     if (["SESSION_EXPIRED", "MEMBER_UNAVAILABLE"].includes(error.code)) {
@@ -36,6 +38,7 @@
   }
   function setBusy(value) {
     busy = value;
+    tools.setBusy(value);
     q("#bookingPanel").setAttribute("aria-busy", String(value));
     ["#sendCode", "#verifyCode", "#changeEmail", "#bookingDate", "#reload", "#previousDate", "#nextDate"].forEach(function (s) { q(s).disabled = value; });
     if (!value) {
@@ -74,7 +77,7 @@
     fill.style.width = Math.min(100, slot.booked_count / slot.capacity * 100) + "%";
     meter.setAttribute("aria-hidden", "true");
     meter.append(fill); button.append(meter);
-    button.append(element("span", "slot-action", slot.is_booked ? "✓ 予約済み" : slot.blocked ? "受付停止" : full ? "満員" : past ? "受付終了" : "タップして予約 →"));
+    button.append(element("span", "slot-action", slot.attended ? "✓ 受講済み" : slot.is_booked ? "✓ 予約済み" : slot.blocked ? "受付停止" : full ? "満員" : past ? "受付終了" : tools.changing ? "この枠へ変更 →" : "タップして予約 →"));
     button.addEventListener("click", function () { reserve(slot); });
     card.append(button);
     if (slot.can_cancel) {
@@ -121,12 +124,16 @@
   async function reserve(slot) {
     if (busy || !token || !slot.available) return;
     const ownToken = token, date = lastDate;
+    const changing = tools.changing;
     setBusy(true); message("");
     try {
-      await api("create9RoundWorkoutBooking", { session_token: ownToken, date: date, slot_id: slot.slot_id });
+      const result = await api(changing ? "reschedule9RoundWorkoutBooking" : "create9RoundWorkoutBooking",
+        { session_token: ownToken, date: date, slot_id: slot.slot_id, booking_id: changing ? changing.booking_id : undefined });
       if (token !== ownToken) return;
-      message(dayLabel(date) + " " + slot.start_time + "–" + slot.end_time + " の予約が完了しました。");
-      await loadSlots(false);
+      tools.finishChange();
+      message(dayLabel(date) + " " + slot.start_time + "–" + slot.end_time + (changing ? " に予約を変更しました。" : " の予約が完了しました。") +
+        (result.notification_pending ? "確認メールは送信待ちです。予約は成立しています。" : "確認メールをお送りしました。"));
+      await Promise.all([loadSlots(false), tools.refresh()]);
     } catch (error) {
       if (token !== ownToken) return;
       handleError(error);
@@ -140,13 +147,18 @@
     const ownToken = token;
     setBusy(true); message("");
     try {
-      await api("cancel9RoundWorkoutBooking", { session_token: ownToken, booking_id: slot.booking_id });
+      const result = await api("cancel9RoundWorkoutBooking", { session_token: ownToken, booking_id: slot.booking_id });
       if (token !== ownToken) return;
-      message("予約を取り消しました。");
-      await loadSlots(false);
+      if (tools.changing && tools.changing.booking_id === slot.booking_id) tools.finishChange();
+      message("予約を取り消しました。" + (result.notification_pending ? "確認メールは送信待ちです。" : "取消確認メールをお送りしました。"));
+      await Promise.all([loadSlots(false), tools.refresh()]);
     } catch (error) { if (token === ownToken) { handleError(error); if (token) await loadSlots(false); } }
     finally { if (token === ownToken || !token) setBusy(false); }
   }
+  tools.onError = handleError;
+  tools.onMessage = message;
+  tools.reload = function () { return loadSlots(false); };
+  tools.cancel = cancelBooking;
   q("#emailForm").addEventListener("submit", async function (event) {
     event.preventDefault();
     if (busy) return;
@@ -188,7 +200,7 @@
   });
   q("#bookingDate").value = range.from; q("#bookingDate").min = range.from;
   q("#bookingDate").addEventListener("change", function () { if (!busy && q("#bookingDate").value) loadSlots(true); });
-  q("#reload").addEventListener("click", function () { if (!busy) loadSlots(true); });
+  q("#reload").addEventListener("click", function () { if (!busy) Promise.all([loadSlots(true), tools.refresh()]); });
   function moveDate(offset) {
     if (busy) return;
     const date = new Date(q("#bookingDate").value + "T12:00:00+09:00");

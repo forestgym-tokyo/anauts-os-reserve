@@ -19,6 +19,7 @@
     return auth.request(action, payload || {});
   }
   function resetData() {
+    window.NineRoundScanner.reset();
     requestSequence++; inFlight = false; board = [];
     if (q("#nrAdminBoard")) q("#nrAdminBoard").replaceChildren();
     if (q("#nrTrialForm")) q("#nrTrialForm").reset();
@@ -42,6 +43,9 @@
   }
   function render(data) {
     board = data.slots;
+    window.NineRoundScanner.sync(data.slots, data.date);
+    q("#nrRetryNotifications").hidden = !management() || !data.pending_notifications;
+    q("#nrRetryNotifications").textContent = "未送信メールを再送（" + (data.pending_notifications || 0) + "件）";
     const target = q("#nrAdminBoard");
     target.replaceChildren();
     board.forEach(function (slot) {
@@ -54,7 +58,7 @@
         const names = textElement("ul", "nr-names");
         slot.members.forEach(function (member) {
           const li = textElement("li");
-          li.append(textElement("span", "", member.name + " 様"), textElement("small", "", "会員番号 " + member.member_no));
+          li.append(textElement("span", "", member.name + " 様"), textElement("small", "", "会員番号 " + member.member_no), textElement("span", member.attended ? "nr-attended" : "nr-not-attended", member.attended ? "受講済み" : "未受講"));
           names.append(li);
         });
         article.append(names);
@@ -92,7 +96,7 @@
     } finally { inFlight = false; setMutationBusy(false); }
   }
   function setMutationBusy(value) {
-    ["#nrAdminDate", "#nrAdminReload", "#nrBlockDay", "#nrUnblockDay", "#nrTrialSave", "#nrTrialNew"].forEach(function (s) { q(s).disabled = value; });
+    ["#nrAdminDate", "#nrAdminReload", "#nrBlockDay", "#nrUnblockDay", "#nrTrialSave", "#nrTrialNew", "#nrRetryNotifications"].forEach(function (s) { q(s).disabled = value; });
     q("#nrTrialForm").querySelectorAll("input,select").forEach(function (el) { el.disabled = value; });
   }
   async function load(clearNotice) {
@@ -159,7 +163,7 @@
     section.innerHTML = [
       '<div class="page-heading"><div><p class="eyebrow">9ROUND ARIO SOGA</p><h1>9ROUND予約</h1><p>デイリーワークアウトの予約確認と体験枠の管理</p></div></div>',
       '<div class="nr-shell"><div class="nr-toolbar"><label>予約日<input id="nrAdminDate" type="date" required></label><button id="nrAdminReload" class="nr-primary" type="button">予約を確認</button></div>',
-      '<div id="nrBlockActions" class="nr-toolbar"><button id="nrBlockDay" type="button">この日の全枠をブロック</button><button id="nrUnblockDay" type="button">この日の全枠を解除</button></div>',
+      '<div id="nrBlockActions" class="nr-toolbar"><button id="nrBlockDay" type="button">この日の全枠をブロック</button><button id="nrUnblockDay" type="button">この日の全枠を解除</button><button id="nrRetryNotifications" type="button" hidden>未送信メールを再送</button></div>',
       '<div id="nrAdminMessage" class="nr-message" role="status" aria-live="polite"></div><div id="nrAdminBoard" class="nr-board"></div>',
       '<details id="nrTrialEditor" class="nr-trial-editor"><summary>体験枠を作成・編集</summary>',
       '<p>デイリーワークアウトとは別の45分枠を追加します。定員は1〜4名です。</p>',
@@ -172,6 +176,8 @@
       '</div><div class="nr-trial-actions"><button id="nrTrialSave" class="nr-primary" type="submit">体験枠を追加</button><button id="nrTrialNew" type="button">新規入力</button></div></form></details></div>'
     ].join("");
     q("#staffWorkspace").append(section);
+    window.NineRoundScanner.mount(q(".nr-shell"));
+    window.NineRoundScanner.onRegistered = function () { load(false); };
     q("#nrAdminDate").value = window.NineRoundTokyoDate();
     newTrial();
     q("#nrAdminReload").addEventListener("click", function () { load(true); });
@@ -180,6 +186,16 @@
     q("#nrTrialNew").addEventListener("click", function () { if (!inFlight) newTrial(); });
     q("#nrBlockDay").addEventListener("click", function () { setBlock(board.filter(function (s) { return s.kind === "DAILY"; }).map(function (s) { return s.slot_id; }), true); });
     q("#nrUnblockDay").addEventListener("click", function () { setBlock(board.filter(function (s) { return s.kind === "DAILY"; }).map(function (s) { return s.slot_id; }), false); });
+    q("#nrRetryNotifications").addEventListener("click", async function () {
+      if (!management() || inFlight) return;
+      const identity = auth.generation; inFlight = true; setMutationBusy(true);
+      try {
+        const result = await request("retry9RoundBookingNotifications", {});
+        if (!eligible() || identity !== auth.generation) return;
+        notice(result.sent + "件送信しました。送信待ちは" + result.pending + "件です。"); inFlight = false; await load(false);
+      } catch (error) { if (eligible() && identity === auth.generation) notice(error.message); }
+      finally { if (identity === auth.generation) { inFlight = false; setMutationBusy(false); } }
+    });
   }
   auth.onChange = syncAccess;
   syncAccess();
