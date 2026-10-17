@@ -91,12 +91,10 @@
   }
   function cancelBooking() {
     if (!selected || busy || !selected.can_cancel) return;
-    if (!window.confirm(selected.name + " 様の " + when(selected) + " の予約をキャンセルしますか？")) return;
     mutate("cancel9RoundManagedBooking", { booking_id: selected.booking_id }, "予約をキャンセルしました。");
   }
   function changeBooking(date, slot) {
     if (!selected || busy || !selected.can_change) return;
-    if (!window.confirm(selected.name + " 様の予約を " + when(selected) + " から " + date.replace(/-/g, "/") + " " + slot.start_time + " に変更しますか？")) return;
     mutate("reschedule9RoundManagedBooking", { booking_id: selected.booking_id, date: date, slot_id: slot.slot_id }, "予約を変更しました。");
   }
   function mount(parent) {
