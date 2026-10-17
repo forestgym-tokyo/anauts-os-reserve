@@ -230,7 +230,7 @@ test("ok_unfinished members receive an OTP, can reserve and use their own QR", (
     const request = e.call("request9RoundBookingCode", { email: "member0@example.invalid" });
     assert.equal(request.ok, true, status);
     assert.equal(e.sent.length, 1, status);
-    const code = e.sent[0].body.match(/は (\\d{6})/)[1];
+    const code = e.sent[0].body.match(/は (\d{6})/)[1];
     const verified = e.call("verify9RoundBookingCode", { challenge_id: request.data.challenge_id, code });
     assert.equal(verified.ok, true, status);
     const token = verified.data.session_token;
