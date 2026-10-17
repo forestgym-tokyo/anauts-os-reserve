@@ -197,7 +197,7 @@ test("unknown, suspended, shared-email and non-allowlisted addresses receive no 
   assert.equal(e.sent.length, 1);
 });
 
-test("code guessing locks after five attempts; expired codes and resends are bounded", () => {
+test("code guessing locks after five attempts and expired codes cannot verify", () => {
   const e = environment();
   const request = e.call("request9RoundBookingCode", { email: "member0@example.invalid" });
   const id = request.data.challenge_id, code = e.sent[0].body.match(/は (\d{6})/)[1];
@@ -208,9 +208,27 @@ test("code guessing locks after five attempts; expired codes and resends are bou
   const second = e.call("request9RoundBookingCode", { email: "member0@example.invalid" });
   e.advance(600001);
   assert.equal(e.call("verify9RoundBookingCode", { challenge_id: second.data.challenge_id, code: e.sent.at(-1).body.match(/は (\d{6})/)[1] }).code, "INVALID_CODE");
-  for (let i = 0; i < 3; i++) { e.advance(61000); assert.equal(e.call("request9RoundBookingCode", { email: "member0@example.invalid" }).ok, true); }
-  e.advance(61000);
-  assert.equal(e.call("request9RoundBookingCode", { email: "member0@example.invalid" }).code, "RATE_LIMIT");
+});
+
+test("verification code sends have no five-per-hour cap and retain the exact sixty-second interval", () => {
+  const e = environment();
+  const request = () => e.call("request9RoundBookingCode", { email: "member0@example.invalid" });
+  let latest = request();
+  assert.equal(latest.ok, true);
+  e.advance(59999);
+  assert.equal(request().code, "RATE_LIMIT");
+  e.advance(1);
+  latest = request();
+  assert.equal(latest.ok, true);
+  for (let i = 0; i < 6; i++) {
+    e.advance(60000);
+    latest = request();
+    assert.equal(latest.ok, true, "the sixth and later sends within one hour must succeed");
+    assert.equal(request().code, "RATE_LIMIT", "the resend interval still applies");
+  }
+  assert.equal(e.sent.length, 8);
+  const code = e.sent.at(-1).body.match(/は (\d{6})/)[1];
+  assert.equal(e.call("verify9RoundBookingCode", { challenge_id: latest.data.challenge_id, code }).ok, true);
 });
 
 test("mail failure invalidates the challenge and releases the lock", () => {

@@ -178,11 +178,11 @@ function nrRequest9RoundCode_(config, body) {
   return nrBookingLocked_(function () {
     const now = new Date();
     const emailHash = nrBookingHash_(config, "email:" + email);
-    const requests = nrBookingRows_(config, "challenges").filter(function (r) {
-      return r.email_hash === emailHash && now.getTime() - Date.parse(r.created_at) < 3600000;
+    const sentRecently = nrBookingRows_(config, "challenges").some(function (r) {
+      return r.email_hash === emailHash && now.getTime() - Date.parse(r.created_at) < 60000;
     });
-    if (requests.length >= 5 || requests.some(function (r) { return now.getTime() - Date.parse(r.created_at) < 60000; })) {
-      nrBookingError_("RATE_LIMIT", "確認コードの再送には時間をあけてください（60秒以上・1時間に5回まで）。");
+    if (sentRecently) {
+      nrBookingError_("RATE_LIMIT", "確認コードの再送は60秒以上あけてください。");
     }
     const member = nrBookingFindMember_(config, function (m) { return m.email === email; });
     const challenge = nrBookingOpaque_();
