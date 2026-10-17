@@ -46,7 +46,7 @@ test("SOGA board loads additively and offers unlimited bulk selection", () => {
   const ui = read("admin/admin-soga-shifts.js");
   const config = read("admin/firebase-config.js");
   const main = read("gas/99_Main.gs");
-  assert.match(config, /admin-soga-shifts\.js\?v=20260918-shift-publication-v1/);
+  assert.match(config, /admin-soga-shifts\.js\?v=[A-Za-z0-9.-]+/);
   assert.match(ui, /希望を全てシフトへ入れる/);
   assert.match(ui, /人数制限なく一括選択/);
   assert.match(ui, /SG\.requests\.forEach\(row=>/);

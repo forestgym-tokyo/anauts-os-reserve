@@ -20,8 +20,9 @@ assert.match(source, /window\.ANAUTS_CLEAR_AUTH_SESSION=clearRefreshSession_/);
 
 for (const page of ["index.html", "admin.html"]) {
   const html = fs.readFileSync(path.join(root, "admin", page), "utf8");
-  const refreshIndex = html.indexOf("admin-auth-refresh.js?v=20260920-fast-login-v1");
-  const adminIndex = html.indexOf("admin.js?v=20260920-fast-login-month-v1");
+  const refreshIndex = html.search(/src="\.\/admin-auth-refresh\.js(?:\?[^"]*)?"/);
+  const adminIndex = html.search(/src="\.\/admin\.js(?:\?[^"]*)?"/);
+  assert.ok(adminIndex >= 0, `${page} は管理画面スクリプトを読み込む`);
   assert.ok(refreshIndex >= 0, `${page} は認証更新スクリプトを読み込む`);
   assert.ok(refreshIndex < adminIndex, `${page} は管理画面起動前に認証更新を準備する`);
 }

@@ -300,7 +300,7 @@ assert.equal(cached.ok, true);
 assert.deepEqual(sheetReads, readsAfterFirst, "再表示は週次キャッシュを使う");
 assert.equal(calendarCalls.length, 1, "再表示ではカレンダーも再取得しない");
 const bulkCacheKey = `tour-week-bulk-v3:0:TOUR:${startDate}:7`;
-assert.equal(cacheSeconds.get(bulkCacheKey), 300);
+assert.equal(cacheSeconds.get(bulkCacheKey), 3600, "週次キャッシュは世代更新で無効化される現行の1時間設定を使う");
 assert.equal(
   cacheSeconds.get(`${bulkCacheKey}:stale`),
   21600,

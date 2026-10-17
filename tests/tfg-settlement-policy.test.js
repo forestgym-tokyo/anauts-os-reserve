@@ -5,7 +5,7 @@ const assert=require("node:assert/strict");
 const vm=require("node:vm");
 
 const adminSource=fs.readFileSync(path.join(__dirname,"../admin/admin-settlement-v2.js"),"utf8");
-const gasSource=fs.readFileSync(path.join(__dirname,"../gas/89_TfgSettlementApproval.gs"),"utf8");
+const gasSource=fs.readFileSync(path.join(__dirname,"../gas/91_TfgSettlementApproval.gs"),"utf8");
 
 function extractFunction(source,name){
   const start=source.indexOf("function "+name+"(");
@@ -73,7 +73,7 @@ test("URL issuance creates a draft and member email is a separate authenticated 
   assert.match(gasSource,/function sendTfgSettlementApproval_/);
   assert.match(gasSource,/fresh\.status==="DRAFT"/);
   assert.match(gasSource,/setValue\("PENDING"\)/);
-  assert.match(adminSource,/下書きを保存し、承認URLを発行しました。会員にはまだ送信していません。/);
+  assert.match(adminSource,/会員向けメールをGmailの下書きに保存しました。内容を確認してGmailから送信してください。/);
 });
 
 

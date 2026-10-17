@@ -24,7 +24,5 @@ assert.match(src,/page1\.getMaxRows\(\) === 41/,'page 1 must remain physically l
 assert.match(src,/page2\.getMaxRows\(\) === 27/,'page 2 must remain physically limited to rows 42-68');
 assert.match(src,/"&scale=4"/,'each fixed sheet must fit to one PDF page');
 assert.match(src,/function setupTourQuestionnaireFastPdf\s*\(/,'one-time prebuild function must exist');
-assert.match(main,/case "generateTourQuestionnairePdf"[\s\S]*?return generateTourQuestionnairePdf\(/,'GET route must use the existing stable generator');
-assert.doesNotMatch(main,/return generateTourQuestionnairePdfFast\(/,'GET route must not use the optional fast generator');
-assert.doesNotMatch(main,/generateTourQuestionnairePdfCompatible_/,'GET route must not contain a fast-generator fallback');
+assert.match(main,/case "generateTourQuestionnairePdf"[\s\S]*?requireNonRestrictedAdminFeature_\([\s\S]*?return generateTourQuestionnairePdfFast\(/,'GET route must authorize the staff member before using the prepared two-page generator');
 console.log('tour questionnaire fast PDF checks passed');

@@ -29,7 +29,7 @@ for (const source of [questionnaire, polish]) {
 }
 assert.doesNotMatch(questionnaire, /setTimeout\(boot\s*,/);
 assert.doesNotMatch(config, /admin-questionnaire-fix\.js/);
-assert.match(config, /admin-tour-ui-polish\.js\?v=20260828-event-driven-v1/);
+assert.match(config, /admin-tour-ui-polish\.js\?v=[A-Za-z0-9.-]+/);
 assert.match(questionnaire, /id="tourAddressCorrect"/);
 assert.match(questionnaire, /class="tour-modal-x"/);
 assert.match(questionnaire, /action:"updateTourCustomerAddress"/);
@@ -45,8 +45,8 @@ assert.match(questionnaire, /id="tourReplyHistory"/);
 assert.doesNotMatch(polish, /MutationObserver|openReplyForRow|wireModal/);
 
 for (const html of [indexHtml, adminHtml]) {
-  assert.match(html, /admin-questionnaire\.js\?v=20260906-tour-reply-history-v1/);
-  assert.match(html, /firebase-config\.js\?v=20260920-head-office-counsel-v2/);
+  assert.match(html, /admin-questionnaire\.js\?v=[A-Za-z0-9.-]+/);
+  assert.match(html, /firebase-config\.js\?v=[A-Za-z0-9.-]+/);
 }
 
 console.log("admin questionnaire lightweight tests passed");

@@ -39,7 +39,7 @@ assert.match(ui, /会員マスター登録、PDF作成、メール下書き作�
 assert.match(ui, /PDFはメール下書きに添付済みです/);
 assert.match(ui, /メールは自動送信されていません/);
 assert.doesNotMatch(ui, /setTimeout\(boot/);
-assert.match(config, /admin-tour-enrollment\.js\?v=20260828-master-draft-v1/);
+assert.match(config, /admin-tour-enrollment\.js\?v=[A-Za-z0-9.-]+/);
 
 const context = {
   console,

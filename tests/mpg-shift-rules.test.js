@@ -123,8 +123,23 @@ test("MPG trigger authorization is non-blocking and availability enforces the 48
   assert.match(rules, /function setupMpgShiftCleanupTrigger/);
   assert.match(rules, /cleanup_trigger_ready = false/);
   assert.match(rules, /cleanupUnbookedMpgShifts\(\)/);
-  assert.match(availability, /normalizedStoreCode === "MPG"/);
-  assert.match(availability, /cleanupUnbookedMpgShifts\(\)/);
+  assert.match(availability, /filterMpgSlotsAgainstHeadOfficeReservations_\(\s*targetDate,\s*slots/);
+  assert.doesNotMatch(availability, /cleanupUnbookedMpgShifts\(\)/, "availability must not synchronously rewrite shifts");
+  const now = Date.parse("2026-10-17T10:00:00+09:00");
+  const context = mpgContext_();
+  context.Date = class extends Date {
+    constructor(...args) { super(...(args.length ? args : [now])); }
+  };
+  context.APP_CONFIG = { SHEETS: { RESERVATIONS: "reservations" } };
+  context.getSheetData = () => [];
+  context.mpgDateTime_ = (date, time) => new context.Date(`${date}T${time}:00+09:00`);
+  context.mpgFindKawakamiReservationTravelConflict_ = () => false;
+  const result = context.filterMpgSlotsAgainstHeadOfficeReservations_("2026-10-19", [
+    { start_time: "09:59", end_time: "10:44" },
+    { start_time: "10:00", end_time: "10:45" },
+    { start_time: "10:01", end_time: "10:46" }
+  ]);
+  assert.deepEqual(Array.from(result, slot => slot.start_time), ["10:01"]);
 });
 
 

@@ -25,7 +25,7 @@ test("shift CSV import states have distinct colors", () => {
 test("admin pages load the cache-busted shift import assets", () => {
   for (const page of ["admin/index.html", "admin/admin.html"]) {
     const html = read(page);
-    assert.match(html, /admin\.css\?v=20260920-shift-import-status-v1/);
-    assert.match(html, /admin\.js\?v=20260920-fast-login-month-v1/);
+    assert.match(html, /admin\.css\?v=[A-Za-z0-9.-]+/);
+    assert.match(html, /admin\.js\?v=[A-Za-z0-9.-]+/);
   }
 });

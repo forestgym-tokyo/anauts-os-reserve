@@ -14,9 +14,9 @@ const yoshimaru = fs.readFileSync(
   "utf8"
 );
 
-assert.match(main, /case "getAvailableSlots":\s*return getAvailableSlotsStoreAware_\(/);
-assert.match(main, /case "createReservation":\s*return createReservationStoreAware_\(/);
-assert.match(main, /case "getAvailableSlotsRange":\s*return getAvailableSlotsRangeStoreAware_\(/);
+assert.match(main, /case "getAvailableSlots":[\s\S]*?return getAvailableSlotsStoreAware_\([\s\S]*?case "getAvailableSlotsRange"/);
+assert.match(main, /case "createReservation":\s*\{[\s\S]*?return createReservationStoreAware_\([\s\S]*?case "submitDietCounselingResponse"/);
+assert.match(main, /case "getAvailableSlotsRange":[\s\S]*?return getAvailableSlotsRangeStoreAware_\([\s\S]*?case "getServiceHours"/);
 assert.match(yoshimaru, /getAvailableSlots\(dayParams\)/);
 
 const tables = {
@@ -74,7 +74,11 @@ const scriptProperties = new Map();
 const created = [];
 const context = {
   console,
-  Date,
+  // Keep the fixture date in the booking window regardless of the day tests run.
+  Date: new Proxy(Date, {
+    construct(target, args) { return new target(...(args.length ? args : ["2026-09-01T00:00:00Z"])); },
+    get(target, key) { return key === "now" ? () => Date.parse("2026-09-01T00:00:00Z") : Reflect.get(target, key); }
+  }),
   JSON,
   Math,
   Number,

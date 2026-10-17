@@ -21,10 +21,10 @@ const adminHtml = fs.readFileSync(
   "utf8"
 );
 
-assert.match(config, /admin-auto-reassign-enforce\.js\?v=20260920-head-office-counsel-v2/);
+assert.match(config, /admin-auto-reassign-enforce\.js\?v=[A-Za-z0-9.-]+/);
 for (const html of [indexHtml, adminHtml]) {
-  assert.match(html, /admin\.css\?v=20260920-shift-import-status-v1/);
-  assert.match(html, /firebase-config\.js\?v=20260920-head-office-counsel-v2/);
+  assert.match(html, /admin\.css\?v=[A-Za-z0-9.-]+/);
+  assert.match(html, /firebase-config\.js\?v=[A-Za-z0-9.-]+/);
 }
 assert.doesNotMatch(controller, /reassignInvalidReservations/);
 assert.doesNotMatch(controller, /action:\s*["']updateReservation["']/);

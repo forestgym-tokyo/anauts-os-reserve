@@ -21,11 +21,16 @@ test('MPG suspension policy matches agreed rules', () => {
   assert.match(backend, /SUSPENSION_FEE_MONTHLY:\s*550/);
 });
 
-test('member verification uses six digits and email', () => {
+test('staff verification uses six digits and email; the member page uses its issued token', () => {
   assert.match(backend, /\^\\d\{6\}\$/);
   assert.match(backend, /メールアドレス/);
-  assert.match(page, /maxlength="6"/);
-  assert.match(page, /登録メールアドレス/);
+  assert.match(page, /専用URL/);
+  assert.match(page, /\^\[a-f0-9\]\{64\}\$/);
+  assert.match(page, /action:"verifyMpgSuspensionToken",token/);
+  assert.match(page, /action:"submitMpgSuspensionToken"/);
+  const tokenBackend = fs.readFileSync(path.join(root, 'gas', '81_MpgSuspensionToken.gs'), 'utf8');
+  assert.match(tokenBackend, /function verifyMpgSuspensionToken_/);
+  assert.match(tokenBackend, /function submitMpgSuspensionToken_/);
 });
 
 test('admin notifications include both recipients', () => {

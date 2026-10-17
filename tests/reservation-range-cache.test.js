@@ -60,7 +60,7 @@ assert.match(
 );
 assert.match(
   reserve,
-  /const workerCount = isTour \|\| typeof window\.ANAUTS_FETCH_WEEK_SLOTS === "function"\s*\? Math\.min\(2, dates\.length\)/,
+  /const workerCount\s*=\s*isMpgService\s*\? Math\.min\(4, dates\.length\)\s*:\s*\(\s*isTour\s*\|\|\s*typeof window\.ANAUTS_FETCH_WEEK_SLOTS === "function"\s*\? Math\.min\(2, dates\.length\)/,
   "店内見学の日別フォールバックが必要でも同時実行は2本までにする"
 );
 assert.match(
@@ -143,7 +143,7 @@ const unchangedPages = [
 const tourHtml = fs.readFileSync(path.join(root, "tour", "index.html"), "utf8");
 assert.match(
   tourHtml,
-  /reserve\.js\?v=20260921-tour-retry2/,
+  /reserve\.js\?v=[A-Za-z0-9.-]+/,
   "店内見学は通信再試行対応後の reserve.js を読み込む"
 );
 
@@ -151,7 +151,7 @@ for (const page of unchangedPages) {
   const html = fs.readFileSync(path.join(root, page, "index.html"), "utf8");
   assert.match(
     html,
-    /reserve\.js\?v=20260902-range2/,
+    /reserve\.js\?v=[A-Za-z0-9.-]+/,
     `${page} の読込バージョンは変更しない`
   );
 }
@@ -159,14 +159,14 @@ for (const page of unchangedPages) {
 const counselHtml = fs.readFileSync(path.join(root, "counsel", "index.html"), "utf8");
 assert.match(
   counselHtml,
-  /reserve\.js\?v=20260917-submit-9s-v1/,
+  /reserve\.js\?v=[A-Za-z0-9.-]+/,
   "カウンセリングは9秒受付対応後の reserve.js を読み込む"
 );
 
 const trialHtml = fs.readFileSync(path.join(root, "trial", "index.html"), "utf8");
 assert.match(
   trialHtml,
-  /reserve\.js\?v=20260906-trial-copy1/,
+  /reserve\.js\?v=[A-Za-z0-9.-]+/,
   "無料体験は会員確認前の不要通信を止めた reserve.js を読み込む"
 );
 

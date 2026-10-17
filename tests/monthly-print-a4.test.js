@@ -11,16 +11,17 @@ function extract(name) {
   return match[0];
 }
 
-test("October SOGA print opens a white, single-page A4 landscape document with all 66 shifts", async () => {
+test("October SOGA print opens its current white A4 portrait timecard with all 66 shifts", async () => {
   let html = "";
   let printCalls = 0;
+  const printButton = { onclick: null };
   const printDoc = {
     fonts: { ready: Promise.resolve() },
     open() {},
     write(value) { html = value; },
     close() {},
     querySelector(selector) {
-      if (selector === "#printNow") return { onclick: null };
+      if (selector === "#printNow") return printButton;
       if (selector === "#monthlyPrintSheet") return { querySelectorAll: () => [] };
       throw new Error(`Unexpected selector: ${selector}`);
     }
@@ -42,7 +43,7 @@ test("October SOGA print opens a white, single-page A4 landscape document with a
   rows.push({store_code:"YACHIYO",date:"2026-10-01",start_time:"10:15",end_time:"14:00",staff_code:"OTHER"});
   const scope = vm.createContext({
     monthlyLoadedMonth_:"2026-10",
-    state:{authUser:{permission:"MANAGER"},monthlyMonth:"2026-10",monthlyRows:rows,staff:[{staff_code:"SPECIAL",display_name:"小澤 <まなみ>"},{staff_code:"KAWAKAMI",display_name:"川上"},{staff_code:"OTHER",display_name:"他店"}]},
+    state:{authUser:{permission:"MANAGER"},monthlyMonth:"2026-10",monthlyRows:rows,staff:[{staff_code:"SPECIAL",display_name:"小澤<まなみ>"},{staff_code:"KAWAKAMI",display_name:"川上"},{staff_code:"OTHER",display_name:"他店"}]},
     canPrintMonthly_:()=>true,
     sogaStaffRestricted_:()=>false,
     document:{querySelector:selector=>selector==="#mStore"?{value:"SOGA"}:null},
@@ -51,19 +52,21 @@ test("October SOGA print opens a white, single-page A4 landscape document with a
     esc:value=>String(value).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])),
     alert:message=>{throw new Error(message)}
   });
-  vm.runInContext(["monthlyPrintCss_","fitMonthlyPrintCells_","printMonth_"].map(extract).join("\n")+"\nprintMonth_()",scope);
+  const sogaHelpers = source.slice(source.indexOf("    const SOGA_PRINT_START_"), source.indexOf("    function printMonth_("));
+  vm.runInContext(sogaHelpers + "\n" + ["monthlyPrintCss_","fitMonthlyPrintCells_","printMonth_"].map(extract).join("\n")+"\nprintMonth_()",scope);
   await new Promise(setImmediate);
 
+  assert.equal(printCalls,0,"印刷内容を確認してから印刷ボタンを押せる");
+  printButton.onclick();
   assert.equal(printCalls,1);
-  assert.match(html, /@page\{size:A4 landscape;margin:8mm\}/);
-  assert.match(html, /color-scheme:light;background:#fff/);
-  assert.match(html, /#monthlyPrintSheet\{width:270mm;height:180mm/);
-  assert.match(html, /\.print-grid\{height:164mm/);
-  assert.match(html, /\.print-actions\{display:none!important\}/);
-  assert.equal((html.match(/class="print-shift"/g)||[]).length,66);
-  assert.match(html,/小澤 &lt;まなみ&gt;/);
+  assert.match(html, /@page\{size:A4 portrait;margin:0\}/);
+  assert.match(html, /background:#fff;color:#111/);
+  assert.match(html, /\.soga-p-sheet\{width:210mm;height:297mm/);
+  assert.match(html, /\.soga-p-calendar\{height:273mm/);
+  assert.match(html, /\.soga-p-actions\{display:none!important\}/);
+  assert.equal((html.match(/class="soga-p-shift"/g)||[]).length,66);
+  assert.match(html,/小澤&lt;まなみ&gt;/);
   assert.doesNotMatch(html,/他店|#090d0a/);
-  assert.equal(270+8*2<297,true,"horizontal print margins fit A4");
-  assert.equal(180+8*2<210,true,"vertical print margins fit A4");
-  assert.equal(10+6+164,180,"calendar elements fit the print sheet");
+  assert.equal(5+200+5,210,"horizontal print margins fit A4");
+  assert.equal(6+13+273+5,297,"calendar and margins fit the A4 sheet");
 });

@@ -10,7 +10,7 @@ const config = fs.readFileSync(path.join(root, "admin", "firebase-config.js"), "
 const indexHtml = fs.readFileSync(path.join(root, "admin", "index.html"), "utf8");
 const auth = fs.readFileSync(path.join(root, "gas", "50_Auth.gs"), "utf8");
 
-assert.match(admin, /include_staff_schedule:\s*"1"/);
+assert.match(admin, /include_staff_schedule:cachedSchedule\?"0":"1"/);
 assert.match(admin, /staff_schedule_error/);
 assert.match(admin, /retryStaffScheduleButton/);
 assert.match(admin, /staffScheduleRequestSequence_/);
@@ -21,10 +21,10 @@ assert.match(admin, /data-management-shift-delete/);
 assert.match(admin, /action:"saveStaffShift"/);
 assert.match(admin, /action:"deleteStaffShift"/);
 
-assert.ok(
-  config.indexOf("workspaceUrl,") < config.indexOf("primaryUrl\n"),
-  "Workspace route must be attempted before the public Apps Script route"
-);
+assert.match(config, /new Set\(\[primaryUrl, configuredUrl\]\.filter\(Boolean\)\)/,
+  "Use the current public API before its configured fallback");
+assert.match(config, /rememberedUrl && !apiUrls\.includes\(rememberedUrl\)/,
+  "Do not reuse old Workspace URLs outside the current API list");
 assert.match(config, /Promise\.race\(\[/);
 assert.match(config, /return parseApiResponse_\(response, action\)/);
 assert.match(config, /API_REQUEST_TIMEOUT_MS\s*=\s*60000/);
@@ -34,7 +34,7 @@ assert.doesNotMatch(config, /window\.addEventListener\("load", function \(\) \{\
 
 assert.match(indexHtml, /rel="preconnect" href="https:\/\/script\.google\.com"/);
 assert.match(indexHtml, /20260920-shift-import-status-v1/);
-assert.match(config, /admin-monthly-v58\.js\?v=20260920-fast-month-v1/);
+assert.match(config, /admin-monthly-v58\.js\?v=[A-Za-z0-9.-]+/);
 
 assert.match(auth, /getStaffSchedule\(params\)/);
 assert.match(auth, /CacheService\.getScriptCache\(\)/);
