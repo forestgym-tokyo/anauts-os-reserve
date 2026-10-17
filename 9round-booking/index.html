@@ -36,14 +36,32 @@
 
     <section id="installPanel" class="install-panel" aria-labelledby="installTitle" hidden>
       <div><h2 id="installTitle">ホーム画面から、すぐ予約。</h2><p>9ROUND予約をスマートフォンに追加できます。</p></div>
-      <button id="installApp" class="primary" type="button">アプリをインストール</button>
+      <button id="installApp" class="primary" type="button">ホーム画面への追加方法</button>
       <a id="openInstallPage" class="primary install-link" href="https://forestgym-tokyo.github.io/anauts-os-reserve/9round-booking/" target="_top" rel="noopener" hidden>インストール用ページを開く</a>
-      <details id="installHelp"><summary>ホーム画面への追加方法</summary>
-        <p><b>Android：</b>Chromeで開き、「アプリをインストール」をタップします。表示されない場合は、右上の「⋮」→「ホーム画面に追加」→「インストール」を選びます。</p>
-        <p><b>iPhone：</b>Safariで開き、共有ボタン→「ホーム画面に追加」→「追加」を選びます。「ウェブアプリとして開く」が出たらオンにします。</p>
-        <p>メールやLINEのアプリ内で開いている場合は、SafariまたはChromeで開き直してください。</p>
-      </details>
       <p id="installStatus" class="hint" role="status" aria-live="polite"></p>
+      <details id="installHelp"><summary>追加手順を確認する</summary>
+        <p id="installBrowserGuide">LINEやメールの画面から追加できない場合は、予約URLをChromeまたはSafariで開いてください。</p>
+        <section data-install-platform="android">
+          <h3>Androidで追加する</h3>
+          <ol><li>この予約画面をChromeで開きます。</li><li>右上の「⋮」→「ホーム画面に追加」を選びます。</li><li>「インストール」をタップし、画面の案内に沿って追加します。</li></ol>
+          <a id="openInstallChrome" class="primary install-link" href="https://forestgym-tokyo.github.io/anauts-os-reserve/9round-booking/" rel="noopener">Chromeで予約画面を開く</a>
+          <p>Chromeが開かない場合は、下の予約URLをコピーしてChromeのアドレス欄に貼り付けてください。</p>
+        </section>
+        <section data-install-platform="ios">
+          <h3>iPhoneで追加する</h3>
+          <ol><li>この予約画面をSafariで開きます。</li><li>共有ボタン（または「…」→「共有」）→「ホーム画面に追加」を選びます。</li><li>「ウェブアプリとして開く」があればオンにして、「追加」をタップします。</li></ol>
+          <p>Safari以外で開いている場合は、下の予約URLをコピーしてSafariのアドレス欄に貼り付けてください。</p>
+        </section>
+        <section data-install-platform="desktop" hidden>
+          <h3>パソコンで追加する</h3>
+          <p>ChromeまたはEdgeのアドレス欄にあるインストールアイコン、またはブラウザーのメニューからアプリをインストールできます。</p>
+        </section>
+        <button id="copyInstallUrl" class="text-button" type="button">予約URLをコピー</button>
+        <label class="install-url-label" for="installUrl" hidden>コピー用の予約URL</label>
+        <input id="installUrl" class="install-url" type="url" readonly hidden>
+        <p id="installCopyStatus" class="hint" role="status" aria-live="polite"></p>
+        <p>追加済みの場合は、ホーム画面の「9ROUND予約」アイコンから開いてください。</p>
+      </details>
       <p class="install-fallback"><a href="https://script.google.com/macros/s/AKfycbzVxf1HKZgXet5XrZjqQbzQ47dH8vMISf1mdEE_AH4m3EABceonv1V2OG0jtuIJLvkq/exec?page=member" target="_top" rel="noopener">うまく開けない場合は従来の予約画面へ</a></p>
     </section>
 

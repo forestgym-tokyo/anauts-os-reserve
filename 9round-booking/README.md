@@ -182,6 +182,8 @@ Playwrightを利用できる環境では、`node tests/9round-booking.browser.cj
 
 PWA専用の`node tests/9round-pwa.browser.cjs`では、Chromeのインストール条件エラーなし、manifest、Service Worker、オフライン時の画面、APIをキャッシュしないこと、スマホ幅、既存Service Workerがある状態のGASへの切り戻しを検証しました。実機でのインストール・実メール受信は別途確認が必要です。
 
+2026/10/18：インストール確認画面を出せる場合だけ「アプリをインストール」と表示するよう修正しました。それ以外は端末別の追加手順を開き、AndroidはChromeで開くボタン、iPhoneはSafariの共有メニュー、両方に予約URLコピーを用意しています。[修正内容・検証範囲](docs/install-guide-20261018.md)を参照してください。
+
 ### 2026/10/17 追加仕様：ok_unfinishedの予約許可
 
 独立GASの`Booking.gs`で会員ステータス`ok`・`ok_unfinished`を予約可能にしました。`kyukai`・`taikai`・`kari`などは引き続き対象外です。本人確認コード送信、コード確認、予約、変更・キャンセル、QRの各処理で同じ会員適格性判定を再利用します。**GitHubコードの変更だけでは本番APIには反映されません。**独立GASへソースを反映し、新しいWebアプリバージョンで既存デプロイを更新した後、`ok_unfinished`会員の認証・予約を実機で確認してください。本番予約データや会員マスターの初期化は不要・禁止です。
