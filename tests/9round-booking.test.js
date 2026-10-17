@@ -818,3 +818,74 @@ test("attendance and ended slots free the ten-reservation allowance without remo
     assert.equal(reserve(e, token, slots[9].slot_id).ok, true);
   }
 });
+
+test("code-copy link requires the independent email token, stores only hashes, and is revoked after verification", () => {
+  const e = environment();
+  const response = e.call("request9RoundBookingCode", { email: "member0@example.invalid" });
+  const mail = e.sent.at(-1), link = new URL(mail.body.split("\n").at(-1));
+  const payload = Object.fromEntries(link.searchParams);
+  const code = mail.body.match(/は (\d{6})/)[1];
+  assert.match(mail.htmlBody, /コードをコピー/);
+  assert.equal(payload.page, "code-copy");
+  assert.equal(response.data.code, undefined);
+  assert.equal(response.data.copy_token, undefined);
+  assert.equal(e.data.sheets.get("nr_challenges").rows[1].includes(payload.copy_token), false);
+  assert.equal(e.data.sheets.get("nr_challenges").rows[1].includes(code), false);
+  const config = e.context.nrBookingConfig_();
+  assert.throws(() => e.context.nrGet9RoundBookingCodeForCopy_(config, { challenge_id: payload.challenge_id }), /コピー用リンク/);
+  assert.throws(() => e.context.nrGet9RoundBookingCodeForCopy_(config, { ...payload, copy_token: "a".repeat(64) }), /コピー用リンク/);
+  assert.equal(e.context.nrGet9RoundBookingCodeForCopy_(config, payload).code, code);
+  assert.equal(e.call("verify9RoundBookingCode", { challenge_id: response.data.challenge_id, code }).ok, true);
+  assert.throws(() => e.context.nrGet9RoundBookingCodeForCopy_(config, payload), /コピー用リンク/);
+});
+
+test("expired and exhausted email code-copy links disclose no code", () => {
+  const e = environment();
+  const config = e.context.nrBookingConfig_();
+  e.call("request9RoundBookingCode", { email: "member0@example.invalid" });
+  const payload = Object.fromEntries(new URL(e.sent.at(-1).body.split("\n").at(-1)).searchParams);
+  e.advance(600001);
+  assert.throws(() => e.context.nrGet9RoundBookingCodeForCopy_(config, payload), /コピー用リンク/);
+  const next = e.call("request9RoundBookingCode", { email: "member0@example.invalid" });
+  const newPayload = Object.fromEntries(new URL(e.sent.at(-1).body.split("\n").at(-1)).searchParams);
+  assert.throws(() => e.context.nrGet9RoundBookingCodeForCopy_(config, { ...newPayload, copy_token: payload.copy_token }), /コピー用リンク/);
+  for (let i = 0; i < 5; i++) e.call("verify9RoundBookingCode", { challenge_id: next.data.challenge_id, code: "invalid" });
+  assert.throws(() => e.context.nrGet9RoundBookingCodeForCopy_(config, newPayload), /コピー用リンク/);
+});
+
+test("production preparation isolates storage, keeps source data, and activation never resets reservations", () => {
+  const e = environment({ realStaffAuth: true });
+  const sourceRows = JSON.stringify(Array.from(e.data.sheets.values()).map(s => s.rows));
+  const production = new e.data.constructor("production-reservations");
+  production.getUrl = () => "https://docs.google.com/spreadsheets/d/production-reservations/edit";
+  let created = 0, deploymentUrl = "https://script.google.com/macros/s/verified-public-id/dev";
+  const originalOpen = e.context.SpreadsheetApp.openById;
+  e.context.SpreadsheetApp.openById = id => id === production.id ? production : originalOpen(id);
+  e.context.SpreadsheetApp.create = () => { created++; return production; };
+  e.context.PropertiesService.getScriptProperties = () => ({
+    getProperties: () => e.properties, getProperty: key => e.properties[key] || null,
+    setProperty: (key, value) => { e.properties[key] = value; },
+    setProperties: values => Object.assign(e.properties, values)
+  });
+  e.context.ScriptApp = { getService: () => ({ getUrl: () => deploymentUrl }) };
+  vm.runInContext(read("9round-booking/gas/Production.gs"), e.context);
+  e.context.nrBookingProductionTargets_ = () => ({ masterId: e.master.id, masterSheet: "Members", directoryId: e.directory.id });
+  const prepared = e.context.nrPrepare9RoundBookingProduction_();
+  assert.equal(prepared.prepared, true);
+  assert.equal(e.properties.ROUND9_BOOKING_ENABLED, "false");
+  assert.equal(e.properties.ROUND9_BOOKING_DEVELOPMENT_DATA_ID, e.data.id);
+  assert.equal(production.sheets.get("nr_bookings").getLastRow(), 1);
+  assert.throws(() => e.context.nrActivate9RoundBookingProduction_(), /バージョン付きデプロイ/);
+  deploymentUrl = "https://script.google.com/macros/s/verified-public-id/exec";
+  assert.equal(e.context.nrActivate9RoundBookingProduction_().enabled, true);
+  assert.equal(e.properties.ROUND9_BOOKING_MEMBER_URL, deploymentUrl + "?page=member");
+  const token = e.login(0);
+  assert.equal(e.call("create9RoundWorkoutBooking", { session_token: token, date: day, slot_id: slotId }).ok, true);
+  e.context.nrActivate9RoundBookingProduction_();
+  assert.equal(production.sheets.get("nr_bookings").getLastRow(), 2);
+  assert.equal(created, 1);
+  assert.throws(() => e.context.nrPrepare9RoundBookingProduction_(), /再初期化はしません/);
+  assert.equal(JSON.stringify(Array.from(e.data.sheets.values()).map(s => s.rows)), sourceRows);
+  const functionNames = [...read("9round-booking/gas/Production.gs").matchAll(/function\s+(\w+)\s*\(/g)].map(m => m[1]);
+  assert.ok(functionNames.every(name => name.endsWith("_")), "provisioning helpers must be inaccessible to HTML RPC");
+});

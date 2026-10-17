@@ -1,6 +1,16 @@
 /** Entry point for a NEW standalone Apps Script project, never the A-nauts project. */
 function doGet(e) {
   const page = String(e && e.parameter && e.parameter.page || "");
+  if (page === "code-copy") {
+    const template = HtmlService.createTemplateFromFile("CodeCopy");
+    template.code = ""; template.bookingUrl = ""; template.errorMessage = "";
+    try {
+      const value = nrGet9RoundBookingCodeForCopy_(nrBookingConfig_(), e.parameter);
+      template.code = value.code; template.bookingUrl = value.bookingUrl;
+    } catch (error) { template.errorMessage = error.message || "確認コードを再送してください。"; }
+    return template.evaluate().setTitle("確認コードをコピー | 9ROUND アリオ蘇我店")
+      .addMetaTag("viewport", "width=device-width,initial-scale=1");
+  }
   if (page === "member" || page === "staff") {
     const template = HtmlService.createTemplateFromFile(page === "staff" ? "Staff" : "Member");
     template.configJson = JSON.stringify({

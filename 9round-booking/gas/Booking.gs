@@ -13,7 +13,7 @@ const NR_BOOKING = Object.freeze({
   bookingLimit: 10,
   attempts: 5,
   tables: {
-    challenges: ["challenge_id", "email_hash", "code_hash", "member_no", "created_at", "expires_at", "attempts", "status"],
+    challenges: ["challenge_id", "email_hash", "code_hash", "member_no", "created_at", "expires_at", "attempts", "status", "copy_token_hash"],
     sessions: ["token_hash", "member_no", "email_hash", "created_at", "expires_at", "status"],
     fighters: ["member_no", "email_hash", "fighter_name", "created_at", "updated_at"],
     bookings: ["booking_id", "kind", "slot_id", "date", "start_time", "end_time", "member_no", "member_name", "created_at", "status", "cancelled_at"],
@@ -186,21 +186,26 @@ function nrRequest9RoundCode_(config, body) {
     }
     const member = nrBookingFindMember_(config, function (m) { return m.email === email; });
     const challenge = nrBookingOpaque_();
-    const code = String(parseInt(nrBookingHash_(config, nrBookingOpaque_()).slice(0, 10), 16) % 1000000).padStart(6, "0");
+    const code = nrBookingChallengeCode_(config, challenge);
+    const copyToken = nrBookingOpaque_();
     const allowed = config.environment === "production" || config.testEmails.indexOf(email) >= 0;
     const row = {
       challenge_id: challenge, email_hash: emailHash, code_hash: nrBookingHash_(config, challenge + ":" + code),
       member_no: member && allowed ? member.no : "", created_at: now.toISOString(),
       expires_at: new Date(now.getTime() + NR_BOOKING.otpMinutes * 60000).toISOString(),
-      attempts: "0", status: "PENDING"
+      attempts: "0", status: "PENDING", copy_token_hash: nrBookingHash_(config, "copy:" + copyToken)
     };
     const rowNumber = nrBookingSheet_(config, "challenges").getLastRow() + 1;
     nrBookingWrite_(config, "challenges", row, rowNumber);
     if (member && allowed) {
       try {
+        const copyUrl = nrBookingCodeCopyUrl_(challenge, copyToken);
         MailApp.sendEmail({
           to: email, subject: "【9ROUND アリオ蘇我店】予約の本人確認コード",
-          body: "予約の本人確認コードは " + code + " です。\n\n有効期限は10分です。\nこのコードを他の方に伝えないでください。\nお心当たりがない場合は、このメールを破棄してください。",
+          body: "予約の本人確認コードは " + code + " です。\n\n有効期限は10分です。\nこのコードを他の方に伝えないでください。\nお心当たりがない場合は、このメールを破棄してください。" + (copyUrl ? "\n\nコードをコピー（専用画面）:\n" + copyUrl : ""),
+          htmlBody: '<div style="font-family:sans-serif;max-width:560px;color:#171719"><h2>9ROUND アリオ蘇我店</h2><p>予約の本人確認コードです。</p><p style="font-size:36px;font-weight:bold;letter-spacing:8px;background:#f4f4f5;padding:20px;text-align:center">' + code + '</p>' +
+            (copyUrl ? '<p><a href="' + nrBookingHtml_(copyUrl) + '" style="display:inline-block;background:#e52535;color:white;padding:14px 24px;text-decoration:none;border-radius:8px;font-weight:bold">コードをコピー</a></p><p style="font-size:12px">専用画面を開き、「コピーする」を押してください。</p>' : '') +
+            '<p>有効期限は10分です。コピー後、元の予約画面に戻って入力してください。</p><p>このコードやボタンのリンクを他の方に伝えないでください。お心当たりがない場合は、このメールを破棄してください。</p></div>',
           name: "9ROUND アリオ蘇我店", replyTo: "9round.ariosoga@gmail.com"
         });
       } catch (_) {
@@ -213,6 +218,29 @@ function nrRequest9RoundCode_(config, body) {
     return { challenge_id: challenge, expires_in: 600,
       message: "登録メールアドレスが確認できた場合、確認コードをお送りします。届かない場合は登録内容をスタッフにご確認ください。" };
   });
+}
+
+function nrBookingChallengeCode_(config, challenge) {
+  return String(parseInt(nrBookingHash_(config, "otp:" + challenge).slice(0, 10), 16) % 1000000).padStart(6, "0");
+}
+
+function nrBookingCodeCopyUrl_(challenge, copyToken) {
+  const url = String(PropertiesService.getScriptProperties().getProperties().ROUND9_BOOKING_MEMBER_URL || "");
+  if (!/^https:\/\/[a-z0-9.-]+\/[^\s<>"#]*$/i.test(url)) return "";
+  const page = /[?&]page=/.test(url) ? url.replace(/([?&])page=[^&]*/, "$1page=code-copy") : url + (url.indexOf("?") < 0 ? "?" : "&") + "page=code-copy";
+  return page + "&challenge_id=" + encodeURIComponent(challenge) + "&copy_token=" + encodeURIComponent(copyToken);
+}
+
+function nrGet9RoundBookingCodeForCopy_(config, body) {
+  const id = String(body.challenge_id || ""), copyToken = String(body.copy_token || "");
+  const row = /^[a-f0-9]{64}$/.test(id) && /^[a-f0-9]{64}$/.test(copyToken) && nrBookingRows_(config, "challenges").find(function (r) { return r.challenge_id === id; });
+  if (!row || row.status !== "PENDING" || Date.now() >= Date.parse(row.expires_at) || Number(row.attempts) >= NR_BOOKING.attempts ||
+      row.copy_token_hash !== nrBookingHash_(config, "copy:" + copyToken)) {
+    nrBookingError_("INVALID_COPY_LINK", "このコピー用リンクは無効か、有効期限が切れています。予約画面から確認コードを再送してください。");
+  }
+  const code = nrBookingChallengeCode_(config, id);
+  if (row.code_hash !== nrBookingHash_(config, id + ":" + code)) nrBookingError_("INVALID_COPY_LINK", "確認コードを再送してください。");
+  return { code: code, bookingUrl: String(PropertiesService.getScriptProperties().getProperties().ROUND9_BOOKING_MEMBER_URL || "") };
 }
 
 function nrVerify9RoundCode_(config, body) {

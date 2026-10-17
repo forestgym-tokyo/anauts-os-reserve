@@ -23,6 +23,12 @@ assert.equal(e.call("set9RoundWorkoutBlock", { id_token: "admin", date: day, slo
 let origin = "";
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, "http://127.0.0.1");
+  if (url.pathname === "/__copy-test.html") {
+    const source = fs.readFileSync(path.join(root, "9round-booking/gas/CodeCopy.html"), "utf8");
+    const start = source.indexOf("<? if (code) { ?>"), end = source.indexOf("<? } else { ?>");
+    const html = (source.slice(0, start) + source.slice(start + "<? if (code) { ?>".length, end) + source.slice(source.indexOf("<? } ?>", end) + "<? } ?>".length)).replace("<?= code ?>", "123456");
+    res.writeHead(200, { "Content-Type": "text/html;charset=utf-8" }); res.end(html); return;
+  }
   if (url.pathname === "/__booking_api" && req.method === "POST") {
     let text = "";
     req.on("data", c => { text += c; });
@@ -83,6 +89,14 @@ async function main() {
     return { page, ctx };
   }
   try {
+    const codeCopy = await context();
+    await codeCopy.ctx.grantPermissions(["clipboard-read", "clipboard-write"], { origin });
+    await codeCopy.page.goto(origin + "/__copy-test.html");
+    await codeCopy.page.locator("#copyButton").click();
+    await codeCopy.page.locator("#status").getByText(/^コピーしました/).waitFor();
+    assert.equal(await codeCopy.page.evaluate(() => navigator.clipboard.readText()), "123456");
+    await checkOverflow(codeCopy.page, "code copy mobile");
+    await codeCopy.ctx.close();
     const off = await context(390, false);
     await off.page.goto(origin + "/9round-booking/");
     await off.page.getByText("現在、予約受付の準備中です。", { exact: true }).waitFor();
