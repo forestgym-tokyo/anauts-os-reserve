@@ -1,0 +1,18 @@
+{
+  "id": "./",
+  "name": "9ROUND アリオ蘇我店 ワークアウト予約",
+  "short_name": "9ROUND予約",
+  "description": "9ROUND アリオ蘇我店の会員向けワークアウト予約アプリ",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0b0b0d",
+  "theme_color": "#111111",
+  "prefer_related_applications": false,
+  "icons": [
+    { "src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

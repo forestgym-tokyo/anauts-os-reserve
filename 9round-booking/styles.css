@@ -1,0 +1,71 @@
+:root{color-scheme:dark;--bg:#0b0b0d;--panel:#171719;--line:#333336;--text:#fafafa;--muted:#b2b2b9;--red:#e52535;--red-light:#ff6672}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP","Yu Gothic",sans-serif;line-height:1.6}
+button,input{font:inherit}
+button{cursor:pointer}
+button:disabled{cursor:default}
+button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:4px}
+.site-header{max-width:1080px;margin:0 auto;padding:24px 32px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #262628}
+.brand{font-size:29px;font-weight:950;letter-spacing:-1.5px;line-height:1}.brand>span{color:var(--red);font-size:39px;margin-right:1px}.brand small{display:block;font-size:9px;letter-spacing:3.7px;text-align:right;margin-top:5px;color:#d8d8de}
+.header-label{font-size:10px;letter-spacing:2px;color:var(--muted)}
+main{max-width:724px;margin:auto;padding:40px 24px}
+.eyebrow{font-size:10px;font-weight:800;letter-spacing:2px;color:var(--red-light);margin:0 0 12px;display:flex;align-items:center;gap:8px}.eyebrow>span{display:block;width:22px;height:2px;background:var(--red)}
+h1{font-size:clamp(32px,5.5vw,47px);font-weight:900;line-height:1.4;letter-spacing:-1px;margin:0 0 16px}
+.intro-copy{color:#c6c6cc;font-size:14px;margin:0}
+.facts{margin-top:22px;display:flex;gap:18px;align-items:center;font-size:11px;color:#c6c6cc;flex-wrap:wrap}.facts b{font-size:21px;color:#fff;font-variant-numeric:tabular-nums}.facts>span+span{border-left:1px solid var(--line);padding-left:18px}
+.steps{padding:0;list-style:none;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:30px 0 22px;font-size:11px;color:#9d9da6}.steps li{padding:10px 0;border-top:2px solid #353539}.steps li[aria-current=step]{border-top-color:var(--red);color:#fff}.steps b{margin-right:5px;font-size:10px}
+.panel{padding:28px;background:var(--panel);border:1px solid #303033;border-radius:16px}
+.section-heading h2{font-size:21px;line-height:1.5;margin:0 0 8px;letter-spacing:-.3px}.section-heading .eyebrow{margin-bottom:8px}
+.hint{color:var(--muted);font-size:12px;line-height:1.8;margin:8px 0 20px}
+label{font-size:12px;font-weight:700;display:block;margin-bottom:8px}
+input{background:#0e0e10;color:white;border:1px solid #48484c;border-radius:9px;padding:14px;width:100%;min-width:0;min-height:50px;font-size:16px}
+input::placeholder{color:#8c8c96}
+.primary{background:var(--red);border:0;border-radius:9px;padding:15px 18px;color:#fff;font-size:14px;font-weight:800;min-height:52px;width:100%;display:flex;align-items:center;justify-content:space-between;margin-top:16px}
+.primary:hover:not(:disabled){background:#f02c3d}.primary:disabled{opacity:.6}
+.privacy-note{font-size:11px;color:#a6a6b0;margin:23px 0 0;padding-top:18px;border-top:1px solid #343438;line-height:1.8}
+.code-input{letter-spacing:10px;font-size:24px;text-align:center;font-variant-numeric:tabular-nums}
+.text-button{background:transparent;border:0;color:#dedee5;font-size:12px;min-height:44px;padding:8px 4px;text-decoration:underline;text-underline-offset:4px}
+#changeEmail{width:100%;margin-top:8px}
+.message{margin:0 0 18px;padding:14px 16px;border:1px solid #77777e;border-left:3px solid var(--red);border-radius:8px;background:#232326;font-size:13px;overflow-wrap:anywhere}.message.is-error{color:#ffb6be;border-color:#8e3540}
+.verified-bar{display:flex;align-items:center;justify-content:space-between;margin:-8px 0 20px;font-size:12px;color:#cfcfd7}.verified-bar i{font-style:normal;background:#eee;color:#111;display:inline-grid;place-items:center;width:17px;height:17px;border-radius:50%;margin-right:5px}
+.date-controls{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;gap:8px;margin:8px 0 22px}
+.date-arrow{border:1px solid #48484c;border-radius:9px;background:#242426;color:#fff;font-size:25px}
+.date-controls input{font-size:16px;font-weight:700;text-align:center}
+.schedule-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}.schedule-heading h3{margin:0;font-size:15px}.tap-guide{margin:0 0 18px;font-size:11px}
+.period-heading{display:flex;align-items:center;gap:9px;color:#c5c5cd;font-size:11px;letter-spacing:1.5px;margin:22px 0 10px}.period-heading:after{content:"";height:1px;flex:1;background:#353539}
+.slot-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.slot-card{border:1px solid #4a4a50;border-radius:11px;overflow:hidden;background:#202023}
+.slot-button{width:100%;background:none;border:0;color:#fff;padding:15px 13px;text-align:left;display:flex;flex-direction:column;gap:9px;min-height:132px}
+.slot-button:not(:disabled):hover{background:#2c2023}
+.slot-time{font-size:16px;font-weight:800;letter-spacing:-.3px;font-variant-numeric:tabular-nums}
+.slot-count{font-size:11px;color:#c3c3cc;display:flex;align-items:center;justify-content:space-between}
+.slot-count b{font-size:15px;font-weight:800;color:#f7f7fa}
+.slot-action{display:flex;align-items:center;justify-content:space-between;gap:4px;font-size:11px;color:var(--red-light);font-weight:800}
+.slot-meter{height:3px;width:100%;background:#4b4b51}.slot-meter i{display:block;height:100%;background:var(--red)}
+.slot-card.is-mine{border:2px solid var(--red);background:#29171b}.slot-card.is-mine .slot-button{padding:14px 12px;min-height:130px}.slot-card.is-mine .slot-action{color:#fff}
+.slot-card.is-full{border-style:dashed;background:#161618}.slot-card.is-full .slot-action{color:#aaaab3}.slot-card.is-past{opacity:.6}
+.cancel-booking{display:block;background:#1d1014;color:#ffc1c7;width:100%;border:0;border-top:1px solid #663038;min-height:44px;font-size:11px;text-decoration:underline}
+.slot-card.is-blocked{background:repeating-linear-gradient(135deg,#171719,#171719 10px,#1d1d20 10px,#1d1d20 20px);border-style:dashed}.slot-card.is-blocked .slot-action{color:#c6c6cc}
+.loading{padding:32px 12px;color:var(--muted);font-size:13px;text-align:center}
+.slot-card.is-submitting{border-color:var(--red-light);background:#352026}.slot-card.is-submitting .slot-action{color:#fff}
+body.has-booking-feedback{overflow:hidden}
+.booking-feedback{width:min(400px,calc(100% - 32px));max-height:calc(100dvh - 32px);padding:30px 24px;border:1px solid #626268;border-top:4px solid var(--red);border-radius:18px;background:#1c1c20;color:var(--text);text-align:center;box-shadow:0 24px 80px #0009;overflow-y:auto;overflow-wrap:anywhere}
+.booking-feedback::backdrop{background:#000b}
+.booking-feedback h2{font-size:22px;line-height:1.5;margin:18px 0 12px;letter-spacing:-.5px;outline:none}
+.booking-feedback-icon{display:grid;place-items:center;width:64px;height:64px;margin:0 auto;border-radius:50%;background:#273c33;color:#93edbc;font-size:36px;font-weight:800}
+.booking-feedback[data-state=pending] .booking-feedback-icon{background:transparent;border:4px solid #4d3036;border-top-color:var(--red-light)}
+.booking-feedback[data-state=error] .booking-feedback-icon{background:#40262c;color:#ffb6be}
+.booking-feedback-when{font-size:19px;font-weight:800;line-height:1.6;margin:0 0 8px;white-space:pre-line;font-variant-numeric:tabular-nums}
+.booking-feedback-workout{font-size:11px;color:#c4c4ce;margin:0}
+.booking-feedback-note{font-size:13px;color:#d8d8df;line-height:1.9;margin:18px 0 0;white-space:pre-line}
+.booking-feedback .primary{justify-content:center;margin-top:24px}
+.member-details{border:1px solid #48484c;border-radius:10px;padding:14px;margin:0 0 16px}.member-details summary{cursor:pointer;font-size:13px;font-weight:800;min-height:32px}.member-qr{text-align:center;margin-top:16px}.member-qr canvas{width:240px;max-width:100%;height:auto;background:#fff;image-rendering:pixelated}.member-actions{display:flex;gap:14px;flex-wrap:wrap;align-items:center}.member-actions a{color:#fff}.my-booking{border-top:1px solid #48484c;padding-top:12px;margin-top:12px;font-size:12px}.booking-state{display:block;color:var(--red-light);font-size:11px;margin-top:5px}#changeBookingBanner p{margin:0}
+.install-panel{border:1px solid #77404a;background:#201519;border-radius:12px;padding:18px;margin:22px 0}
+.install-panel h2{font-size:16px;line-height:1.5;margin:0 0 6px}.install-panel p{font-size:12px;line-height:1.8;color:#d3c9cc;margin:0 0 12px}.install-panel .primary{margin:12px 0;justify-content:center}.install-link{text-decoration:none;text-align:center}.install-panel summary{font-size:12px;cursor:pointer;padding:8px 0}.install-panel details p{margin:8px 0 12px}.install-panel #installStatus{margin:6px 0 0;min-height:0}
+.install-panel .install-fallback{margin:10px 0 0;font-size:11px}.install-fallback a{color:#d3c9cc}
+.footer-note{text-align:center;color:#898992;line-height:2;letter-spacing:1px;font-size:10px;margin:30px 0 10px}
+.is-verified main{padding-top:20px}.is-verified .intro h1{font-size:clamp(27px,5vw,38px);overflow-wrap:anywhere}.is-verified .intro-copy{display:none}.is-verified .facts{margin-top:6px}.is-verified .steps{margin-top:18px}#fighterGreeting{display:block;font-size:.65em;letter-spacing:0;margin-bottom:8px;overflow-wrap:anywhere}#fighterStatus{margin-bottom:0}
+@media(max-width:480px){.site-header{padding:18px 20px}.header-label{font-size:8px;letter-spacing:1px}main{padding:28px 17px}.panel{padding:23px 17px}.facts{gap:12px}.facts>span+span{padding-left:12px}.facts>span:last-child{font-size:10px}h1{font-size:33px}.slot-time{font-size:14px}.slot-button{padding:14px 10px}.slot-card.is-mine .slot-button{padding:13px 9px}.section-heading h2{font-size:19px}}
+@media(prefers-reduced-motion:no-preference){button{transition:background .15s,border-color .15s}.booking-feedback[data-state=pending] .booking-feedback-icon{animation:booking-spin .8s linear infinite}}
+@keyframes booking-spin{to{transform:rotate(360deg)}}

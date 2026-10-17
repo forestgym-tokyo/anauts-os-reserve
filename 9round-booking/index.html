@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#111111">
+  <meta name="referrer" content="no-referrer">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="9ROUND予約">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" href="./icons/icon-192.png">
+  <title>デイリーワークアウト予約 | 9ROUND アリオ蘇我店</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./config.js" defer></script>
+  <script src="./pwa.js" defer></script>
+  <script src="./api.js" defer></script>
+  <script src="./vendor/qrcode.min.js" defer></script>
+  <script src="./fighter.js" defer></script>
+  <script src="./member-tools.js" defer></script>
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="brand" aria-label="9ROUND"><span>9</span>ROUND<small>ARIO SOGA</small></div>
+    <span class="header-label">MEMBER BOOKING</span>
+  </header>
+  <main>
+    <section class="intro">
+      <p class="eyebrow"><span></span> DAILY WORKOUT</p>
+      <h1><span id="fighterGreeting" hidden></span>次の30分を、<br>あなたの力に。</h1>
+      <p class="intro-copy">デイリーワークアウト予約</p>
+      <div class="facts"><span><b>30</b>分 / ワークアウト</span><span><b>4</b>名 / 各枠</span><span>9ROUND アリオ蘇我店</span></div>
+    </section>
+
+    <section id="installPanel" class="install-panel" aria-labelledby="installTitle" hidden>
+      <div><h2 id="installTitle">ホーム画面から、すぐ予約。</h2><p>9ROUND予約をスマートフォンに追加できます。</p></div>
+      <button id="installApp" class="primary" type="button">アプリをインストール</button>
+      <a id="openInstallPage" class="primary install-link" href="https://forestgym-tokyo.github.io/anauts-os-reserve/9round-booking/" target="_top" rel="noopener" hidden>インストール用ページを開く</a>
+      <details id="installHelp"><summary>ホーム画面への追加方法</summary>
+        <p><b>Android：</b>Chromeで開き、「アプリをインストール」をタップします。表示されない場合は、右上の「⋮」→「ホーム画面に追加」→「インストール」を選びます。</p>
+        <p><b>iPhone：</b>Safariで開き、共有ボタン→「ホーム画面に追加」→「追加」を選びます。「ウェブアプリとして開く」が出たらオンにします。</p>
+        <p>メールやLINEのアプリ内で開いている場合は、SafariまたはChromeで開き直してください。</p>
+      </details>
+      <p id="installStatus" class="hint" role="status" aria-live="polite"></p>
+      <p class="install-fallback"><a href="https://script.google.com/macros/s/AKfycbzVxf1HKZgXet5XrZjqQbzQ47dH8vMISf1mdEE_AH4m3EABceonv1V2OG0jtuIJLvkq/exec?page=member" target="_top" rel="noopener">うまく開けない場合は従来の予約画面へ</a></p>
+    </section>
+
+    <ol class="steps" aria-label="予約の手順">
+      <li id="stepVerify" aria-current="step"><b>01</b> 本人確認</li>
+      <li id="stepDate"><b>02</b> 日付を選択</li>
+      <li id="stepBook"><b>03</b> 枠をタップ</li>
+    </ol>
+    <p class="hint">予約・変更・取消は、開始1時間前までです。未消化予約は10コマまで。</p>
+    <p id="connectionStatus" class="message" role="status" hidden>現在オフラインです。本人確認や予約にはインターネット接続が必要です。</p>
+    <div id="message" class="message" role="status" aria-live="polite" hidden></div>
+    <section id="authPanel" class="panel">
+      <div class="section-heading"><p class="eyebrow">START HERE</p><h2>メールアドレスで本人確認</h2></div>
+      <p class="hint">会員登録のメールアドレスに確認コードをお送りします。本人確認後に予約と会員QRをご利用いただけます。</p>
+      <form id="emailForm">
+        <label for="email">登録メールアドレス</label>
+        <input id="email" name="email" type="email" autocomplete="email" inputmode="email" placeholder="example@email.com" maxlength="254" required>
+        <button id="sendCode" class="primary" type="submit">確認コードを送る <span aria-hidden="true">→</span></button>
+      </form>
+      <form id="codeForm" hidden>
+        <p id="codeGuide" class="hint"></p>
+        <label for="code">6桁の確認コード</label>
+        <input id="code" name="code" class="code-input" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" placeholder="000000" required>
+        <button id="verifyCode" class="primary" type="submit">本人確認して予約へ <span aria-hidden="true">→</span></button>
+        <button id="changeEmail" type="button" class="text-button">メールアドレスを変更・コードを再送</button>
+      </form>
+      <p class="privacy-note">他の会員様のお名前は表示されません。予約済み人数のみ確認できます。</p>
+    </section>
+
+    <section id="bookingPanel" class="panel booking-panel" hidden>
+      <div class="verified-bar"><span><i aria-hidden="true">✓</i> 本人確認済み</span><button id="logout" type="button" class="text-button">ログアウト</button></div>
+      <details id="fighterPanel" class="member-details"><summary id="fighterSummary">ファイター登録</summary>
+        <p class="hint">あなたのファイターネームを登録してください。登録後も、ここからいつでも変更できます。</p>
+        <form id="fighterForm"><label for="fighterName">ファイターネーム（1〜24文字）</label><input id="fighterName" name="fighter_name" type="text" autocomplete="nickname" maxlength="48" placeholder="あなたのファイターネーム" required><button id="fighterSave" class="primary" type="submit">ファイター登録する →</button></form>
+        <p id="fighterStatus" class="hint" role="status" aria-live="polite"></p>
+      </details>
+      <details id="memberPassPanel" class="member-details"><summary>会員QRを表示（店舗で提示）</summary>
+        <div class="member-qr"><canvas id="memberQrCanvas" width="1" height="1" aria-label="ご本人の会員QR"></canvas></div>
+        <p id="qrStatus" class="hint" role="status"></p>
+        <div class="member-actions"><a id="qrSave" class="text-button" download="9round-member-qr.png" hidden>QR画像を保存</a><button id="qrReload" type="button" class="text-button" data-member-action="qr">再表示</button><button id="qrRotate" type="button" class="text-button" data-member-action="qr">QRを再発行</button></div>
+      </details>
+      <details id="myBookingsPanel" class="member-details"><summary>予約の確認・変更・キャンセル</summary><div id="myBookings" aria-live="polite"></div></details>
+      <div id="changeBookingBanner" class="message" hidden><p id="changeBookingText"></p><button id="changeAbort" type="button" class="text-button">変更をやめる</button></div>
+      <div class="section-heading"><p class="eyebrow">CHOOSE YOUR TIME</p><h2>日付と時間を選ぶ</h2></div>
+      <label for="bookingDate">予約日</label>
+      <div class="date-controls"><button id="previousDate" type="button" class="date-arrow" aria-label="前日">‹</button><input id="bookingDate" type="date" required><button id="nextDate" type="button" class="date-arrow" aria-label="翌日">›</button></div>
+      <div class="schedule-heading"><h3 id="dateHeading"></h3><button id="reload" class="text-button" type="button">再読込 ↻</button></div>
+      <p class="hint tap-guide">空いている枠をタップすると予約が完了します。</p>
+      <p id="bookingLimitStatus" class="hint" role="status" aria-live="polite"></p>
+      <div id="slotList" aria-live="polite"></div>
+      <p class="privacy-note">予約・変更・取消は開始1時間前まで可能です。満員の枠は選択できません。</p>
+    </section>
+    <p class="footer-note">10:15–14:00 / 16:15–20:45<br>9ROUND アリオ蘇我店</p>
+    <noscript>ご予約にはJavaScriptを有効にしてください。</noscript>
+  </main>
+  <dialog id="bookingFeedback" class="booking-feedback" aria-labelledby="bookingFeedbackTitle" aria-describedby="bookingFeedbackWhen bookingFeedbackNote">
+    <div role="status" aria-live="polite" aria-atomic="true">
+      <span id="bookingFeedbackIcon" class="booking-feedback-icon" aria-hidden="true"></span>
+      <h2 id="bookingFeedbackTitle" tabindex="-1"></h2>
+      <p id="bookingFeedbackWhen" class="booking-feedback-when"></p>
+      <p class="booking-feedback-workout">9ROUND アリオ蘇我店 · 30分ワークアウト</p>
+      <p id="bookingFeedbackNote" class="booking-feedback-note"></p>
+    </div>
+    <button id="bookingFeedbackClose" class="primary" type="button" hidden>閉じる</button>
+  </dialog>
+</body>
+</html>
