@@ -156,18 +156,19 @@ function nrBookingMembers_(config) {
       no: String(row[indexes[0]] || "").trim(),
       name: String(row[indexes[1]] || "").trim(),
       email: String(row[indexes[2]] || "").trim().toLowerCase(),
-      active: ["ok", "契約中", "active", "act"].indexOf(String(row[indexes[3]] || "").trim().toLowerCase()) >= 0
+      active: String(row[indexes[3]] || "").trim() === "ok"
     };
   });
 }
 
 function nrBookingFindMember_(config, predicate) {
-  const all = nrBookingMembers_(config);
+  // Only eligible "ok" rows take part in identity and duplicate checks.
+  const all = nrBookingMembers_(config).filter(function (member) { return member.active; });
   const matches = all.filter(function (member) {
-    return member.active && member.no && member.name && predicate(member);
+    return member.no && member.name && predicate(member);
   });
   // Imports can repeat the same member, including spaces between family/given names.
-  // Conflicting identities or statuses must never select an arbitrary person.
+  // Conflicting eligible identities must never select an arbitrary person.
   if (!matches.length) return null;
   const member = matches[0];
   const sameIdentity = function (row) {
@@ -175,7 +176,7 @@ function nrBookingFindMember_(config, predicate) {
       row.name.replace(/[\s\u3000]+/g, "") === member.name.replace(/[\s\u3000]+/g, "");
   };
   if (!matches.every(sameIdentity)) return null;
-  const sameEmail = all.filter(function (row) { return row.active && row.email === member.email; });
+  const sameEmail = all.filter(function (row) { return row.email === member.email; });
   if (!sameEmail.every(sameIdentity)) return null;
   const sameNumber = all.filter(function (row) { return row.no === member.no; });
   return sameNumber.every(sameIdentity) ? member : null;

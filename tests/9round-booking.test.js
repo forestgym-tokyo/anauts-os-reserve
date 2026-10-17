@@ -211,7 +211,7 @@ test("repeated master rows for one identity allow verification and booking witho
 });
 
 test("conflicting master duplicates prevent both code delivery and booking with an existing session", () => {
-  for (const [column, value] of [[0, "9999999"], [1, "別の会員"], [2, "other@example.invalid"], [3, "休会中"]]) {
+  for (const [column, value] of [[0, "9999999"], [1, "別の会員"], [2, "other@example.invalid"]]) {
     const e = environment(), token = e.login(0), sentBefore = e.sent.length;
     const rows = e.master.sheets.get("Members").rows, conflict = rows[1].slice();
     conflict[column] = value; rows.push(conflict); e.advance(61000);
@@ -219,6 +219,49 @@ test("conflicting master duplicates prevent both code delivery and booking with 
     assert.equal(e.sent.length, sentBefore);
     assert.equal(reserve(e, token).ok, false);
     assert.equal(e.data.sheets.get("nr_bookings").rows.length, 1);
+  }
+});
+
+test("only the member status ok can receive a verification code", () => {
+  for (const status of ["契約中", "active", "act", "OK", "kyukai", "休会中", "退会済み", "", "unknown"]) {
+    const e = environment();
+    e.master.sheets.get("Members").rows[1][3] = status;
+    const response = e.call("request9RoundBookingCode", { email: "member0@example.invalid" });
+    assert.equal(response.ok, true, status);
+    assert.equal(e.sent.length, 0, status);
+    assert.equal(e.data.sheets.get("nr_challenges").rows[1][3], "", status);
+  }
+});
+
+test("non-ok master rows are excluded from email and member-number duplicate checks", () => {
+  for (const status of ["契約中", "active", "act", "OK", "kyukai", "退会済み", ""]) {
+    const e = environment(), rows = e.master.sheets.get("Members").rows;
+    rows.push(["9999998", "別の会員", rows[1][2], status]);
+    rows.push([rows[1][0], "過去の登録", "old@example.invalid", status]);
+    const masterBefore = JSON.stringify(rows);
+    const token = e.login(0);
+    assert.equal(reserve(e, token).ok, true, status);
+    assert.equal(JSON.stringify(rows), masterBefore);
+  }
+});
+
+test("a status change away from ok blocks code verification and existing member sessions", () => {
+  for (const status of ["契約中", "active", "act", "OK", "kyukai", "退会済み", ""]) {
+    const e = environment();
+    const requested = e.call("request9RoundBookingCode", { email: "member0@example.invalid" });
+    const code = e.sent[0].body.match(/は (\d{6})/)[1];
+    e.master.sheets.get("Members").rows[1][3] = status;
+    assert.equal(e.call("verify9RoundBookingCode", { challenge_id: requested.data.challenge_id, code }).code, "MEMBER_UNAVAILABLE", status);
+
+    const logged = environment(), token = logged.login(0);
+    const booking = reserve(logged, token);
+    assert.equal(booking.ok, true);
+    logged.master.sheets.get("Members").rows[1][3] = status;
+    assert.equal(logged.call("get9RoundWorkoutSlots", { session_token: token, date: day }).code, "MEMBER_UNAVAILABLE", status);
+    assert.equal(reserve(logged, token).code, "MEMBER_UNAVAILABLE", status);
+    assert.equal(logged.call("cancel9RoundWorkoutBooking", { session_token: token, booking_id: booking.data.booking_id }).code, "MEMBER_UNAVAILABLE", status);
+    assert.equal(logged.data.sheets.get("nr_bookings").rows.length, 2);
+    assert.equal(logged.data.sheets.get("nr_bookings").rows[1][9], "CONFIRMED");
   }
 });
 
