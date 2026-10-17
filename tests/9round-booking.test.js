@@ -223,7 +223,35 @@ test("conflicting master duplicates prevent both code delivery and booking with 
   }
 });
 
-test("only the member status ok can receive a verification code", () => {
+test("ok_unfinished members receive an OTP, can reserve and use their own QR", () => {
+  for (const status of ["ok_unfinished", " ok_unfinished "]) {
+    const e = environment();
+    e.master.sheets.get("Members").rows[1][3] = status;
+    const request = e.call("request9RoundBookingCode", { email: "member0@example.invalid" });
+    assert.equal(request.ok, true, status);
+    assert.equal(e.sent.length, 1, status);
+    const code = e.sent[0].body.match(/は (\\d{6})/)[1];
+    const verified = e.call("verify9RoundBookingCode", { challenge_id: request.data.challenge_id, code });
+    assert.equal(verified.ok, true, status);
+    const token = verified.data.session_token;
+    assert.equal(e.call("get9RoundWorkoutSlots", { session_token: token, date: day }).ok, true, status);
+    assert.equal(reserve(e, token).ok, true, status);
+    assert.equal(e.call("get9RoundMemberPass", { session_token: token }).ok, true, status);
+  }
+});
+
+test("switches between ok and ok_unfinished keep verified members eligible", () => {
+  for (const [from, to] of [["ok", "ok_unfinished"], ["ok_unfinished", "ok"]]) {
+    const e = environment();
+    e.master.sheets.get("Members").rows[1][3] = from;
+    const token = e.login(0);
+    e.master.sheets.get("Members").rows[1][3] = to;
+    assert.equal(e.call("get9RoundWorkoutSlots", { session_token: token, date: day }).ok, true);
+    assert.equal(reserve(e, token).ok, true);
+  }
+});
+
+test("ineligible member statuses cannot receive a verification code", () => {
   for (const status of ["契約中", "active", "act", "OK", "kyukai", "休会中", "退会済み", "", "unknown"]) {
     const e = environment();
     e.master.sheets.get("Members").rows[1][3] = status;
@@ -234,7 +262,7 @@ test("only the member status ok can receive a verification code", () => {
   }
 });
 
-test("non-ok master rows are excluded from email and member-number duplicate checks", () => {
+test("ineligible master rows are excluded from email and member-number duplicate checks", () => {
   for (const status of ["契約中", "active", "act", "OK", "kyukai", "退会済み", ""]) {
     const e = environment(), rows = e.master.sheets.get("Members").rows;
     rows.push(["9999998", "別の会員", rows[1][2], status]);
@@ -246,7 +274,7 @@ test("non-ok master rows are excluded from email and member-number duplicate che
   }
 });
 
-test("a status change away from ok blocks code verification and existing member sessions", () => {
+test("a status change to an ineligible state blocks code verification and existing member sessions", () => {
   for (const status of ["契約中", "active", "act", "OK", "kyukai", "退会済み", ""]) {
     const e = environment();
     const requested = e.call("request9RoundBookingCode", { email: "member0@example.invalid" });
