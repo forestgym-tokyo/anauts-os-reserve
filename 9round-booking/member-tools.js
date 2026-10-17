@@ -57,7 +57,7 @@
       }
       if (r.can_cancel) {
         const cancel = element("button", "text-button", "キャンセルする"); cancel.type = "button"; cancel.dataset.memberAction = "cancel";
-        cancel.addEventListener("click", function () { if (!busy) tools.cancel(r); }); actions.append(cancel);
+        cancel.addEventListener("click", function () { if (!busy) tools.cancel(r, cancel); }); actions.append(cancel);
       }
       if (!r.can_change && r.status === "CONFIRMED" && !r.attended) actions.append(element("small", "hint", "変更・取消の締切を過ぎています"));
       card.append(actions); target.append(card);

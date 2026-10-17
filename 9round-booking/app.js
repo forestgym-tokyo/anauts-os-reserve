@@ -104,9 +104,9 @@
     button.addEventListener("click", function () { reserve(slot, button); });
     card.append(button);
     if (slot.can_cancel) {
-      const cancel = element("button", "cancel-booking", "この予約を取り消す");
+      const cancel = element("button", "cancel-booking", "タップしてキャンセル →");
       cancel.type = "button"; cancel.dataset.cancel = slot.booking_id;
-      cancel.addEventListener("click", function () { cancelBooking(slot); });
+      cancel.addEventListener("click", function () { cancelBooking(slot, cancel); });
       card.append(cancel);
     }
     return card;
@@ -175,19 +175,37 @@
       if (token) await loadSlots(false);
     } finally { if (token === ownToken || !token) setBusy(false); }
   }
-  async function cancelBooking(slot) {
+  async function cancelBooking(slot, button) {
     if (busy || !token) return;
-    if (!window.confirm(slot.start_time + " の予約を取り消しますか？")) return;
-    const ownToken = token;
+    const ownToken = token, date = slot.date || lastDate;
+    const originalText = button && button.textContent;
     setBusy(true); message("");
+    if (button) {
+      button.textContent = "キャンセルしています。";
+      button.setAttribute("aria-busy", "true");
+      const card = button.closest(".slot-card");
+      if (card) card.classList.add("is-submitting");
+    }
+    bookingFeedback("pending", date, slot, "キャンセルしています。", "そのままお待ちください。");
     try {
       const result = await api("cancel9RoundWorkoutBooking", { session_token: ownToken, booking_id: slot.booking_id });
       if (token !== ownToken) return;
       if (tools.changing && tools.changing.booking_id === slot.booking_id) tools.finishChange();
-      message("予約を取り消しました。" + (result.notification_pending ? "確認メールは送信待ちです。" : "取消確認メールをお送りしました。"));
+      bookingFeedback("success", date, slot, "キャンセルが完了しました", result.notification_pending
+        ? "キャンセルは完了しています。\n確認メールは送信待ちです。"
+        : "キャンセル確認メールをお送りしました。");
+      message("キャンセルが完了しました。" + (result.notification_pending ? "確認メールは送信待ちです。" : "キャンセル確認メールをお送りしました。"));
       await Promise.all([loadSlots(false), tools.refresh()]);
-    } catch (error) { if (token === ownToken) { handleError(error); if (token) await loadSlots(false); } }
-    finally { if (token === ownToken || !token) setBusy(false); }
+    } catch (error) {
+      if (token !== ownToken) return;
+      handleError(error);
+      if (token) bookingFeedback("error", date, slot, error.code ? "キャンセルを完了できませんでした" : "キャンセル結果を確認できませんでした", error.message +
+        (error.code ? "" : "\n予約一覧・確認メールで結果をご確認ください。"));
+      if (token) await loadSlots(false);
+    } finally {
+      if (button && button.isConnected) { button.textContent = originalText; button.removeAttribute("aria-busy"); }
+      if (token === ownToken || !token) setBusy(false);
+    }
   }
   tools.onError = handleError;
   window.NineRoundFighter.onError = handleError;

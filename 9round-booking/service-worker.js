@@ -1,5 +1,5 @@
 "use strict";
-const CACHE = "9round-booking-public-v1-20261017";
+const CACHE = "9round-booking-public-v2-20261018-cancel-feedback";
 const BASE = new URL("./", self.location.href);
 const INDEX = new URL("index.html", BASE).href;
 const FILES = ["index.html", "styles.css", "config.js", "api.js", "app.js", "fighter.js", "member-tools.js", "pwa.js", "manifest.webmanifest", "vendor/qrcode.min.js", "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png", "icons/apple-touch-icon.png"];

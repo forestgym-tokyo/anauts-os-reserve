@@ -58,7 +58,8 @@ input::placeholder{color:#8c8c96}
 .slot-meter{height:3px;width:100%;background:#4b4b51}.slot-meter i{display:block;height:100%;background:var(--red)}
 .slot-card.is-mine{border:2px solid var(--red);background:#29171b}.slot-card.is-mine .slot-button{padding:14px 12px;min-height:130px}.slot-card.is-mine .slot-action{color:#fff}
 .slot-card.is-full{border-style:dashed;background:#161618}.slot-card.is-full .slot-action{color:#aaaab3}.slot-card.is-past{opacity:.6}
-.cancel-booking{display:block;background:#1d1014;color:#ffc1c7;width:100%;border:0;border-top:1px solid #663038;min-height:44px;font-size:11px;text-decoration:underline}
+.cancel-booking{display:flex;align-items:center;background:#1d1014;color:var(--red-light);width:100%;border:0;border-top:1px solid #663038;min-height:44px;padding:12px 9px;text-align:left;font-size:11px;font-weight:800}
+.cancel-booking:hover:not(:disabled){background:#352026}.cancel-booking:disabled{color:#dedee5}
 .slot-card.is-blocked{background:repeating-linear-gradient(135deg,#171719,#171719 10px,#1d1d20 10px,#1d1d20 20px);border-style:dashed}.slot-card.is-blocked .slot-action{color:#c6c6cc}
 .loading{padding:32px 12px;color:var(--muted);font-size:13px;text-align:center}
 .slot-card.is-submitting{border-color:var(--red-light);background:#352026}.slot-card.is-submitting .slot-action{color:#fff}
@@ -451,7 +452,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
       if (r.can_cancel) {
         const cancel = element("button", "text-button", "キャンセルする"); cancel.type = "button"; cancel.dataset.memberAction = "cancel";
-        cancel.addEventListener("click", function () { if (!busy) tools.cancel(r); }); actions.append(cancel);
+        cancel.addEventListener("click", function () { if (!busy) tools.cancel(r, cancel); }); actions.append(cancel);
       }
       if (!r.can_change && r.status === "CONFIRMED" && !r.attended) actions.append(element("small", "hint", "変更・取消の締切を過ぎています"));
       card.append(actions); target.append(card);
@@ -611,9 +612,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     button.addEventListener("click", function () { reserve(slot, button); });
     card.append(button);
     if (slot.can_cancel) {
-      const cancel = element("button", "cancel-booking", "この予約を取り消す");
+      const cancel = element("button", "cancel-booking", "タップしてキャンセル →");
       cancel.type = "button"; cancel.dataset.cancel = slot.booking_id;
-      cancel.addEventListener("click", function () { cancelBooking(slot); });
+      cancel.addEventListener("click", function () { cancelBooking(slot, cancel); });
       card.append(cancel);
     }
     return card;
@@ -682,19 +683,37 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (token) await loadSlots(false);
     } finally { if (token === ownToken || !token) setBusy(false); }
   }
-  async function cancelBooking(slot) {
+  async function cancelBooking(slot, button) {
     if (busy || !token) return;
-    if (!window.confirm(slot.start_time + " の予約を取り消しますか？")) return;
-    const ownToken = token;
+    const ownToken = token, date = slot.date || lastDate;
+    const originalText = button && button.textContent;
     setBusy(true); message("");
+    if (button) {
+      button.textContent = "キャンセルしています。";
+      button.setAttribute("aria-busy", "true");
+      const card = button.closest(".slot-card");
+      if (card) card.classList.add("is-submitting");
+    }
+    bookingFeedback("pending", date, slot, "キャンセルしています。", "そのままお待ちください。");
     try {
       const result = await api("cancel9RoundWorkoutBooking", { session_token: ownToken, booking_id: slot.booking_id });
       if (token !== ownToken) return;
       if (tools.changing && tools.changing.booking_id === slot.booking_id) tools.finishChange();
-      message("予約を取り消しました。" + (result.notification_pending ? "確認メールは送信待ちです。" : "取消確認メールをお送りしました。"));
+      bookingFeedback("success", date, slot, "キャンセルが完了しました", result.notification_pending
+        ? "キャンセルは完了しています。\n確認メールは送信待ちです。"
+        : "キャンセル確認メールをお送りしました。");
+      message("キャンセルが完了しました。" + (result.notification_pending ? "確認メールは送信待ちです。" : "キャンセル確認メールをお送りしました。"));
       await Promise.all([loadSlots(false), tools.refresh()]);
-    } catch (error) { if (token === ownToken) { handleError(error); if (token) await loadSlots(false); } }
-    finally { if (token === ownToken || !token) setBusy(false); }
+    } catch (error) {
+      if (token !== ownToken) return;
+      handleError(error);
+      if (token) bookingFeedback("error", date, slot, error.code ? "キャンセルを完了できませんでした" : "キャンセル結果を確認できませんでした", error.message +
+        (error.code ? "" : "\n予約一覧・確認メールで結果をご確認ください。"));
+      if (token) await loadSlots(false);
+    } finally {
+      if (button && button.isConnected) { button.textContent = originalText; button.removeAttribute("aria-busy"); }
+      if (token === ownToken || !token) setBusy(false);
+    }
   }
   tools.onError = handleError;
   window.NineRoundFighter.onError = handleError;

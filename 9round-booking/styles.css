@@ -45,7 +45,8 @@ input::placeholder{color:#8c8c96}
 .slot-meter{height:3px;width:100%;background:#4b4b51}.slot-meter i{display:block;height:100%;background:var(--red)}
 .slot-card.is-mine{border:2px solid var(--red);background:#29171b}.slot-card.is-mine .slot-button{padding:14px 12px;min-height:130px}.slot-card.is-mine .slot-action{color:#fff}
 .slot-card.is-full{border-style:dashed;background:#161618}.slot-card.is-full .slot-action{color:#aaaab3}.slot-card.is-past{opacity:.6}
-.cancel-booking{display:block;background:#1d1014;color:#ffc1c7;width:100%;border:0;border-top:1px solid #663038;min-height:44px;font-size:11px;text-decoration:underline}
+.cancel-booking{display:flex;align-items:center;background:#1d1014;color:var(--red-light);width:100%;border:0;border-top:1px solid #663038;min-height:44px;padding:12px 9px;text-align:left;font-size:11px;font-weight:800}
+.cancel-booking:hover:not(:disabled){background:#352026}.cancel-booking:disabled{color:#dedee5}
 .slot-card.is-blocked{background:repeating-linear-gradient(135deg,#171719,#171719 10px,#1d1d20 10px,#1d1d20 20px);border-style:dashed}.slot-card.is-blocked .slot-action{color:#c6c6cc}
 .loading{padding:32px 12px;color:var(--muted);font-size:13px;text-align:center}
 .slot-card.is-submitting{border-color:var(--red-light);background:#352026}.slot-card.is-submitting .slot-action{color:#fff}
