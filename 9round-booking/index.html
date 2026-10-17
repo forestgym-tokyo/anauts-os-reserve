@@ -56,7 +56,7 @@
       <div class="verified-bar"><span><i aria-hidden="true">✓</i> 本人確認済み</span><button id="logout" type="button" class="text-button">ログアウト</button></div>
       <details id="fighterPanel" class="member-details"><summary id="fighterSummary">ファイター登録</summary>
         <p class="hint">あなたのファイターネームを登録してください。登録後も、ここからいつでも変更できます。</p>
-        <form id="fighterForm"><label for="fighterName">ファイターネーム（1〜24文字）</label><input id="fighterName" name="fighter_name" type="text" autocomplete="nickname" maxlength="48" placeholder="あなたのリングネーム" required><button id="fighterSave" class="primary" type="submit">ファイター登録する →</button></form>
+        <form id="fighterForm"><label for="fighterName">ファイターネーム（1〜24文字）</label><input id="fighterName" name="fighter_name" type="text" autocomplete="nickname" maxlength="48" placeholder="あなたのファイターネーム" required><button id="fighterSave" class="primary" type="submit">ファイター登録する →</button></form>
         <p id="fighterStatus" class="hint" role="status" aria-live="polite"></p>
       </details>
       <details id="memberPassPanel" class="member-details"><summary>会員QRを表示（店舗で提示）</summary>
@@ -78,5 +78,15 @@
     <p class="footer-note">10:15–14:00 / 16:15–20:45<br>9ROUND アリオ蘇我店</p>
     <noscript>ご予約にはJavaScriptを有効にしてください。</noscript>
   </main>
+  <dialog id="bookingFeedback" class="booking-feedback" aria-labelledby="bookingFeedbackTitle" aria-describedby="bookingFeedbackWhen bookingFeedbackNote">
+    <div role="status" aria-live="polite" aria-atomic="true">
+      <span id="bookingFeedbackIcon" class="booking-feedback-icon" aria-hidden="true"></span>
+      <h2 id="bookingFeedbackTitle" tabindex="-1"></h2>
+      <p id="bookingFeedbackWhen" class="booking-feedback-when"></p>
+      <p class="booking-feedback-workout">9ROUND アリオ蘇我店 · 30分ワークアウト</p>
+      <p id="bookingFeedbackNote" class="booking-feedback-note"></p>
+    </div>
+    <button id="bookingFeedbackClose" class="primary" type="button" hidden>閉じる</button>
+  </dialog>
 </body>
 </html>

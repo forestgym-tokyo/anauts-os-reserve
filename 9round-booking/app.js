@@ -7,6 +7,28 @@
   let token = "", challenge = "", busy = false, sequence = 0;
   let range = { from: window.NineRoundTokyoDate(), to: "" };
   let lastDate = "", limitReached = false;
+  let feedbackSlotId = "";
+  function bookingFeedback(state, date, slot, title, note) {
+    const dialog = q("#bookingFeedback"), pending = state === "pending";
+    feedbackSlotId = slot.slot_id;
+    dialog.dataset.state = state;
+    q("#bookingFeedbackIcon").textContent = pending ? "" : state === "success" ? "✓" : "!";
+    q("#bookingFeedbackTitle").textContent = title;
+    q("#bookingFeedbackWhen").textContent = dayLabel(date, "short") + "\n" + slot.start_time + " 開始";
+    q("#bookingFeedbackNote").textContent = note;
+    q("#bookingFeedbackClose").hidden = pending;
+    if (!dialog.open) { dialog.showModal(); document.body.classList.add("has-booking-feedback"); }
+    q(pending ? "#bookingFeedbackTitle" : "#bookingFeedbackClose").focus({ preventScroll: true });
+  }
+  q("#bookingFeedbackClose").addEventListener("click", function () { q("#bookingFeedback").close(); });
+  q("#bookingFeedback").addEventListener("cancel", function (event) {
+    if (q("#bookingFeedback").dataset.state === "pending") event.preventDefault();
+  });
+  q("#bookingFeedback").addEventListener("close", function () {
+    document.body.classList.remove("has-booking-feedback");
+    const button = Array.from(document.querySelectorAll("[data-book]")).find(function (b) { return b.dataset.book === feedbackSlotId; });
+    if (button) { const card = button.closest(".slot-card"); card.tabIndex = -1; card.focus({ preventScroll: true }); }
+  });
   function message(text, error) {
     q("#message").hidden = !text;
     q("#message").textContent = text || "";
@@ -23,7 +45,7 @@
     q("#stepVerify").removeAttribute("aria-current");
     q("#stepDate").removeAttribute("aria-current");
     q(value ? "#stepDate" : "#stepVerify").setAttribute("aria-current", "step");
-    if (!value) { q("#slotList").replaceChildren(); q("#code").value = ""; q("#bookingLimitStatus").textContent = ""; limitReached = false; }
+    if (!value) { q("#bookingFeedback").close(); q("#slotList").replaceChildren(); q("#code").value = ""; q("#bookingLimitStatus").textContent = ""; limitReached = false; }
     window.NineRoundFighter.authenticate(value ? token : "");
     tools.authenticate(value ? token : "");
   }
@@ -51,8 +73,8 @@
     });
     document.querySelectorAll("[data-cancel]").forEach(function (button) { button.disabled = value; });
   }
-  function dayLabel(date) {
-    return new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", month: "long", day: "numeric", weekday: "long" }).format(new Date(date + "T12:00:00+09:00"));
+  function dayLabel(date, weekday) {
+    return new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", month: "long", day: "numeric", weekday: weekday || "long" }).format(new Date(date + "T12:00:00+09:00"));
   }
   function element(tag, className, text) {
     const node = document.createElement(tag);
@@ -79,7 +101,7 @@
     meter.setAttribute("aria-hidden", "true");
     meter.append(fill); button.append(meter);
     button.append(element("span", "slot-action", slot.attended ? "✓ 受講済み" : slot.is_booked ? "✓ 予約済み" : slot.blocked ? "受付停止" : full ? "満員" : past ? "受付終了" : tools.changing ? "この枠へ変更 →" : limitReached ? "未消化予約の上限" : "タップして予約 →"));
-    button.addEventListener("click", function () { reserve(slot); });
+    button.addEventListener("click", function () { reserve(slot, button); });
     card.append(button);
     if (slot.can_cancel) {
       const cancel = element("button", "cancel-booking", "この予約を取り消す");
@@ -124,22 +146,31 @@
       if (ownSequence === sequence || !token) setBusy(false);
     }
   }
-  async function reserve(slot) {
+  async function reserve(slot, button) {
     if (busy || !token || !slot.available) return;
     const ownToken = token, date = lastDate;
     const changing = tools.changing;
     setBusy(true); message("");
+    button.closest(".slot-card").classList.add("is-submitting");
+    button.setAttribute("aria-busy", "true");
+    button.querySelector(".slot-action").textContent = changing ? "変更しています…" : "予約しています…";
+    bookingFeedback("pending", date, slot, changing ? "予約を変更しています…" : "予約しています…", "そのままお待ちください。");
     try {
       const result = await api(changing ? "reschedule9RoundWorkoutBooking" : "create9RoundWorkoutBooking",
         { session_token: ownToken, date: date, slot_id: slot.slot_id, booking_id: changing ? changing.booking_id : undefined });
       if (token !== ownToken) return;
       tools.finishChange();
+      bookingFeedback("success", date, slot, changing ? "予約を変更しました" : "予約が完了しました", result.notification_pending
+        ? "予約は成立しています。\n確認メールは送信待ちです。"
+        : "確認メールをお送りしました。\nご来店をお待ちしています！");
       message(dayLabel(date) + " " + slot.start_time + (changing ? " に予約を変更しました。" : " の予約が完了しました。") +
         (result.notification_pending ? "確認メールは送信待ちです。予約は成立しています。" : "確認メールをお送りしました。"));
       await Promise.all([loadSlots(false), tools.refresh()]);
     } catch (error) {
       if (token !== ownToken) return;
       handleError(error);
+      if (token) bookingFeedback("error", date, slot, error.code ? "予約を完了できませんでした" : "予約結果を確認できませんでした", error.message +
+        (error.code ? "" : "\n予約一覧・確認メールをご確認ください。"));
       // Capacity conflicts and uncertain responses must not leave stale cards enabled.
       if (token) await loadSlots(false);
     } finally { if (token === ownToken || !token) setBusy(false); }

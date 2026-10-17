@@ -13,6 +13,7 @@ new Function("require", "__dirname", "module", "exports", harness + "\nmodule.ex
 const e = helperModule.exports.environment({ realStaffAuth: true });
 const day = "2026-10-18", firstSlot = "DAILY:" + day + ":10:15", secondSlot = "DAILY:" + day + ":11:00", blockedSlot = "DAILY:" + day + ":11:45";
 const actions = [];
+let bookingGate = null, bookingFailure = null;
 for (let i = 1; i <= 4; i++) {
   const token = e.login(i);
   assert.equal(e.call("create9RoundWorkoutBooking", { session_token: token, date: day, slot_id: secondSlot }).ok, true);
@@ -25,10 +26,14 @@ const server = http.createServer((req, res) => {
   if (url.pathname === "/__booking_api" && req.method === "POST") {
     let text = "";
     req.on("data", c => { text += c; });
-    req.on("end", () => {
+    req.on("end", async () => {
       const body = JSON.parse(text); actions.push(body.action);
+      const mutation = /^(create|reschedule)9RoundWorkoutBooking$/.test(body.action);
+      if (mutation && bookingGate) await bookingGate;
+      const failure = mutation && bookingFailure;
+      if (failure) bookingFailure = null;
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify(e.call(body.action, body)));
+      res.end(JSON.stringify(failure || e.call(body.action, body)));
     });
     return;
   }
@@ -46,6 +51,11 @@ const server = http.createServer((req, res) => {
 });
 async function checkOverflow(page, label) {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, label + " horizontal overflow");
+}
+async function dismissBookingResult(page, state = "success") {
+  await page.locator('#bookingFeedback[data-state="' + state + '"]').waitFor({ state: "visible" });
+  await page.locator("#bookingFeedbackClose").click();
+  await page.locator('#bookingPanel[aria-busy="false"]').waitFor();
 }
 async function main() {
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
@@ -92,6 +102,7 @@ async function main() {
     await member.page.getByText("テスト会員0さん、", { exact: true }).waitFor();
     assert.match(await member.page.locator(".intro h1").textContent(), /次の30分を/);
     assert.equal(await member.page.locator("#fighterPanel").getAttribute("open"), "");
+    assert.equal(await member.page.locator("#fighterName").getAttribute("placeholder"), "あなたのファイターネーム");
     await member.page.locator("#fighterName").fill("ソガの赤い虎");
     await member.page.locator("#fighterSave").click();
     await member.page.getByText("ソガの赤い虎さん、", { exact: true }).waitFor();
@@ -107,7 +118,40 @@ async function main() {
     assert.equal(await member.page.locator(".is-full button").isDisabled(), true);
     assert.equal(await member.page.locator(".is-blocked button").isDisabled(), true);
     assert.equal((await member.page.locator("#bookingPanel").textContent()).includes("テスト会員"), false);
+    bookingFailure = { ok: false, code: "SLOT_FULL", message: "この枠は満員になりました。別の枠をお選びください。" };
     await member.page.locator(".slot-button").first().click();
+    await member.page.locator("#bookingFeedbackTitle").getByText("予約を完了できませんでした", { exact: true }).waitFor();
+    assert.match(await member.page.locator("#bookingFeedbackNote").textContent(), /満員/);
+    assert.equal(await member.page.locator(".is-mine").count(), 0);
+    await dismissBookingResult(member.page, "error");
+    bookingFailure = { ok: false, message: "通信結果を確認できませんでした。" };
+    await member.page.locator(".slot-button").first().click();
+    await member.page.locator("#bookingFeedbackTitle").getByText("予約結果を確認できませんでした", { exact: true }).waitFor();
+    assert.match(await member.page.locator("#bookingFeedbackNote").textContent(), /予約一覧・確認メールをご確認/);
+    await dismissBookingResult(member.page, "error");
+    let releaseBooking;
+    bookingGate = new Promise(resolve => { releaseBooking = resolve; });
+    const createsBefore = actions.filter(a => a === "create9RoundWorkoutBooking").length;
+    await member.page.locator(".slot-button").first().click();
+    await member.page.locator('#bookingFeedback[data-state="pending"]').waitFor({ state: "visible" });
+    assert.equal(await member.page.locator("#bookingFeedbackTitle").textContent(), "予約しています…");
+    assert.match(await member.page.locator("#bookingFeedbackWhen").textContent(), /10月18日.*\n10:15 開始/);
+    assert.equal(await member.page.locator("#bookingFeedbackClose").isVisible(), false);
+    assert.equal(await member.page.locator(".slot-button:not(:disabled)").count(), 0);
+    await member.page.locator(".slot-button").first().dispatchEvent("click");
+    await member.page.keyboard.press("Escape");
+    assert.equal(await member.page.locator("#bookingFeedback").isVisible(), true);
+    assert.equal(await member.page.locator(".is-mine").count(), 0, "pending feedback must not claim success");
+    await member.page.screenshot({ path: path.join(evidence, "booking-pending-mobile.png") });
+    await member.page.setViewportSize({ width: 320, height: 780 }); await checkOverflow(member.page, "pending feedback 320");
+    await member.page.setViewportSize({ width: 390, height: 844 });
+    bookingGate = null; releaseBooking();
+    await member.page.locator('#bookingFeedback[data-state="success"]').waitFor({ state: "visible" });
+    assert.equal(await member.page.locator("#bookingFeedbackTitle").textContent(), "予約が完了しました");
+    assert.equal(await member.page.locator("#bookingFeedbackIcon").textContent(), "✓");
+    assert.equal(actions.filter(a => a === "create9RoundWorkoutBooking").length, createsBefore + 1, "repeated tap must only submit once");
+    await member.page.screenshot({ path: path.join(evidence, "booking-success-mobile.png") });
+    await dismissBookingResult(member.page);
     await member.page.locator(".is-mine").waitFor();
     assert.match(await member.page.locator(".is-mine").textContent(), /3 \/ 4名/);
     await member.page.screenshot({ path: path.join(evidence, "member-mobile.png"), fullPage: true });
@@ -124,12 +168,14 @@ async function main() {
     // management UI; it never cancels or changes anything on its own.
     const changeFrom = "DAILY:" + day + ":12:30", changeTo = "DAILY:" + day + ":13:15";
     await member.page.locator('[data-book="' + changeFrom + '"]').click();
+    await dismissBookingResult(member.page);
     await member.page.locator(".is-mine").waitFor();
     const confirmation = e.sent.filter(m => m.to === "member0@example.invalid" && /予約確認/.test(m.subject)).at(-1);
     const changeLink = new URL(confirmation.body.match(/予約を変更する:\n([^\n]+)/)[1]);
     await member.page.goto(origin + "/9round-booking/" + changeLink.search);
     await member.page.locator("#changeBookingBanner").waitFor({ state: "visible" });
     await member.page.locator('[data-book="' + changeTo + '"]').click();
+    await dismissBookingResult(member.page);
     await member.page.getByText(/に予約を変更しました。/).waitFor();
     assert.equal(await member.page.locator("#changeBookingBanner").isVisible(), false);
     const changedMail = e.sent.filter(m => m.to === "member0@example.invalid" && /予約変更/.test(m.subject)).at(-1);
@@ -152,6 +198,7 @@ async function main() {
     await member.page.locator("#bookingDate").fill(today);
     await member.page.locator("#bookingDate").dispatchEvent("change");
     await member.page.locator('[data-book="' + todaySlot + '"]').click();
+    await dismissBookingResult(member.page);
     await member.page.locator(".is-mine").waitFor();
 
     const staff = await context(1024);
@@ -198,7 +245,10 @@ async function main() {
     await member.page.locator("#bookingDate").dispatchEvent("change");
     e.mailFailure(true);
     await member.page.locator('[data-book="' + changeFrom + '"]').click();
-    await member.page.getByText(/確認メールは送信待ちです/).waitFor();
+    await member.page.locator('#bookingFeedback[data-state="success"]').waitFor();
+    assert.match(await member.page.locator("#bookingFeedbackNote").textContent(), /予約は成立しています。.*\n確認メールは送信待ち/);
+    await dismissBookingResult(member.page);
+    await member.page.locator("#message").getByText(/確認メールは送信待ちです/).waitFor();
     await staff.page.locator("#nrAdminReload").click();
     await staff.page.locator("#nrRetryNotifications").waitFor({ state: "visible" });
     e.mailFailure(false);
@@ -313,6 +363,7 @@ async function main() {
     await limited.page.locator('[data-member-action="change"]').first().click();
     await limited.page.locator("#changeBookingBanner").waitFor({ state: "visible" });
     await limited.page.locator('[data-book="' + limitSlots[10].slot_id + '"]').click();
+    await dismissBookingResult(limited.page);
     await limited.page.getByText(/に予約を変更しました/).waitFor();
     assert.equal(e.call("get9RoundMemberBookings", { session_token: limitToken }).data.outstanding_count, 10);
     limited.page.on("dialog", dialog => dialog.accept());
@@ -320,7 +371,7 @@ async function main() {
     await limited.page.locator("#bookingLimitStatus").getByText(/未消化予約 9 \/ 10コマ/).waitFor();
     await limited.ctx.close();
     assert.deepEqual(errors, []);
-    console.log(JSON.stringify({ status: "passed", checks: ["member email ownership flow", "fighter registration and rename personalize greeting", "30 minute wording and start-time-only slots", "real and fighter names on staff board", "11 slots / counts only", "full and blocked cannot book", "tap reserve / cancel", "email change and cancel links require explicit authenticated action", "atomic change to another slot", "management mail change and cancel links require staff login and explicit action", "real QR image decoding and attendance registration", "USB reader and duplicate attendance", "camera fallback", "blocked camera policy keeps photo and reader available", "future dates cannot register attendance", "mail failure preserves reservation and managers retry", "block/unblock preserves reservations", "trial creation", "independent staff roles", "A-nauts is read-only", "logout clears identities and fighter name", "ten outstanding reservations prevent an eleventh and still allow change or cancel", "no horizontal overflow at 320/390/1024/1280px", "no browser exceptions"], apiCalls: actions.length }));
+    console.log(JSON.stringify({ status: "passed", checks: ["member email ownership flow", "fighter registration and rename personalize greeting", "30 minute wording and start-time-only slots", "real and fighter names on staff board", "11 slots / counts only", "full and blocked cannot book", "tap reserve / cancel", "fighter placeholder uses fighter name", "pending dialog shows selected time and blocks repeated submission", "success is shown only after the booking response", "capacity rejection and unknown transport result have distinct feedback", "email change and cancel links require explicit authenticated action", "atomic change to another slot", "management mail change and cancel links require staff login and explicit action", "real QR image decoding and attendance registration", "USB reader and duplicate attendance", "camera fallback", "blocked camera policy keeps photo and reader available", "future dates cannot register attendance", "mail failure preserves reservation and managers retry", "block/unblock preserves reservations", "trial creation", "independent staff roles", "A-nauts is read-only", "logout clears identities and fighter name", "ten outstanding reservations prevent an eleventh and still allow change or cancel", "no horizontal overflow at 320/390/1024/1280px", "no browser exceptions"], apiCalls: actions.length }));
   } finally { await browser.close(); server.close(); }
 }
 main().catch(error => { console.error(error); server.close(); process.exitCode = 1; });
