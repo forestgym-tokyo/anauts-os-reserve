@@ -63,7 +63,8 @@ function nrCancel9RoundMailBooking_(config, body) {
 function nrReschedule9RoundMailBooking_(config, body) {
   return nrBookingLocked_(function () {
     const access = nrBookingMailAccess_(config, body);
-    nrBookingRequireMutable_(config, access.booking);
+    // The common workflow preserves idempotency on repeated submission while
+    // still enforcing reservation status, capacity and the 1-hour deadline.
     const actor = access.role === "ADMIN" ? { staff_code: "MAIL_ADMIN_LINK" } : null;
     return nrBookingRescheduleForMember_(config, body, access.member, actor);
   });
