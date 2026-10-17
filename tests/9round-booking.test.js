@@ -126,6 +126,7 @@ function environment(options = {}) {
   vm.runInContext(read("9round-booking/gas/Workflows.gs"), context);
   vm.runInContext(read("9round-booking/gas/Fighters.gs"), context);
   vm.runInContext(read("9round-booking/gas/Management.gs"), context);
+  vm.runInContext(read("9round-booking/gas/MailLinks.gs"), context);
   vm.runInContext(read("9round-booking/gas/SlotManagement.gs"), context);
   if (options.realStaffAuth) vm.runInContext(read("9round-booking/gas/StaffAuth.gs"), context);
   if (!options.noSetup) context.setup9RoundBookingStorage_();
@@ -1076,4 +1077,68 @@ test("production preparation isolates storage, keeps source data, and activation
   assert.equal(JSON.stringify(Array.from(e.data.sheets.values()).map(s => s.rows)), sourceRows);
   const functionNames = [...read("9round-booking/gas/Production.gs").matchAll(/function\s+(\w+)\s*\(/g)].map(m => m[1]);
   assert.ok(functionNames.every(name => name.endsWith("_")), "provisioning helpers must be inaccessible to HTML RPC");
+});
+
+test("booking email actions bypass six-hour session but require a booking-scoped secret and explicit POST", () => {
+  const e = environment(), token = e.login(0);
+  const reserved = reserve(e, token);
+  assert.equal(reserved.ok, true);
+  const bookingId = reserved.data.booking_id;
+  const sentMember = e.sent.find(mail => mail.subject.startsWith("【9ROUND アリオ蘇我店】予約確認"));
+  const sentAdmin = e.sent.find(mail => mail.subject.startsWith("【9ROUND 管理通知】予約確認"));
+  assert.ok(sentMember && sentAdmin);
+  const memberLinks = [...sentMember.body.matchAll(/https:\/\/[^\s]+/g)].map(m => m[0]);
+  const adminLinks = [...sentAdmin.body.matchAll(/https:\/\/[^\s]+/g)].map(m => m[0]);
+  assert.equal(memberLinks.length, 2);
+  assert.equal(adminLinks.length, 2);
+  const memberUrl = new URL(memberLinks[1]);
+  const adminUrl = new URL(adminLinks[1]);
+  const mk = new URLSearchParams(memberUrl.hash.slice(1));
+  const ak = new URLSearchParams(adminUrl.hash.slice(1));
+  assert.equal(memberUrl.pathname.endsWith("/link-actions.html"), true);
+  assert.equal(mk.get("booking_id"), bookingId);
+  assert.notEqual(mk.get("mail_token"), ak.get("mail_token"));
+  const member = { booking_id: bookingId, mail_token: mk.get("mail_token") };
+  const manager = { booking_id: bookingId, mail_token: ak.get("mail_token") };
+  const bad = e.call("get9RoundMailBooking", { ...member, mail_token: "0".repeat(64) });
+  assert.equal(bad.code, "INVALID_MAIL_LINK");
+  assert.equal(e.call("get9RoundMailBooking", member).data.booking.can_cancel, true);
+  assert.equal(e.call("get9RoundMailBooking", manager).data.booking.can_cancel, true);
+  assert.equal(e.call("get9RoundMailSlots", { ...member, date: day }).ok, true);
+  assert.equal(e.data.sheets.get("nr_bookings").rows[1][8], "CONFIRMED");
+  e.advance(7 * 3600000);
+  assert.equal(e.call("get9RoundMailBooking", member).data.booking.can_cancel, true);
+  assert.equal(e.call("cancel9RoundMailBooking", member).ok, true);
+  assert.equal(e.call("get9RoundMailBooking", member).data.booking.status, "CANCELLED");
+  assert.equal(e.call("cancel9RoundMailBooking", member).code, "BOOKING_UNAVAILABLE");
+});
+
+test("management email can reschedule without staff login and preserves guards", () => {
+  const e = environment(), token = e.login(0);
+  const booked = reserve(e, token);
+  assert.equal(booked.ok, true);
+  const adminMail = e.sent.find(mail => mail.subject.startsWith("【9ROUND 管理通知】予約確認"));
+  const changeLink = [...adminMail.body.matchAll(/https:\/\/[^\s]+/g)][0][0];
+  const parts = new URLSearchParams(new URL(changeLink).hash.slice(1));
+  const args = { booking_id: parts.get("booking_id"), mail_token: parts.get("mail_token") };
+  const next = "DAILY:" + day + ":11:00";
+  assert.equal(e.call("reschedule9RoundMailBooking", { ...args, date: day, slot_id: next }).ok, true);
+  assert.equal(e.call("reschedule9RoundMailBooking", { ...args, date: day, slot_id: next }).ok, true); // idempotent replay
+  assert.equal(e.call("cancel9RoundMailBooking", args).ok, false);
+  assert.equal(e.data.sheets.get("nr_bookings").rows[1][8], "RESCHEDULED");
+  assert.equal(e.data.sheets.get("nr_management_actions").rows.length > 1, true);
+});
+
+test("suspended members, invalid secrets and past deadlines reject email actions", () => {
+  const e = environment(), token = e.login(0);
+  const booked = reserve(e, token);
+  const memberMail = e.sent.find(mail => mail.subject.startsWith("【9ROUND アリオ蘇我店】予約確認"));
+  const link = [...memberMail.body.matchAll(/https:\/\/[^\s]+/g)][1][0];
+  const parts = new URLSearchParams(new URL(link).hash.slice(1));
+  const args = { booking_id: parts.get("booking_id"), mail_token: parts.get("mail_token") };
+  e.master.sheets.get("Members").rows[1][3] = "kyukai";
+  assert.equal(e.call("cancel9RoundMailBooking", args).ok, false);
+  e.master.sheets.get("Members").rows[1][3] = "ok";
+  e.advance(26 * 3600000);
+  assert.equal(e.call("cancel9RoundMailBooking", args).code, "DEADLINE_PASSED");
 });
