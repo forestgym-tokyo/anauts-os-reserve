@@ -1105,7 +1105,7 @@ test("booking email actions bypass six-hour session but require a booking-scoped
   assert.equal(e.call("get9RoundMailBooking", member).data.booking.can_cancel, true);
   assert.equal(e.call("get9RoundMailBooking", manager).data.booking.can_cancel, true);
   assert.equal(e.call("get9RoundMailSlots", { ...member, date: day }).ok, true);
-  assert.equal(e.data.sheets.get("nr_bookings").rows[1][8], "CONFIRMED");
+  assert.equal(e.data.sheets.get("nr_bookings").rows[1][9], "CONFIRMED");
   e.advance(7 * 3600000);
   assert.equal(e.call("get9RoundMailBooking", member).data.booking.can_cancel, true);
   assert.equal(e.call("cancel9RoundMailBooking", member).ok, true);
@@ -1125,7 +1125,7 @@ test("management email can reschedule without staff login and preserves guards",
   assert.equal(e.call("reschedule9RoundMailBooking", { ...args, date: day, slot_id: next }).ok, true);
   assert.equal(e.call("reschedule9RoundMailBooking", { ...args, date: day, slot_id: next }).ok, true); // idempotent replay
   assert.equal(e.call("cancel9RoundMailBooking", args).ok, false);
-  assert.equal(e.data.sheets.get("nr_bookings").rows[1][8], "RESCHEDULED");
+  assert.equal(e.data.sheets.get("nr_bookings").rows[1][9], "RESCHEDULED");
   assert.equal(e.data.sheets.get("nr_management_actions").rows.length > 1, true);
 });
 
