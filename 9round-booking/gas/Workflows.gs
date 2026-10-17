@@ -116,8 +116,13 @@ function nrBookingHtml_(value) {
   return String(value).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; });
 }
 
-function nrBookingMailLink_(url, bookingId, intent) {
-  return url + (url.indexOf("?") < 0 ? "?" : "&") + "booking_id=" + encodeURIComponent(bookingId) + "&intent=" + intent;
+function nrBookingMailLink_(config, booking, member, role, intent) {
+  // Hash fragment is never sent to the static host or its HTTP access logs.
+  // The page clears the fragment immediately. No session or six-hour limit.
+  const page = "https://forestgym-tokyo.github.io/anauts-os-reserve/9round-booking/link-actions.html";
+  const token = nrBookingMailToken_(config, booking, member, role);
+  return page + "#booking_id=" + encodeURIComponent(booking.booking_id) +
+    "&mail_token=" + encodeURIComponent(token) + "&intent=" + encodeURIComponent(intent);
 }
 
 function nrBookingNotify_(config, type, booking, member, previous, staff) {
@@ -126,11 +131,11 @@ function nrBookingNotify_(config, type, booking, member, previous, staff) {
   const when = booking.date + " " + booking.start_time;
   const old = previous ? "\n変更前: " + previous.date + " " + previous.start_time : "";
   const summary = member.name + " 様\n\nデイリーワークアウトの" + label + "を受け付けました。\n日時: " + when + old + "\n店舗: 9ROUND アリオ蘇我店\n\n予約・変更・取消は開始1時間前までです。";
-  const changeUrl = nrBookingMailLink_(settings.memberUrl, booking.booking_id, "change");
-  const cancelUrl = nrBookingMailLink_(settings.memberUrl, booking.booking_id, "cancel");
+  const changeUrl = nrBookingMailLink_(config, booking, member, "MEMBER", "change");
+  const cancelUrl = nrBookingMailLink_(config, booking, member, "MEMBER", "cancel");
   const active = type !== "CANCELLED";
   const buttons = active ? '<p><a style="display:inline-block;padding:13px 20px;background:#e52535;color:#fff;text-decoration:none;border-radius:6px;margin-right:10px" href="' + nrBookingHtml_(changeUrl) + '">予約を変更する</a>' +
-    '<a style="display:inline-block;padding:13px 20px;background:#222;color:#fff;text-decoration:none;border-radius:6px" href="' + nrBookingHtml_(cancelUrl) + '">予約をキャンセルする</a></p><p style="font-size:12px">ボタンから本人確認後に操作できます。メールを開くだけでは予約は変更・取消されません。</p>' : "";
+    '<a style="display:inline-block;padding:13px 20px;background:#222;color:#fff;text-decoration:none;border-radius:6px" href="' + nrBookingHtml_(cancelUrl) + '">予約をキャンセルする</a></p><p style="font-size:12px">確認コードの再入力は不要です。このメールを第三者へ転送しないでください。メールを開くだけでは予約は変更・取消されません。</p>' : "";
   const subject = "【9ROUND アリオ蘇我店】" + label + " " + when;
   const payload = {
     subject: subject, body: summary + (active ? "\n\n予約を変更する:\n" + changeUrl + "\n\n予約をキャンセルする:\n" + cancelUrl : ""),
@@ -138,13 +143,13 @@ function nrBookingNotify_(config, type, booking, member, previous, staff) {
     name: "9ROUND アリオ蘇我店", replyTo: "9round.ariosoga@gmail.com"
   };
   const fighter = nrBookingFighterProfile_(config, member).fighter_name;
-  const adminChangeUrl = nrBookingMailLink_(settings.staffUrl, booking.booking_id, "change");
-  const adminCancelUrl = nrBookingMailLink_(settings.staffUrl, booking.booking_id, "cancel");
+  const adminChangeUrl = nrBookingMailLink_(config, booking, member, "ADMIN", "change");
+  const adminCancelUrl = nrBookingMailLink_(config, booking, member, "ADMIN", "cancel");
   const adminSummary = "デイリーワークアウト " + label + "\n日時: " + when + old + "\n氏名: " + member.name +
     "\nファイターネーム: " + (fighter || "未登録") + "\n会員番号: " + member.no + "\n登録メール: " + member.email +
     (staff ? "\n管理操作: " + staff.staff_code : "") + "\n\n予約・変更・取消は開始1時間前までです。";
   const adminButtons = active ? '<p><a style="display:inline-block;padding:13px 20px;background:#e52535;color:#fff;margin-right:10px" href="' + nrBookingHtml_(adminChangeUrl) + '">管理画面で変更する</a>' +
-    '<a style="display:inline-block;padding:13px 20px;background:#222;color:#fff" href="' + nrBookingHtml_(adminCancelUrl) + '">管理画面でキャンセルする</a></p><p>スタッフログイン後、管理者・マネージャーが操作できます。リンクを開くだけでは確定しません。</p>' : "";
+    '<a style="display:inline-block;padding:13px 20px;background:#222;color:#fff" href="' + nrBookingHtml_(adminCancelUrl) + '">管理画面でキャンセルする</a></p><p>この管理通知メールの専用リンクからログインなしで対象予約のみ操作できます。リンクを転送しないでください。リンクを開くだけでは確定しません。</p>' : "";
   const admin = { subject: "【9ROUND 管理通知】" + label + " " + when,
     body: adminSummary + (active ? "\n\n管理画面で変更する:\n" + adminChangeUrl + "\n\n管理画面でキャンセルする:\n" + adminCancelUrl : ""),
     htmlBody: '<div style="font-family:sans-serif;max-width:620px;color:#111"><h2>9ROUND 管理通知</h2><p>' + nrBookingHtml_(adminSummary).replace(/\n/g, "<br>") + "</p>" + adminButtons + "</div>",
