@@ -156,13 +156,13 @@ function nrBookingMembers_(config) {
       no: String(row[indexes[0]] || "").trim(),
       name: String(row[indexes[1]] || "").trim(),
       email: String(row[indexes[2]] || "").trim().toLowerCase(),
-      active: String(row[indexes[3]] || "").trim() === "ok"
+      active: ["ok", "ok_unfinished"].includes(String(row[indexes[3]] || "").trim())
     };
   });
 }
 
 function nrBookingFindMember_(config, predicate) {
-  // Only eligible "ok" rows take part in identity and duplicate checks.
+  // Only eligible "ok" / "ok_unfinished" rows take part in identity and duplicate checks.
   const all = nrBookingMembers_(config).filter(function (member) { return member.active; });
   const matches = all.filter(function (member) {
     return member.no && member.name && predicate(member);
