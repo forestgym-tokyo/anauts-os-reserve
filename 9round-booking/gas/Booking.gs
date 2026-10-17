@@ -156,13 +156,13 @@ function nrBookingMembers_(config) {
       no: String(row[indexes[0]] || "").trim(),
       name: String(row[indexes[1]] || "").trim(),
       email: String(row[indexes[2]] || "").trim().toLowerCase(),
-      active: ["ok", "ok_unfinished"].includes(String(row[indexes[3]] || "").trim())
+      active: ["ok", "ok_unfinished", "complete"].includes(String(row[indexes[3]] || "").trim())
     };
   });
 }
 
 function nrBookingFindMember_(config, predicate) {
-  // Only eligible "ok" / "ok_unfinished" rows take part in identity and duplicate checks.
+  // Only eligible "ok" / "ok_unfinished" / "complete" rows take part in identity and duplicate checks.
   const all = nrBookingMembers_(config).filter(function (member) { return member.active; });
   const matches = all.filter(function (member) {
     return member.no && member.name && predicate(member);
@@ -552,6 +552,10 @@ function round9BookingApi_(action, body) {
       get9RoundWorkoutSlots: nrGet9RoundSlots_,
       create9RoundWorkoutBooking: nrCreate9RoundBooking_,
       cancel9RoundWorkoutBooking: nrCancel9RoundBooking_,
+      get9RoundMailBooking: nrGet9RoundMailBooking_,
+      get9RoundMailSlots: nrGet9RoundMailSlots_,
+      cancel9RoundMailBooking: nrCancel9RoundMailBooking_,
+      reschedule9RoundMailBooking: nrReschedule9RoundMailBooking_,
       reschedule9RoundWorkoutBooking: nrReschedule9RoundBooking_,
       get9RoundMemberBookings: nrGet9RoundMemberBookings_,
       get9RoundFighterProfile: nrGet9RoundFighterProfile_,
