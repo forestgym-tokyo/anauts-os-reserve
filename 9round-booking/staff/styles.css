@@ -26,5 +26,9 @@
 [data-nine-round-board] .nr-trial-editor p{font-size:12px;color:#bdb1bf;line-height:1.8}
 [data-nine-round-board] .nr-trial-actions{display:flex;gap:12px;margin-top:14px}
 [data-nine-round-board] [hidden]{display:none!important}
+[data-nine-round-board][hidden]{display:none!important}
+[data-nine-round-board] .nr-slot.is-deleted{border-style:dashed;opacity:.75}
+[data-nine-round-board] .nr-deleted-label{font-size:12px;font-weight:800;color:#ff929e}
+[data-nine-round-board] [data-slot-mutation]{margin:10px 0 0 8px}
 [data-nine-round-board] .nr-scanner{border-top:1px solid #483c44;margin-top:24px;padding-top:20px}[data-nine-round-board] .nr-scanner h2{font-size:18px;margin:0 0 8px}[data-nine-round-board] .nr-scanner p{font-size:12px;color:#bdb1bf}[data-nine-round-board] .nr-scanner label{margin:12px 0}[data-nine-round-board] .nr-scanner video{display:block;width:100%;max-width:560px;border:2px solid #e52535;border-radius:10px;background:#000;margin:14px 0}[data-nine-round-board] .nr-reader-input{display:flex;gap:8px}[data-nine-round-board] .nr-reader-input input{min-width:0;flex:1}[data-nine-round-board] .nr-reader-input button{white-space:nowrap}[data-nine-round-board] .nr-attended{background:#203d2b;color:#b6f4ca;padding:2px 9px;border-radius:10px;font-size:11px}[data-nine-round-board] .nr-not-attended{font-size:11px;color:#ada3af}[data-nine-round-board] .nr-scanner .is-error{border-left-color:#ff6976}
 @media(max-width:600px){[data-nine-round-board] .nr-shell{padding:16px}[data-nine-round-board] .nr-board{grid-template-columns:1fr}[data-nine-round-board] .nr-trial-fields{grid-template-columns:1fr}[data-nine-round-board] .nr-toolbar{align-items:stretch}[data-nine-round-board] .nr-toolbar label{flex:1}[data-nine-round-board] .nr-slot-head{font-size:14px}}

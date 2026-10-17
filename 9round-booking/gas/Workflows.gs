@@ -73,7 +73,7 @@ function nrBookingRescheduleForMember_(config, body, member, staff) {
     if (rows.some(function (r) { return r.slot_id === slot.slot_id && r.member_no === member.no && r.status === "CONFIRMED"; })) {
       nrBookingError_("ALREADY_BOOKED", "変更先の枠はすでに予約済みです。元の予約は維持されています。");
     }
-    if (nrBookingRows_(config, "blocks").some(function (b) { return b.slot_id === slot.slot_id && b.status === "BLOCKED"; })) {
+    if (nrBookingRows_(config, "blocks").some(function (b) { return b.slot_id === slot.slot_id && ["BLOCKED", "DELETED"].indexOf(b.status) >= 0; })) {
       nrBookingError_("SLOT_BLOCKED", "変更先は受付停止中です。元の予約は維持されています。");
     }
     if (nrBookingCount_(rows, slot.slot_id) >= slot.capacity) nrBookingError_("SLOT_FULL", "変更先は満員です。元の予約は維持されています。");

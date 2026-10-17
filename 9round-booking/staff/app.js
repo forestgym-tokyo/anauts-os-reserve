@@ -2,10 +2,11 @@
   "use strict";
   const q = function (s) { return document.querySelector(s); };
   let refreshToken = "", expiresAt = 0, refreshing = null, signingIn = false;
-  const auth = window.NineRoundStaff = { idToken: "", canManage: false, generation: 0, onChange: function () {} };
+  const auth = window.NineRoundStaff = { idToken: "", canManage: false, canManageSlots: false, canManageBookings: false, canRetryNotifications: false, generation: 0, onChange: function () {} };
   function message(text) { q("#staffLoginMessage").hidden = !text; q("#staffLoginMessage").textContent = text || ""; }
   function logout() {
     auth.generation++; auth.idToken = ""; auth.canManage = false;
+    auth.canManageSlots = false; auth.canManageBookings = false; auth.canRetryNotifications = false;
     refreshToken = ""; expiresAt = 0;
     q("#staffPassword").value = "";
     q("#staffLoginPanel").hidden = false; q("#staffAuthBar").hidden = true;
@@ -71,7 +72,6 @@
       auth.idToken = data.idToken; refreshToken = data.refreshToken; expiresAt = Date.now() + Number(data.expiresIn) * 1000;
       const board = await auth.request("get9RoundBookingBoard", { date: window.NineRoundTokyoDate() });
       if (generation !== auth.generation) return;
-      auth.canManage = board.can_manage === true;
       q("#staffLoginPanel").hidden = true; q("#staffAuthBar").hidden = false;
       auth.onChange(board);
     } catch (error) {

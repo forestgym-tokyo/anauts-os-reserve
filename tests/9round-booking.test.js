@@ -126,6 +126,7 @@ function environment(options = {}) {
   vm.runInContext(read("9round-booking/gas/Workflows.gs"), context);
   vm.runInContext(read("9round-booking/gas/Fighters.gs"), context);
   vm.runInContext(read("9round-booking/gas/Management.gs"), context);
+  vm.runInContext(read("9round-booking/gas/SlotManagement.gs"), context);
   if (options.realStaffAuth) vm.runInContext(read("9round-booking/gas/StaffAuth.gs"), context);
   if (!options.noSetup) context.setup9RoundBookingStorage_();
   function call(action, body = {}) { const result = context.round9BookingApi_(action, body); assert.equal(locked, false, "lock must be released on all paths"); return plain(result); }
@@ -344,7 +345,7 @@ test("staff names require a valid eligible staff account; forged roles and other
 test("blocks are enforced on the server, preserve existing bookings, and can be lifted per day", () => {
   const e = environment(), first = e.login(0), second = e.login(1);
   const booking = reserve(e, first).data.booking_id;
-  for (const id_token of ["staff", "other"]) {
+  for (const id_token of ["staff", "manager", "other"]) {
     assert.equal(e.call("set9RoundWorkoutBlock", { id_token, date: day, slot_id: slotId, blocked: true }).ok, false);
   }
   const ids = plain(e.context.nrBookingDailySlots_(day)).map(s => s.slot_id);
@@ -355,7 +356,7 @@ test("blocks are enforced on the server, preserve existing bookings, and can be 
   assert.ok(slots.every(s => s.blocked && !s.available)); assert.equal(slots[0].booked_count, 1); assert.equal(slots[0].can_cancel, true);
   const board = e.call("get9RoundBookingBoard", { id_token: "staff", date: day }).data;
   assert.equal(board.slots[0].status, "BLOCKED"); assert.equal(board.slots[0].members.length, 1);
-  assert.equal(e.call("set9RoundWorkoutBlock", { id_token: "manager", date: day, slot_ids: ids, blocked: false }).ok, true);
+  assert.equal(e.call("set9RoundWorkoutBlock", { id_token: "admin", date: day, slot_ids: ids, blocked: false }).ok, true);
   assert.equal(reserve(e, second).ok, true);
   assert.equal(e.call("set9RoundWorkoutBlock", { id_token: "admin", date: day, slot_id: "DAILY:2026-10-19:10:15", blocked: true }).code, "INVALID_SLOT");
   assert.equal(e.call("set9RoundWorkoutBlock", { id_token: "admin", date: day, slot_id: slotId, blocked: "false" }).code, "INVALID_BLOCK");
@@ -441,7 +442,10 @@ test("standalone auth verifies Firebase, checks directory roles, and never write
   for (const id_token of ["admin", "manager", "staff"]) {
     const result = e.call("get9RoundBookingBoard", { id_token, date: day });
     assert.equal(result.ok, true, JSON.stringify(result));
-    assert.equal(result.data.can_manage, id_token !== "staff");
+    assert.equal(result.data.can_manage, id_token === "admin");
+    assert.equal(result.data.can_manage_slots, id_token === "admin");
+    assert.equal(result.data.can_manage_bookings, true);
+    assert.equal(result.data.can_retry_notifications, id_token !== "staff");
   }
   for (const id_token of ["other", "inactive", "invalid", ""]) {
     assert.equal(e.call("get9RoundBookingBoard", { id_token, date: day }).ok, false);
@@ -757,7 +761,7 @@ test("staff see current fighter and real names while member slot responses revea
   e.call("save9RoundFighterProfile", { session_token: token, fighter_name: "SOGA FIGHTER" });
   let shown = e.call("get9RoundBookingBoard", { id_token: "staff", date: day }).data.slots[0].members[0];
   assert.equal(shown.name, "テスト会員0"); assert.equal(shown.fighter_name, "SOGA FIGHTER");
-  assert.equal(shown.can_change, false);
+  assert.equal(shown.can_change, true);
   e.call("save9RoundFighterProfile", { session_token: token, fighter_name: "NEW FIGHTER" });
   shown = e.call("get9RoundManagedBooking", { id_token: "admin", booking_id: id }).data.booking;
   assert.equal(shown.name, "テスト会員0"); assert.equal(shown.fighter_name, "NEW FIGHTER");
@@ -781,14 +785,13 @@ test("fighter identity is revoked with the authenticated member and not inherite
   assert.equal(e.call("get9RoundBookingBoard", { id_token: "admin", date: day }).ok, true);
 });
 
-test("management email IDs and forged roles never authorize manager booking endpoints", () => {
+test("email IDs and forged roles never authorize staff booking endpoints", () => {
   const e = environment({ realStaffAuth: true }), token = e.login(), id = reserve(e, token).data.booking_id;
   for (const action of ["get9RoundManagedBooking", "cancel9RoundManagedBooking", "reschedule9RoundManagedBooking"]) {
-    for (const id_token of ["", "invalid", "staff", "other", "inactive"]) {
+    for (const id_token of ["", "invalid", "other", "inactive"]) {
       const rejected = e.call(action, { id_token, session_token: token, permission: "ADMIN", booking_id: id, date: day, slot_id: "DAILY:" + day + ":11:45" });
       assert.equal(rejected.ok, false);
       assert.ok(["FORBIDDEN", "STAFF_SESSION_EXPIRED"].includes(rejected.code));
-      if (id_token === "staff") assert.equal(rejected.code, "FORBIDDEN");
     }
   }
   assert.equal(e.call("get9RoundMemberBookings", { session_token: token }).data.bookings[0].status, "CONFIRMED");
@@ -841,6 +844,75 @@ test("managers cannot cancel or change attended bookings", () => {
   assert.equal(e.call("get9RoundManagedBooking", { id_token: "admin", booking_id: id }).data.booking.can_cancel, false);
   assert.equal(e.call("cancel9RoundManagedBooking", { id_token: "admin", booking_id: id }).code, "ALREADY_ATTENDED");
   assert.equal(e.call("reschedule9RoundManagedBooking", { id_token: "admin", booking_id: id, date: day, slot_id: slotId }).code, "ALREADY_ATTENDED");
+});
+
+test("staff, managers and administrators can change and cancel with their verified actor recorded", () => {
+  for (const [id_token, actor] of [["staff", "S"], ["manager", "M"], ["admin", "A"]]) {
+    const e = environment({ realStaffAuth: true }), token = e.login(), id = reserve(e, token).data.booking_id;
+    const board = e.call("get9RoundBookingBoard", { id_token, date: day }).data;
+    assert.equal(board.can_manage_bookings, true);
+    assert.equal(board.slots[0].members[0].can_change, true);
+    const changed = e.call("reschedule9RoundManagedBooking", { id_token, booking_id: id, date: day, slot_id: "DAILY:" + day + ":11:00" });
+    assert.equal(changed.ok, true, JSON.stringify(changed));
+    assert.equal(e.call("cancel9RoundManagedBooking", { id_token, booking_id: changed.data.booking_id }).ok, true);
+    const audit = e.data.sheets.get("nr_management_actions").rows;
+    assert.equal(audit.length, 3);
+    assert.equal(audit[1][3], actor); assert.equal(audit[2][3], actor);
+    assert.equal(e.call("get9RoundMemberBookings", { session_token: token }).data.bookings.some(b => b.status === "CONFIRMED"), false);
+    assert.ok(e.writes.every(name => name.startsWith("nr_")));
+  }
+});
+
+test("only administrators can create, block, delete or restore slots even with forged role fields", () => {
+  const e = environment({ realStaffAuth: true });
+  for (const id_token of ["staff", "manager", "other", "inactive", "invalid", ""]) {
+    for (const action of ["save9RoundTrialSlot", "set9RoundWorkoutBlock", "delete9RoundBookingSlot", "restore9RoundBookingSlot"]) {
+      const before = e.writes.length;
+      const result = e.call(action, { id_token, permission: "ADMIN", date: day, slot_id: slotId, blocked: true,
+        start_time: "11:00", capacity: 1, title: "体験" });
+      assert.equal(result.ok, false, id_token + " " + action);
+      assert.ok(["FORBIDDEN", "STAFF_SESSION_EXPIRED"].includes(result.code));
+      assert.equal(e.writes.length, before);
+    }
+  }
+});
+
+test("daily slot deletion preserves reservations, blocks direct booking and rescheduling, and restores stopped", () => {
+  const e = environment({ realStaffAuth: true }), token = e.login(), booking = reserve(e, token).data.booking_id;
+  const target = "DAILY:" + day + ":11:00", base = { id_token: "admin", date: day };
+  assert.equal(e.call("delete9RoundBookingSlot", { ...base, slot_id: slotId }).code, "SLOT_HAS_BOOKINGS");
+  assert.equal(e.call("delete9RoundBookingSlot", { ...base, slot_id: target }).ok, true);
+  const after = e.writes.length;
+  assert.equal(e.call("delete9RoundBookingSlot", { ...base, slot_id: target }).data.unchanged, true);
+  assert.equal(e.writes.length, after);
+  for (const id_token of ["staff", "manager"]) {
+    assert.equal(e.call("get9RoundBookingBoard", { id_token, date: day }).data.slots.some(s => s.slot_id === target), false);
+  }
+  const removed = e.call("get9RoundBookingBoard", base).data.slots.find(s => s.slot_id === target);
+  assert.equal(removed.status, "DELETED"); assert.equal(removed.can_restore, true); assert.equal(removed.available, false);
+  assert.equal(e.call("get9RoundWorkoutSlots", { session_token: token, date: day }).data.slots.some(s => s.slot_id === target), false);
+  assert.equal(reserve(e, token, target).code, "SLOT_BLOCKED");
+  assert.equal(e.call("reschedule9RoundManagedBooking", { ...base, booking_id: booking, slot_id: target }).code, "SLOT_BLOCKED");
+  assert.equal(e.call("set9RoundWorkoutBlock", { ...base, slot_ids: [target, "DAILY:" + day + ":11:45"], blocked: false }).code, "SLOT_DELETED");
+  assert.equal(e.call("get9RoundManagedBooking", { ...base, booking_id: booking }).data.booking.status, "CONFIRMED");
+  assert.equal(e.call("restore9RoundBookingSlot", { ...base, slot_id: target }).data.status, "BLOCKED");
+  assert.equal(reserve(e, token, target).code, "SLOT_BLOCKED");
+  assert.equal(e.call("set9RoundWorkoutBlock", { ...base, slot_id: target, blocked: false }).ok, true);
+  assert.equal(reserve(e, token, target).ok, true);
+  assert.equal(e.call("delete9RoundBookingSlot", { ...base, slot_id: "DAILY:2026-10-19:11:00" }).code, "INVALID_SLOT");
+  assert.equal(e.data.sheets.get("nr_bookings").rows.length, 3);
+});
+
+test("trial slots are deleted without removing history and restore with reception stopped", () => {
+  const e = environment({ realStaffAuth: true }), base = { id_token: "admin", date: day };
+  const trial = e.call("save9RoundTrialSlot", { ...base, start_time: "11:00", title: "体験", capacity: 2 }).data.slot_id;
+  assert.equal(e.call("delete9RoundBookingSlot", { ...base, slot_id: trial }).ok, true);
+  assert.equal(e.data.sheets.get("nr_trials").rows.length, 2);
+  assert.equal(e.call("get9RoundBookingBoard", { id_token: "staff", date: day }).data.slots.some(s => s.slot_id === trial), false);
+  assert.equal(e.call("save9RoundTrialSlot", { ...base, slot_id: trial, start_time: "11:00", title: "体験", capacity: 2 }).code, "SLOT_DELETED");
+  assert.equal(e.call("restore9RoundBookingSlot", { ...base, slot_id: trial }).data.status, "CLOSED");
+  assert.equal(e.call("get9RoundBookingBoard", base).data.slots.find(s => s.slot_id === trial).status, "CLOSED");
+  assert.equal(e.call("delete9RoundBookingSlot", { ...base, date: "2026-10-19", slot_id: trial }).code, "INVALID_SLOT");
 });
 
 test("multiple verified management recipients are retained, deduplicated and restricted by the development allowlist", () => {

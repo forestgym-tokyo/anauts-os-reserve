@@ -228,7 +228,7 @@ function enforceSogaStaffUi_(){
 
   document.body?.classList.add("soga-staff-restricted");
 
-  const allowedViews=new Set(["myShift","monthlySchedule","sogaShift"]);
+  const allowedViews=new Set(["myShift","monthlySchedule","sogaShift","nineRoundBooking"]);
   $$(".topnav .nav-button").forEach(button=>{
     const allowed=allowedViews.has(String(button.dataset.view||""));
     if(allowed)return;

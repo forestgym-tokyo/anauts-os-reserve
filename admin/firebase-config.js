@@ -232,9 +232,13 @@ document.addEventListener("DOMContentLoaded", function () {
     "./admin-daily-report.js?v=20260903-daily-save-required-v5",
     "./admin-soga-shifts.js?v=20260926-a4-shift-print-v1",
     "./admin-mpg-shifts.js?v=20261003-mpg-trigger-v3",
-    "../9round-booking/config.js?v=20261017",
-    "../9round-booking/api.js?v=20261017",
-    "./admin-9round-booking.js?v=20261017"
+    "../9round-booking/config.js?v=20261017-os-management",
+    "../9round-booking/api.js?v=20261017-os-management",
+    "./admin-9round-booking.js?v=20261017-os-management",
+    "../9round-booking/vendor/jsqr.min.js?v=20261017-os-management",
+    "../9round-booking/staff/scanner.js?v=20261017-os-management",
+    "../9round-booking/staff/booking-actions.js?v=20261017-os-management",
+    "../9round-booking/staff/board.js?v=20261017-os-management"
   ];
   var started = false;
 

@@ -13,7 +13,7 @@ new Function("require", "__dirname", "module", "exports", harness + "\nmodule.ex
 const e = helperModule.exports.environment({ realStaffAuth: true });
 const day = "2026-10-18", firstSlot = "DAILY:" + day + ":10:15", secondSlot = "DAILY:" + day + ":11:00", blockedSlot = "DAILY:" + day + ":11:45";
 const actions = [];
-let bookingGate = null, bookingFailure = null;
+let bookingGate = null, bookingFailure = null, boardGate = null;
 for (let i = 1; i <= 4; i++) {
   const token = e.login(i);
   assert.equal(e.call("create9RoundWorkoutBooking", { session_token: token, date: day, slot_id: secondSlot }).ok, true);
@@ -21,6 +21,23 @@ for (let i = 1; i <= 4; i++) {
 }
 assert.equal(e.call("set9RoundWorkoutBlock", { id_token: "admin", date: day, slot_id: blockedSlot, blocked: true }).ok, true);
 let origin = "";
+function integrationFixture(role) {
+  // Exercise the real SOGA permission UI and shared board, using only test data.
+  const admin = fs.readFileSync(path.join(root, "admin/admin.js"), "utf8");
+  const permissions = admin.slice(admin.indexOf("function roleHonorific("), admin.indexOf("function applyAuthBootstrap_("));
+  return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="./admin.css"><title>A-nauts OS / 9ROUND ブランチ確認</title></head><body>
+    <div class="app-shell"><header class="topbar"><div class="brand"><div class="brand-mark">A</div><div><strong>A-nauts OS</strong><span>Reserve / Admin</span></div></div>
+    <div class="topbar-right"><span class="store-chip">SOGA</span><div id="authUserArea"><span id="authUserName"></span><span id="authUserPermission"></span></div><button id="logoutButton">ログアウト</button></div>
+    <nav class="topnav"><button class="nav-button is-active" data-view="staffSchedule">スタッフ予定</button><button id="myShiftNav" class="nav-button" data-view="myShift">自分の予定</button><button class="nav-button" data-view="registration">各種登録</button></nav></header>
+    <main class="main"><section id="staffScheduleView" class="view is-active"><h1>スタッフ予定</h1></section><section id="myShiftView" class="view"><h1>自分の予定</h1></section><section id="registrationView" class="view"><h1>各種登録</h1></section></main></div>
+    <script>const state={idToken:"",authUser:null,testRole:""};const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);function authEnabled(){return true}
+    ${permissions}
+    function logout(){state.idToken="";state.authUser=null;applyPermissionUi()}
+    window.setTestUser=function(role,claims){state.testRole=role;state.idToken="stale-"+role;state.authUser={staff_code:{admin:"A",manager:"M",staff:"S",other:"Y"}[role],email:role+"@example.invalid",permission:claims||({admin:"ADMIN",manager:"MANAGER",staff:"STAFF",other:"STAFF"}[role]),store_code:role==="staff"?"SOGA":"YACHIYO",active:true};applyPermissionUi()};
+    window.refreshCalls=0;window.ANAUTS_ENSURE_FRESH_AUTH_TOKEN=async function(){window.refreshCalls++;state.idToken=state.testRole};
+    window.setTestUser(${JSON.stringify(role)});document.querySelector("#logoutButton").onclick=()=>logout();</script>
+    <script src="../9round-booking/config.js"></script><script src="../9round-booking/api.js"></script><script src="./admin-9round-booking.js"></script><script src="../9round-booking/vendor/jsqr.min.js"></script><script src="../9round-booking/staff/scanner.js"></script><script src="../9round-booking/staff/booking-actions.js"></script><script src="../9round-booking/staff/board.js"></script></body></html>`;
+}
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, "http://127.0.0.1");
   if (url.pathname === "/__copy-test.html") {
@@ -36,6 +53,7 @@ const server = http.createServer((req, res) => {
       const body = JSON.parse(text); actions.push(body.action);
       const mutation = /^(create|reschedule)9RoundWorkoutBooking$/.test(body.action);
       if (mutation && bookingGate) await bookingGate;
+      if (body.action === "get9RoundBookingBoard" && boardGate) await boardGate;
       const failure = mutation && bookingFailure;
       if (failure) bookingFailure = null;
       res.writeHead(200, { "Content-Type": "application/json" });
@@ -43,10 +61,10 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
-  if (url.pathname === "/admin/__read-only-test.html") {
+  if (url.pathname === "/admin/__integration-test.html") {
+    const role = ["admin", "manager", "staff", "other"].includes(url.searchParams.get("role")) ? url.searchParams.get("role") : "staff";
     res.writeHead(200, { "Content-Type": "text/html;charset=utf-8" });
-    res.end('<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{background:#111;color:white;font:14px sans-serif;margin:16px}main{max-width:1000px;margin:auto}</style></head><body><button id="logoutButton">ログアウト</button><main class="main"><section id="monthlyScheduleView"><div class="page-heading"><h1>9ROUND予定</h1></div></section></main><script>const state={idToken:"staff",authUser:{staff_code:"S",permission:"STAFF",store_code:"SOGA",active:true}};function withAuth(p){return Object.assign({},p,{id_token:state.idToken})}function applyPermissionUi(){}function logout(){state.idToken="";state.authUser=null}document.querySelector("#logoutButton").onclick=()=>logout();</script><script src="../9round-booking/config.js"></script><script src="../9round-booking/api.js"></script><script src="./admin-9round-booking.js"></script></body></html>');
-    return;
+    res.end(integrationFixture(role)); return;
   }
   let file = path.resolve(root, "." + decodeURIComponent(url.pathname));
   if (!file.startsWith(root + "/")) { res.writeHead(403); res.end(); return; }
@@ -312,18 +330,96 @@ async function main() {
 
     const viewer = await context();
     const actionStart = actions.length;
-    await viewer.page.goto(origin + "/admin/__read-only-test.html");
-    await viewer.page.locator("#nrAppBoard summary").click();
-    await viewer.page.locator("#nrAppDate").fill(day);
-    await viewer.page.locator("#nrAppDate").dispatchEvent("change");
+    await viewer.page.goto(origin + "/admin/__integration-test.html?role=staff");
+    await viewer.page.locator("#nineRoundBookingNav").click();
+    await viewer.page.locator("#nrAdminDate").fill(day);
+    await viewer.page.locator("#nrAdminDate").dispatchEvent("change");
     await viewer.page.getByText("テスト会員1 様", { exact: true }).first().waitFor();
-    assert.equal(await viewer.page.locator("#nrAppSlots .nr-slot").count(), 12);
-    assert.equal(await viewer.page.getByRole("button", { name: /ブロック|体験枠を/ }).count(), 0);
+    assert.equal(await viewer.page.locator("#nrAdminBoard .nr-slot").count(), 12);
+    assert.equal(await viewer.page.locator("#nrBlockDay").isVisible(), false);
+    assert.equal(await viewer.page.locator("#nrTrialEditor").isVisible(), false);
+    assert.equal(await viewer.page.locator("[data-slot-mutation]").count(), 0);
+    assert.equal(await viewer.page.locator("#staffLoginForm").count(), 0, "A-nauts login is reused");
+    assert.ok(await viewer.page.evaluate(() => window.refreshCalls > 0));
     assert.ok(actions.slice(actionStart).every(action => action === "get9RoundBookingBoard"));
-    await checkOverflow(viewer.page, "A-nauts reader mobile");
-    await viewer.page.screenshot({ path: path.join(evidence, "anauts-reader.png"), fullPage: true });
+    viewer.page.on("dialog", dialog => dialog.accept());
+    await viewer.page.locator('[data-slot-id="' + firstSlot + '"]').getByRole("button", { name: "変更", exact: true }).first().click();
+    await viewer.page.locator('[data-managed-slot="DAILY:' + day + ':18:30"]').click();
+    await viewer.page.locator("#nrManagedMessage").getByText(/予約を変更しました/).waitFor();
+    await viewer.page.locator('[data-slot-id="DAILY:' + day + ':18:30"]').getByRole("button", { name: "キャンセル", exact: true }).first().click();
+    await viewer.page.locator("#nrManagedCancel").click();
+    await viewer.page.locator("#nrManagedMessage").getByText(/予約をキャンセルしました/).waitFor();
+    await checkOverflow(viewer.page, "A-nauts staff mobile");
+    await viewer.page.screenshot({ path: path.join(evidence, "anauts-staff.png"), fullPage: true });
+
+    const managerView = await context();
+    await managerView.page.goto(origin + "/admin/__integration-test.html?role=manager");
+    await managerView.page.locator("#nineRoundBookingNav").click();
+    await managerView.page.locator("#nrAdminDate").fill(day);
+    await managerView.page.locator("#nrAdminDate").dispatchEvent("change");
+    await managerView.page.locator("[data-manage-booking]").first().waitFor();
+    assert.equal(await managerView.page.locator("#nrTrialEditor").isVisible(), false);
+    assert.equal(await managerView.page.locator("#nrBlockDay").isVisible(), false);
+    assert.equal(await managerView.page.locator("[data-slot-mutation]").count(), 0);
+    await checkOverflow(managerView.page, "A-nauts manager mobile");
+    await managerView.ctx.close();
+
+    const adminView = await context(1280);
+    await adminView.page.goto(origin + "/admin/__integration-test.html?role=admin");
+    await adminView.page.locator("#nineRoundBookingNav").click();
+    await adminView.page.locator("#nrAdminDate").fill(day);
+    await adminView.page.locator("#nrAdminDate").dispatchEvent("change");
+    await adminView.page.locator("#nrBlockDay").waitFor({ state: "visible" });
+    assert.equal(await adminView.page.locator("#nrTrialEditor").isVisible(), true);
+    adminView.page.on("dialog", dialog => dialog.accept());
+    await adminView.page.locator('[data-slot-id="' + firstSlot + '"]').waitFor();
+    const removedSlot = "DAILY:" + day + ":20:00", removedCard = adminView.page.locator('[data-slot-id="' + removedSlot + '"]');
+    await removedCard.getByRole("button", { name: "枠を削除", exact: true }).click();
+    await removedCard.getByText("削除済み", { exact: true }).waitFor();
+    assert.equal(e.call("get9RoundWorkoutSlots", { session_token: e.login(7), date: day }).data.slots.some(s => s.slot_id === removedSlot), false);
+    await removedCard.getByRole("button", { name: "枠を復元", exact: true }).click();
+    await removedCard.getByText("デイリーワークアウト（ブロック中）", { exact: true }).waitFor();
+    await removedCard.getByRole("button", { name: "ブロックを解除", exact: true }).click();
+    await removedCard.getByText("デイリーワークアウト", { exact: true }).waitFor();
+    await adminView.page.locator("#nrTrialEditor summary").click();
+    await adminView.page.locator("#nrTrialTitle").fill("OS体験枠");
+    await adminView.page.locator("#nrTrialDate").fill(day);
+    await adminView.page.locator("#nrTrialStart").fill("17:45");
+    await adminView.page.locator("#nrTrialSave").click();
+    const newTrialCard = adminView.page.locator("#nrAdminBoard .nr-slot").filter({ hasText: "OS体験枠" });
+    await newTrialCard.waitFor();
+    await newTrialCard.getByRole("button", { name: "枠を削除", exact: true }).click();
+    await newTrialCard.getByText("削除済み", { exact: true }).waitFor();
+    await newTrialCard.getByRole("button", { name: "枠を復元", exact: true }).click();
+    await newTrialCard.getByText(/受付停止/).waitFor();
+    await adminView.page.screenshot({ path: path.join(evidence, "anauts-admin.png"), fullPage: true });
+    await checkOverflow(adminView.page, "A-nauts admin desktop");
+    for (const width of [320, 390, 1024]) {
+      await adminView.page.setViewportSize({ width, height: 844 });
+      await checkOverflow(adminView.page, "A-nauts admin " + width);
+    }
+    await adminView.ctx.close();
+
+    const denied = await context();
+    await denied.page.goto(origin + "/admin/__integration-test.html?role=other");
+    assert.equal(await denied.page.locator("#nineRoundBookingNav").count(), 0);
+    await denied.page.evaluate(() => window.setTestUser("other", "ADMIN"));
+    await denied.page.locator("#nineRoundBookingNav").click();
+    await denied.page.locator("#nineRoundBookingNav").waitFor({ state: "hidden" });
+    assert.equal(await denied.page.locator("#nrAdminBoard").textContent(), "");
+    await denied.ctx.close();
+
+    let releaseBoard;
+    boardGate = new Promise(resolve => { releaseBoard = resolve; });
+    const pendingBoard = viewer.page.waitForResponse(r => r.url().includes("/__booking_api") && r.request().postDataJSON().action === "get9RoundBookingBoard");
+    const startedBoard = viewer.page.waitForRequest(r => r.url().includes("/__booking_api") && r.postDataJSON().action === "get9RoundBookingBoard");
+    await viewer.page.locator("#nrAdminReload").click();
+    await startedBoard;
     await viewer.page.locator("#logoutButton").click();
-    assert.equal(await viewer.page.locator("#nrAppBoard").isVisible(), false);
+    releaseBoard(); boardGate = null; await pendingBoard;
+    await viewer.page.waitForLoadState("networkidle");
+    assert.equal(await viewer.page.locator("#nineRoundBookingView").isVisible(), false);
+    assert.equal(await viewer.page.locator("#nrAdminBoard").textContent(), "");
     assert.equal((await viewer.page.locator("body").textContent()).includes("テスト会員1"), false);
 
     const blockedCamera = await context();
@@ -343,10 +439,13 @@ async function main() {
     await normalStaff.page.locator("#staffPassword").fill("test-password");
     await normalStaff.page.locator("#staffSignIn").click();
     await normalStaff.page.locator("#nrAdminDate").waitFor();
+    await normalStaff.page.locator("#nrAdminDate").fill(day);
+    await normalStaff.page.locator("#nrAdminDate").dispatchEvent("change");
+    await normalStaff.page.locator("[data-manage-booking]").first().waitFor();
     assert.equal(await normalStaff.page.locator("#nrTrialEditor").isVisible(), false);
     assert.equal(await normalStaff.page.locator("#nrBlockActions").isVisible(), false);
-    assert.equal(await normalStaff.page.locator("#nrManagedPanel").isVisible(), false);
-    assert.equal(await normalStaff.page.locator("[data-manage-booking]").count(), 0);
+    assert.equal(await normalStaff.page.locator("#nrManagedPanel").isVisible(), true);
+    assert.ok(await normalStaff.page.locator("[data-manage-booking]").count() > 0);
     assert.equal(await normalStaff.page.getByRole("button", { name: /ブロックを解除|予約受付をブロック/ }).count(), 0);
     await normalStaff.page.locator("#staffLogout").click();
     assert.equal(await normalStaff.page.locator("#nrAdminBoard .nr-slot").count(), 0);
@@ -386,7 +485,7 @@ async function main() {
     await limited.page.locator("#bookingLimitStatus").getByText(/未消化予約 9 \/ 10コマ/).waitFor();
     await limited.ctx.close();
     assert.deepEqual(errors, []);
-    console.log(JSON.stringify({ status: "passed", checks: ["member email ownership flow", "fighter registration and rename personalize greeting", "30 minute wording and start-time-only slots", "real and fighter names on staff board", "11 slots / counts only", "full and blocked cannot book", "tap reserve / cancel", "fighter placeholder uses fighter name", "pending dialog shows selected time and blocks repeated submission", "success is shown only after the booking response", "capacity rejection and unknown transport result have distinct feedback", "email change and cancel links require explicit authenticated action", "atomic change to another slot", "management mail change and cancel links require staff login and explicit action", "real QR image decoding and attendance registration", "USB reader and duplicate attendance", "camera fallback", "blocked camera policy keeps photo and reader available", "future dates cannot register attendance", "mail failure preserves reservation and managers retry", "block/unblock preserves reservations", "trial creation", "independent staff roles", "A-nauts is read-only", "logout clears identities and fighter name", "ten outstanding reservations prevent an eleventh and still allow change or cancel", "no horizontal overflow at 320/390/1024/1280px", "no browser exceptions"], apiCalls: actions.length }));
+    console.log(JSON.stringify({ status: "passed", checks: ["member email ownership flow", "fighter registration and rename personalize greeting", "30 minute wording and start-time-only slots", "real and fighter names on staff board", "11 slots / counts only", "full and blocked cannot book", "tap reserve / cancel", "fighter placeholder uses fighter name", "pending dialog shows selected time and blocks repeated submission", "success is shown only after the booking response", "capacity rejection and unknown transport result have distinct feedback", "email change and cancel links require explicit authenticated action", "atomic change to another slot", "management mail change and cancel links require staff login and explicit action", "real QR image decoding and attendance registration", "USB reader and duplicate attendance", "camera fallback", "blocked camera policy keeps photo and reader available", "future dates cannot register attendance", "mail failure preserves reservation and managers retry", "block/unblock preserves reservations", "trial creation", "independent staff roles", "A-nauts staff login and refreshed tokens are reused", "staff change and cancellation within A-nauts", "manager slot controls are hidden", "admin deletion and restoration for daily and trial slots", "forged role and late logout responses clear member data", "logout clears identities and fighter name", "ten outstanding reservations prevent an eleventh and still allow change or cancel", "no horizontal overflow at 320/390/1024/1280px", "no browser exceptions"], apiCalls: actions.length }));
   } finally { await browser.close(); server.close(); }
 }
 main().catch(error => { console.error(error); server.close(); process.exitCode = 1; });

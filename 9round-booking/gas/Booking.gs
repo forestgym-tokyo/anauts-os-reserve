@@ -347,7 +347,9 @@ function nrGet9RoundSlots_(config, body) {
   const rows = nrBookingRows_(config, "bookings");
   const blocks = nrBookingRows_(config, "blocks");
   const attendance = nrBookingRows_(config, "attendance");
-  const slots = nrBookingDailySlots_(date).map(function (slot) {
+  const slots = nrBookingDailySlots_(date).filter(function (slot) {
+    return !blocks.some(function (b) { return b.slot_id === slot.slot_id && b.status === "DELETED"; });
+  }).map(function (slot) {
     const mine = rows.find(function (r) { return r.slot_id === slot.slot_id && r.member_no === auth.member.no && r.status === "CONFIRMED"; });
     const count = nrBookingCount_(rows, slot.slot_id);
     const withinDeadline = nrBookingBeforeDeadline_(slot);
@@ -379,7 +381,7 @@ function nrCreate9RoundBooking_(config, body) {
       nrBookingError_("BOOKING_LIMIT", "未消化の予約は10コマまでです。予約の変更・取消は予約一覧から行えます。");
     }
     nrBookingNotificationConfig_(config);
-    if (nrBookingRows_(config, "blocks").some(function (r) { return r.slot_id === slot.slot_id && r.status === "BLOCKED"; })) {
+    if (nrBookingRows_(config, "blocks").some(function (r) { return r.slot_id === slot.slot_id && ["BLOCKED", "DELETED"].indexOf(r.status) >= 0; })) {
       nrBookingError_("SLOT_BLOCKED", "この枠は予約受付を停止しています。他の枠をお選びください。");
     }
     nrBookingRequireDeadline_(slot);
@@ -444,24 +446,31 @@ function nrGet9RoundBoard_(config, body) {
   const attendance = nrBookingRows_(config, "attendance");
   const fighters = nrBookingFighterNames_(config);
   const trials = nrBookingRows_(config, "trials").filter(function (r) { return r.date === date; });
-  const slots = nrBookingDailySlots_(date).concat(trials);
-  const canManage = ["ADMIN", "MANAGER"].indexOf(auth.permission) >= 0;
-  return { date: date, can_manage: canManage,
-    pending_notifications: canManage ? nrBookingRows_(config, "mail").filter(function (m) { return m.status !== "SENT"; }).length : 0,
+  const canManageSlots = auth.permission === "ADMIN";
+  const canRetryNotifications = ["ADMIN", "MANAGER"].indexOf(auth.permission) >= 0;
+  const slots = nrBookingDailySlots_(date).concat(trials).filter(function (slot) {
+    return canManageSlots || (slot.status !== "DELETED" && !blocks.some(function (b) { return b.slot_id === slot.slot_id && b.status === "DELETED"; }));
+  });
+  return { date: date, can_manage: canManageSlots, can_manage_slots: canManageSlots,
+    can_manage_bookings: true, can_retry_notifications: canRetryNotifications,
+    pending_notifications: canRetryNotifications ? nrBookingRows_(config, "mail").filter(function (m) { return m.status !== "SENT"; }).length : 0,
     slots: slots.map(function (slot) {
+    const deleted = slot.status === "DELETED" || blocks.some(function (b) { return b.slot_id === slot.slot_id && b.status === "DELETED"; });
     return { slot_id: slot.slot_id, kind: slot.kind, date: date, title: slot.title || "デイリーワークアウト",
       start_time: slot.start_time, end_time: slot.end_time, capacity: Number(slot.capacity),
-      status: slot.kind === "DAILY" && blocks.some(function (b) { return b.slot_id === slot.slot_id && b.status === "BLOCKED"; }) ? "BLOCKED" : slot.status,
+      status: deleted ? "DELETED" : slot.kind === "DAILY" && blocks.some(function (b) { return b.slot_id === slot.slot_id && b.status === "BLOCKED"; }) ? "BLOCKED" : slot.status,
       booked_count: nrBookingCount_(rows, slot.slot_id),
-      available: slot.kind === "DAILY" && nrBookingBeforeDeadline_(slot) && nrBookingCount_(rows, slot.slot_id) < Number(slot.capacity) &&
+      can_delete: canManageSlots && !deleted && nrBookingCount_(rows, slot.slot_id) === 0,
+      can_restore: canManageSlots && deleted,
+      available: !deleted && slot.kind === "DAILY" && nrBookingBeforeDeadline_(slot) && nrBookingCount_(rows, slot.slot_id) < Number(slot.capacity) &&
         !blocks.some(function (b) { return b.slot_id === slot.slot_id && b.status === "BLOCKED"; }),
       members: rows.filter(function (r) { return r.slot_id === slot.slot_id && r.status === "CONFIRMED"; })
         .map(function (r) {
           const checkin = attendance.find(function (a) { return a.booking_id === r.booking_id && a.status === "ATTENDED"; });
           return { booking_id: r.booking_id, member_no: r.member_no, name: r.member_name,
             fighter_name: fighters[r.member_no] || "", attended: !!checkin,
-            can_cancel: canManage && nrBookingBeforeDeadline_(r) && !checkin,
-            can_change: canManage && nrBookingBeforeDeadline_(r) && !checkin,
+            can_cancel: nrBookingBeforeDeadline_(r) && !checkin,
+            can_change: nrBookingBeforeDeadline_(r) && !checkin,
             checked_in_at: checkin ? checkin.checked_in_at : "" };
         })
     };
@@ -469,7 +478,7 @@ function nrGet9RoundBoard_(config, body) {
 }
 
 function nrSet9RoundBlock_(config, body) {
-  const auth = nrBookingStaff_(config, body, true);
+  const auth = nrBookingSlotAdmin_(config, body);
   if (typeof body.blocked !== "boolean") nrBookingError_("INVALID_BLOCK", "ブロックまたは解除を指定してください。");
   return nrBookingLocked_(function () {
     const date = nrBookingRequireDate_(config, body.date);
@@ -479,6 +488,9 @@ function nrSet9RoundBlock_(config, body) {
       nrBookingError_("INVALID_SLOT", "対象日のデイリーワークアウト枠を指定してください。");
     }
     const rows = nrBookingRows_(config, "blocks");
+    if (rows.some(function (r) { return ids.indexOf(r.slot_id) >= 0 && r.status === "DELETED"; })) {
+      nrBookingError_("SLOT_DELETED", "削除した枠は、先に復元してください。");
+    }
     Array.from(new Set(ids)).forEach(function (id) {
       const slot = valid.find(function (s) { return s.slot_id === id; });
       const old = rows.find(function (r) { return r.slot_id === id; });
@@ -493,7 +505,7 @@ function nrSet9RoundBlock_(config, body) {
 
 /** Trial slots are independent records; members cannot book them via the DAILY API. */
 function nrSave9RoundTrial_(config, body) {
-  const auth = nrBookingStaff_(config, body, true);
+  const auth = nrBookingSlotAdmin_(config, body);
   return nrBookingLocked_(function () {
     const date = nrBookingRequireDate_(config, body.date);
     const time = String(body.start_time || "");
@@ -514,6 +526,7 @@ function nrSave9RoundTrial_(config, body) {
     const id = String(body.slot_id || "");
     const old = id ? rows.find(function (r) { return r.slot_id === id; }) : null;
     if (id && !old) nrBookingError_("INVALID_SLOT", "体験枠が見つかりません。");
+    if (old && old.status === "DELETED") nrBookingError_("SLOT_DELETED", "削除済みの体験枠は、先に復元してください。");
     if (rows.some(function (r) { return r.slot_id !== id && r.date === date && r.start_time === time && r.status === "OPEN" && status === "OPEN"; })) {
       nrBookingError_("DUPLICATE_TRIAL", "同じ日時の体験枠はすでにあります。");
     }
@@ -553,7 +566,9 @@ function round9BookingApi_(action, body) {
       logout9RoundBooking: nrLogout9RoundBooking_,
       get9RoundBookingBoard: nrGet9RoundBoard_,
       save9RoundTrialSlot: nrSave9RoundTrial_,
-      set9RoundWorkoutBlock: nrSet9RoundBlock_
+      set9RoundWorkoutBlock: nrSet9RoundBlock_,
+      delete9RoundBookingSlot: nrDelete9RoundSlot_,
+      restore9RoundBookingSlot: nrRestore9RoundSlot_
     };
     if (!handlers[action]) nrBookingError_("ACTION_NOT_FOUND", "指定された操作は利用できません。");
     return successResponse(handlers[action](config, body || {}));

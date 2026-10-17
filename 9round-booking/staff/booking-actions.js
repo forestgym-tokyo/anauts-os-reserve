@@ -7,8 +7,8 @@
   const actions = window.NineRoundBookingActions = { onUpdated: function () {}, mount: mount, reset: reset, open: open,
     authenticate: function () {
       if (!mounted) return;
-      q("#nrManagedPanel").hidden = !auth.idToken || !auth.canManage;
-      if (!auth.idToken || !auth.canManage || identity === String(auth.generation)) return;
+      q("#nrManagedPanel").hidden = !auth.idToken || !auth.canManageBookings;
+      if (!auth.idToken || !auth.canManageBookings || identity === String(auth.generation)) return;
       identity = String(auth.generation);
       if (wanted) open(wanted, intent);
     }
@@ -22,7 +22,7 @@
     q("#nrManagedMessage").textContent = ""; q("#nrManagedPicker").hidden = true;
     q("#nrManagedDate").value = ""; setBusy(false);
   }
-  function current(seq, generation) { return seq === sequence && auth.generation === generation && !!auth.idToken && auth.canManage; }
+  function current(seq, generation) { return seq === sequence && auth.generation === generation && !!auth.idToken && auth.canManageBookings; }
   function message(text) { q("#nrManagedMessage").textContent = text || ""; }
   function setBusy(value) {
     busy = value;
@@ -31,7 +31,7 @@
   }
   function when(r) { return r.date.replace(/-/g, "/") + " " + r.start_time; }
   async function open(id, requestedIntent) {
-    if (!auth.idToken || !auth.canManage || busy) return;
+    if (!auth.idToken || !auth.canManageBookings || busy) return;
     const seq = ++sequence, generation = auth.generation;
     selected = null; q("#nrManagedPanel").hidden = false; q("#nrManagedPanel").open = true;
     q("#nrManagedContent").replaceChildren(); q("#nrManagedSlots").replaceChildren(); q("#nrManagedPicker").hidden = true;
@@ -78,7 +78,7 @@
     finally { if (current(seq, generation)) setBusy(false); }
   }
   async function mutate(action, payload, done) {
-    if (!selected || busy || !auth.canManage) return;
+    if (!selected || busy || !auth.canManageBookings) return;
     const seq = sequence, generation = auth.generation; setBusy(true); message("処理しています…");
     try {
       const result = await auth.request(action, payload);
@@ -103,7 +103,7 @@
     if (mounted) return;
     mounted = true;
     const panel = el("details"); panel.id = "nrManagedPanel"; panel.className = "nr-managed"; panel.hidden = true;
-    panel.innerHTML = '<summary>予約の変更・キャンセル（管理者）</summary><p class="hint">変更・取消は開始1時間前までです。</p><div id="nrManagedContent"></div><div id="nrManagedMessage" class="nr-message" role="status" aria-live="polite"></div><div id="nrManagedPicker" hidden><label>変更先の日付<input id="nrManagedDate" type="date" required></label><div id="nrManagedSlots" class="nr-managed-slots"></div></div>';
+    panel.innerHTML = '<summary>予約の変更・キャンセル</summary><p class="hint">変更・取消は開始1時間前までです。</p><div id="nrManagedContent"></div><div id="nrManagedMessage" class="nr-message" role="status" aria-live="polite"></div><div id="nrManagedPicker" hidden><label>変更先の日付<input id="nrManagedDate" type="date" required></label><div id="nrManagedSlots" class="nr-managed-slots"></div></div>';
     parent.insertBefore(panel, q("#nrAdminBoard"));
     q("#nrManagedDate").addEventListener("change", function () { if (q("#nrManagedDate").value) loadSlots(); });
   }

@@ -4,7 +4,7 @@
   if (!auth) return;
   let built = false, requestSequence = 0, inFlight = false, board = [], currentIdentity = "";
   const q = function (s) { return document.querySelector(s); };
-  function management() { return auth.canManage === true; }
+  function management() { return auth.canManageSlots === true; }
   function eligible() { return !!auth.idToken; }
   function textElement(tag, className, text) {
     const node = document.createElement(tag);
@@ -22,6 +22,7 @@
     window.NineRoundScanner.reset();
     window.NineRoundBookingActions.reset();
     requestSequence++; inFlight = false; board = [];
+    auth.canManage = false; auth.canManageSlots = false; auth.canManageBookings = false; auth.canRetryNotifications = false;
     if (q("#nrAdminBoard")) q("#nrAdminBoard").replaceChildren();
     if (q("#nrTrialForm")) q("#nrTrialForm").reset();
     if (q("#nrTrialId")) q("#nrTrialId").value = "";
@@ -44,25 +45,36 @@
     window.NineRoundBookingActions.authenticate();
   }
   function render(data) {
+    auth.canManage = data.can_manage_slots === true;
+    auth.canManageSlots = data.can_manage_slots === true;
+    auth.canManageBookings = data.can_manage_bookings === true;
+    auth.canRetryNotifications = data.can_retry_notifications === true;
+    q("#nrTrialEditor").hidden = !management();
+    q("#nrBlockActions").hidden = !management() && !auth.canRetryNotifications;
+    q("#nrBlockDay").hidden = !management(); q("#nrUnblockDay").hidden = !management();
+    window.NineRoundBookingActions.authenticate();
     board = data.slots;
     window.NineRoundScanner.sync(data.slots, data.date);
-    q("#nrRetryNotifications").hidden = !management() || !data.pending_notifications;
+    q("#nrRetryNotifications").hidden = !auth.canRetryNotifications || !data.pending_notifications;
     q("#nrRetryNotifications").textContent = "未送信メールを再送（" + (data.pending_notifications || 0) + "件）";
     const target = q("#nrAdminBoard");
     target.replaceChildren();
     board.forEach(function (slot) {
       const article = textElement("article", "nr-slot" + (slot.kind === "TRIAL" ? " is-trial" : ""));
+      article.classList.toggle("is-deleted", slot.status === "DELETED");
+      article.dataset.slotId = slot.slot_id;
       const header = textElement("div", "nr-slot-head");
       header.append(textElement("strong", "", slot.start_time));
       header.append(textElement("span", "nr-count", slot.booked_count + " / " + slot.capacity + "名"));
       article.append(header, textElement("p", "nr-kind", slot.kind === "TRIAL" ? "体験 · " + slot.title + (slot.status === "CLOSED" ? "（受付停止）" : "") : "デイリーワークアウト" + (slot.status === "BLOCKED" ? "（ブロック中）" : "")));
+      if (slot.status === "DELETED") article.append(textElement("p", "nr-deleted-label", "削除済み"));
       if (slot.members.length) {
         const names = textElement("ul", "nr-names");
         slot.members.forEach(function (member) {
           const li = textElement("li");
           li.append(textElement("span", "", member.name + " 様"), textElement("small", "", "会員番号 " + member.member_no), textElement("span", member.attended ? "nr-attended" : "nr-not-attended", member.attended ? "受講済み" : "未受講"));
           li.append(textElement("span", "nr-fighter-name", "ファイター：" + (member.fighter_name || "未登録")));
-          if (management() && slot.kind === "DAILY" && (member.can_change || member.can_cancel)) {
+          if (auth.canManageBookings && slot.kind === "DAILY" && (member.can_change || member.can_cancel)) {
             const actions = textElement("div", "nr-member-actions");
             [["change", "変更", member.can_change], ["cancel", "キャンセル", member.can_cancel]].forEach(function (a) {
               if (!a[2]) return;
@@ -77,16 +89,26 @@
         });
         article.append(names);
       } else article.append(textElement("p", "nr-empty", "予約はまだありません"));
-      if (slot.kind === "TRIAL" && management()) {
+      if (slot.kind === "TRIAL" && slot.status !== "DELETED" && management()) {
         const edit = textElement("button", "", "体験枠を編集");
         edit.type = "button";
         edit.addEventListener("click", function () { editTrial(slot); });
         article.append(edit);
-      } else if (slot.kind === "DAILY" && management()) {
+      } else if (slot.kind === "DAILY" && slot.status !== "DELETED" && management()) {
         const block = textElement("button", "", slot.status === "BLOCKED" ? "ブロックを解除" : "予約受付をブロック");
         block.type = "button"; block.classList.toggle("nr-primary", slot.status === "BLOCKED");
         block.addEventListener("click", function () { setBlock([slot.slot_id], slot.status !== "BLOCKED"); });
         article.append(block);
+      }
+      if (management()) {
+        const deleted = slot.status === "DELETED";
+        const remove = textElement("button", "", deleted ? "枠を復元" : "枠を削除");
+        remove.type = "button"; remove.dataset.slotMutation = deleted ? "restore" : "delete";
+        remove.disabled = deleted ? !slot.can_restore : !slot.can_delete;
+        remove.dataset.unavailable = String(remove.disabled);
+        if (!deleted && !slot.can_delete) remove.title = "予約が入っている枠は削除できません。";
+        remove.addEventListener("click", function () { setDeleted(slot, !deleted); });
+        article.append(remove);
       }
       target.append(article);
     });
@@ -107,11 +129,26 @@
       await load(false);
     } catch (error) {
       if (ownSequence === requestSequence && eligible()) { notice(error.message); inFlight = false; await load(false); }
-    } finally { inFlight = false; setMutationBusy(false); }
+    } finally { if (auth.generation === ownStaff) { inFlight = false; setMutationBusy(false); } }
+  }
+  async function setDeleted(slot, deleted) {
+    if (!management() || inFlight || !(deleted ? slot.can_delete : slot.can_restore)) return;
+    const label = slot.date.replace(/-/g, "/") + " " + slot.start_time;
+    if (!window.confirm(deleted ? label + " の枠を削除しますか？予約のある枠は削除できません。あとから復元できます。" : label + " の枠を復元しますか？復元後は受付停止となります。")) return;
+    inFlight = true; setMutationBusy(true);
+    const ownStaff = auth.generation, ownSequence = ++requestSequence;
+    try {
+      await request(deleted ? "delete9RoundBookingSlot" : "restore9RoundBookingSlot", { date: slot.date, slot_id: slot.slot_id });
+      if (ownSequence !== requestSequence || !eligible() || auth.generation !== ownStaff) return;
+      notice(deleted ? "枠を削除しました。管理者はこの画面から復元できます。" : "枠を復元しました。受付を再開する場合は、停止を解除してください。");
+      inFlight = false; await load(false);
+    } catch (error) { if (ownSequence === requestSequence && eligible()) notice(error.message); }
+    finally { if (auth.generation === ownStaff) { inFlight = false; setMutationBusy(false); } }
   }
   function setMutationBusy(value) {
     ["#nrAdminDate", "#nrAdminReload", "#nrBlockDay", "#nrUnblockDay", "#nrTrialSave", "#nrTrialNew", "#nrRetryNotifications"].forEach(function (s) { q(s).disabled = value; });
     q("#nrTrialForm").querySelectorAll("input,select").forEach(function (el) { el.disabled = value; });
+    q("#nrAdminBoard").querySelectorAll("button").forEach(function (el) { el.disabled = value || el.dataset.unavailable === "true"; });
   }
   async function load(clearNotice) {
     if (!eligible() || inFlight) return;
@@ -167,13 +204,14 @@
       q("#nrAdminDate").value = payload.date;
       newTrial(); notice("体験枠を保存しました。"); inFlight = false; await load(false);
     } catch (error) { if (ownSequence === requestSequence && eligible()) notice(error.message); }
-    finally { inFlight = false; setMutationBusy(false); }
+    finally { if (auth.generation === ownStaff) { inFlight = false; setMutationBusy(false); } }
   }
   function build() {
     if (built) return;
     built = true;
     const section = document.createElement("section");
     section.id = "nineRoundBookingView"; section.dataset.nineRoundBoard = "";
+    if (auth.embedded) section.className = "view";
     section.innerHTML = [
       '<div class="page-heading"><div><p class="eyebrow">9ROUND ARIO SOGA</p><h1>9ROUND予約</h1><p>デイリーワークアウトの予約確認と体験枠の管理</p></div></div>',
       '<div class="nr-shell"><div class="nr-toolbar"><label>予約日<input id="nrAdminDate" type="date" required></label><button id="nrAdminReload" class="nr-primary" type="button">予約を確認</button></div>',
@@ -189,21 +227,25 @@
       '<label>受付状態<select id="nrTrialStatus"><option value="OPEN">受付可能</option><option value="CLOSED">受付停止</option></select></label>',
       '</div><div class="nr-trial-actions"><button id="nrTrialSave" class="nr-primary" type="submit">体験枠を追加</button><button id="nrTrialNew" type="button">新規入力</button></div></form></details></div>'
     ].join("");
-    q("#staffWorkspace").append(section);
-    window.NineRoundBookingActions.mount(q(".nr-shell"));
+    (auth.workspace || q("#staffWorkspace")).append(section);
+    window.NineRoundBookingActions.mount(section.querySelector(".nr-shell"));
     window.NineRoundBookingActions.onUpdated = function () { return load(false); };
-    window.NineRoundScanner.mount(q(".nr-shell"));
+    window.NineRoundScanner.mount(section.querySelector(".nr-shell"));
     window.NineRoundScanner.onRegistered = function () { load(false); };
     q("#nrAdminDate").value = window.NineRoundTokyoDate();
     newTrial();
     q("#nrAdminReload").addEventListener("click", function () { load(true); });
-    q("#nrAdminDate").addEventListener("change", function () { if (q("#nrAdminDate").value) load(true); });
+    q("#nrAdminDate").addEventListener("change", function () {
+      if (!q("#nrAdminDate").value) return;
+      if (!q("#nrTrialId").value) q("#nrTrialDate").value = q("#nrAdminDate").value;
+      load(true);
+    });
     q("#nrTrialForm").addEventListener("submit", saveTrial);
     q("#nrTrialNew").addEventListener("click", function () { if (!inFlight) newTrial(); });
-    q("#nrBlockDay").addEventListener("click", function () { setBlock(board.filter(function (s) { return s.kind === "DAILY"; }).map(function (s) { return s.slot_id; }), true); });
-    q("#nrUnblockDay").addEventListener("click", function () { setBlock(board.filter(function (s) { return s.kind === "DAILY"; }).map(function (s) { return s.slot_id; }), false); });
+    q("#nrBlockDay").addEventListener("click", function () { setBlock(board.filter(function (s) { return s.kind === "DAILY" && s.status !== "DELETED"; }).map(function (s) { return s.slot_id; }), true); });
+    q("#nrUnblockDay").addEventListener("click", function () { setBlock(board.filter(function (s) { return s.kind === "DAILY" && s.status !== "DELETED"; }).map(function (s) { return s.slot_id; }), false); });
     q("#nrRetryNotifications").addEventListener("click", async function () {
-      if (!management() || inFlight) return;
+      if (!auth.canRetryNotifications || inFlight) return;
       const identity = auth.generation; inFlight = true; setMutationBusy(true);
       try {
         const result = await request("retry9RoundBookingNotifications", {});
@@ -212,7 +254,9 @@
       } catch (error) { if (eligible() && identity === auth.generation) notice(error.message); }
       finally { if (identity === auth.generation) { inFlight = false; setMutationBusy(false); } }
     });
+    if (auth.onMounted) auth.onMounted(section);
   }
+  auth.reloadBoard = function () { return load(true); };
   auth.onChange = syncAccess;
   syncAccess();
 })();

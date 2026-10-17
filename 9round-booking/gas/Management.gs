@@ -1,4 +1,4 @@
-/** Explicit manager endpoints. Email URLs never grant authority or mutate data. */
+/** Authenticated staff operations. Email URLs never grant authority or mutate data. */
 function nrBookingManagedMember_(config, body, requireActive) {
   const booking = nrBookingRows_(config, "bookings").find(function (r) { return r.booking_id === String(body.booking_id || ""); });
   if (!booking) nrBookingError_("BOOKING_NOT_FOUND", "対象の予約が見つかりません。");
@@ -14,7 +14,7 @@ function nrBookingManagedMember_(config, body, requireActive) {
 }
 
 function nrGet9RoundManagedBooking_(config, body) {
-  nrBookingStaff_(config, body, true);
+  nrBookingStaff_(config, body, false);
   const selected = nrBookingManagedMember_(config, body, false), r = selected.booking;
   const attended = nrBookingAttended_(config, r.booking_id);
   const mutable = r.status === "CONFIRMED" && nrBookingBeforeDeadline_(r) && !attended;
@@ -26,7 +26,7 @@ function nrGet9RoundManagedBooking_(config, body) {
 }
 
 function nrCancel9RoundManagedBooking_(config, body) {
-  const staff = nrBookingStaff_(config, body, true);
+  const staff = nrBookingStaff_(config, body, false);
   return nrBookingLocked_(function () {
     const selected = nrBookingManagedMember_(config, body, false);
     return nrBookingCancelForMember_(config, body, selected.member, staff);
@@ -34,7 +34,7 @@ function nrCancel9RoundManagedBooking_(config, body) {
 }
 
 function nrReschedule9RoundManagedBooking_(config, body) {
-  const staff = nrBookingStaff_(config, body, true);
+  const staff = nrBookingStaff_(config, body, false);
   return nrBookingLocked_(function () {
     const selected = nrBookingManagedMember_(config, body, true);
     return nrBookingRescheduleForMember_(config, body, selected.member, staff);
