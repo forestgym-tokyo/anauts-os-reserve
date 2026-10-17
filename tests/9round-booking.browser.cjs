@@ -52,7 +52,7 @@ const server = http.createServer((req, res) => {
   if (!file.startsWith(root + "/")) { res.writeHead(403); res.end(); return; }
   if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, "index.html");
   if (!fs.existsSync(file)) { res.writeHead(404); res.end(); return; }
-  const type = { ".html": "text/html;charset=utf-8", ".js": "text/javascript;charset=utf-8", ".css": "text/css;charset=utf-8", ".png": "image/png" }[path.extname(file)] || "text/plain";
+  const type = { ".html": "text/html;charset=utf-8", ".js": "text/javascript;charset=utf-8", ".css": "text/css;charset=utf-8", ".png": "image/png", ".webmanifest": "application/manifest+json" }[path.extname(file)] || "text/plain";
   res.writeHead(200, { "Content-Type": type, ...(url.searchParams.has("cameraBlocked") ? { "Permissions-Policy": "camera=()" } : {}) }); res.end(fs.readFileSync(file));
 });
 async function checkOverflow(page, label) {
@@ -69,7 +69,8 @@ async function main() {
   const browser = await chromium.launch({ headless: true, executablePath: process.env.ROUND9_CHROMIUM_PATH || undefined, args: ["--no-sandbox","--disable-dev-shm-usage","--disable-gpu","--no-zygote"] });
   const errors = [];
   async function context(width = 390, fixtures = true) {
-    const ctx = await browser.newContext({ viewport: { width, height: 844 }, locale: "ja-JP", timezoneId: "Asia/Tokyo" });
+    // This suite routes mock API/config responses; service workers are verified separately.
+    const ctx = await browser.newContext({ viewport: { width, height: 844 }, locale: "ja-JP", timezoneId: "Asia/Tokyo", serviceWorkers: "block" });
     const page = await ctx.newPage();
     page.setDefaultTimeout(10000);
     await page.clock.install({ time: new Date("2026-10-17T00:00:00Z") });

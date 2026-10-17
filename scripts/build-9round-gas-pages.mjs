@@ -7,6 +7,8 @@ const folder = path.join(root, "9round-booking");
 for (const [source, target] of [["index.html", "Member.html"], ["staff/index.html", "Staff.html"]]) {
   const file = path.join(folder, source);
   let html = fs.readFileSync(file, "utf8");
+  // Install assets belong to the top-level HTTPS app, never the GAS sandbox URL.
+  html = html.replace(/\s*<link rel="(?:manifest|apple-touch-icon|icon)"[^>]*>/g, "");
   html = html.replace(/<link rel="stylesheet" href="([^"]+)">/g, (_, relative) =>
     "<style>\n" + fs.readFileSync(path.resolve(path.dirname(file), relative), "utf8") + "\n</style>");
   const scripts = [];

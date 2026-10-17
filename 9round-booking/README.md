@@ -1,8 +1,8 @@
 # 9ROUND アリオ蘇我店 ワークアウト予約
 
-開発ブランチ：feature/9round-member-booking
+PWA更新ブランチ：feature/9round-installable（予約機能の開発元：feature/9round-member-booking）
 
-**会員向け公開済みです（2026/10/17）。** 独立プロジェクト「9ROUND Booking - Ario Soga」のバージョン1を全員が開ける設定にし、本番予約受付を有効にしました。会員は登録メールの確認コード、スタッフは既存スタッフアカウントで認証します。本番の会員マスター・スタッフ名簿は読み取りのみで、予約は新しい専用データへ保存します。config.jsのAPI URLは空で、静的ページは本番APIに接続しません。既存A-nauts GAS・既存デプロイ・マスター・トリガーは変更していません。
+**会員向けGitHub Pages版を公開済みです（2026/10/17）。** [全会員共通の予約画面](https://forestgym-tokyo.github.io/anauts-os-reserve/9round-booking/)をホーム画面へインストールできます。本人確認・予約処理は独立GASのバージョン3を使い、従来のGAS画面・同じ予約データも維持しています。会員は登録メールの確認コード、スタッフは既存スタッフアカウントで認証します。本番の会員マスター・スタッフ名簿は読み取りのみです。ソースのconfig.jsは未接続のまま、公開ビルドだけに確認済みAPI URLを設定します。既存A-nauts GAS・マスター・トリガーは変更していません。戻し方は[公開・復旧手順](docs/pwa-release-20261017.md)を参照してください。
 
 ## 構成
 
@@ -103,7 +103,7 @@
 
 メールに「コードをコピー」ボタンを付け、専用画面でクリップボードへコピーできます。メールアプリ内でスクリプトを実行する方式ではありません。URLにはコード本体を含めず、本人確認用コードとは独立した推測困難なトークンを使い、そのハッシュだけを保存します。使用済み・期限切れ・誤入力上限に達したコードは表示しません。コピー機能が利用できない場合は長押しで選択できます。コピー後は元の予約画面に戻って貼り付けます。
 
-未登録・休会中・メール重複の場合も会員の存在や氏名を応答に含めません。同一メールを使う複数会員は、別会員を誤って選ばないように予約を止めます。セッション発行後も予約時に会員の有効状態とメールの一致を再確認します。
+未登録・休会中・会員を一意に特定できない場合も会員の存在や氏名を応答に含めません。同じ番号・メール・有効状態で、名前が空白の違いだけの重複行は同一会員として照合します。番号・メール・名前・有効状態に矛盾がある場合や、同一メールを使う別会員の場合は予約を止めます。セッション発行後も予約時に会員の有効状態とメールの一致を再確認します。
 
 会員のセッションはブラウザーのsessionStorage、独立管理画面のスタッフ認証はメモリー内に保持します。トークンをURL・localStorageに保存しません。A-nautsの閲覧連携では、既存アプリから更新済みFirebaseトークンを受け取ります。
 
@@ -111,9 +111,9 @@
 
 独立GAS：[9ROUND Booking - Ario Soga](https://script.google.com/home/projects/1bMtNarNVT3JKIDA-w_vmWKD-jfaODvBRtEL6qNCQF3HQkg_qsl4yVifq/edit)。本番の会員マスター（9ROUND_Member）と既存のauth_users・staffを読み取り確認し、有効会員70名を確認しました。専用の本番予約データを新規作成し、開発用の予約データ・架空マスター・架空スタッフ名簿は保持しています。
 
-- バージョン：1、2026/10/17作成。
+- GASバージョン：3、2026/10/17 12:29 JST。バージョン1・2も履歴に保持。
 - デプロイID：`AKfycbzVxf1HKZgXet5XrZjqQbzQ47dH8vMISf1mdEE_AH4m3EABceonv1V2OG0jtuIJLvkq`。
-- 会員向け公開URL：[全会員共通の予約画面](https://script.google.com/macros/s/AKfycbzVxf1HKZgXet5XrZjqQbzQ47dH8vMISf1mdEE_AH4m3EABceonv1V2OG0jtuIJLvkq/exec?page=member)。全会員共通で、Googleアカウントなしで開けます。
+- 会員向け公開URL：[全会員共通の予約画面](https://forestgym-tokyo.github.io/anauts-os-reserve/9round-booking/)。全会員共通で、Googleアカウントなしで開けます。従来の[直接GAS画面](https://script.google.com/macros/s/AKfycbzVxf1HKZgXet5XrZjqQbzQ47dH8vMISf1mdEE_AH4m3EABceonv1V2OG0jtuIJLvkq/exec?page=member)も維持します。
 - スタッフ向け公開URL：[予約管理画面](https://script.google.com/macros/s/AKfycbzVxf1HKZgXet5XrZjqQbzQ47dH8vMISf1mdEE_AH4m3EABceonv1V2OG0jtuIJLvkq/exec?page=staff)。スタッフ認証と権限検査が必要です。
 - アクセスは全員、`ROUND9_BOOKING_ENV=production`、`ROUND9_BOOKING_ENABLED=true`。匿名での会員・スタッフ画面へのGETが200で、未認証の予約枠APIはSESSION_EXPIREDとなることを確認しました。
 
@@ -158,6 +158,7 @@
 | ROUND9_BOOKING_FIREBASE_API_KEY | 既存Firebaseの公開Web APIキー |
 | ROUND9_BOOKING_STAFF_DIRECTORY_ID | 開発時はテスト用スタッフ名簿ID。本番運用時はA-nauts名簿を読み取りのみで参照 |
 | ROUND9_BOOKING_MEMBER_URL | メールのボタンが開く会員予約画面のHTTPS URL。GASでは末尾に?page=memberを付けます |
+| ROUND9_BOOKING_CODE_COPY_URL | 確認メールのコードコピー専用GAS URL（?page=code-copy）。会員画面がGitHub Pagesの場合もGASを指定 |
 | ROUND9_BOOKING_STAFF_URL | 管理通知のボタンが開く独立スタッフ画面のHTTPS URL。GASでは末尾に?page=staffを付けます |
 | ROUND9_BOOKING_ADMIN_EMAILS | 管理通知先。カンマ区切り。開発時はテスト許可メールだけ、本番では必須 |
 
@@ -167,10 +168,12 @@
 
     node --test tests/9round-booking.test.js
 
-新機能の51件が成功しています。GASサービスのローカルテスト実装で、定員・再送・取消・変更・ブロック・認証・権限・体験枠・データ分離に加え、1時間前の境界、会員・管理メールのボタン、管理操作の権限と記録、ファイター登録・名前変更と情報分離、未消化予約10コマの上限、送信待ちと再送、会員QRの再発行、スタッフ読取と二重受講防止、コピー用トークンの分離と失効、本番準備時のデータ分離と有効化手順を検証しています。実際のQR画像を生成・解析して内容が一致することも確認しています。メールの実受信・店舗機器でのQR読取は別途確認が必要です。
+サーバーの54件が成功しています。GASサービスのローカルテスト実装で、定員・再送・取消・変更・ブロック・認証・権限・体験枠・データ分離に加え、1時間前の境界、会員・管理メールのボタン、管理操作の権限と記録、ファイター登録・名前変更と情報分離、未消化予約10コマの上限、送信待ちと再送、会員QRの再発行、スタッフ読取と二重受講防止、コピー用トークンの分離と失効、本番準備時のデータ分離と有効化手順を検証しています。実際のQR画像を生成・解析して内容が一致することも確認しています。メールの実受信・店舗機器でのQR読取は別途確認が必要です。
 
 Playwrightを利用できる環境では、`node tests/9round-booking.browser.cjs`で専用テストサーバーを起動し、実際の画面とQR画像を使った操作を検証できます。`ROUND9_PLAYWRIGHT_MODULE`、`ROUND9_CHROMIUM_PATH`で既存のインストールを指定できます。実Googleアカウント・実Firebaseパスワード・実メール・実会員データを使いません。
 
-ローカルのテストデータとGASテスト実装を接続したChromiumで28項目・99回のAPI呼び出しと、確認コードのクリップボードコピーが成功しました。会員のメール確認→予約→取消、ファイター登録・名前変更・挨拶、開始時刻表示、会員・管理メールからの変更・取消、10コマ上限時の新規受付停止と既存予約変更、QR画像読取→受講済み、リーダー入力・二重読取、カメラ利用不可時の案内、送信待ちメールの管理再送、満員・ブロック、体験枠、スタッフ権限、A-nautsの閲覧専用連携、ログアウト時の情報消去を含みます。320／390／1024／1280pxで横にはみ出さず、ブラウザー例外もありません。
+ローカルのテストデータとGASテスト実装を接続したChromiumで28項目と、確認コードのクリップボードコピーが成功しました。会員のメール確認→予約→取消、ファイター登録・名前変更・挨拶、開始時刻表示、会員・管理メールからの変更・取消、10コマ上限時の新規受付停止と既存予約変更、QR画像読取→受講済み、リーダー入力・二重読取、カメラ利用不可時の案内、送信待ちメールの管理再送、満員・ブロック、体験枠、スタッフ権限、A-nautsの閲覧専用連携、ログアウト時の情報消去を含みます。320／390／1024／1280pxで横にはみ出さず、ブラウザー例外もありません。
 
 全体テストは123件中106件が成功しました。失敗17件は変更前コミット941cd5271449ee0732837651f376a5f56333edb1と同じで、新たな失敗はありません。旧ファイル名・旧アセットのバージョンを前提にするチェックなどが含まれます。
+
+PWA専用の`node tests/9round-pwa.browser.cjs`では、Chromeのインストール条件エラーなし、manifest、Service Worker、オフライン時の画面、APIをキャッシュしないこと、スマホ幅、既存Service Workerがある状態のGASへの切り戻しを検証しました。実機でのインストール・実メール受信は別途確認が必要です。

@@ -6,6 +6,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#111111">
   <meta name="referrer" content="no-referrer">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="9ROUND予約">
   <title>デイリーワークアウト予約 | 9ROUND アリオ蘇我店</title>
   <style>
 :root{color-scheme:dark;--bg:#0b0b0d;--panel:#171719;--line:#333336;--text:#fafafa;--muted:#b2b2b9;--red:#e52535;--red-light:#ff6672}
@@ -71,6 +74,9 @@ body.has-booking-feedback{overflow:hidden}
 .booking-feedback-note{font-size:13px;color:#d8d8df;line-height:1.9;margin:18px 0 0;white-space:pre-line}
 .booking-feedback .primary{justify-content:center;margin-top:24px}
 .member-details{border:1px solid #48484c;border-radius:10px;padding:14px;margin:0 0 16px}.member-details summary{cursor:pointer;font-size:13px;font-weight:800;min-height:32px}.member-qr{text-align:center;margin-top:16px}.member-qr canvas{width:240px;max-width:100%;height:auto;background:#fff;image-rendering:pixelated}.member-actions{display:flex;gap:14px;flex-wrap:wrap;align-items:center}.member-actions a{color:#fff}.my-booking{border-top:1px solid #48484c;padding-top:12px;margin-top:12px;font-size:12px}.booking-state{display:block;color:var(--red-light);font-size:11px;margin-top:5px}#changeBookingBanner p{margin:0}
+.install-panel{border:1px solid #77404a;background:#201519;border-radius:12px;padding:18px;margin:22px 0}
+.install-panel h2{font-size:16px;line-height:1.5;margin:0 0 6px}.install-panel p{font-size:12px;line-height:1.8;color:#d3c9cc;margin:0 0 12px}.install-panel .primary{margin:12px 0;justify-content:center}.install-link{text-decoration:none;text-align:center}.install-panel summary{font-size:12px;cursor:pointer;padding:8px 0}.install-panel details p{margin:8px 0 12px}.install-panel #installStatus{margin:6px 0 0;min-height:0}
+.install-panel .install-fallback{margin:10px 0 0;font-size:11px}.install-fallback a{color:#d3c9cc}
 .footer-note{text-align:center;color:#898992;line-height:2;letter-spacing:1px;font-size:10px;margin:30px 0 10px}
 .is-verified main{padding-top:20px}.is-verified .intro h1{font-size:clamp(27px,5vw,38px);overflow-wrap:anywhere}.is-verified .intro-copy{display:none}.is-verified .facts{margin-top:6px}.is-verified .steps{margin-top:18px}#fighterGreeting{display:block;font-size:.65em;letter-spacing:0;margin-bottom:8px;overflow-wrap:anywhere}#fighterStatus{margin-bottom:0}
 @media(max-width:480px){.site-header{padding:18px 20px}.header-label{font-size:8px;letter-spacing:1px}main{padding:28px 17px}.panel{padding:23px 17px}.facts{gap:12px}.facts>span+span{padding-left:12px}.facts>span:last-child{font-size:10px}h1{font-size:33px}.slot-time{font-size:14px}.slot-button{padding:14px 10px}.slot-card.is-mine .slot-button{padding:13px 9px}.section-heading h2{font-size:19px}}
@@ -78,6 +84,7 @@ body.has-booking-feedback{overflow:hidden}
 @keyframes booking-spin{to{transform:rotate(360deg)}}
 
 </style>
+
 
 
 
@@ -98,12 +105,26 @@ body.has-booking-feedback{overflow:hidden}
       <div class="facts"><span><b>30</b>分 / ワークアウト</span><span><b>4</b>名 / 各枠</span><span>9ROUND アリオ蘇我店</span></div>
     </section>
 
+    <section id="installPanel" class="install-panel" aria-labelledby="installTitle" hidden>
+      <div><h2 id="installTitle">ホーム画面から、すぐ予約。</h2><p>9ROUND予約をスマートフォンに追加できます。</p></div>
+      <button id="installApp" class="primary" type="button">アプリをインストール</button>
+      <a id="openInstallPage" class="primary install-link" href="https://forestgym-tokyo.github.io/anauts-os-reserve/9round-booking/" target="_top" rel="noopener" hidden>インストール用ページを開く</a>
+      <details id="installHelp"><summary>ホーム画面への追加方法</summary>
+        <p><b>Android：</b>Chromeで開き、「アプリをインストール」をタップします。表示されない場合は、右上の「⋮」→「ホーム画面に追加」→「インストール」を選びます。</p>
+        <p><b>iPhone：</b>Safariで開き、共有ボタン→「ホーム画面に追加」→「追加」を選びます。「ウェブアプリとして開く」が出たらオンにします。</p>
+        <p>メールやLINEのアプリ内で開いている場合は、SafariまたはChromeで開き直してください。</p>
+      </details>
+      <p id="installStatus" class="hint" role="status" aria-live="polite"></p>
+      <p class="install-fallback"><a href="https://script.google.com/macros/s/AKfycbzVxf1HKZgXet5XrZjqQbzQ47dH8vMISf1mdEE_AH4m3EABceonv1V2OG0jtuIJLvkq/exec?page=member" target="_top" rel="noopener">うまく開けない場合は従来の予約画面へ</a></p>
+    </section>
+
     <ol class="steps" aria-label="予約の手順">
       <li id="stepVerify" aria-current="step"><b>01</b> 本人確認</li>
       <li id="stepDate"><b>02</b> 日付を選択</li>
       <li id="stepBook"><b>03</b> 枠をタップ</li>
     </ol>
     <p class="hint">予約・変更・取消は、開始1時間前までです。未消化予約は10コマまで。</p>
+    <p id="connectionStatus" class="message" role="status" hidden>現在オフラインです。本人確認や予約にはインターネット接続が必要です。</p>
     <div id="message" class="message" role="status" aria-live="polite" hidden></div>
     <section id="authPanel" class="panel">
       <div class="section-heading"><p class="eyebrow">START HERE</p><h2>メールアドレスで本人確認</h2></div>
@@ -165,6 +186,71 @@ window.ANAUTS_ROUND9_BOOKING = <?!= configJson ?>;
 <script>
 (function () {
   "use strict";
+  const config = window.ANAUTS_ROUND9_BOOKING || {};
+  if (config.preferLegacy && /^https:\/\/script\.google\.com\/macros\/s\/[a-zA-Z0-9_-]+\/exec\?page=member$/.test(config.legacyMemberUrl || "")) {
+    window.location.replace(config.legacyMemberUrl);
+    return;
+  }
+  const panel = document.getElementById("installPanel");
+  if (!panel) return;
+  const button = document.getElementById("installApp");
+  const help = document.getElementById("installHelp");
+  const status = document.getElementById("installStatus");
+  const connection = document.getElementById("connectionStatus");
+  const updateConnection = function () { if (connection) connection.hidden = navigator.onLine; };
+  window.addEventListener("online", updateConnection);
+  window.addEventListener("offline", updateConnection);
+  updateConnection();
+  const gasHosted = typeof google !== "undefined" && google.script && google.script.run;
+  if (!gasHosted && "serviceWorker" in navigator && window.isSecureContext) {
+    navigator.serviceWorker.register("./service-worker.js", { scope: "./", updateViaCache: "none" })
+      .catch(function () { /* Browser menu installation remains available. */ });
+  }
+  const standalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+  if (standalone) return;
+  panel.hidden = false;
+  if (gasHosted) {
+    button.hidden = true;
+    document.getElementById("openInstallPage").hidden = false;
+    help.hidden = true;
+    status.textContent = "インストール用ページを開いて、ホーム画面に追加してください。";
+    return;
+  }
+  let promptEvent;
+  window.addEventListener("beforeinstallprompt", function (event) {
+    event.preventDefault(); promptEvent = event;
+    button.textContent = "アプリをインストール";
+    status.textContent = "";
+  });
+  button.addEventListener("click", async function () {
+    if (!promptEvent) {
+      help.open = true;
+      status.textContent = "お使いの端末に合わせて、下の手順で追加してください。";
+      return;
+    }
+    const event = promptEvent; promptEvent = null;
+    button.disabled = true;
+    try {
+      await event.prompt();
+      const choice = await event.userChoice;
+      if (choice.outcome !== "accepted") {
+        help.open = true;
+        status.textContent = "ブラウザーのメニューからもホーム画面に追加できます。";
+      }
+    } catch (_) {
+      help.open = true;
+      status.textContent = "ブラウザーのメニューからホーム画面に追加してください。";
+    } finally { button.disabled = false; }
+  });
+  window.addEventListener("appinstalled", function () {
+    promptEvent = null; panel.hidden = true;
+  });
+})();
+
+</script>
+<script>
+(function () {
+  "use strict";
   function responseData(result) {
     if (!result || !result.ok) {
       const error = new Error(result && result.message || "処理を完了できませんでした。");
@@ -209,6 +295,9 @@ window.ANAUTS_ROUND9_BOOKING = <?!= configJson ?>;
     } catch (error) {
       if (error.name === "AbortError") {
         throw new Error("通信結果を確認できませんでした。予約操作後の場合は、空き枠を再読込して予約状況をご確認ください。");
+      }
+      if (error.name === "TypeError") {
+        throw new Error("インターネット接続を確認して、もう一度お試しください。");
       }
       throw error;
     } finally {

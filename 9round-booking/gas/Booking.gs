@@ -166,11 +166,19 @@ function nrBookingFindMember_(config, predicate) {
   const matches = all.filter(function (member) {
     return member.active && member.no && member.name && predicate(member);
   });
-  // Shared emails and duplicate member numbers must never select an arbitrary person.
-  if (matches.length !== 1) return null;
+  // Imports can repeat the same member, including spaces between family/given names.
+  // Conflicting identities or statuses must never select an arbitrary person.
+  if (!matches.length) return null;
   const member = matches[0];
+  const sameIdentity = function (row) {
+    return row.no === member.no && row.email === member.email && row.active === member.active &&
+      row.name.replace(/[\s\u3000]+/g, "") === member.name.replace(/[\s\u3000]+/g, "");
+  };
+  if (!matches.every(sameIdentity)) return null;
+  const sameEmail = all.filter(function (row) { return row.active && row.email === member.email; });
+  if (!sameEmail.every(sameIdentity)) return null;
   const sameNumber = all.filter(function (row) { return row.no === member.no; });
-  return sameNumber.length === 1 ? member : null;
+  return sameNumber.every(sameIdentity) ? member : null;
 }
 
 function nrRequest9RoundCode_(config, body) {
@@ -225,7 +233,8 @@ function nrBookingChallengeCode_(config, challenge) {
 }
 
 function nrBookingCodeCopyUrl_(challenge, copyToken) {
-  const url = String(PropertiesService.getScriptProperties().getProperties().ROUND9_BOOKING_MEMBER_URL || "");
+  const properties = PropertiesService.getScriptProperties().getProperties();
+  const url = String(properties.ROUND9_BOOKING_CODE_COPY_URL || properties.ROUND9_BOOKING_MEMBER_URL || "");
   if (!/^https:\/\/[a-z0-9.-]+\/[^\s<>"#]*$/i.test(url)) return "";
   const page = /[?&]page=/.test(url) ? url.replace(/([?&])page=[^&]*/, "$1page=code-copy") : url + (url.indexOf("?") < 0 ? "?" : "&") + "page=code-copy";
   return page + "&challenge_id=" + encodeURIComponent(challenge) + "&copy_token=" + encodeURIComponent(copyToken);

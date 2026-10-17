@@ -5,9 +5,16 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#111111">
   <meta name="referrer" content="no-referrer">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="9ROUND予約">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" href="./icons/icon-192.png">
   <title>デイリーワークアウト予約 | 9ROUND アリオ蘇我店</title>
   <link rel="stylesheet" href="./styles.css">
   <script src="./config.js" defer></script>
+  <script src="./pwa.js" defer></script>
   <script src="./api.js" defer></script>
   <script src="./vendor/qrcode.min.js" defer></script>
   <script src="./fighter.js" defer></script>
@@ -27,12 +34,26 @@
       <div class="facts"><span><b>30</b>分 / ワークアウト</span><span><b>4</b>名 / 各枠</span><span>9ROUND アリオ蘇我店</span></div>
     </section>
 
+    <section id="installPanel" class="install-panel" aria-labelledby="installTitle" hidden>
+      <div><h2 id="installTitle">ホーム画面から、すぐ予約。</h2><p>9ROUND予約をスマートフォンに追加できます。</p></div>
+      <button id="installApp" class="primary" type="button">アプリをインストール</button>
+      <a id="openInstallPage" class="primary install-link" href="https://forestgym-tokyo.github.io/anauts-os-reserve/9round-booking/" target="_top" rel="noopener" hidden>インストール用ページを開く</a>
+      <details id="installHelp"><summary>ホーム画面への追加方法</summary>
+        <p><b>Android：</b>Chromeで開き、「アプリをインストール」をタップします。表示されない場合は、右上の「⋮」→「ホーム画面に追加」→「インストール」を選びます。</p>
+        <p><b>iPhone：</b>Safariで開き、共有ボタン→「ホーム画面に追加」→「追加」を選びます。「ウェブアプリとして開く」が出たらオンにします。</p>
+        <p>メールやLINEのアプリ内で開いている場合は、SafariまたはChromeで開き直してください。</p>
+      </details>
+      <p id="installStatus" class="hint" role="status" aria-live="polite"></p>
+      <p class="install-fallback"><a href="https://script.google.com/macros/s/AKfycbzVxf1HKZgXet5XrZjqQbzQ47dH8vMISf1mdEE_AH4m3EABceonv1V2OG0jtuIJLvkq/exec?page=member" target="_top" rel="noopener">うまく開けない場合は従来の予約画面へ</a></p>
+    </section>
+
     <ol class="steps" aria-label="予約の手順">
       <li id="stepVerify" aria-current="step"><b>01</b> 本人確認</li>
       <li id="stepDate"><b>02</b> 日付を選択</li>
       <li id="stepBook"><b>03</b> 枠をタップ</li>
     </ol>
     <p class="hint">予約・変更・取消は、開始1時間前までです。未消化予約は10コマまで。</p>
+    <p id="connectionStatus" class="message" role="status" hidden>現在オフラインです。本人確認や予約にはインターネット接続が必要です。</p>
     <div id="message" class="message" role="status" aria-live="polite" hidden></div>
     <section id="authPanel" class="panel">
       <div class="section-heading"><p class="eyebrow">START HERE</p><h2>メールアドレスで本人確認</h2></div>

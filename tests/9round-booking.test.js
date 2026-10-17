@@ -197,6 +197,31 @@ test("unknown, suspended, shared-email and non-allowlisted addresses receive no 
   assert.equal(e.sent.length, 1);
 });
 
+test("repeated master rows for one identity allow verification and booking without editing the master", () => {
+  const e = environment(), rows = e.master.sheets.get("Members").rows;
+  const repeated = rows[1].slice();
+  repeated[1] = repeated[1].replace("会員", "　会員 ");
+  rows.push(repeated, rows[1].slice());
+  const masterBefore = JSON.stringify(rows);
+  const token = e.login(0);
+  assert.equal(reserve(e, token).ok, true);
+  assert.equal(e.sent.filter(mail => mail.subject.includes("本人確認コード")).length, 1);
+  assert.equal(JSON.stringify(rows), masterBefore);
+  assert.ok(e.writes.every(name => name.startsWith("nr_")));
+});
+
+test("conflicting master duplicates prevent both code delivery and booking with an existing session", () => {
+  for (const [column, value] of [[0, "9999999"], [1, "別の会員"], [2, "other@example.invalid"], [3, "休会中"]]) {
+    const e = environment(), token = e.login(0), sentBefore = e.sent.length;
+    const rows = e.master.sheets.get("Members").rows, conflict = rows[1].slice();
+    conflict[column] = value; rows.push(conflict); e.advance(61000);
+    assert.equal(e.call("request9RoundBookingCode", { email: "member0@example.invalid" }).ok, true);
+    assert.equal(e.sent.length, sentBefore);
+    assert.equal(reserve(e, token).ok, false);
+    assert.equal(e.data.sheets.get("nr_bookings").rows.length, 1);
+  }
+});
+
 test("code guessing locks after five attempts and expired codes cannot verify", () => {
   const e = environment();
   const request = e.call("request9RoundBookingCode", { email: "member0@example.invalid" });
@@ -837,6 +862,17 @@ test("code-copy link requires the independent email token, stores only hashes, a
   assert.equal(e.context.nrGet9RoundBookingCodeForCopy_(config, payload).code, code);
   assert.equal(e.call("verify9RoundBookingCode", { challenge_id: response.data.challenge_id, code }).ok, true);
   assert.throws(() => e.context.nrGet9RoundBookingCodeForCopy_(config, payload), /コピー用リンク/);
+});
+
+test("an installed member app keeps its email copy link on the independent code-copy endpoint", () => {
+  const e = environment();
+  e.properties.ROUND9_BOOKING_MEMBER_URL = "https://member-app.example.invalid/booking/";
+  e.properties.ROUND9_BOOKING_CODE_COPY_URL = "https://script.google.com/macros/s/test/exec?page=code-copy";
+  e.call("request9RoundBookingCode", { email: "member0@example.invalid" });
+  const link = new URL(e.sent.at(-1).body.split("\n").at(-1));
+  assert.equal(link.origin, "https://script.google.com");
+  assert.equal(link.searchParams.get("page"), "code-copy");
+  assert.equal(e.context.nrGet9RoundBookingCodeForCopy_(e.context.nrBookingConfig_(), Object.fromEntries(link.searchParams)).bookingUrl, e.properties.ROUND9_BOOKING_MEMBER_URL);
 });
 
 test("expired and exhausted email code-copy links disclose no code", () => {

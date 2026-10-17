@@ -45,6 +45,9 @@
       if (error.name === "AbortError") {
         throw new Error("通信結果を確認できませんでした。予約操作後の場合は、空き枠を再読込して予約状況をご確認ください。");
       }
+      if (error.name === "TypeError") {
+        throw new Error("インターネット接続を確認して、もう一度お試しください。");
+      }
       throw error;
     } finally {
       clearTimeout(timer);
