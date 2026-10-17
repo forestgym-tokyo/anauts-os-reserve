@@ -10,16 +10,19 @@ const NR_BOOKING = Object.freeze({
   otpMinutes: 10,
   sessionHours: 6,
   cutoffMinutes: 60,
+  bookingLimit: 10,
   attempts: 5,
   tables: {
     challenges: ["challenge_id", "email_hash", "code_hash", "member_no", "created_at", "expires_at", "attempts", "status"],
     sessions: ["token_hash", "member_no", "email_hash", "created_at", "expires_at", "status"],
+    fighters: ["member_no", "email_hash", "fighter_name", "created_at", "updated_at"],
     bookings: ["booking_id", "kind", "slot_id", "date", "start_time", "end_time", "member_no", "member_name", "created_at", "status", "cancelled_at"],
     trials: ["slot_id", "kind", "date", "start_time", "end_time", "capacity", "title", "status", "created_by", "updated_at"],
     blocks: ["slot_id", "date", "start_time", "status", "updated_by", "updated_at"],
     passes: ["pass_id", "member_no", "email_hash", "token_hash", "created_at", "status"],
     attendance: ["booking_id", "member_no", "checked_in_at", "staff_code", "status"],
     changes: ["old_booking_id", "new_booking_id", "new_slot_id", "created_at"],
+    management_actions: ["action_id", "booking_id", "action_type", "staff_code", "created_at", "new_booking_id"],
     mail: ["event_id", "booking_id", "event_type", "recipient_role", "recipient", "payload_json", "status", "created_at", "sent_at", "attempts", "last_error"]
   }
 });
@@ -319,7 +322,8 @@ function nrGet9RoundSlots_(config, body) {
       can_cancel: withinDeadline && !!mine && !attended, can_change: withinDeadline && !!mine && !attended,
       attended: attended, deadline: nrBookingDeadline_(slot) };
   });
-  return { date: date, range: nrBookingRange_(config), slots: slots };
+  return { date: date, range: nrBookingRange_(config), slots: slots,
+    outstanding_count: nrBookingOutstanding_(config, auth.member.no, rows), booking_limit: NR_BOOKING.bookingLimit };
 }
 
 function nrCreate9RoundBooking_(config, body) {
@@ -333,6 +337,9 @@ function nrCreate9RoundBooking_(config, body) {
       return r.slot_id === slot.slot_id && r.member_no === auth.member.no && r.status === "CONFIRMED";
     });
     if (mine) return { booking_id: mine.booking_id, already_booked: true };
+    if (nrBookingOutstanding_(config, auth.member.no, rows) >= NR_BOOKING.bookingLimit) {
+      nrBookingError_("BOOKING_LIMIT", "未消化の予約は10コマまでです。予約の変更・取消は予約一覧から行えます。");
+    }
     nrBookingNotificationConfig_(config);
     if (nrBookingRows_(config, "blocks").some(function (r) { return r.slot_id === slot.slot_id && r.status === "BLOCKED"; })) {
       nrBookingError_("SLOT_BLOCKED", "この枠は予約受付を停止しています。他の枠をお選びください。");
@@ -355,8 +362,13 @@ function nrCreate9RoundBooking_(config, body) {
 function nrCancel9RoundBooking_(config, body) {
   return nrBookingLocked_(function () {
     const auth = nrBookingSession_(config, body);
+    return nrBookingCancelForMember_(config, body, auth.member);
+  });
+}
+
+function nrBookingCancelForMember_(config, body, member, staff) {
     const row = nrBookingRows_(config, "bookings").find(function (r) {
-      return r.booking_id === String(body.booking_id || "") && r.member_no === auth.member.no;
+      return r.booking_id === String(body.booking_id || "") && r.member_no === member.no;
     });
     if (!row) nrBookingError_("BOOKING_NOT_FOUND", "ご本人の予約を確認できません。");
     if (row.status === "CANCELLED") return { cancelled: true };
@@ -365,8 +377,8 @@ function nrCancel9RoundBooking_(config, body) {
     row.status = "CANCELLED";
     row.cancelled_at = new Date().toISOString();
     nrBookingWrite_(config, "bookings", row, row._row);
-    return { cancelled: true, notification_pending: nrBookingNotify_(config, "CANCELLED", row, auth.member) };
-  });
+    if (staff) nrBookingManagementAudit_(config, row.booking_id, "CANCELLED", staff, "");
+    return { cancelled: true, notification_pending: nrBookingNotify_(config, "CANCELLED", row, member, null, staff) };
 }
 
 function nrLogout9RoundBooking_(config, body) {
@@ -392,6 +404,7 @@ function nrGet9RoundBoard_(config, body) {
   const rows = nrBookingRows_(config, "bookings");
   const blocks = nrBookingRows_(config, "blocks");
   const attendance = nrBookingRows_(config, "attendance");
+  const fighters = nrBookingFighterNames_(config);
   const trials = nrBookingRows_(config, "trials").filter(function (r) { return r.date === date; });
   const slots = nrBookingDailySlots_(date).concat(trials);
   const canManage = ["ADMIN", "MANAGER"].indexOf(auth.permission) >= 0;
@@ -402,11 +415,16 @@ function nrGet9RoundBoard_(config, body) {
       start_time: slot.start_time, end_time: slot.end_time, capacity: Number(slot.capacity),
       status: slot.kind === "DAILY" && blocks.some(function (b) { return b.slot_id === slot.slot_id && b.status === "BLOCKED"; }) ? "BLOCKED" : slot.status,
       booked_count: nrBookingCount_(rows, slot.slot_id),
+      available: slot.kind === "DAILY" && nrBookingBeforeDeadline_(slot) && nrBookingCount_(rows, slot.slot_id) < Number(slot.capacity) &&
+        !blocks.some(function (b) { return b.slot_id === slot.slot_id && b.status === "BLOCKED"; }),
       members: rows.filter(function (r) { return r.slot_id === slot.slot_id && r.status === "CONFIRMED"; })
         .map(function (r) {
           const checkin = attendance.find(function (a) { return a.booking_id === r.booking_id && a.status === "ATTENDED"; });
           return { booking_id: r.booking_id, member_no: r.member_no, name: r.member_name,
-            attended: !!checkin, checked_in_at: checkin ? checkin.checked_in_at : "" };
+            fighter_name: fighters[r.member_no] || "", attended: !!checkin,
+            can_cancel: canManage && nrBookingBeforeDeadline_(r) && !checkin,
+            can_change: canManage && nrBookingBeforeDeadline_(r) && !checkin,
+            checked_in_at: checkin ? checkin.checked_in_at : "" };
         })
     };
   }).sort(function (a, b) { return a.start_time.localeCompare(b.start_time) || a.kind.localeCompare(b.kind); }) };
@@ -485,6 +503,11 @@ function round9BookingApi_(action, body) {
       cancel9RoundWorkoutBooking: nrCancel9RoundBooking_,
       reschedule9RoundWorkoutBooking: nrReschedule9RoundBooking_,
       get9RoundMemberBookings: nrGet9RoundMemberBookings_,
+      get9RoundFighterProfile: nrGet9RoundFighterProfile_,
+      save9RoundFighterProfile: nrSave9RoundFighterProfile_,
+      get9RoundManagedBooking: nrGet9RoundManagedBooking_,
+      cancel9RoundManagedBooking: nrCancel9RoundManagedBooking_,
+      reschedule9RoundManagedBooking: nrReschedule9RoundManagedBooking_,
       get9RoundMemberPass: nrGet9RoundMemberPass_,
       rotate9RoundMemberPass: nrRotate9RoundMemberPass_,
       checkIn9RoundMember: nrCheckIn9RoundMember_,

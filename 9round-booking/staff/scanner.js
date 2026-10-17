@@ -29,7 +29,7 @@
     try {
       const data = await auth.request("checkIn9RoundMember", { date: ownDate, slot_id: slot, qr_text: text });
       if (!auth.idToken || identity !== auth.generation) return;
-      notice(data.member_name + " 様 · " + data.start_time + "–" + data.end_time + (data.already_attended ? " は登録済みです。" : " を受講済みにしました。"));
+      notice(data.member_name + " 様 · " + data.start_time + (data.already_attended ? " は登録済みです。" : " を受講済みにしました。"));
       scanner.onRegistered();
     } catch (error) { if (auth.idToken && identity === auth.generation) notice(error.message, true); }
     finally { if (identity === auth.generation) { busy = false; controls(); } }
@@ -111,7 +111,7 @@
       if (date !== value) { stop(); lastSeen = ""; }
       date = value; q("#nrScanSlot").replaceChildren();
       const daily = slots.filter(function (s) { return s.kind === "DAILY"; });
-      daily.forEach(function (s) { const option = document.createElement("option"); option.value = s.slot_id; option.textContent = s.start_time + "–" + s.end_time; q("#nrScanSlot").append(option); });
+      daily.forEach(function (s) { const option = document.createElement("option"); option.value = s.slot_id; option.textContent = s.start_time; q("#nrScanSlot").append(option); });
       const next = daily.find(function (s) { return Date.parse(value + "T" + s.end_time + ":00+09:00") > Date.now(); });
       q("#nrScanSlot").value = daily.some(function (s) { return s.slot_id === previous; }) ? previous : next ? next.slot_id : daily.length ? daily[daily.length - 1].slot_id : "";
       if (!active()) notice("受講登録する場合は、予約日を本日に切り替えてください。");

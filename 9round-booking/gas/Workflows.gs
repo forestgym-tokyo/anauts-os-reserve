@@ -21,12 +21,23 @@ function nrBookingRequireMutable_(config, booking) {
   nrBookingRequireDeadline_(booking);
 }
 
+function nrBookingOutstanding_(config, memberNo, rows) {
+  const attendance = nrBookingRows_(config, "attendance");
+  return rows.filter(function (r) {
+    return r.member_no === memberNo && r.status === "CONFIRMED" &&
+      Date.parse(r.date + "T" + r.end_time + ":00+09:00") > Date.now() &&
+      !attendance.some(function (a) { return a.booking_id === r.booking_id && a.status === "ATTENDED"; });
+  }).length;
+}
+
 function nrGet9RoundMemberBookings_(config, body) {
   const auth = nrBookingSession_(config, body);
   const attendance = nrBookingRows_(config, "attendance");
   const today = nrBookingRange_(config).from;
   const wanted = String(body.booking_id || "");
-  return { bookings: nrBookingRows_(config, "bookings").filter(function (r) {
+  const rows = nrBookingRows_(config, "bookings");
+  return { outstanding_count: nrBookingOutstanding_(config, auth.member.no, rows), booking_limit: NR_BOOKING.bookingLimit,
+    bookings: rows.filter(function (r) {
     return r.member_no === auth.member.no && ((r.status === "CONFIRMED" && r.date >= today) || r.booking_id === wanted);
   }).map(function (r) {
     const attended = attendance.some(function (a) { return a.booking_id === r.booking_id && a.status === "ATTENDED"; });
@@ -39,22 +50,27 @@ function nrGet9RoundMemberBookings_(config, body) {
 function nrReschedule9RoundBooking_(config, body) {
   return nrBookingLocked_(function () {
     const auth = nrBookingSession_(config, body);
+    return nrBookingRescheduleForMember_(config, body, auth.member);
+  });
+}
+
+function nrBookingRescheduleForMember_(config, body, member, staff) {
     const rows = nrBookingRows_(config, "bookings");
-    const old = rows.find(function (r) { return r.booking_id === String(body.booking_id || "") && r.member_no === auth.member.no; });
+    const old = rows.find(function (r) { return r.booking_id === String(body.booking_id || "") && r.member_no === member.no; });
     if (!old) nrBookingError_("BOOKING_NOT_FOUND", "ご本人の予約を確認できません。");
     const date = nrBookingRequireDate_(config, body.date);
     const slot = nrBookingDailySlots_(date).find(function (r) { return r.slot_id === body.slot_id; });
     if (!slot) nrBookingError_("INVALID_SLOT", "変更先の枠を選び直してください。");
     const id = nrBookingHash_(config, "reschedule:" + old.booking_id + ":" + slot.slot_id);
     if (old.status === "RESCHEDULED") {
-      const completed = rows.find(function (r) { return r.booking_id === id && r.member_no === auth.member.no; });
+      const completed = rows.find(function (r) { return r.booking_id === id && r.member_no === member.no; });
       if (completed) return { booking_id: id, already_changed: true };
     }
     nrBookingRequireMutable_(config, old);
     if (old.slot_id === slot.slot_id) return { booking_id: old.booking_id, already_changed: true };
     nrBookingRequireDeadline_(slot);
     nrBookingNotificationConfig_(config);
-    if (rows.some(function (r) { return r.slot_id === slot.slot_id && r.member_no === auth.member.no && r.status === "CONFIRMED"; })) {
+    if (rows.some(function (r) { return r.slot_id === slot.slot_id && r.member_no === member.no && r.status === "CONFIRMED"; })) {
       nrBookingError_("ALREADY_BOOKED", "変更先の枠はすでに予約済みです。元の予約は維持されています。");
     }
     if (nrBookingRows_(config, "blocks").some(function (b) { return b.slot_id === slot.slot_id && b.status === "BLOCKED"; })) {
@@ -63,7 +79,7 @@ function nrReschedule9RoundBooking_(config, body) {
     if (nrBookingCount_(rows, slot.slot_id) >= slot.capacity) nrBookingError_("SLOT_FULL", "変更先は満員です。元の予約は維持されています。");
     const changedAt = new Date().toISOString();
     const booking = { booking_id: id, kind: "DAILY", slot_id: slot.slot_id, date: date, start_time: slot.start_time,
-      end_time: slot.end_time, member_no: auth.member.no, member_name: auth.member.name, created_at: changedAt,
+      end_time: slot.end_time, member_no: member.no, member_name: member.name, created_at: changedAt,
       status: "CONFIRMED", cancelled_at: "" };
     const previous = Object.assign({}, old);
     old.status = "RESCHEDULED"; old.cancelled_at = changedAt;
@@ -75,24 +91,25 @@ function nrReschedule9RoundBooking_(config, body) {
     }); });
     nrBookingSheet_(config, "bookings").getRange(2, 1, values.length, NR_BOOKING.tables.bookings.length).setNumberFormat("@").setValues(values);
     nrBookingWrite_(config, "changes", { old_booking_id: old.booking_id, new_booking_id: id, new_slot_id: slot.slot_id, created_at: changedAt });
+    if (staff) nrBookingManagementAudit_(config, old.booking_id, "CHANGED", staff, id);
     return { booking_id: id, already_changed: false,
-      notification_pending: nrBookingNotify_(config, "CHANGED", booking, auth.member, previous) };
-  });
+      notification_pending: nrBookingNotify_(config, "CHANGED", booking, member, previous, staff) };
 }
 
 function nrBookingNotificationConfig_(config) {
   const p = PropertiesService.getScriptProperties().getProperties();
   const url = String(p.ROUND9_BOOKING_MEMBER_URL || "").trim();
+  const staffUrl = String(p.ROUND9_BOOKING_STAFF_URL || "").trim();
   const recipients = String(p.ROUND9_BOOKING_ADMIN_EMAILS || (config.environment === "development" ? config.testEmails[0] : "") || "")
     .split(",").map(function (s) { return s.trim().toLowerCase(); }).filter(Boolean);
-  if (!/^https:\/\/[a-z0-9.-]+\/[^\s<>"#]*$/i.test(url) || !recipients.length) {
-    nrBookingError_("BOOKING_CONFIGURATION", "確認メールの予約画面URL・管理通知先を設定してください。");
+  if (![url, staffUrl].every(function (u) { return /^https:\/\/[a-z0-9.-]+\/[^\s<>"#]*$/i.test(u); }) || !recipients.length) {
+    nrBookingError_("BOOKING_CONFIGURATION", "確認メールの会員・スタッフ画面URLと管理通知先を設定してください。");
   }
   const emails = Array.from(new Set(recipients.map(nrBookingEmail_)));
   if (config.environment === "development" && emails.some(function (email) { return config.testEmails.indexOf(email) < 0; })) {
     nrBookingError_("BOOKING_CONFIGURATION", "開発環境の管理通知先はテスト許可メールに限定してください。");
   }
-  return { memberUrl: url, adminEmails: emails };
+  return { memberUrl: url, staffUrl: staffUrl, adminEmails: emails };
 }
 
 function nrBookingHtml_(value) {
@@ -103,11 +120,11 @@ function nrBookingMailLink_(url, bookingId, intent) {
   return url + (url.indexOf("?") < 0 ? "?" : "&") + "booking_id=" + encodeURIComponent(bookingId) + "&intent=" + intent;
 }
 
-function nrBookingNotify_(config, type, booking, member, previous) {
+function nrBookingNotify_(config, type, booking, member, previous, staff) {
   const settings = nrBookingNotificationConfig_(config);
   const label = { CONFIRMED: "予約確認", CHANGED: "予約変更", CANCELLED: "予約取消" }[type];
-  const when = booking.date + " " + booking.start_time + "–" + booking.end_time;
-  const old = previous ? "\n変更前: " + previous.date + " " + previous.start_time + "–" + previous.end_time : "";
+  const when = booking.date + " " + booking.start_time;
+  const old = previous ? "\n変更前: " + previous.date + " " + previous.start_time : "";
   const summary = member.name + " 様\n\nデイリーワークアウトの" + label + "を受け付けました。\n日時: " + when + old + "\n店舗: 9ROUND アリオ蘇我店\n\n予約・変更・取消は開始1時間前までです。";
   const changeUrl = nrBookingMailLink_(settings.memberUrl, booking.booking_id, "change");
   const cancelUrl = nrBookingMailLink_(settings.memberUrl, booking.booking_id, "cancel");
@@ -120,8 +137,17 @@ function nrBookingNotify_(config, type, booking, member, previous) {
     htmlBody: '<div style="font-family:sans-serif;max-width:620px;color:#111"><h2 style="border-bottom:3px solid #e52535;padding-bottom:12px">9ROUND ARIO SOGA</h2><p>' + nrBookingHtml_(summary).replace(/\n/g, "<br>") + "</p>" + buttons + "</div>",
     name: "9ROUND アリオ蘇我店", replyTo: "9round.ariosoga@gmail.com"
   };
+  const fighter = nrBookingFighterProfile_(config, member).fighter_name;
+  const adminChangeUrl = nrBookingMailLink_(settings.staffUrl, booking.booking_id, "change");
+  const adminCancelUrl = nrBookingMailLink_(settings.staffUrl, booking.booking_id, "cancel");
+  const adminSummary = "デイリーワークアウト " + label + "\n日時: " + when + old + "\n氏名: " + member.name +
+    "\nファイターネーム: " + (fighter || "未登録") + "\n会員番号: " + member.no + "\n登録メール: " + member.email +
+    (staff ? "\n管理操作: " + staff.staff_code : "") + "\n\n予約・変更・取消は開始1時間前までです。";
+  const adminButtons = active ? '<p><a style="display:inline-block;padding:13px 20px;background:#e52535;color:#fff;margin-right:10px" href="' + nrBookingHtml_(adminChangeUrl) + '">管理画面で変更する</a>' +
+    '<a style="display:inline-block;padding:13px 20px;background:#222;color:#fff" href="' + nrBookingHtml_(adminCancelUrl) + '">管理画面でキャンセルする</a></p><p>スタッフログイン後、管理者・マネージャーが操作できます。リンクを開くだけでは確定しません。</p>' : "";
   const admin = { subject: "【9ROUND 管理通知】" + label + " " + when,
-    body: "デイリーワークアウト " + label + "\n日時: " + when + old + "\n氏名: " + member.name + "\n会員番号: " + member.no + "\n登録メール: " + member.email,
+    body: adminSummary + (active ? "\n\n管理画面で変更する:\n" + adminChangeUrl + "\n\n管理画面でキャンセルする:\n" + adminCancelUrl : ""),
+    htmlBody: '<div style="font-family:sans-serif;max-width:620px;color:#111"><h2>9ROUND 管理通知</h2><p>' + nrBookingHtml_(adminSummary).replace(/\n/g, "<br>") + "</p>" + adminButtons + "</div>",
     name: "9ROUND 予約管理", replyTo: "9round.ariosoga@gmail.com" };
   const definitions = [
     { role: "MEMBER", recipient: member.email, payload: payload },

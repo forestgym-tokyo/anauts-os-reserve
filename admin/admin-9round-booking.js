@@ -30,11 +30,11 @@
     data.slots.forEach(function (slot) {
       const card = el("article", "nr-slot" + (slot.kind === "TRIAL" ? " is-trial" : ""));
       const header = el("div", "nr-slot-head");
-      header.append(el("strong", "", slot.start_time + "–" + slot.end_time), el("span", "nr-count", slot.booked_count + " / " + slot.capacity + "名"));
+      header.append(el("strong", "", slot.start_time), el("span", "nr-count", slot.booked_count + " / " + slot.capacity + "名"));
       card.append(header, el("p", "nr-kind", (slot.kind === "TRIAL" ? "体験 · " + slot.title : "デイリーワークアウト") +
         (["BLOCKED", "CLOSED"].includes(slot.status) ? "（受付停止）" : "")));
       const names = el("ul", "nr-names");
-      slot.members.forEach(function (member) { const li = el("li"); li.append(el("span", "", member.name + " 様")); names.append(li); });
+      slot.members.forEach(function (member) { const li = el("li"); li.append(el("span", "", member.name + " 様"), el("small", "", "ファイター：" + (member.fighter_name || "未登録"))); names.append(li); });
       card.append(names);
       if (!slot.members.length) card.append(el("p", "nr-empty", "予約はまだありません"));
       target.append(card);

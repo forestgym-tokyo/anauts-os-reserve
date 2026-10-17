@@ -26,7 +26,7 @@
     const el = document.createElement(tag); if (className) el.className = className;
     if (text !== undefined) el.textContent = text; return el;
   }
-  function when(r) { return r.date.replace(/-/g, "/") + " " + r.start_time + "–" + r.end_time; }
+  function when(r) { return r.date.replace(/-/g, "/") + " " + r.start_time; }
   function syncButtons() {
     document.querySelectorAll("[data-member-action]").forEach(function (b) { b.disabled = busy || qrBusy; });
   }

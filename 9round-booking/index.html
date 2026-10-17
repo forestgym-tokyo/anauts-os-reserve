@@ -10,6 +10,7 @@
   <script src="./config.js" defer></script>
   <script src="./api.js" defer></script>
   <script src="./vendor/qrcode.min.js" defer></script>
+  <script src="./fighter.js" defer></script>
   <script src="./member-tools.js" defer></script>
   <script src="./app.js" defer></script>
 </head>
@@ -21,9 +22,9 @@
   <main>
     <section class="intro">
       <p class="eyebrow"><span></span> DAILY WORKOUT</p>
-      <h1>次の45分を、<br>あなたの力に。</h1>
+      <h1><span id="fighterGreeting" hidden></span>次の30分を、<br>あなたの力に。</h1>
       <p class="intro-copy">デイリーワークアウト予約</p>
-      <div class="facts"><span><b>45</b>分 / 1コマ</span><span><b>4</b>名 / 各枠</span><span>9ROUND アリオ蘇我店</span></div>
+      <div class="facts"><span><b>30</b>分 / ワークアウト</span><span><b>4</b>名 / 各枠</span><span>9ROUND アリオ蘇我店</span></div>
     </section>
 
     <ol class="steps" aria-label="予約の手順">
@@ -31,7 +32,7 @@
       <li id="stepDate"><b>02</b> 日付を選択</li>
       <li id="stepBook"><b>03</b> 枠をタップ</li>
     </ol>
-    <p class="hint">予約・変更・取消は、開始1時間前までです。</p>
+    <p class="hint">予約・変更・取消は、開始1時間前までです。未消化予約は10コマまで。</p>
     <div id="message" class="message" role="status" aria-live="polite" hidden></div>
     <section id="authPanel" class="panel">
       <div class="section-heading"><p class="eyebrow">START HERE</p><h2>メールアドレスで本人確認</h2></div>
@@ -53,6 +54,11 @@
 
     <section id="bookingPanel" class="panel booking-panel" hidden>
       <div class="verified-bar"><span><i aria-hidden="true">✓</i> 本人確認済み</span><button id="logout" type="button" class="text-button">ログアウト</button></div>
+      <details id="fighterPanel" class="member-details"><summary id="fighterSummary">ファイター登録</summary>
+        <p class="hint">あなたのファイターネームを登録してください。登録後も、ここからいつでも変更できます。</p>
+        <form id="fighterForm"><label for="fighterName">ファイターネーム（1〜24文字）</label><input id="fighterName" name="fighter_name" type="text" autocomplete="nickname" maxlength="48" placeholder="あなたのリングネーム" required><button id="fighterSave" class="primary" type="submit">ファイター登録する →</button></form>
+        <p id="fighterStatus" class="hint" role="status" aria-live="polite"></p>
+      </details>
       <details id="memberPassPanel" class="member-details"><summary>会員QRを表示（店舗で提示）</summary>
         <div class="member-qr"><canvas id="memberQrCanvas" width="1" height="1" aria-label="ご本人の会員QR"></canvas></div>
         <p id="qrStatus" class="hint" role="status"></p>
@@ -65,6 +71,7 @@
       <div class="date-controls"><button id="previousDate" type="button" class="date-arrow" aria-label="前日">‹</button><input id="bookingDate" type="date" required><button id="nextDate" type="button" class="date-arrow" aria-label="翌日">›</button></div>
       <div class="schedule-heading"><h3 id="dateHeading"></h3><button id="reload" class="text-button" type="button">再読込 ↻</button></div>
       <p class="hint tap-guide">空いている枠をタップすると予約が完了します。</p>
+      <p id="bookingLimitStatus" class="hint" role="status" aria-live="polite"></p>
       <div id="slotList" aria-live="polite"></div>
       <p class="privacy-note">予約・変更・取消は開始1時間前まで可能です。満員の枠は選択できません。</p>
     </section>

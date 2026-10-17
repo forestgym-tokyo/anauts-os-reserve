@@ -6,7 +6,7 @@
   const storageKey = "nr_booking_session_v1";
   let token = "", challenge = "", busy = false, sequence = 0;
   let range = { from: window.NineRoundTokyoDate(), to: "" };
-  let lastDate = "";
+  let lastDate = "", limitReached = false;
   function message(text, error) {
     q("#message").hidden = !text;
     q("#message").textContent = text || "";
@@ -23,7 +23,8 @@
     q("#stepVerify").removeAttribute("aria-current");
     q("#stepDate").removeAttribute("aria-current");
     q(value ? "#stepDate" : "#stepVerify").setAttribute("aria-current", "step");
-    if (!value) { q("#slotList").replaceChildren(); q("#code").value = ""; }
+    if (!value) { q("#slotList").replaceChildren(); q("#code").value = ""; q("#bookingLimitStatus").textContent = ""; limitReached = false; }
+    window.NineRoundFighter.authenticate(value ? token : "");
     tools.authenticate(value ? token : "");
   }
   function handleError(error) {
@@ -66,9 +67,9 @@
     const button = element("button", "slot-button");
     button.type = "button";
     button.dataset.book = slot.slot_id;
-    button.dataset.available = String(slot.available);
-    button.disabled = !slot.available;
-    button.append(element("span", "slot-time", slot.start_time + "–" + slot.end_time));
+    button.dataset.available = String(slot.available && (!limitReached || !!tools.changing));
+    button.disabled = button.dataset.available !== "true";
+    button.append(element("span", "slot-time", slot.start_time));
     const count = element("span", "slot-count", "予約済み");
     count.append(element("b", "", slot.booked_count + " / " + slot.capacity + "名"));
     button.append(count);
@@ -77,7 +78,7 @@
     fill.style.width = Math.min(100, slot.booked_count / slot.capacity * 100) + "%";
     meter.setAttribute("aria-hidden", "true");
     meter.append(fill); button.append(meter);
-    button.append(element("span", "slot-action", slot.attended ? "✓ 受講済み" : slot.is_booked ? "✓ 予約済み" : slot.blocked ? "受付停止" : full ? "満員" : past ? "受付終了" : tools.changing ? "この枠へ変更 →" : "タップして予約 →"));
+    button.append(element("span", "slot-action", slot.attended ? "✓ 受講済み" : slot.is_booked ? "✓ 予約済み" : slot.blocked ? "受付停止" : full ? "満員" : past ? "受付終了" : tools.changing ? "この枠へ変更 →" : limitReached ? "未消化予約の上限" : "タップして予約 →"));
     button.addEventListener("click", function () { reserve(slot); });
     card.append(button);
     if (slot.can_cancel) {
@@ -89,6 +90,8 @@
     return card;
   }
   function renderSlots(data) {
+    limitReached = data.outstanding_count >= data.booking_limit;
+    q("#bookingLimitStatus").textContent = "未消化予約 " + data.outstanding_count + " / " + data.booking_limit + "コマ" + (limitReached ? "（上限に達しています。予約一覧から変更・取消できます）" : "");
     range = data.range;
     q("#bookingDate").min = range.from;
     q("#bookingDate").max = range.to;
@@ -131,7 +134,7 @@
         { session_token: ownToken, date: date, slot_id: slot.slot_id, booking_id: changing ? changing.booking_id : undefined });
       if (token !== ownToken) return;
       tools.finishChange();
-      message(dayLabel(date) + " " + slot.start_time + "–" + slot.end_time + (changing ? " に予約を変更しました。" : " の予約が完了しました。") +
+      message(dayLabel(date) + " " + slot.start_time + (changing ? " に予約を変更しました。" : " の予約が完了しました。") +
         (result.notification_pending ? "確認メールは送信待ちです。予約は成立しています。" : "確認メールをお送りしました。"));
       await Promise.all([loadSlots(false), tools.refresh()]);
     } catch (error) {
@@ -143,7 +146,7 @@
   }
   async function cancelBooking(slot) {
     if (busy || !token) return;
-    if (!window.confirm(slot.start_time + "–" + slot.end_time + " の予約を取り消しますか？")) return;
+    if (!window.confirm(slot.start_time + " の予約を取り消しますか？")) return;
     const ownToken = token;
     setBusy(true); message("");
     try {
@@ -156,6 +159,7 @@
     finally { if (token === ownToken || !token) setBusy(false); }
   }
   tools.onError = handleError;
+  window.NineRoundFighter.onError = handleError;
   tools.onMessage = message;
   tools.reload = function () { return loadSlots(false); };
   tools.cancel = cancelBooking;

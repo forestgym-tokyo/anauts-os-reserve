@@ -60,11 +60,12 @@ input::placeholder{color:#8c8c96}
 .loading{padding:32px 12px;color:var(--muted);font-size:13px;text-align:center}
 .member-details{border:1px solid #48484c;border-radius:10px;padding:14px;margin:0 0 16px}.member-details summary{cursor:pointer;font-size:13px;font-weight:800;min-height:32px}.member-qr{text-align:center;margin-top:16px}.member-qr canvas{width:240px;max-width:100%;height:auto;background:#fff;image-rendering:pixelated}.member-actions{display:flex;gap:14px;flex-wrap:wrap;align-items:center}.member-actions a{color:#fff}.my-booking{border-top:1px solid #48484c;padding-top:12px;margin-top:12px;font-size:12px}.booking-state{display:block;color:var(--red-light);font-size:11px;margin-top:5px}#changeBookingBanner p{margin:0}
 .footer-note{text-align:center;color:#898992;line-height:2;letter-spacing:1px;font-size:10px;margin:30px 0 10px}
-.is-verified main{padding-top:20px}.is-verified .intro h1,.is-verified .intro-copy{display:none}.is-verified .facts{margin-top:6px}.is-verified .steps{margin-top:18px}
+.is-verified main{padding-top:20px}.is-verified .intro h1{font-size:clamp(27px,5vw,38px);overflow-wrap:anywhere}.is-verified .intro-copy{display:none}.is-verified .facts{margin-top:6px}.is-verified .steps{margin-top:18px}#fighterGreeting{display:block;font-size:.65em;letter-spacing:0;margin-bottom:8px;overflow-wrap:anywhere}#fighterStatus{margin-bottom:0}
 @media(max-width:480px){.site-header{padding:18px 20px}.header-label{font-size:8px;letter-spacing:1px}main{padding:28px 17px}.panel{padding:23px 17px}.facts{gap:12px}.facts>span+span{padding-left:12px}.facts>span:last-child{font-size:10px}h1{font-size:33px}.slot-time{font-size:14px}.slot-button{padding:14px 10px}.slot-card.is-mine .slot-button{padding:13px 9px}.section-heading h2{font-size:19px}}
 @media(prefers-reduced-motion:no-preference){button{transition:background .15s,border-color .15s}}
 
 </style>
+
 
 
 
@@ -79,9 +80,9 @@ input::placeholder{color:#8c8c96}
   <main>
     <section class="intro">
       <p class="eyebrow"><span></span> DAILY WORKOUT</p>
-      <h1>次の45分を、<br>あなたの力に。</h1>
+      <h1><span id="fighterGreeting" hidden></span>次の30分を、<br>あなたの力に。</h1>
       <p class="intro-copy">デイリーワークアウト予約</p>
-      <div class="facts"><span><b>45</b>分 / 1コマ</span><span><b>4</b>名 / 各枠</span><span>9ROUND アリオ蘇我店</span></div>
+      <div class="facts"><span><b>30</b>分 / ワークアウト</span><span><b>4</b>名 / 各枠</span><span>9ROUND アリオ蘇我店</span></div>
     </section>
 
     <ol class="steps" aria-label="予約の手順">
@@ -89,7 +90,7 @@ input::placeholder{color:#8c8c96}
       <li id="stepDate"><b>02</b> 日付を選択</li>
       <li id="stepBook"><b>03</b> 枠をタップ</li>
     </ol>
-    <p class="hint">予約・変更・取消は、開始1時間前までです。</p>
+    <p class="hint">予約・変更・取消は、開始1時間前までです。未消化予約は10コマまで。</p>
     <div id="message" class="message" role="status" aria-live="polite" hidden></div>
     <section id="authPanel" class="panel">
       <div class="section-heading"><p class="eyebrow">START HERE</p><h2>メールアドレスで本人確認</h2></div>
@@ -111,6 +112,11 @@ input::placeholder{color:#8c8c96}
 
     <section id="bookingPanel" class="panel booking-panel" hidden>
       <div class="verified-bar"><span><i aria-hidden="true">✓</i> 本人確認済み</span><button id="logout" type="button" class="text-button">ログアウト</button></div>
+      <details id="fighterPanel" class="member-details"><summary id="fighterSummary">ファイター登録</summary>
+        <p class="hint">あなたのファイターネームを登録してください。登録後も、ここからいつでも変更できます。</p>
+        <form id="fighterForm"><label for="fighterName">ファイターネーム（1〜24文字）</label><input id="fighterName" name="fighter_name" type="text" autocomplete="nickname" maxlength="48" placeholder="あなたのリングネーム" required><button id="fighterSave" class="primary" type="submit">ファイター登録する →</button></form>
+        <p id="fighterStatus" class="hint" role="status" aria-live="polite"></p>
+      </details>
       <details id="memberPassPanel" class="member-details"><summary>会員QRを表示（店舗で提示）</summary>
         <div class="member-qr"><canvas id="memberQrCanvas" width="1" height="1" aria-label="ご本人の会員QR"></canvas></div>
         <p id="qrStatus" class="hint" role="status"></p>
@@ -123,6 +129,7 @@ input::placeholder{color:#8c8c96}
       <div class="date-controls"><button id="previousDate" type="button" class="date-arrow" aria-label="前日">‹</button><input id="bookingDate" type="date" required><button id="nextDate" type="button" class="date-arrow" aria-label="翌日">›</button></div>
       <div class="schedule-heading"><h3 id="dateHeading"></h3><button id="reload" class="text-button" type="button">再読込 ↻</button></div>
       <p class="hint tap-guide">空いている枠をタップすると予約が完了します。</p>
+      <p id="bookingLimitStatus" class="hint" role="status" aria-live="polite"></p>
       <div id="slotList" aria-live="polite"></div>
       <p class="privacy-note">予約・変更・取消は開始1時間前まで可能です。満員の枠は選択できません。</p>
     </section>
@@ -228,6 +235,54 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 (function () {
   "use strict";
   const q = function (s) { return document.querySelector(s); };
+  let token = "", sequence = 0, saving = false;
+  const fighter = window.NineRoundFighter = {
+    onError: function () {},
+    authenticate: function (value) {
+      if (token === value) return;
+      token = value; sequence++; saving = false;
+      q("#fighterGreeting").textContent = ""; q("#fighterGreeting").hidden = true;
+      q("#fighterForm").reset(); q("#fighterStatus").textContent = "";
+      q("#fighterPanel").open = false; q("#fighterSummary").textContent = "ファイター登録";
+      q("#fighterSave").textContent = "ファイター登録する →"; q("#fighterSave").disabled = false;
+      if (token) load();
+    }
+  };
+  function render(data) {
+    q("#fighterGreeting").textContent = data.display_name + "さん、";
+    q("#fighterGreeting").hidden = false;
+    q("#fighterName").value = data.fighter_name;
+    q("#fighterSummary").textContent = data.registered ? "ファイターネームを変更" : "ファイター登録";
+    q("#fighterSave").textContent = data.registered ? "ファイターネームを変更する →" : "ファイター登録する →";
+  }
+  async function load() {
+    const ownToken = token, seq = ++sequence;
+    try {
+      const data = await window.NineRoundBookingApi("get9RoundFighterProfile", { session_token: ownToken });
+      if (token !== ownToken || seq !== sequence) return;
+      render(data); q("#fighterPanel").open = !data.registered;
+    } catch (error) { if (token === ownToken && seq === sequence) fighter.onError(error); }
+  }
+  q("#fighterForm").addEventListener("submit", async function (event) {
+    event.preventDefault();
+    if (!token || saving) return;
+    const ownToken = token, seq = ++sequence;
+    saving = true; q("#fighterSave").disabled = true; q("#fighterStatus").textContent = "保存しています…";
+    try {
+      const data = await window.NineRoundBookingApi("save9RoundFighterProfile", { session_token: ownToken, fighter_name: q("#fighterName").value });
+      if (token !== ownToken || seq !== sequence) return;
+      render(data); q("#fighterStatus").textContent = "ファイターネームを保存しました。いつでも変更できます。";
+    } catch (error) {
+      if (token === ownToken && seq === sequence) { q("#fighterStatus").textContent = error.message; fighter.onError(error); }
+    } finally { if (token === ownToken && seq === sequence) { saving = false; q("#fighterSave").disabled = false; } }
+  });
+})();
+
+</script>
+<script>
+(function () {
+  "use strict";
+  const q = function (s) { return document.querySelector(s); };
   const api = window.NineRoundBookingApi;
   const config = window.ANAUTS_ROUND9_BOOKING || {};
   const query = new URLSearchParams(window.location.search);
@@ -253,7 +308,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     const el = document.createElement(tag); if (className) el.className = className;
     if (text !== undefined) el.textContent = text; return el;
   }
-  function when(r) { return r.date.replace(/-/g, "/") + " " + r.start_time + "–" + r.end_time; }
+  function when(r) { return r.date.replace(/-/g, "/") + " " + r.start_time; }
   function syncButtons() {
     document.querySelectorAll("[data-member-action]").forEach(function (b) { b.disabled = busy || qrBusy; });
   }
@@ -346,7 +401,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   const storageKey = "nr_booking_session_v1";
   let token = "", challenge = "", busy = false, sequence = 0;
   let range = { from: window.NineRoundTokyoDate(), to: "" };
-  let lastDate = "";
+  let lastDate = "", limitReached = false;
   function message(text, error) {
     q("#message").hidden = !text;
     q("#message").textContent = text || "";
@@ -363,7 +418,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     q("#stepVerify").removeAttribute("aria-current");
     q("#stepDate").removeAttribute("aria-current");
     q(value ? "#stepDate" : "#stepVerify").setAttribute("aria-current", "step");
-    if (!value) { q("#slotList").replaceChildren(); q("#code").value = ""; }
+    if (!value) { q("#slotList").replaceChildren(); q("#code").value = ""; q("#bookingLimitStatus").textContent = ""; limitReached = false; }
+    window.NineRoundFighter.authenticate(value ? token : "");
     tools.authenticate(value ? token : "");
   }
   function handleError(error) {
@@ -406,9 +462,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     const button = element("button", "slot-button");
     button.type = "button";
     button.dataset.book = slot.slot_id;
-    button.dataset.available = String(slot.available);
-    button.disabled = !slot.available;
-    button.append(element("span", "slot-time", slot.start_time + "–" + slot.end_time));
+    button.dataset.available = String(slot.available && (!limitReached || !!tools.changing));
+    button.disabled = button.dataset.available !== "true";
+    button.append(element("span", "slot-time", slot.start_time));
     const count = element("span", "slot-count", "予約済み");
     count.append(element("b", "", slot.booked_count + " / " + slot.capacity + "名"));
     button.append(count);
@@ -417,7 +473,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     fill.style.width = Math.min(100, slot.booked_count / slot.capacity * 100) + "%";
     meter.setAttribute("aria-hidden", "true");
     meter.append(fill); button.append(meter);
-    button.append(element("span", "slot-action", slot.attended ? "✓ 受講済み" : slot.is_booked ? "✓ 予約済み" : slot.blocked ? "受付停止" : full ? "満員" : past ? "受付終了" : tools.changing ? "この枠へ変更 →" : "タップして予約 →"));
+    button.append(element("span", "slot-action", slot.attended ? "✓ 受講済み" : slot.is_booked ? "✓ 予約済み" : slot.blocked ? "受付停止" : full ? "満員" : past ? "受付終了" : tools.changing ? "この枠へ変更 →" : limitReached ? "未消化予約の上限" : "タップして予約 →"));
     button.addEventListener("click", function () { reserve(slot); });
     card.append(button);
     if (slot.can_cancel) {
@@ -429,6 +485,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     return card;
   }
   function renderSlots(data) {
+    limitReached = data.outstanding_count >= data.booking_limit;
+    q("#bookingLimitStatus").textContent = "未消化予約 " + data.outstanding_count + " / " + data.booking_limit + "コマ" + (limitReached ? "（上限に達しています。予約一覧から変更・取消できます）" : "");
     range = data.range;
     q("#bookingDate").min = range.from;
     q("#bookingDate").max = range.to;
@@ -471,7 +529,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         { session_token: ownToken, date: date, slot_id: slot.slot_id, booking_id: changing ? changing.booking_id : undefined });
       if (token !== ownToken) return;
       tools.finishChange();
-      message(dayLabel(date) + " " + slot.start_time + "–" + slot.end_time + (changing ? " に予約を変更しました。" : " の予約が完了しました。") +
+      message(dayLabel(date) + " " + slot.start_time + (changing ? " に予約を変更しました。" : " の予約が完了しました。") +
         (result.notification_pending ? "確認メールは送信待ちです。予約は成立しています。" : "確認メールをお送りしました。"));
       await Promise.all([loadSlots(false), tools.refresh()]);
     } catch (error) {
@@ -483,7 +541,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   }
   async function cancelBooking(slot) {
     if (busy || !token) return;
-    if (!window.confirm(slot.start_time + "–" + slot.end_time + " の予約を取り消しますか？")) return;
+    if (!window.confirm(slot.start_time + " の予約を取り消しますか？")) return;
     const ownToken = token;
     setBusy(true); message("");
     try {
@@ -496,6 +554,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     finally { if (token === ownToken || !token) setBusy(false); }
   }
   tools.onError = handleError;
+  window.NineRoundFighter.onError = handleError;
   tools.onMessage = message;
   tools.reload = function () { return loadSlots(false); };
   tools.cancel = cancelBooking;

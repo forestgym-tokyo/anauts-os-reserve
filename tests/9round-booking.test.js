@@ -73,6 +73,7 @@ function environment(options = {}) {
     ROUND9_BOOKING_TEST_EMAILS: Array.from({ length: 8 }, (_, i) => "member" + i + "@example.invalid").concat(["admin", "manager", "staff", "other", "inactive"].map(s => s + "@example.invalid")).join(","),
     ROUND9_BOOKING_FIREBASE_API_KEY: "test-firebase-key", ROUND9_BOOKING_STAFF_DIRECTORY_ID: directory.id,
     ROUND9_BOOKING_MEMBER_URL: "https://example.invalid/booking/?page=member",
+    ROUND9_BOOKING_STAFF_URL: "https://example.invalid/booking/staff/?page=staff",
     ROUND9_BOOKING_ADMIN_EMAILS: "admin@example.invalid",
     ...options.properties
   };
@@ -123,6 +124,8 @@ function environment(options = {}) {
   vm.createContext(context);
   vm.runInContext(read("9round-booking/gas/Booking.gs"), context);
   vm.runInContext(read("9round-booking/gas/Workflows.gs"), context);
+  vm.runInContext(read("9round-booking/gas/Fighters.gs"), context);
+  vm.runInContext(read("9round-booking/gas/Management.gs"), context);
   if (options.realStaffAuth) vm.runInContext(read("9round-booking/gas/StaffAuth.gs"), context);
   if (!options.noSetup) context.setup9RoundBookingStorage_();
   function call(action, body = {}) { const result = context.round9BookingApi_(action, body); assert.equal(locked, false, "lock must be released on all paths"); return plain(result); }
@@ -327,7 +330,8 @@ test("standalone entry point accepts POST only and exposes no member data in GET
   };
   vm.createContext(c); vm.runInContext(read("9round-booking/gas/WebApp.gs"), c);
   const actions = ["request9RoundBookingCode", "verify9RoundBookingCode", "get9RoundWorkoutSlots", "create9RoundWorkoutBooking",
-    "cancel9RoundWorkoutBooking", "logout9RoundBooking", "get9RoundBookingBoard", "save9RoundTrialSlot", "set9RoundWorkoutBlock"];
+    "cancel9RoundWorkoutBooking", "logout9RoundBooking", "get9RoundBookingBoard", "save9RoundTrialSlot", "set9RoundWorkoutBlock",
+    "save9RoundFighterProfile", "cancel9RoundManagedBooking", "reschedule9RoundManagedBooking"];
   for (const action of actions) {
     const result = c.doPost({ postData: { contents: JSON.stringify({ action, marker: "test" }) } });
     assert.equal(result.action, action); assert.equal(result.body.marker, "test");
@@ -473,7 +477,12 @@ test("confirmation and management mails are separate, escape HTML, and contain o
   assert.doesNotMatch(memberMail.htmlBody, /session_token|NR9:|<b>会員/);
   const link = new URL(memberMail.body.match(/予約をキャンセルする:\n([^\n]+)/)[1]);
   assert.equal(link.searchParams.get("booking_id"), id); assert.equal(link.searchParams.get("intent"), "cancel");
-  assert.match(adminMail.body, /会員番号: 1000000/); assert.doesNotMatch(adminMail.body, /booking_id=|session_token/);
+  assert.match(adminMail.body, /会員番号: 1000000/); assert.doesNotMatch(adminMail.body, /session_token|id_token|NR9:/);
+  const adminLink = new URL(adminMail.body.match(/管理画面で変更する:\n([^\n]+)/)[1]);
+  assert.equal(adminLink.pathname, "/booking/staff/"); assert.equal(adminLink.searchParams.get("page"), "staff");
+  assert.equal(adminLink.searchParams.get("booking_id"), id); assert.equal(adminLink.searchParams.get("intent"), "change");
+  assert.match(adminMail.htmlBody, /管理画面でキャンセルする/);
+  assert.match(adminMail.htmlBody, /&lt;b&gt;会員&amp;名&lt;\/b&gt;/);
   const again = reserve(e, token);
   assert.equal(again.data.already_booked, true); assert.equal(e.sent.length, before + 2);
   e.call("cancel9RoundWorkoutBooking", { session_token: token, booking_id: id });
@@ -616,14 +625,178 @@ test("bundled QR encoder produces a real image that the offline scanner decodes"
 test("development upgrade adds only missing tables and preserves existing reservations", () => {
   const e = environment(), token = e.login(); reserve(e, token);
   const before = plain(e.data.sheets.get("nr_bookings").rows);
-  for (const name of ["nr_passes", "nr_attendance", "nr_changes", "nr_mail"]) e.data.sheets.delete(name);
+  for (const name of ["nr_passes", "nr_attendance", "nr_changes", "nr_mail", "nr_fighters", "nr_management_actions"]) e.data.sheets.delete(name);
   vm.runInContext(read("9round-booking/gas/Development.gs"), e.context);
   e.context.upgrade9RoundBookingDevelopment();
   assert.deepEqual(plain(e.data.sheets.get("nr_bookings").rows), before);
-  for (const name of ["nr_passes", "nr_attendance", "nr_changes", "nr_mail"]) assert.equal(e.data.sheets.get(name).rows.length, 1);
+  for (const name of ["nr_passes", "nr_attendance", "nr_changes", "nr_mail", "nr_fighters", "nr_management_actions"]) assert.equal(e.data.sheets.get(name).rows.length, 1);
   const count = e.writes.length; e.context.upgrade9RoundBookingDevelopment();
   assert.equal(e.writes.length, count);
   e.properties.ROUND9_BOOKING_ENV = "production";
   assert.throws(() => e.context.upgrade9RoundBookingDevelopment(), /開発用/);
   assert.equal(e.writes.length, count);
+});
+
+test("fighters register and rename only their own profile without changing the member master", () => {
+  const e = environment(), token = e.login(), other = e.login(1), masterBefore = plain(e.master.sheets.get("Members").rows);
+  assert.deepEqual(e.call("get9RoundFighterProfile", { session_token: token }).data,
+    { fighter_name: "", display_name: "テスト会員0", registered: false });
+  assert.equal(e.call("save9RoundFighterProfile", { session_token: token, member_no: "1000001", fighter_name: "  ソガの虎  " }).data.fighter_name, "ソガの虎");
+  assert.equal(e.call("get9RoundFighterProfile", { session_token: other, member_no: "1000000" }).data.fighter_name, "");
+  e.advance(1000);
+  assert.equal(e.call("save9RoundFighterProfile", { session_token: token, fighter_name: "RED TIGER" }).data.display_name, "RED TIGER");
+  assert.equal(e.data.sheets.get("nr_fighters").rows.length, 2, "rename updates one profile instead of appending duplicates");
+  assert.deepEqual(plain(e.master.sheets.get("Members").rows), masterBefore);
+  assert.ok(e.writes.every(name => name.startsWith("nr_")));
+  for (const action of ["get9RoundFighterProfile", "save9RoundFighterProfile"]) assert.equal(e.call(action, { fighter_name: "forged", member_no: "1000000" }).code, "SESSION_EXPIRED");
+});
+
+test("fighter validation supports Japanese and emoji, blocks controls and protects Sheets and mail HTML", () => {
+  const e = environment(), token = e.login();
+  for (const name of ["", "  ", "あ".repeat(25), "赤\n虎", "赤\u202e虎", "赤\u0000虎"]) {
+    assert.equal(e.call("save9RoundFighterProfile", { session_token: token, fighter_name: name }).code, "INVALID_FIGHTER_NAME");
+  }
+  assert.equal(e.call("save9RoundFighterProfile", { session_token: token, fighter_name: "🥊".repeat(24) }).ok, true);
+  e.call("save9RoundFighterProfile", { session_token: token, fighter_name: '=HYPERLINK("x")' });
+  assert.ok(e.data.sheets.get("nr_fighters").rows[1][2].startsWith("'="));
+  e.call("save9RoundFighterProfile", { session_token: token, fighter_name: '<img src=x onerror="x">' });
+  reserve(e, token);
+  assert.match(e.sent.at(-1).htmlBody, /&lt;img src=x onerror=&quot;x&quot;&gt;/);
+  assert.doesNotMatch(e.sent.at(-1).htmlBody, /<img/);
+});
+
+test("staff see current fighter and real names while member slot responses reveal neither other name", () => {
+  const e = environment({ realStaffAuth: true }), token = e.login(), other = e.login(1);
+  const id = reserve(e, token).data.booking_id;
+  e.call("save9RoundFighterProfile", { session_token: token, fighter_name: "SOGA FIGHTER" });
+  let shown = e.call("get9RoundBookingBoard", { id_token: "staff", date: day }).data.slots[0].members[0];
+  assert.equal(shown.name, "テスト会員0"); assert.equal(shown.fighter_name, "SOGA FIGHTER");
+  assert.equal(shown.can_change, false);
+  e.call("save9RoundFighterProfile", { session_token: token, fighter_name: "NEW FIGHTER" });
+  shown = e.call("get9RoundManagedBooking", { id_token: "admin", booking_id: id }).data.booking;
+  assert.equal(shown.name, "テスト会員0"); assert.equal(shown.fighter_name, "NEW FIGHTER");
+  const publicSlots = JSON.stringify(e.call("get9RoundWorkoutSlots", { session_token: other, date: day }));
+  assert.doesNotMatch(publicSlots, /NEW FIGHTER|SOGA FIGHTER|テスト会員0|1000000|fighter_name|member_name/);
+});
+
+test("fighter identity is revoked with the authenticated member and not inherited after registered email changes", () => {
+  const e = environment(), token = e.login();
+  e.call("save9RoundFighterProfile", { session_token: token, fighter_name: "OLD NAME" });
+  e.master.sheets.get("Members").rows[1][3] = "kyukai";
+  assert.equal(e.call("save9RoundFighterProfile", { session_token: token, fighter_name: "new" }).code, "MEMBER_UNAVAILABLE");
+  e.master.sheets.get("Members").rows[1][3] = "ok";
+  e.master.sheets.get("Members").rows[1][2] = "new-address@example.invalid";
+  assert.equal(e.call("get9RoundFighterProfile", { session_token: token }).code, "MEMBER_UNAVAILABLE");
+  e.properties.ROUND9_BOOKING_TEST_EMAILS += ",new-address@example.invalid";
+  const challenge = e.call("request9RoundBookingCode", { email: "new-address@example.invalid" });
+  const code = e.sent.at(-1).body.match(/は (\d{6})/)[1];
+  const session = e.call("verify9RoundBookingCode", { challenge_id: challenge.data.challenge_id, code }).data.session_token;
+  assert.equal(e.call("get9RoundFighterProfile", { session_token: session }).data.registered, false);
+  assert.equal(e.call("get9RoundBookingBoard", { id_token: "admin", date: day }).ok, true);
+});
+
+test("management email IDs and forged roles never authorize manager booking endpoints", () => {
+  const e = environment({ realStaffAuth: true }), token = e.login(), id = reserve(e, token).data.booking_id;
+  for (const action of ["get9RoundManagedBooking", "cancel9RoundManagedBooking", "reschedule9RoundManagedBooking"]) {
+    for (const id_token of ["", "invalid", "staff", "other", "inactive"]) {
+      const rejected = e.call(action, { id_token, session_token: token, permission: "ADMIN", booking_id: id, date: day, slot_id: "DAILY:" + day + ":11:45" });
+      assert.equal(rejected.ok, false);
+      assert.ok(["FORBIDDEN", "STAFF_SESSION_EXPIRED"].includes(rejected.code));
+      if (id_token === "staff") assert.equal(rejected.code, "FORBIDDEN");
+    }
+  }
+  assert.equal(e.call("get9RoundMemberBookings", { session_token: token }).data.bookings[0].status, "CONFIRMED");
+  assert.equal(e.data.sheets.get("nr_management_actions").rows.length, 1);
+});
+
+test("managers change and cancel on behalf of a member with shared capacity checks, audit and one notification per action", () => {
+  const e = environment({ realStaffAuth: true }), token = e.login(), id = reserve(e, token).data.booking_id;
+  const target = "DAILY:" + day + ":11:00", request = { id_token: "manager", booking_id: id, date: day, slot_id: target };
+  const changed = e.call("reschedule9RoundManagedBooking", request);
+  assert.equal(changed.ok, true, JSON.stringify(changed));
+  const count = e.sent.length;
+  assert.equal(e.call("reschedule9RoundManagedBooking", request).data.already_changed, true);
+  assert.equal(e.sent.length, count);
+  let audit = e.data.sheets.get("nr_management_actions").getDataRange().getDisplayValues();
+  assert.equal(audit.length, 2); assert.equal(audit[1][3], "M"); assert.equal(audit[1][5], changed.data.booking_id);
+  assert.match(e.sent.at(-1).body, /管理操作: M/);
+  assert.equal(e.call("get9RoundMemberBookings", { session_token: token }).data.bookings.filter(b => b.status === "CONFIRMED")[0].slot_id, target);
+  assert.equal(e.call("cancel9RoundManagedBooking", { id_token: "admin", booking_id: changed.data.booking_id }).ok, true);
+  const after = e.sent.length;
+  assert.equal(e.call("cancel9RoundManagedBooking", { id_token: "admin", booking_id: changed.data.booking_id }).ok, true);
+  assert.equal(e.sent.length, after); assert.equal(e.data.sheets.get("nr_management_actions").rows.length, 3);
+  assert.equal(e.call("get9RoundManagedBooking", { id_token: "admin", booking_id: changed.data.booking_id }).data.booking.status, "CANCELLED");
+});
+
+test("manager changes preserve originals for full or blocked targets and enforce both one-hour deadlines", () => {
+  const e = environment(), token = e.login(), id = reserve(e, token).data.booking_id, target = "DAILY:" + day + ":11:00";
+  const body = { id_token: "admin", booking_id: id, date: day, slot_id: target };
+  for (let i = 1; i <= 4; i++) reserve(e, e.login(i), target);
+  assert.equal(e.call("reschedule9RoundManagedBooking", body).code, "SLOT_FULL");
+  e.call("set9RoundWorkoutBlock", { id_token: "admin", date: day, slot_id: "DAILY:" + day + ":11:45", blocked: true });
+  assert.equal(e.call("reschedule9RoundManagedBooking", { ...body, slot_id: "DAILY:" + day + ":11:45" }).code, "SLOT_BLOCKED");
+  assert.equal(e.call("get9RoundManagedBooking", body).data.booking.status, "CONFIRMED");
+  const today = "2026-10-17", first = "DAILY:" + today + ":10:15";
+  const before = environment(), t = before.login(), old = reserve(before, t, first, today).data.booking_id;
+  before.advance(15 * 60000);
+  assert.equal(before.call("cancel9RoundManagedBooking", { id_token: "admin", booking_id: old }).ok, true);
+  const late = environment(), lateToken = late.login(), lateId = reserve(late, lateToken, first, today).data.booking_id;
+  const future = reserve(late, lateToken).data.booking_id;
+  late.advance(15 * 60000 + 1);
+  assert.equal(late.call("cancel9RoundManagedBooking", { id_token: "admin", booking_id: lateId }).code, "DEADLINE_PASSED");
+  assert.equal(late.call("reschedule9RoundManagedBooking", { id_token: "admin", booking_id: lateId, date: today, slot_id: "DAILY:" + today + ":11:00" }).code, "DEADLINE_PASSED");
+  assert.equal(late.call("reschedule9RoundManagedBooking", { id_token: "admin", booking_id: future, date: today, slot_id: first }).code, "DEADLINE_PASSED");
+});
+
+test("managers cannot cancel or change attended bookings", () => {
+  const e = environment(), token = e.login(), today = "2026-10-17", first = "DAILY:" + today + ":10:15";
+  const id = reserve(e, token, first, today).data.booking_id, qr = e.call("get9RoundMemberPass", { session_token: token }).data.qr_text;
+  assert.equal(e.call("checkIn9RoundMember", { id_token: "staff", qr_text: qr, date: today, slot_id: first }).ok, true);
+  assert.equal(e.call("get9RoundManagedBooking", { id_token: "admin", booking_id: id }).data.booking.can_cancel, false);
+  assert.equal(e.call("cancel9RoundManagedBooking", { id_token: "admin", booking_id: id }).code, "ALREADY_ATTENDED");
+  assert.equal(e.call("reschedule9RoundManagedBooking", { id_token: "admin", booking_id: id, date: day, slot_id: slotId }).code, "ALREADY_ATTENDED");
+});
+
+test("multiple verified management recipients are retained, deduplicated and restricted by the development allowlist", () => {
+  const e = environment(), token = e.login();
+  e.properties.ROUND9_BOOKING_ADMIN_EMAILS = "admin@example.invalid,manager@example.invalid,admin@example.invalid";
+  assert.equal(reserve(e, token).ok, true);
+  assert.equal(e.sent.at(-1).to, "admin@example.invalid,manager@example.invalid");
+  e.properties.ROUND9_BOOKING_STAFF_URL = "javascript:alert(1)";
+  assert.equal(reserve(e, token, "DAILY:" + day + ":11:00").code, "BOOKING_CONFIGURATION");
+  assert.equal(e.data.sheets.get("nr_bookings").rows.length, 2);
+});
+
+test("a member can hold ten outstanding reservations across dates, but not an eleventh, and duplicate taps stay idempotent", () => {
+  const e = environment(), token = e.login(), other = e.login(1), slots = plain(e.context.nrBookingDailySlots_(day));
+  const ids = slots.slice(0, 10).map(s => reserve(e, token, s.slot_id).data.booking_id);
+  assert.equal(e.call("get9RoundMemberBookings", { session_token: token }).data.outstanding_count, 10);
+  assert.equal(reserve(e, token, slots[10].slot_id).code, "BOOKING_LIMIT");
+  assert.equal(reserve(e, token, "DAILY:2026-10-19:10:15", "2026-10-19").code, "BOOKING_LIMIT");
+  assert.equal(reserve(e, token, slots[0].slot_id).data.already_booked, true);
+  assert.equal(reserve(e, other, slots[10].slot_id).ok, true, "the ceiling is per member");
+  assert.equal(e.call("reschedule9RoundWorkoutBooking", { session_token: token, booking_id: ids[0], date: day, slot_id: slots[10].slot_id }).ok, true);
+  assert.equal(e.call("get9RoundMemberBookings", { session_token: token }).data.outstanding_count, 10);
+  assert.equal(e.call("reschedule9RoundManagedBooking", { id_token: "admin", booking_id: ids[1], date: "2026-10-19", slot_id: "DAILY:2026-10-19:10:15" }).ok, true);
+  assert.equal(e.call("get9RoundMemberBookings", { session_token: token }).data.outstanding_count, 10);
+  assert.equal(e.call("cancel9RoundWorkoutBooking", { session_token: token, booking_id: ids[2] }).ok, true);
+  assert.equal(reserve(e, token, "DAILY:2026-10-19:11:00", "2026-10-19").ok, true);
+  assert.equal(e.call("get9RoundWorkoutSlots", { session_token: token, date: day }).data.outstanding_count, 10);
+});
+
+test("attendance and ended slots free the ten-reservation allowance without removing bookings from slot capacity", () => {
+  for (const attendance of [true, false]) {
+    const e = environment(), token = e.login(), today = "2026-10-17", first = "DAILY:" + today + ":10:15";
+    reserve(e, token, first, today);
+    const slots = plain(e.context.nrBookingDailySlots_(day));
+    slots.slice(0, 9).forEach(s => assert.equal(reserve(e, token, s.slot_id).ok, true));
+    assert.equal(reserve(e, token, slots[9].slot_id).code, "BOOKING_LIMIT");
+    if (attendance) {
+      const qr = e.call("get9RoundMemberPass", { session_token: token }).data.qr_text;
+      e.call("checkIn9RoundMember", { id_token: "staff", qr_text: qr, date: today, slot_id: first });
+    } else e.advance(2 * 3600000); // 11:00 JST: the 10:15 grid slot has ended.
+    assert.equal(e.call("get9RoundMemberBookings", { session_token: token }).data.outstanding_count, 9);
+    assert.equal(e.call("get9RoundWorkoutSlots", { session_token: token, date: today }).data.slots[0].booked_count, 1);
+    assert.equal(reserve(e, token, slots[9].slot_id).ok, true);
+  }
 });

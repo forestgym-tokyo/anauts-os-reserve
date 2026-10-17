@@ -20,6 +20,7 @@
   }
   function resetData() {
     window.NineRoundScanner.reset();
+    window.NineRoundBookingActions.reset();
     requestSequence++; inFlight = false; board = [];
     if (q("#nrAdminBoard")) q("#nrAdminBoard").replaceChildren();
     if (q("#nrTrialForm")) q("#nrTrialForm").reset();
@@ -40,6 +41,7 @@
     q("#nrBlockActions").hidden = !management();
     if (!eligible()) resetData();
     else if (initialData) render(initialData);
+    window.NineRoundBookingActions.authenticate();
   }
   function render(data) {
     board = data.slots;
@@ -51,7 +53,7 @@
     board.forEach(function (slot) {
       const article = textElement("article", "nr-slot" + (slot.kind === "TRIAL" ? " is-trial" : ""));
       const header = textElement("div", "nr-slot-head");
-      header.append(textElement("strong", "", slot.start_time + "–" + slot.end_time));
+      header.append(textElement("strong", "", slot.start_time));
       header.append(textElement("span", "nr-count", slot.booked_count + " / " + slot.capacity + "名"));
       article.append(header, textElement("p", "nr-kind", slot.kind === "TRIAL" ? "体験 · " + slot.title + (slot.status === "CLOSED" ? "（受付停止）" : "") : "デイリーワークアウト" + (slot.status === "BLOCKED" ? "（ブロック中）" : "")));
       if (slot.members.length) {
@@ -59,6 +61,18 @@
         slot.members.forEach(function (member) {
           const li = textElement("li");
           li.append(textElement("span", "", member.name + " 様"), textElement("small", "", "会員番号 " + member.member_no), textElement("span", member.attended ? "nr-attended" : "nr-not-attended", member.attended ? "受講済み" : "未受講"));
+          li.append(textElement("span", "nr-fighter-name", "ファイター：" + (member.fighter_name || "未登録")));
+          if (management() && slot.kind === "DAILY" && (member.can_change || member.can_cancel)) {
+            const actions = textElement("div", "nr-member-actions");
+            [["change", "変更", member.can_change], ["cancel", "キャンセル", member.can_cancel]].forEach(function (a) {
+              if (!a[2]) return;
+              const button = textElement("button", "", a[1]); button.type = "button";
+              button.dataset.manageBooking = member.booking_id;
+              button.addEventListener("click", function () { window.NineRoundBookingActions.open(member.booking_id, a[0]); });
+              actions.append(button);
+            });
+            li.append(actions);
+          }
           names.append(li);
         });
         article.append(names);
@@ -176,6 +190,8 @@
       '</div><div class="nr-trial-actions"><button id="nrTrialSave" class="nr-primary" type="submit">体験枠を追加</button><button id="nrTrialNew" type="button">新規入力</button></div></form></details></div>'
     ].join("");
     q("#staffWorkspace").append(section);
+    window.NineRoundBookingActions.mount(q(".nr-shell"));
+    window.NineRoundBookingActions.onUpdated = function () { return load(false); };
     window.NineRoundScanner.mount(q(".nr-shell"));
     window.NineRoundScanner.onRegistered = function () { load(false); };
     q("#nrAdminDate").value = window.NineRoundTokyoDate();

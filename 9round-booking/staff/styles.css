@@ -18,6 +18,7 @@
 [data-nine-round-board] .nr-names{padding:0;margin:12px 0 0;list-style:none;font-size:13px;display:grid;gap:6px}
 [data-nine-round-board] .nr-names li{border-top:1px solid #423940;padding-top:7px;display:flex;gap:8px;flex-wrap:wrap;justify-content:space-between;overflow-wrap:anywhere}
 [data-nine-round-board] .nr-names small{color:#b5aab7}
+[data-nine-round-board] .nr-fighter-name{flex-basis:100%;color:#ff929e;font-size:12px}[data-nine-round-board] .nr-member-actions{display:flex;gap:8px;flex-wrap:wrap;flex-basis:100%;margin:8px 0}[data-nine-round-board] .nr-managed{border:1px solid #78424c;border-radius:10px;padding:16px;margin:18px 0}[data-nine-round-board] .nr-managed summary{font-weight:800;cursor:pointer;min-height:40px;font-size:14px}[data-nine-round-board] .nr-managed p{font-size:12px;overflow-wrap:anywhere}[data-nine-round-board] .nr-managed-slots{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:14px}[data-nine-round-board] .nr-managed-slots button{padding:10px 6px;overflow-wrap:anywhere}
 [data-nine-round-board] .nr-empty{font-size:12px;color:#ada3af;padding-top:10px}
 [data-nine-round-board] .nr-trial-editor{margin-top:24px;padding-top:20px;border-top:1px solid #483c44}
 [data-nine-round-board] .nr-trial-editor summary{font-size:15px;font-weight:800;cursor:pointer;min-height:44px}
