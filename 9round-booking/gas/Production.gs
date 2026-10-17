@@ -60,10 +60,10 @@ function nrPrepare9RoundBookingProduction_() {
   });
 }
 
-function nrActivate9RoundBookingProduction_() {
+function nrActivate9RoundBookingProduction_(verifiedDeploymentUrl) {
   const props = PropertiesService.getScriptProperties(), p = props.getProperties();
   const target = nrBookingProductionTargets_();
-  const base = String(ScriptApp.getService().getUrl() || "");
+  const base = String(verifiedDeploymentUrl || ScriptApp.getService().getUrl() || "");
   if (!/^https:\/\/script\.google\.com\/(?:macros\/s|a\/macros\/[^/]+\/s)\/[^/?]+\/exec$/.test(base)) {
     throw new Error("公開用のバージョン付きデプロイが必要です。");
   }

@@ -876,6 +876,9 @@ test("production preparation isolates storage, keeps source data, and activation
   assert.equal(e.properties.ROUND9_BOOKING_DEVELOPMENT_DATA_ID, e.data.id);
   assert.equal(production.sheets.get("nr_bookings").getLastRow(), 1);
   assert.throws(() => e.context.nrActivate9RoundBookingProduction_(), /バージョン付きデプロイ/);
+  assert.throws(() => e.context.nrActivate9RoundBookingProduction_("https://example.invalid/exec"), /バージョン付きデプロイ/);
+  const verifiedDeploymentUrl = "https://script.google.com/macros/s/verified-public-id/exec";
+  assert.equal(e.context.nrActivate9RoundBookingProduction_(verifiedDeploymentUrl).enabled, true, "editor execution may still report a dev URL; use the URL observed in the deployment dialog");
   deploymentUrl = "https://script.google.com/macros/s/verified-public-id/exec";
   assert.equal(e.context.nrActivate9RoundBookingProduction_().enabled, true);
   assert.equal(e.properties.ROUND9_BOOKING_MEMBER_URL, deploymentUrl + "?page=member");

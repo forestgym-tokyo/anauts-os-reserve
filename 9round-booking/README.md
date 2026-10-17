@@ -2,7 +2,7 @@
 
 開発ブランチ：feature/9round-member-booking
 
-**会員向け公開の承認待ちです（2026/10/17）。** 独立プロジェクト「9ROUND Booking - Ario Soga」にバージョン1を作成し、アクセスは本人限定です。本番の会員マスター・スタッフ名簿の読み取り接続と、新しい専用予約データを準備しました。予約受付は無効のままです。config.jsのAPI URLは空で、静的ページは本番APIに接続しません。既存A-nauts GAS・既存デプロイ・マスター・トリガーは変更していません。
+**会員向け公開済みです（2026/10/17）。** 独立プロジェクト「9ROUND Booking - Ario Soga」のバージョン1を全員が開ける設定にし、本番予約受付を有効にしました。会員は登録メールの確認コード、スタッフは既存スタッフアカウントで認証します。本番の会員マスター・スタッフ名簿は読み取りのみで、予約は新しい専用データへ保存します。config.jsのAPI URLは空で、静的ページは本番APIに接続しません。既存A-nauts GAS・既存デプロイ・マスター・トリガーは変更していません。
 
 ## 構成
 
@@ -107,23 +107,23 @@
 
 会員のセッションはブラウザーのsessionStorage、独立管理画面のスタッフ認証はメモリー内に保持します。トークンをURL・localStorageに保存しません。A-nautsの閲覧連携では、既存アプリから更新済みFirebaseトークンを受け取ります。
 
-## 公開準備の状態
+## 公開状態
 
 独立GAS：[9ROUND Booking - Ario Soga](https://script.google.com/home/projects/1bMtNarNVT3JKIDA-w_vmWKD-jfaODvBRtEL6qNCQF3HQkg_qsl4yVifq/edit)。本番の会員マスター（9ROUND_Member）と既存のauth_users・staffを読み取り確認し、有効会員70名を確認しました。専用の本番予約データを新規作成し、開発用の予約データ・架空マスター・架空スタッフ名簿は保持しています。
 
 - バージョン：1、2026/10/17作成。
 - デプロイID：`AKfycbzVxf1HKZgXet5XrZjqQbzQ47dH8vMISf1mdEE_AH4m3EABceonv1V2OG0jtuIJLvkq`。
-- 会員向け準備URL：[全会員共通の予約画面](https://script.google.com/a/macros/theforestgym.com/s/AKfycbzVxf1HKZgXet5XrZjqQbzQ47dH8vMISf1mdEE_AH4m3EABceonv1V2OG0jtuIJLvkq/exec?page=member)。本人限定で表示確認済み、会員への配布は公開後です。
-- スタッフ向け準備URL：[予約管理画面](https://script.google.com/a/macros/theforestgym.com/s/AKfycbzVxf1HKZgXet5XrZjqQbzQ47dH8vMISf1mdEE_AH4m3EABceonv1V2OG0jtuIJLvkq/exec?page=staff)。スタッフ認証と権限検査が必要です。
-- 現在はアクセスMYSELF、`ROUND9_BOOKING_ENV=production`、`ROUND9_BOOKING_ENABLED=false`。匿名公開は自動承認審査で保留され、公開範囲の明示承認待ちです。一般会員が使える公開状態ではありません。
+- 会員向け公開URL：[全会員共通の予約画面](https://script.google.com/macros/s/AKfycbzVxf1HKZgXet5XrZjqQbzQ47dH8vMISf1mdEE_AH4m3EABceonv1V2OG0jtuIJLvkq/exec?page=member)。全会員共通で、Googleアカウントなしで開けます。
+- スタッフ向け公開URL：[予約管理画面](https://script.google.com/macros/s/AKfycbzVxf1HKZgXet5XrZjqQbzQ47dH8vMISf1mdEE_AH4m3EABceonv1V2OG0jtuIJLvkq/exec?page=staff)。スタッフ認証と権限検査が必要です。
+- アクセスは全員、`ROUND9_BOOKING_ENV=production`、`ROUND9_BOOKING_ENABLED=true`。匿名での会員・スタッフ画面へのGETが200で、未認証の予約枠APIはSESSION_EXPIREDとなることを確認しました。
 
-承認後は同じデプロイのアクセスを変更し、発行済みの/exec URLを確認してから、エディターで`nrActivate9RoundBookingProduction_`を呼ぶ一時ラッパーを実行します。会員・スタッフ用メールリンクの設定、専用データの列構成、管理通知先を検査した後に受付を有効化します。一時ラッパーは公開ソースに含めず、実行後にエディターからも除去します。初期化の再実行や既存予約の削除は行いません。
+デプロイ画面で発行された/exec URLを確認し、エディターでそのURLを`nrActivate9RoundBookingProduction_(verifiedDeploymentUrl)`へ渡す一時ラッパーを実行しました。エディターからはScriptAppのサービスURLが/devになる場合があるため、確認済みの/exec URLを明示します。会員・スタッフ用メールリンク、専用データの列構成、管理通知先を検査して受付を有効化しました。一時ラッパーは公開バージョンに含めず、実行後にエディターからも除去しています。初期化の再実行や既存予約の削除は行いません。
 
 `Production.gs`の準備・有効化関数はすべて末尾が`_`で、HTML ServiceからのRPC呼び出しを許可しません。将来の修正は、同じデプロイを新しいバージョンに更新し、URLと予約データを維持します。A-nautsの閲覧パネルは開発ブランチ上で、mainへのマージは行っていません。
 
 ## 独立開発環境の初期構築
 
-以下は当初の開発環境の構築手順です。開発時は新規作成の3スプレッドシートだけを使用し、会員・スタッフ画面を確認しました。現在のプロジェクトは上記の本番準備状態へ移行しているため、開発用初期化関数を再実行しないでください。
+以下は当初の開発環境の構築手順です。開発時は新規作成の3スプレッドシートだけを使用し、会員・スタッフ画面を確認しました。現在のプロジェクトは上記の本番運用状態へ移行しているため、開発用初期化関数を再実行しないでください。
 
 1. 新規の独立Apps Scriptプロジェクトを使います。リポジトリ直下の既存gas/や既存clasp設定は使いません。
 2. 次のコマンドで、静的ページからGAS用のMember.html・Staff.htmlを再生成します。
