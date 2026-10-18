@@ -236,7 +236,7 @@ document.addEventListener("DOMContentLoaded", function () {
     "../9round-booking/api.js?v=20261017-os-management",
     "./admin-9round-booking.js?v=20261017-os-management",
     "../9round-booking/vendor/jsqr.min.js?v=20261017-os-management",
-    "../9round-booking/staff/scanner.js?v=20261018-qr-image-picker",
+    "../9round-booking/staff/scanner.js?v=20261018-qr-image-reading",
     "../9round-booking/staff/booking-actions.js?v=20261017-os-management",
     "../9round-booking/staff/board.js?v=20261017-os-management"
   ];
