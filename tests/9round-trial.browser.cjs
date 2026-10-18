@@ -55,6 +55,7 @@ async function main() {
 
     const desktop = await page(1320); await desktop.goto(origin + "/9round-booking/trial/");
     await desktop.locator("#slots .slot-button").first().waitFor();
+    await desktop.locator('[data-date="2026-10-18"]').click();
     assert.equal(await desktop.locator("#selectedDateLabel").textContent(), "10月18日（日） の体験枠");
     await desktop.locator("#slots .slot-button").first().click();
     await noOverflow(desktop, "desktop trial");
@@ -80,7 +81,7 @@ async function main() {
     await desktop.locator("#resultPanel").waitFor({ state: "visible" });
     assert.equal(await desktop.evaluate(() => location.hash), "");
     assert.equal(actions.filter(a => a === "request9RoundTrialCode").length, codeMails);
-    await desktop.locator("#changeBooking").click(); await desktop.locator("#changeSlots .slot-button").first().click(); await closeFeedback(desktop);
+    await desktop.locator("#changeBooking").click(); await desktop.locator('#changeSlots [data-slot-id="TRIAL:2026-10-18:11:00"]').click(); await closeFeedback(desktop);
     assert.match(await desktop.locator("#resultDetails").textContent(), /11:00/);
     let releaseCancel; cancelGate = new Promise(resolve => { releaseCancel = resolve; });
     await desktop.locator("#cancelBooking").click(); await desktop.locator('#feedback[data-state="pending"]').waitFor({ state: "visible" });
@@ -92,7 +93,7 @@ async function main() {
 
     for (const width of [320, 390, 768]) {
       const mobile = await page(width); await mobile.goto(origin + "/9round-booking/trial/");
-      await mobile.locator("#slots .slot-button").first().waitFor(); await mobile.locator("#slots .slot-button").first().click();
+      await mobile.locator("#slots .slot-button").first().waitFor(); await mobile.locator('[data-date="2026-10-18"]').click(); await mobile.locator("#slots .slot-button").first().click();
       await noOverflow(mobile, "trial width " + width);
       if (width === 390) {
         await mobile.screenshot({ path: path.join(evidence, "trial-mobile.png"), fullPage: true });
