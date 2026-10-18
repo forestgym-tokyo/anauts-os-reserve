@@ -3,7 +3,7 @@
  * Deploy membership/plans.js before this file, using the same server/client rules.
  */
 const NR_MEMBERSHIP = Object.freeze({
-  sheet: "WEB入会申込", version: "ROUND9_2026_10_V2",
+  sheet: "WEB入会申込", version: "ROUND9_2026_10_V3",
   headers: ["申込ID", "受付日時(JST)", "申込ステータス", "カード登録状態", "決済状態", "会員番号", "名前", "名前(ふりがな)", "誕生日", "ファイターネーム", "メールアドレス", "電話番号", "郵便番号", "都道府県・市区町村・町域", "番地・建物名", "住所(全て)", "店舗ID", "プランID", "会員種別", "利用開始日", "月会費", "初期費用", "グローブ代", "当月日数", "初月利用日数", "初月日割り会費", "翌月会費", "初回合計", "キャンペーンID", "継続月数", "ペア氏名", "ペア会員番号", "体験申込ID", "同意日時(JST)", "規約版", "受付キー(HMAC)", "入力照合(HMAC)", "更新日時(JST)"]
 });
 function nrMembershipEnabled_() { return PropertiesService.getScriptProperties().getProperty("ROUND9_MEMBERSHIP_ENABLED") === "true"; }
@@ -60,7 +60,13 @@ function nrMembershipMasterCampaignCount_(config) {
   }).length;
 }
 function nrMembershipReceipt_(row) {
-  return { application_id: row["申込ID"], status: row["申込ステータス"], card_registration: false, payment_status: row["決済状態"], quote: NineRoundMembershipPlans.quote(row["プランID"], row["利用開始日"]) };
+  const number = function (key) { return Number(String(row[key]).replace(/,/g, "")); };
+  const quote = Object.assign({}, NineRoundMembershipPlans.quote(row["プランID"], row["利用開始日"], String(row["受付日時(JST)"]).slice(0, 10)), {
+    monthly: number("月会費"), initial: number("初期費用"), gloves: number("グローブ代"),
+    daysInMonth: number("当月日数"), remainingDays: number("初月利用日数"), firstMonthFee: number("初月日割り会費"),
+    nextMonthFee: number("翌月会費"), total: number("初回合計"), nextBillingFee: number("月会費")
+  });
+  return { application_id: row["申込ID"], status: row["申込ステータス"], card_registration: false, payment_status: row["決済状態"], quote: quote };
 }
 function nrCreate9RoundMembershipApplication_(config, body) {
   nrMembershipRequire_();
@@ -74,7 +80,7 @@ function nrCreate9RoundMembershipApplication_(config, body) {
       return nrMembershipReceipt_(old);
     }
     const model = NineRoundMembershipPlans, plan = model.getPlan(input.plan_id);
-    if (!model.validStart(input.start_date, model.today())) nrBookingError_("MEMBERSHIP_DATE", "本日から2026年10月31日までの利用開始日をお選びください。");
+    if (!model.validStart(input.start_date, model.today())) nrBookingError_("MEMBERSHIP_DATE", "本日から当月末までの利用開始日をお選びください。");
     if (input.trial_application_id) nrTrialSelect_(config, { application_id: input.trial_application_id, trial_token: body.trial_token }, null);
     if (rows.some(function (r) { return r["メールアドレス"] === input.email && ["取消", "却下"].indexOf(r["申込ステータス"]) < 0; })) nrBookingError_("MEMBERSHIP_ALREADY_RECEIVED", "このメールアドレスでのお申込みは受付済みです。変更をご希望の場合は店舗スタッフへご連絡ください。");
     if (plan.campaign) {
@@ -83,7 +89,7 @@ function nrCreate9RoundMembershipApplication_(config, body) {
       const used = nrMembershipMasterCampaignCount_(config) + rows.filter(function (r) { return r["キャンペーンID"] === model.offer.id && !r["会員番号"] && ["取消", "却下"].indexOf(r["申込ステータス"]) < 0; }).length;
       if (used >= model.offer.campaignLimit) nrBookingError_("MEMBERSHIP_CAMPAIGN_FULL", "プレミアムOne・Halfのキャンペーン受付枠は満員です。ほかのプランをご確認いただくか、店舗スタッフへご相談ください。");
     }
-    const quote = model.quote(input.plan_id, input.start_date), now = new Date().toISOString(), id = nrBookingOpaque_();
+    const quote = model.quote(input.plan_id, input.start_date, model.today()), now = new Date().toISOString(), id = nrBookingOpaque_();
     // The master workbook has a different timezone. Persist explicit JST text, never ambiguous serial dates.
     const jst = new Date(Date.parse(now) + 9 * 60 * 60 * 1000).toISOString().replace("T", " ").slice(0, 19) + " +09:00";
     const row = Object.fromEntries(NR_MEMBERSHIP.headers.map(function (key) { return [key, ""]; }));

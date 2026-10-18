@@ -13,17 +13,22 @@
     return ["year", "month", "day"].map(function (key) { return parts.find(function (p) { return p.type === key; }).value; }).join("-");
   }
   function isDate(date) { return /^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(Date.parse(date + "T00:00:00Z")) && new Date(date + "T00:00:00Z").toISOString().slice(0, 10) === date; }
-  function validStart(date, current) { return isDate(date) && date >= current && date <= offer.lastDate; }
-  function quote(planId, startDate) {
+  function validStart(date, current) { return isDate(date) && isDate(current) && date >= current && date.slice(0, 7) === current.slice(0, 7) && date <= offer.lastDate; }
+  function quote(planId, startDate, applicationDate) {
+    applicationDate = applicationDate || today();
     const plan = getPlan(planId);
-    if (!plan || !isDate(startDate)) return null;
+    if (!plan || !isDate(startDate) || !isDate(applicationDate)) return null;
     const parts = startDate.split("-").map(Number);
     const daysInMonth = new Date(Date.UTC(parts[0], parts[1], 0)).getUTCDate();
     const remainingDays = daysInMonth - parts[2] + 1;
     const firstMonthFee = Math.floor(plan.monthly * remainingDays / daysInMonth);
-    const nextMonthFee = parts[2] >= 25 ? plan.monthly : 0;
     const nextMonth = new Date(Date.UTC(parts[0], parts[1], 1)).toISOString().slice(0, 7);
-    return Object.freeze({ planId: plan.id, startDate: startDate, monthly: plan.monthly, initial: plan.initial,
+    const monthlyCutoff = startDate.slice(0, 7) + "-25";
+    // Whether the 25th has passed is based on the application date, not the start day.
+    const nextMonthFee = applicationDate >= monthlyCutoff ? plan.monthly : 0;
+    const nextBillingDate = (nextMonthFee ? nextMonth : startDate.slice(0, 7)) + "-25";
+    const nextBillingMonth = new Date(Date.UTC(parts[0], parts[1] + (nextMonthFee ? 1 : 0), 1)).toISOString().slice(0, 7);
+    return Object.freeze({ planId: plan.id, startDate: startDate, applicationDate: applicationDate, nextBillingDate: nextBillingDate, nextBillingMonth: nextBillingMonth, nextBillingFee: plan.monthly, monthly: plan.monthly, initial: plan.initial,
       gloves: plan.gloves, daysInMonth: daysInMonth, remainingDays: remainingDays,
       firstMonthFee: firstMonthFee, nextMonth: nextMonth, nextMonthFee: nextMonthFee,
       total: plan.initial + plan.gloves + firstMonthFee + nextMonthFee });

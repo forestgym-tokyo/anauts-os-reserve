@@ -25,22 +25,30 @@
   function renderSummary() {
     const plan = model.getPlan(state.plan), summary = q("planSummary"); summary.replaceChildren();
     summary.append(el("p", "summary-plan-name", plan.name)); const price = el("p", "summary-price", model.yen(plan.monthly)); price.append(el("small", "", " / 月")); summary.append(price);
-    const costs = el("dl"), quote = model.quote(plan.id, q("startDate").value);
+    const costs = el("dl"), quote = model.quote(plan.id, q("startDate").value, model.today());
     row(costs, "初期費用", model.yen(plan.initial)); row(costs, "9Rオリジナルグローブ", model.yen(plan.gloves));
     if (quote) {
       row(costs, "初月会費（" + quote.remainingDays + "日 / " + quote.daysInMonth + "日）", model.yen(quote.firstMonthFee));
       if (quote.nextMonthFee) row(costs, Number(quote.nextMonth.slice(5)) + "月分会費", model.yen(quote.nextMonthFee));
     }
     summary.append(costs);
-    if (quote) { const total = el("p", "summary-total", "初回お支払額"); total.append(el("strong", "", model.yen(quote.total))); summary.append(total, el("p", "quote-note", dateLabel(quote.startDate) + "から月末まで（開始日を含む）")); }
+    const first = q("firstPlanSummary"); first.replaceChildren();
+    first.append(el("p", "first-plan", plan.name));
+    if (quote) {
+      first.append(el("p", "first-total-label", "入会当日のお支払額"), el("strong", "first-total", model.yen(quote.total)));
+      const breakdown = el("p", "first-breakdown", "初期費用 " + model.yen(quote.initial) + " ＋ グローブ " + model.yen(quote.gloves) + " ＋ 日割り会費 " + model.yen(quote.firstMonthFee) + (quote.nextMonthFee ? " ＋ " + Number(quote.nextMonth.slice(5)) + "月分 " + model.yen(quote.nextMonthFee) : ""));
+      first.append(breakdown, el("p", "first-next", "次回の定期決済予定：" + dateLabel(quote.nextBillingDate) + " ／ " + Number(quote.nextBillingMonth.slice(5)) + "月分 " + model.yen(quote.nextBillingFee)));
+    } else first.append(el("p", "first-breakdown", "利用開始日をお選びください。"));
+    if (quote) { const total = el("p", "summary-total", "入会当日のお支払額"); total.append(el("strong", "", model.yen(quote.total))); summary.append(total, el("p", "quote-note", dateLabel(quote.startDate) + "から月末まで（開始日を含む）")); }
     else summary.append(el("p", "quote-note", "利用開始日を選ぶと、初回お支払額を表示します。"));
+    if (quote) summary.append(el("p", "quote-note", "次回の定期決済予定：" + dateLabel(quote.nextBillingDate) + " ／ " + Number(quote.nextBillingMonth.slice(5)) + "月分 " + model.yen(quote.nextBillingFee)));
     summary.append(el("p", "summary-term", term(plan)));
     const pair = plan.id === "FAMILY_PAIR"; q("pairSection").hidden = !pair; q("pairName").disabled = !pair; q("pairName").required = pair; q("pairMemberNo").disabled = !pair;
   }
   function showStage(n) {
     state.stage = n; notice(""); ["planStage", "detailsStage", "reviewStage"].forEach(function (id, index) { q(id).hidden = index + 1 !== n; });
-    document.querySelectorAll("[data-step]").forEach(function (item) { const step = Number(item.dataset.step); item.classList.toggle("is-current", step === n); item.classList.toggle("is-done", step < n); if (step === n) item.setAttribute("aria-current", "step"); else item.removeAttribute("aria-current"); });
-    q(["planTitle", "detailsTitle", "reviewTitle"][n - 1]).focus({ preventScroll: true }); document.querySelector(".steps").scrollIntoView({ block: "start", behavior: "auto" });
+    const title = q(["planTitle", "detailsTitle", "reviewTitle"][n - 1]);
+    title.focus({ preventScroll: true }); title.scrollIntoView({ block: "start", behavior: "auto" });
   }
   function normalizeFields() {
     ["fullName", "nameKana", "fighterName", "memberEmail", "memberAddress", "addressDetail", "pairName"].forEach(function (id) { q(id).value = q(id).value.trim(); });
@@ -51,7 +59,7 @@
   function validate() {
     normalizeFields();
     ["startDate", "birthDate", "fullName", "nameKana", "postalCode", "memberPhone", "pairName"].forEach(function (id) { q(id).setCustomValidity(""); });
-    if (!model.validStart(q("startDate").value, model.today())) q("startDate").setCustomValidity("本日から2026年10月31日までの日付をお選びください。");
+    if (!model.validStart(q("startDate").value, model.today())) q("startDate").setCustomValidity("本日から当月末までの日付をお選びください。");
     if (!model.isDate(q("birthDate").value) || q("birthDate").value >= model.today()) q("birthDate").setCustomValidity("生年月日をご確認ください。");
     if (!q("fullName").value || /[\x00-\x1f\x7f]/.test(q("fullName").value)) q("fullName").setCustomValidity("お名前をご入力ください。");
     if (!/^[ァ-ヶー・\s]+$/.test(q("nameKana").value.normalize("NFKC"))) q("nameKana").setCustomValidity("フリガナをカタカナでご入力ください。");
@@ -62,10 +70,11 @@
   }
   function renderReview() {
     const plan = model.getPlan(state.plan), details = q("reviewPlan"), person = q("reviewPerson"); details.replaceChildren(); person.replaceChildren();
-    row(details, "ご入会プラン", plan.name); row(details, "利用開始日", dateLabel(q("startDate").value)); row(details, "月会費", model.yen(plan.monthly)); row(details, "初期費用", model.yen(plan.initial)); row(details, "9Rグローブ", model.yen(plan.gloves)); const quote = model.quote(plan.id, q("startDate").value);
+    row(details, "ご入会プラン", plan.name); row(details, "利用開始日", dateLabel(q("startDate").value)); row(details, "月会費", model.yen(plan.monthly)); row(details, "初期費用", model.yen(plan.initial)); row(details, "9Rグローブ", model.yen(plan.gloves)); const quote = model.quote(plan.id, q("startDate").value, model.today());
     row(details, "初月会費", model.yen(quote.firstMonthFee) + "（" + quote.remainingDays + "日 / " + quote.daysInMonth + "日）");
     if (quote.nextMonthFee) row(details, Number(quote.nextMonth.slice(5)) + "月分会費", model.yen(quote.nextMonthFee));
-    row(details, "初回お支払額", model.yen(quote.total)); row(details, "継続条件", term(plan));
+    row(details, "入会当日のお支払額", model.yen(quote.total));
+    row(details, "次回の定期決済予定", dateLabel(quote.nextBillingDate) + "（" + Number(quote.nextBillingMonth.slice(5)) + "月分 " + model.yen(quote.nextBillingFee) + "）"); row(details, "継続条件", term(plan));
     if (plan.campaign) row(details, "キャンペーン", "One・Half合計で先着30名\n店舗スタッフの確認後に確定します");
     [["お名前", "fullName"], ["フリガナ", "nameKana"], ["ファイターネーム", "fighterName"], ["メール", "memberEmail"], ["電話番号", "memberPhone"], ["郵便番号", "postalCode"], ["ご住所（町域まで）", "memberAddress"], ["番地・建物名", "addressDetail"]].forEach(function (pair) { if (q(pair[1]).value) row(person, pair[0], q(pair[1]).value); }); row(person, "生年月日", dateLabel(q("birthDate").value));
     if (plan.id === "FAMILY_PAIR") { row(person, "お相手のお名前", q("pairName").value); if (q("pairMemberNo").value) row(person, "お相手の会員番号", q("pairMemberNo").value); }
@@ -80,11 +89,13 @@
   if (!open) { q("campaignBanner").hidden = true; notice("2026年10月のお申込み期間は終了しました。現在のプランは店舗スタッフへご確認ください。"); }
   q("memberForm").addEventListener("submit", function (event) { event.preventDefault(); if (state.stage === 2 && validate()) { renderReview(); showStage(3); } });
   q("memberForm").addEventListener("input", function (event) { if (event.target.setCustomValidity) event.target.setCustomValidity(""); resetConsent(); });
-  q("toDetails").addEventListener("click", function () { if (!open || model.today() > model.offer.lastDate) { notice("お申込み期間は終了しました。店舗スタッフへご確認ください。"); return; } renderSummary(); showStage(2); });
+  q("toDetails").addEventListener("click", function () { if (!open || model.today() > model.offer.lastDate) { notice("お申込み期間は終了しました。店舗スタッフへご確認ください。"); return; } q("startDate").setCustomValidity("");
+    if (!model.validStart(q("startDate").value, model.today())) { q("startDate").setCustomValidity("本日から当月末までの日付をお選びください。"); q("startDate").reportValidity(); return; }
+    renderSummary(); showStage(2); });
   ["changePlan", "backToPlans"].forEach(function (id) { q(id).addEventListener("click", function () { resetConsent(); showStage(1); }); });
   q("toReview").addEventListener("click", function () { if (validate()) { renderReview(); showStage(3); } });
   q("editDetails").addEventListener("click", function () { state.requestId = ""; resetConsent(); showStage(2); });
-  q("startDate").addEventListener("input", renderSummary);
+  q("startDate").addEventListener("input", function () { q("startDate").setCustomValidity(""); state.requestId = ""; resetConsent(); renderSummary(); });
   window.NineRoundMembershipPostal.connect({ zip: q("postalCode"), base: q("memberAddress"), status: q("postalStatus"), select: q("addressCandidates"), choices: q("addressCandidatesLabel"), retry: q("retryPostal") });
   const reference = new URLSearchParams(window.location.hash.slice(1));
   const trialId = reference.get("application_id"), trialToken = reference.get("trial_token");
@@ -120,7 +131,7 @@
       const receipt = await window.NineRoundBookingApi("create9RoundMembershipApplication", payload());
       q("reviewStage").hidden = true; q("receivedStage").hidden = false; q("receivedDetails").replaceChildren();
       row(q("receivedDetails"), "受付番号", receipt.application_id); row(q("receivedDetails"), "プラン", model.getPlan(receipt.quote.planId).name);
-      row(q("receivedDetails"), "利用開始日", dateLabel(receipt.quote.startDate)); row(q("receivedDetails"), "初回お支払額", model.yen(receipt.quote.total));
+      row(q("receivedDetails"), "利用開始日", dateLabel(receipt.quote.startDate)); row(q("receivedDetails"), "入会当日のお支払額", model.yen(receipt.quote.total));
       row(q("receivedDetails"), "お申込み状況", "内容確認待ち・カード未登録・未決済"); notice(""); q("receivedTitle").focus();
     } catch (error) { notice((error.code ? error.message : "通信結果を確認できませんでした。入力を変更せず、もう一度送信すると同じ受付内容を確認します。") || "保存できませんでした。"); }
     finally { state.busy = false; q("editDetails").disabled = false; updateSubmit(); }
