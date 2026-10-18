@@ -1,12 +1,19 @@
 (function () {
   "use strict";
-  function responseData(result) {
+  const workoutEndDate = "2026-10-24";
+  window.NineRoundWorkoutEndDate = workoutEndDate;
+  function responseData(result, action) {
     if (!result || !result.ok) {
       const error = new Error(result && result.message || "処理を完了できませんでした。");
       error.code = result && result.code;
       throw error;
     }
-    return result.data;
+    const data = result.data;
+    if (data && data.range && ["get9RoundWorkoutSlots", "get9RoundMailBooking", "get9RoundManagedBooking"].includes(action)) {
+      data.range.to = data.range.to && data.range.to < workoutEndDate ? data.range.to : workoutEndDate;
+      if (data.booking && data.range.from > data.range.to) data.booking.can_change = false;
+    }
+    return data;
   }
   window.NineRoundBookingApi = async function (action, payload) {
     const config = window.ANAUTS_ROUND9_BOOKING || {};
@@ -22,7 +29,7 @@
         }, config.requestTimeoutMs || 30000);
         google.script.run.withSuccessHandler(function (result) {
           clearTimeout(timer);
-          try { resolve(responseData(result)); } catch (error) { reject(error); }
+          try { resolve(responseData(result, action)); } catch (error) { reject(error); }
         }).withFailureHandler(function () {
           clearTimeout(timer); reject(new Error("予約システムに接続できませんでした。"));
         }).nineRoundBookingRequest(Object.assign({}, payload, { action: action }));
@@ -40,7 +47,7 @@
       const text = await response.text();
       let result;
       try { result = JSON.parse(text); } catch (_) { throw new Error("予約システムに接続できませんでした。"); }
-      return responseData(result);
+      return responseData(result, action);
     } catch (error) {
       if (error.name === "AbortError") {
         throw new Error("通信結果を確認できませんでした。予約操作後の場合は、空き枠を再読込して予約状況をご確認ください。");
@@ -61,3 +68,4 @@
     return get("year") + "-" + get("month") + "-" + get("day");
   };
 })();
+

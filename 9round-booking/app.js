@@ -4,9 +4,10 @@
   const api = window.NineRoundBookingApi;
   const tools = window.NineRoundMemberTools;
   const fighter = window.NineRoundFighter;
+  const bookingEndDate = window.NineRoundWorkoutEndDate || "2026-10-24";
   const storageKey = "nr_booking_session_v1";
   let token = "", challenge = "", busy = false, sequence = 0;
-  let range = { from: window.NineRoundTokyoDate(), to: "" };
+  let range = { from: window.NineRoundTokyoDate(), to: bookingEndDate };
   let lastDate = "", limitReached = false;
   let feedbackSlotId = "";
   function bookingFeedback(state, date, slot, title, note) {
@@ -66,8 +67,10 @@
     q("#bookingPanel").setAttribute("aria-busy", String(value));
     ["#sendCode", "#verifyCode", "#changeEmail", "#bookingDate", "#reload", "#previousDate", "#nextDate"].forEach(function (s) { q(s).disabled = value; });
     if (!value) {
-      q("#previousDate").disabled = q("#bookingDate").value <= range.from;
-      q("#nextDate").disabled = !!range.to && q("#bookingDate").value >= range.to;
+      const closed = window.NineRoundTokyoDate() > bookingEndDate;
+      q("#bookingDate").disabled = closed;
+      q("#previousDate").disabled = closed || q("#bookingDate").value <= range.from;
+      q("#nextDate").disabled = closed || !!range.to && q("#bookingDate").value >= range.to;
     }
     updateBookingButtons();
     document.querySelectorAll("[data-cancel]").forEach(function (button) { button.disabled = value; });
@@ -122,7 +125,7 @@
   function renderSlots(data) {
     limitReached = data.outstanding_count >= data.booking_limit;
     q("#bookingLimitStatus").textContent = "未消化予約 " + data.outstanding_count + " / " + data.booking_limit + "コマ" + (limitReached ? "（上限に達しています。予約一覧から変更・取消できます）" : "");
-    range = data.range;
+    range = { from: data.range.from, to: data.range.to && data.range.to < bookingEndDate ? data.range.to : bookingEndDate };
     q("#bookingDate").min = range.from;
     q("#bookingDate").max = range.to;
     q("#dateHeading").textContent = dayLabel(data.date);
@@ -137,6 +140,19 @@
   }
   async function loadSlots(clearMessage) {
     if (!token) return;
+    range.from = window.NineRoundTokyoDate();
+    if (range.from > range.to) {
+      sequence++;
+      q("#bookingDate").value = "";
+      q("#dateHeading").textContent = "暫定予約の受付は終了しました";
+      q("#slotList").replaceChildren();
+      q("#bookingLimitStatus").textContent = "";
+      message("10月25日（日）以降はデジムからご予約ください。");
+      setBusy(false);
+      return;
+    }
+    const selected = q("#bookingDate").value;
+    q("#bookingDate").value = !selected || selected < range.from ? range.from : selected > range.to ? range.to : selected;
     const ownSequence = ++sequence, ownToken = token, date = q("#bookingDate").value;
     setBusy(true);
     if (clearMessage) message("");
@@ -156,6 +172,7 @@
   }
   async function reserve(slot, button) {
     if (busy || !token || !slot.available) return;
+    if (window.NineRoundTokyoDate() > bookingEndDate || lastDate > bookingEndDate) return loadSlots(true);
     if (!tools.changing && !fighter.requireRegistration()) return;
     const ownToken = token, date = lastDate;
     const changing = tools.changing;
@@ -261,7 +278,8 @@
     // Clear local identity immediately, even when the network is unavailable.
     if (oldToken) try { await api("logout9RoundBooking", { session_token: oldToken }); } catch (_) {}
   });
-  q("#bookingDate").value = range.from; q("#bookingDate").min = range.from;
+  q("#bookingDate").value = range.from <= range.to ? range.from : "";
+  q("#bookingDate").min = range.from; q("#bookingDate").max = range.to;
   q("#bookingDate").addEventListener("change", function () { if (!busy && q("#bookingDate").value) loadSlots(true); });
   q("#reload").addEventListener("click", function () { if (!busy) Promise.all([loadSlots(true), tools.refresh(), fighter.refresh()]); });
   function moveDate(offset) {
@@ -279,3 +297,4 @@
   if (token) loadSlots(true);
   else if (!(window.ANAUTS_ROUND9_BOOKING || {}).apiUrl) message("現在、予約受付の準備中です。");
 })();
+
