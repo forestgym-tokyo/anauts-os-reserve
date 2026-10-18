@@ -93,9 +93,9 @@
 
     <section id="bookingPanel" class="panel booking-panel" hidden>
       <div class="verified-bar"><span><i aria-hidden="true">✓</i> 本人確認済み</span><button id="logout" type="button" class="text-button">ログアウト</button></div>
-      <details id="fighterPanel" class="member-details"><summary id="fighterSummary">ファイター登録</summary>
-        <p class="hint">あなたのファイターネームを登録してください。登録後も、ここからいつでも変更できます。</p>
-        <form id="fighterForm"><label for="fighterName">ファイターネーム（1〜24文字）</label><input id="fighterName" name="fighter_name" type="text" autocomplete="nickname" maxlength="48" placeholder="あなたのファイターネーム" required><button id="fighterSave" class="primary" type="submit">ファイター登録する →</button></form>
+      <details id="fighterPanel" class="member-details"><summary id="fighterSummary">ファイター登録（必須）</summary>
+        <p class="hint">予約にはファイターネームの登録が必須です。入力して保存してください。登録後も、ここからいつでも変更できます。</p>
+        <form id="fighterForm"><label for="fighterName">ファイターネーム（必須・1〜24文字）</label><input id="fighterName" name="fighter_name" type="text" autocomplete="nickname" maxlength="48" placeholder="あなたのファイターネーム" required><button id="fighterSave" class="primary" type="submit">ファイター登録する →</button></form>
         <p id="fighterStatus" class="hint" role="status" aria-live="polite"></p>
       </details>
       <details id="memberPassPanel" class="member-details"><summary>会員QRを表示（店舗で提示）</summary>

@@ -1,5 +1,5 @@
 "use strict";
-const CACHE = "9round-booking-public-v3-20261018-install-guide";
+const CACHE = "9round-booking-public-v4-20261019-fighter-required";
 const BASE = new URL("./", self.location.href);
 const INDEX = new URL("index.html", BASE).href;
 const FILES = ["index.html", "styles.css", "config.js", "api.js", "app.js", "fighter.js", "member-tools.js", "pwa.js", "manifest.webmanifest", "vendor/qrcode.min.js", "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png", "icons/apple-touch-icon.png"];
