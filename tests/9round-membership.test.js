@@ -67,3 +67,34 @@ test("postal normalization, exact match, deduplication and multiple candidates",
   assert.deepEqual(postal.addresses({status:200,results:[r,r,{...r,address3:"別町"},{...r,zipcode:"9999999"}]},"2600835"),["千葉県千葉市中央区川崎町","千葉県千葉市中央区別町"]);
   assert.deepEqual(postal.addresses({status:200,results:null},"2600835"),[]); assert.throws(()=>postal.addresses({status:500},"2600835"));
 });
+function formHarness(hash="") {
+  class Element {
+    constructor(){this.value="";this.maxLength=254;this.children=[];this.listeners={};this.classList={toggle(){}};this.dataset={};}
+    append(...nodes){this.children.push(...nodes);} replaceChildren(...nodes){this.children=nodes;}
+    addEventListener(type,fn){this.listeners[type]=fn;} setAttribute(){} removeAttribute(){} focus(){} scrollIntoView(){} setCustomValidity(){} reportValidity(){return true;}
+  }
+  const ids=[...read("9round-booking/membership/index.html").matchAll(/id="([^"]+)"/g)].map(m=>m[1]);
+  const elements=Object.fromEntries(ids.map(id=>[id,new Element()]));
+  let resolveTrial, rejectTrial; const pending=new Promise((resolve,reject)=>{resolveTrial=resolve;rejectTrial=reject;});
+  const calls=[],history=[];
+  const w={NineRoundMembershipPlans:{...model,today:()=>"2026-10-18"},NineRoundMembershipPostal:{connect(){}},crypto:crypto.webcrypto,
+    location:{hash,pathname:"/9round-booking/membership/",search:""},history:{replaceState(...args){history.push(args[2]);}},
+    NineRoundBookingApi(action,payload){calls.push({action,payload});return action==="get9RoundTrialBooking"?pending:Promise.resolve({accepting:false});}};
+  const doc={getElementById:id=>elements[id],createElement:()=>new Element(),createTextNode:text=>({textContent:text}),querySelector:()=>new Element(),querySelectorAll:()=>[]};
+  vm.runInNewContext(read("9round-booking/membership/app.js"),{window:w,document:doc,URLSearchParams,Uint8Array});
+  return {elements,calls,history,resolveTrial,rejectTrial};
+}
+test("trial reference prefills only stored contact fields, removes the fragment and preserves edits during loading",async()=>{
+  const id="a".repeat(64),token="b".repeat(64),e=formHarness("#application_id="+id+"&trial_token="+token);
+  e.elements.fullName.value="入力中の名前";
+  e.resolveTrial({application_id:id,name:"体験予約の名前",email:"visitor@example.invalid",phone:"09012345678"});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(e.elements.fullName.value,"入力中の名前");assert.equal(e.elements.memberEmail.value,"visitor@example.invalid");assert.equal(e.elements.memberPhone.value,"09012345678");
+  assert.equal(e.elements.memberAddress.value,"");assert.deepEqual(e.history,["/9round-booking/membership/"]);
+  assert.equal(e.calls.filter(c=>c.action==="get9RoundTrialBooking").length,1);
+});
+test("invalid or expired trial references remain editable without invented customer information",async()=>{
+  const invalid=formHarness("#name=偽の名前&email=fake@example.invalid");assert.equal(invalid.calls.some(c=>c.action==="get9RoundTrialBooking"),false);assert.equal(invalid.elements.fullName.value,"");
+  const expired=formHarness("#application_id="+"a".repeat(64)+"&trial_token="+"b".repeat(64));expired.rejectTrial(new Error("expired"));await new Promise(resolve=>setImmediate(resolve));
+  assert.match(expired.elements.prefillNotice.textContent,/取得できませんでした/);assert.equal(expired.elements.memberFields.disabled,false);
+});
