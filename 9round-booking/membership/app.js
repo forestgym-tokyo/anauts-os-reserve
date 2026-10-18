@@ -138,8 +138,8 @@
   });
   window.NineRoundBookingApi("get9RoundMembershipStatus", {}).then(function (status) {
     if (!status.accepting) return;
-    state.accepting = true; q("toPayment").textContent = "申込内容を送信する";
-    q("submissionNote").textContent = "送信すると、お申込み内容を店舗へ送信します。カード登録・決済はまだ行われません。";
+    state.accepting = true; q("toPayment").textContent = "カード登録・お支払いへ進む";
+    q("submissionNote").textContent = "現在は、お申込み内容を店舗へ送信します。カード登録・お支払いは、準備が整い次第ご案内します。";
     document.querySelector(".preview-note").replaceChildren(el("span", "", "入会申込受付"), document.createTextNode("現在は申込内容の送信までご利用いただけます。カード登録・決済は準備中です。"));
     updateSubmit();
   }).catch(function () { /* Keep submission disabled when server availability is unknown. */ });
