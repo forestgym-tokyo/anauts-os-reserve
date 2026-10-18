@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#080b12">
+  <meta name="referrer" content="no-referrer">
+  <meta name="description" content="9ROUND アリオ蘇我店の無料体験予約。ご希望の日時を選んで、はじめの一歩を。">
+  <title>無料体験予約 | 9ROUND アリオ蘇我店</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script src="../config.js" defer></script>
+  <script src="../api.js" defer></script>
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <header class="site-header"><div class="brand" aria-label="9ROUND"><span>9</span>ROUND<small>ARIO SOGA</small></div><span class="header-label"><i></i> FREE TRIAL</span></header>
+  <main>
+    <section class="hero" aria-labelledby="heroTitle">
+      <div class="hero-copy"><p class="eyebrow">YOUR FIRST ROUND.</p><h1 id="heroTitle">はじめの一歩を、<br><span>あなたのペースで。</span></h1><p class="hero-description">キックボクシングが初めてでも大丈夫。<br>9ROUNDのワークアウトを、まずは無料で。</p><div class="hero-tags"><span>初心者歓迎</span><span>1枠2名まで</span><span>アリオ蘇我店</span></div></div>
+      <div class="hero-price" aria-label="体験料金 無料"><span class="price-label">FIRST SESSION</span><strong><span>¥</span>0</strong><span class="price-caption">無料体験</span><div class="round-lines" aria-hidden="true"></div></div>
+    </section>
+    <ol class="steps" aria-label="申込の流れ"><li class="is-current" data-step="1"><span>01</span>日時を選ぶ</li><li data-step="2"><span>02</span>お客様情報</li><li data-step="3"><span>03</span>予約完了</li></ol>
+    <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+    <div class="booking-layout" id="bookingLayout">
+      <section class="panel schedule-panel" aria-labelledby="scheduleTitle">
+        <div class="panel-heading"><div><p class="eyebrow">CHOOSE YOUR ROUND</p><h2 id="scheduleTitle">体験日時を選ぶ</h2></div><span class="free-tag">体験無料</span></div>
+        <p class="section-description">ご予約できる日時だけを表示しています。</p>
+        <div class="schedule-controls"><button id="previousWeek" type="button" class="icon-button" aria-label="前の7日間">←</button><strong id="weekLabel">スケジュールを確認しています</strong><button id="nextWeek" type="button" class="icon-button" aria-label="次の7日間">→</button></div>
+        <div id="dateStrip" class="date-strip" aria-label="体験日を選択"></div>
+        <div class="slot-heading"><h3 id="selectedDateLabel">日時を選択してください</h3><span class="availability-key"><i></i> 予約可能</span></div>
+        <div id="slots" class="slots" aria-live="polite"><p class="empty-state">空き状況を確認しています…</p></div>
+        <div class="schedule-footer"><span>1枠2名まで</span><span>変更・キャンセルは開始1時間前まで</span></div>
+        <button id="reloadSchedule" class="text-button" type="button">空き状況を更新する ↻</button>
+      </section>
+      <aside class="panel form-panel" aria-labelledby="formTitle">
+        <p class="eyebrow">RESERVE YOUR FIRST ROUND</p><h2 id="formTitle">お客様情報</h2>
+        <div id="selection" class="selection"><span class="selection-icon" aria-hidden="true">↖</span><p>ご希望の体験日時を<br>選択してください。</p></div>
+        <form id="applicationForm">
+          <fieldset id="detailsFields" disabled>
+            <label>参加人数<span class="required">必須</span><select id="partySize" name="party_size"><option value="1">1名</option><option value="2">2名</option></select></label>
+            <label>お名前<span class="required">必須</span><input id="name" name="name" autocomplete="name" maxlength="60" placeholder="例：山田 太郎" required></label>
+            <label id="companionField" hidden>同行者のお名前<span class="required">必須</span><input id="companionName" name="companion_name" maxlength="60" placeholder="例：山田 花子"></label>
+            <label>メールアドレス<span class="required">必須</span><input id="email" name="email" type="email" autocomplete="email" inputmode="email" maxlength="254" placeholder="example@email.com" required></label>
+            <label>電話番号<span class="required">必須</span><input id="phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="25" placeholder="09012345678" required></label>
+            <div class="honeypot" aria-hidden="true"><label>Website<input id="website" name="website" tabindex="-1" autocomplete="off"></label></div>
+            <label class="consent"><input id="consent" type="checkbox" required><span>入力情報を体験予約の受付・連絡に利用することに同意します。</span></label>
+          </fieldset>
+          <div class="total-line"><span>体験料金</span><strong>無料<span>¥0</span></strong></div>
+          <button id="submitBooking" class="primary-button" type="submit" disabled>無料体験を予約する <span aria-hidden="true">→</span></button>
+          <p class="form-note">タップすると予約が確定し、確認メールをお送りします。</p>
+        </form>
+        <p class="secure-note"><span aria-hidden="true">◇</span> 会員番号・クレジットカードの登録は不要です。</p>
+      </aside>
+    </div>
+    <section id="resultPanel" class="panel result-panel" hidden aria-live="polite"><div id="resultIcon" class="result-icon" aria-hidden="true">✓</div><p class="eyebrow">YOUR NEXT ROUND</p><h2 id="resultTitle">体験予約が完了しました</h2><p id="resultDescription">確認メールをお送りしました。当日のご来店をお待ちしています。</p><dl id="resultDetails" class="result-details"></dl><p id="resultMailNote" class="form-note"></p><div id="resultActions" class="result-actions"><button id="changeBooking" class="primary-button" type="button">体験日時を変更する</button><button id="cancelBooking" class="secondary-button" type="button">予約をキャンセルする</button></div><div id="changePanel" hidden><h3>変更先の日時を選んでください</h3><div id="changeSlots" class="change-slots"></div><button id="closeChange" class="text-button" type="button">日時の変更をやめる</button></div><p class="form-note">変更・キャンセルは開始1時間前まで承ります。</p></section>
+    <section class="visit-note"><span>01 / YOUR FIRST VISIT</span><h2>まずは、動いてみることから。</h2><p>体験当日は、動きやすい服装でお越しください。<br>ご不明な点は店舗スタッフへお気軽にご相談ください。</p></section>
+  </main>
+  <footer><a class="footer-brand" href="./">9ROUND <span>ARIO SOGA</span></a><span>© 9ROUND アリオ蘇我店</span></footer>
+  <dialog id="feedback"><div class="feedback-icon" id="feedbackIcon" aria-hidden="true"></div><h2 id="feedbackTitle">予約しています…</h2><p id="feedbackText"></p><button id="feedbackClose" class="primary-button" type="button" hidden>閉じる</button></dialog>
+</body>
+</html>

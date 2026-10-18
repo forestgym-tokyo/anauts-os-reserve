@@ -1,0 +1,34 @@
+name: 9ROUND trial review
+on:
+  push:
+    branches: [feature/9round-free-trial-20261018]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  trial:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Server and existing booking regressions
+        run: node --test tests/9round-booking.test.js tests/9round-trial.test.js tests/9round-mpg-bridge.test.js tests/mpg-shift-rules.test.js
+      - name: Install isolated browser driver
+        run: npm install --prefix "$RUNNER_TEMP/9round-trial-browser" --no-package-lock --ignore-scripts playwright@1.51.1 @fontsource/noto-sans-jp@5.3.1
+      - name: Browser interactions and design screenshots
+        env:
+          ROUND9_PLAYWRIGHT_MODULE: ${{ runner.temp }}/9round-trial-browser/node_modules/playwright
+          ROUND9_CHROMIUM_PATH: /usr/bin/google-chrome
+          ROUND9_BROWSER_EVIDENCE: ${{ runner.temp }}/9round-trial-evidence
+          ROUND9_BROWSER_FONT_DIR: ${{ runner.temp }}/9round-trial-browser/node_modules/@fontsource/noto-sans-jp
+        run: node tests/9round-trial.browser.cjs
+      - name: Preserve review screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: 9round-trial-review
+          path: ${{ runner.temp }}/9round-trial-evidence
+          if-no-files-found: ignore

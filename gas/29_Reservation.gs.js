@@ -24,6 +24,7 @@ function createReservation(params) {
     LockService.getScriptLock();
 
   let createdEvent = null;
+  let nineRoundHold = null;
 
   try {
 
@@ -659,6 +660,9 @@ function createReservation(params) {
     const reservationId =
       generateReservationId_();
 
+    if (typeof mpg9RoundAcquireSupport_ === "function") nineRoundHold = mpg9RoundAcquireSupport_({ service_code: serviceCode, staff_code: assignedStaff.staff_code,
+      reservation_id: reservationId, date: targetDate, start_time: startTime, end_time: formatReservationTime_(endAt) });
+
     const serviceName =
       normalizeReservationText_(
         service.service_name ||
@@ -1119,8 +1123,8 @@ function createReservation(params) {
     );
 
     return errorResponse(
-      "予約登録中にエラーが発生しました。",
-      "SYSTEM_ERROR",
+      error.mpg9RoundCode ? error.message : "予約登録中にエラーが発生しました。",
+      error.mpg9RoundCode || "SYSTEM_ERROR",
       {
         message:
           error.message
@@ -1128,6 +1132,8 @@ function createReservation(params) {
     );
 
   } finally {
+
+    if (typeof mpg9RoundReleaseSupportSafely_ === "function") mpg9RoundReleaseSupportSafely_(nineRoundHold);
 
     try {
       lock.releaseLock();

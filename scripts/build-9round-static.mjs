@@ -12,7 +12,7 @@ if (!output || !/^https:\/\/script\.google\.com\/macros\/s\/[a-zA-Z0-9_-]+\/exec
 const source = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../9round-booking");
 const target = path.resolve(output);
 if (target === source || target.startsWith(source + path.sep)) throw new Error("Output must be separate from source");
-const files = ["index.html", "styles.css", "api.js", "app.js", "fighter.js", "member-tools.js", "pwa.js", "service-worker.js", "manifest.webmanifest", "vendor/qrcode.min.js", "vendor/qrcode-LICENSE.txt", "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png", "icons/apple-touch-icon.png"];
+const files = ["index.html", "styles.css", "api.js", "app.js", "fighter.js", "member-tools.js", "pwa.js", "service-worker.js", "manifest.webmanifest", "link-actions.html", "link-actions.js", "trial/index.html", "trial/styles.css", "trial/app.js", "vendor/qrcode.min.js", "vendor/qrcode-LICENSE.txt", "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png", "icons/apple-touch-icon.png"];
 for (const file of files) {
   const dest = path.join(target, file);
   fs.mkdirSync(path.dirname(dest), { recursive: true });

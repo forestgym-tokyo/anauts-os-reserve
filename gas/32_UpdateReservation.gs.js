@@ -113,6 +113,7 @@ function updateReservation(params, operationOptions) {
   let sheetRollbackValues = null;
   let sheetUpdated = false;
   let eventUpdated = false;
+  let nineRoundHold = null;
 
   try {
     lock.waitLock(30000);
@@ -594,6 +595,10 @@ function updateReservation(params, operationOptions) {
       .getRange(reservationInfo.rowNumber, 1, 1, reservationInfo.headers.length)
       .getValues()[0];
 
+    if (typeof mpg9RoundAcquireSupport_ === "function") nineRoundHold = mpg9RoundAcquireSupport_({ service_code: serviceCode, staff_code: assignedStaff.staff_code,
+      reservation_id: reservationId, date: targetDate, start_time: startTime, end_time: formatReservationTime_(endAt),
+      previous: { staff_code: oldStaffCode, date: oldDate, start_time: oldStartTime, end_time: oldEndTime } });
+
     calendarEvent.setTitle(eventTitle);
     calendarEvent.setDescription(eventDescription);
     calendarEvent.setTime(startAt, endAt);
@@ -852,11 +857,12 @@ function updateReservation(params, operationOptions) {
     }
 
     logError("updateReservation", error.message, { stack: error.stack });
-    return errorResponse("予約変更中にエラーが発生しました。", "SYSTEM_ERROR", {
+    return errorResponse(error.mpg9RoundCode ? error.message : "予約変更中にエラーが発生しました。", error.mpg9RoundCode || "SYSTEM_ERROR", {
       message: error.message
     });
 
   } finally {
+    if (typeof mpg9RoundReleaseSupportSafely_ === "function") mpg9RoundReleaseSupportSafely_(nineRoundHold);
     try {
       lock.releaseLock();
     } catch (error) {

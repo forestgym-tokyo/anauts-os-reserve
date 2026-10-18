@@ -21,6 +21,7 @@
   function resetData() {
     window.NineRoundScanner.reset();
     window.NineRoundBookingActions.reset();
+    if (window.NineRoundTrialActions) window.NineRoundTrialActions.reset();
     requestSequence++; inFlight = false; board = [];
     auth.canManage = false; auth.canManageSlots = false; auth.canManageBookings = false; auth.canRetryNotifications = false;
     if (q("#nrAdminBoard")) q("#nrAdminBoard").replaceChildren();
@@ -68,19 +69,29 @@
       header.append(textElement("span", "nr-count", slot.booked_count + " / " + slot.capacity + "名"));
       article.append(header, textElement("p", "nr-kind", slot.kind === "TRIAL" ? "体験 · " + slot.title + (slot.status === "CLOSED" ? "（受付停止）" : "") : "デイリーワークアウト" + (slot.status === "BLOCKED" ? "（ブロック中）" : "")));
       if (slot.status === "DELETED") article.append(textElement("p", "nr-deleted-label", "削除済み"));
+      if (slot.mpg_conflict) article.append(textElement("p", "nr-message", "MPGトレーニングサポートと体験予約が重なっています。担当者を確認してください。"));
+      else if (slot.staffing_conflict) article.append(textElement("p", "nr-message", "勤務・予約状況が変わり、両方に予約があるため追加受付を停止しています。担当者を確認してください。"));
       if (slot.members.length) {
         const names = textElement("ul", "nr-names");
         slot.members.forEach(function (member) {
           const li = textElement("li");
-          li.append(textElement("span", "", member.name + " 様"), textElement("small", "", "会員番号 " + member.member_no), textElement("span", member.attended ? "nr-attended" : "nr-not-attended", member.attended ? "受講済み" : "未受講"));
-          li.append(textElement("span", "nr-fighter-name", "ファイター：" + (member.fighter_name || "未登録")));
-          if (auth.canManageBookings && slot.kind === "DAILY" && (member.can_change || member.can_cancel)) {
+          li.append(textElement("span", "", member.name + " 様"));
+          if (slot.kind === "TRIAL") {
+            li.append(textElement("small", "", (member.party_size || 1) + "名 / 無料"));
+            if (member.companion_name) li.append(textElement("span", "nr-trial-contact", "同行者：" + member.companion_name + " 様"));
+            if (member.email) li.append(textElement("span", "nr-trial-contact", member.email));
+            if (member.phone) li.append(textElement("span", "nr-trial-contact", member.phone));
+          } else {
+            li.append(textElement("small", "", "会員番号 " + member.member_no), textElement("span", member.attended ? "nr-attended" : "nr-not-attended", member.attended ? "受講済み" : "未受講"));
+            li.append(textElement("span", "nr-fighter-name", "ファイター：" + (member.fighter_name || "未登録")));
+          }
+          if (auth.canManageBookings && (slot.kind === "DAILY" || member.application_id && window.NineRoundTrialActions) && (member.can_change || member.can_cancel)) {
             const actions = textElement("div", "nr-member-actions");
             [["change", "変更", member.can_change], ["cancel", "キャンセル", member.can_cancel]].forEach(function (a) {
               if (!a[2]) return;
               const button = textElement("button", "", a[1]); button.type = "button";
               button.dataset.manageBooking = member.booking_id;
-              button.addEventListener("click", function () { window.NineRoundBookingActions.open(member.booking_id, a[0]); });
+              button.addEventListener("click", function () { if (slot.kind === "TRIAL") window.NineRoundTrialActions.open(member.application_id, a[0]); else window.NineRoundBookingActions.open(member.booking_id, a[0]); });
               actions.append(button);
             });
             li.append(actions);
@@ -176,7 +187,8 @@
     q("#nrTrialForm").reset(); q("#nrTrialId").value = "";
     q("#nrTrialDate").value = q("#nrAdminDate").value;
     q("#nrTrialTitle").value = "体験";
-    q("#nrTrialStart").value = "10:15"; q("#nrTrialCapacity").value = "1";
+    const first = board.find(function (s) { return s.kind === "TRIAL" && s.date === q("#nrTrialDate").value; });
+    q("#nrTrialStart").value = first ? first.start_time : "13:15"; q("#nrTrialCapacity").value = "2";
     q("#nrTrialSave").textContent = "体験枠を追加";
   }
   function editTrial(slot) {
@@ -218,17 +230,18 @@
       '<div id="nrBlockActions" class="nr-toolbar"><button id="nrBlockDay" type="button">この日の全枠をブロック</button><button id="nrUnblockDay" type="button">この日の全枠を解除</button><button id="nrRetryNotifications" type="button" hidden>未送信メールを再送</button></div>',
       '<div id="nrAdminMessage" class="nr-message" role="status" aria-live="polite"></div><div id="nrAdminBoard" class="nr-board"></div>',
       '<details id="nrTrialEditor" class="nr-trial-editor"><summary>体験枠を作成・編集</summary>',
-      '<p>デイリーワークアウトとは別の45分枠を追加します。定員は1〜4名です。</p>',
+      '<p>川上さんのMPG勤務時間帯と土曜13:15だけ受付できます。デイリーワークアウトとは別の45分枠・定員1〜2名、体験料は無料です。</p>',
       '<form id="nrTrialForm"><input id="nrTrialId" type="hidden"><div class="nr-trial-fields">',
       '<label>体験枠名<input id="nrTrialTitle" maxlength="60" value="体験" required></label>',
       '<label>日付<input id="nrTrialDate" type="date" required></label>',
       '<label>開始時刻<input id="nrTrialStart" type="time" value="10:15" required></label>',
-      '<label>定員<select id="nrTrialCapacity"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>',
+      '<label>定員<select id="nrTrialCapacity"><option>1</option><option selected>2</option></select></label>',
       '<label>受付状態<select id="nrTrialStatus"><option value="OPEN">受付可能</option><option value="CLOSED">受付停止</option></select></label>',
       '</div><div class="nr-trial-actions"><button id="nrTrialSave" class="nr-primary" type="submit">体験枠を追加</button><button id="nrTrialNew" type="button">新規入力</button></div></form></details></div>'
     ].join("");
     (auth.workspace || q("#staffWorkspace")).append(section);
     window.NineRoundBookingActions.mount(section.querySelector(".nr-shell"));
+    if (window.NineRoundTrialActions) window.NineRoundTrialActions.mount(section.querySelector(".nr-shell"));
     window.NineRoundBookingActions.onUpdated = function () { return load(false); };
     window.NineRoundScanner.mount(section.querySelector(".nr-shell"));
     window.NineRoundScanner.onRegistered = function () { load(false); };
