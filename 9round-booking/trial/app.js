@@ -127,6 +127,7 @@
   }
   function renderResult(result) {
     state.application = result;
+    if (q("membershipLink")) q("membershipLink").href = "../membership/#" + new URLSearchParams({ application_id: result.application_id, trial_token: result.trial_token }).toString();
     q("bookingLayout").hidden = true; q("resultPanel").hidden = false; q("changePanel").hidden = true;
     step(3); notice("");
     const cancelled = result.status === "CANCELLED";

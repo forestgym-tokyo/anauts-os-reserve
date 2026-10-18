@@ -596,6 +596,7 @@ function round9BookingApi_(action, body) {
       delete9RoundBookingSlot: nrDelete9RoundSlot_,
       restore9RoundBookingSlot: nrRestore9RoundSlot_
     };
+    if (typeof nrMembershipHandlers_ === "function") Object.assign(handlers, nrMembershipHandlers_());
     if (typeof nrTrialHandlers_ === "function") Object.assign(handlers, nrTrialHandlers_());
     if (typeof nrCoordinate9RoundMpg_ === "function") handlers.coordinate9RoundMpg = nrCoordinate9RoundMpg_;
     if (!handlers[action]) nrBookingError_("ACTION_NOT_FOUND", "指定された操作は利用できません。");

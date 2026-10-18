@@ -3,22 +3,26 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#080b12">
+  <meta name="theme-color" content="#000000">
   <meta name="referrer" content="no-referrer">
   <meta name="robots" content="noindex,nofollow">
   <meta name="description" content="9ROUND アリオ蘇我店のWEB入会。プラン・利用開始日・お申込み内容をご確認いただけます。">
   <title>WEB入会 | 9ROUND アリオ蘇我店</title>
   <link rel="stylesheet" href="./styles.css">
+  <script src="../config.js" defer></script>
+  <script src="../api.js" defer></script>
   <script src="./plans.js" defer></script>
+  <script src="./postal.js" defer></script>
   <script src="./app.js" defer></script>
 </head>
 <body>
   <header class="site-header"><a class="brand" href="../trial/" aria-label="9ROUND アリオ蘇我店"><span>9</span>ROUND<small>ARIO SOGA</small></a><span class="header-label"><i></i> WEB MEMBERSHIP</span></header>
   <main>
-    <div class="preview-note" role="note"><span>確認用プレビュー</span>現在はお申込み内容の確認までご利用いただけます。入会受付・カード登録・決済はまだ開始していません。</div>
+    <div class="preview-note" role="note"><span>確認用プレビュー</span>入会画面を更新しています。現在、申込みの送信・カード登録・決済は行えません。</div>
     <section class="hero" aria-labelledby="pageTitle"><div><p class="eyebrow">MAKE IT YOUR ROUTINE.</p><h1 id="pageTitle">あなたに合うプランで、<br><span>9ROUNDをはじめよう。</span></h1><p class="hero-description">プランを選んで、あなたのスタート日を。<br>お申込みに必要な情報を、順番にご確認いただけます。</p></div><div class="hero-aside"><span class="small-label">9ROUND ARIO SOGA</span><p>ここから始まる、<br>あなたの新しい習慣。</p><a href="../trial/">まずは無料体験へ <span aria-hidden="true">↗</span></a></div></section>
     <ol class="steps" aria-label="入会手続きの流れ"><li class="is-current" data-step="1" aria-current="step"><span>01</span>プラン</li><li data-step="2"><span>02</span>お客様情報</li><li data-step="3"><span>03</span>内容確認</li><li data-step="4"><span>04</span>カード登録</li></ol>
     <noscript><p class="notice">この画面をご利用いただくには、JavaScriptを有効にしてください。</p></noscript>
+    <div id="prefillNotice" class="notice" role="status" aria-live="polite" hidden></div>
     <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
 
     <section id="planStage" class="stage" aria-labelledby="planTitle">
@@ -31,24 +35,27 @@
 
     <section id="detailsStage" class="stage" aria-labelledby="detailsTitle" hidden>
       <div class="section-heading"><div><p class="eyebrow">02 / YOUR DETAILS</p><h2 id="detailsTitle" tabindex="-1">お客様情報を入力する</h2></div><button class="text-button" id="changePlan" type="button">プランを変更する</button></div>
-      <div class="details-layout"><div class="panel details-panel"><form id="memberForm" method="post" novalidate><fieldset id="memberFields" disabled>
+      <div class="details-layout"><div class="panel details-panel"><form id="memberForm" method="post" novalidate><fieldset id="memberFields" disabled><div class="honeypot" aria-hidden="true"><label>Website<input id="website" tabindex="-1" autocomplete="off"></label></div>
         <div class="form-section"><div class="form-section-heading"><span class="section-number">01</span><div><h3>ご利用開始日</h3><p>この日から、ご選択のプランで契約が始まります。</p></div></div><label for="startDate">利用開始日<span class="required">必須</span></label><input id="startDate" name="start_date" type="date" required><p class="field-note">10月中の利用開始日をお選びください。</p></div>
         <div class="form-section"><div class="form-section-heading"><span class="section-number">02</span><div><h3>ご本人様について</h3><p>会員情報の登録に使用します。</p></div></div><div class="form-grid">
           <label>お名前<span class="required">必須</span><input id="fullName" name="name" autocomplete="name" maxlength="60" placeholder="例：山田 太郎" required></label>
           <label>フリガナ<span class="required">必須</span><input id="nameKana" name="name_kana" maxlength="100" placeholder="例：ヤマダ タロウ" required></label>
           <label>生年月日<span class="required">必須</span><input id="birthDate" name="birth_date" type="date" autocomplete="bday" required></label>
-          <label>ファイターネーム<span class="optional">任意</span><input id="fighterName" name="fighter_name" maxlength="40" placeholder="お好きな呼び名"></label>
+          <label>ファイターネーム<span class="optional">任意</span><input id="fighterName" name="fighter_name" maxlength="24" placeholder="お好きな呼び名"></label>
         </div></div>
         <div class="form-section"><div class="form-section-heading"><span class="section-number">03</span><div><h3>ご連絡先・ご住所</h3><p>確認メールを受け取れるメールアドレスをご入力ください。</p></div></div><div class="form-grid">
           <label class="wide">メールアドレス<span class="required">必須</span><input id="memberEmail" name="email" type="email" inputmode="email" autocomplete="email" maxlength="254" placeholder="example@email.com" required></label>
           <label>電話番号<span class="optional">任意</span><input id="memberPhone" name="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="25" placeholder="09012345678"></label>
-          <label>郵便番号<span class="required">必須</span><input id="postalCode" name="postal_code" inputmode="numeric" autocomplete="postal-code" maxlength="8" placeholder="260-0835" required></label>
-          <label class="wide">ご住所<span class="required">必須</span><input id="memberAddress" name="address" autocomplete="street-address" maxlength="200" placeholder="都道府県・市区町村・番地・建物名" required></label>
+          <label>郵便番号<span class="required">必須</span><input id="postalCode" name="postal_code" inputmode="numeric" autocomplete="postal-code" maxlength="9" aria-describedby="postalStatus" placeholder="260-0835" required></label>
+          <div class="wide postal-tools"><p id="postalStatus" class="field-note" role="status" aria-live="polite">郵便番号を7桁入力すると、町域まで自動で入力します。</p><button id="retryPostal" class="text-button" type="button" hidden>住所を再検索する</button></div>
+          <label class="wide" id="addressCandidatesLabel" hidden>住所を選択する<select id="addressCandidates" aria-describedby="postalStatus"></select></label>
+          <label class="wide">都道府県・市区町村・町域<span class="required">必須</span><input id="memberAddress" name="address_base" autocomplete="address-line1" maxlength="150" placeholder="郵便番号から自動入力（手入力もできます）" required></label>
+          <label class="wide">番地・建物名<span class="required">必須</span><input id="addressDetail" name="address_detail" autocomplete="address-line2" maxlength="150" placeholder="例：2-3-4 ○○マンション101" required></label>
         </div></div>
-        <div class="form-section" id="pairSection" hidden><div class="form-section-heading"><span class="section-number">04</span><div><h3>ペア・ファミリーの方</h3><p>一緒にご利用される方をお知らせください。</p></div></div><div class="form-grid"><label>お相手のお名前<span class="required">必須</span><input id="pairName" name="pair_name" maxlength="60" placeholder="例：山田 花子" disabled></label><label>お相手の会員番号<span class="optional">お持ちの場合</span><input id="pairMemberNo" name="pair_member_no" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" placeholder="数字6桁" disabled></label></div><p class="field-note">他のペア・ファミリーメンバー全員が退会された場合は、翌月1日から通常プランへ移行します。</p></div>
-        <div class="input-notice"><span aria-hidden="true">◇</span><p>カード情報はこの画面では入力しません。カード登録・お支払いは、決済代行会社の画面で行う予定です。</p></div>
+        <div class="form-section" id="pairSection" hidden><div class="form-section-heading"><span class="section-number">04</span><div><h3>ペア・ファミリーの方</h3><p>一緒にご利用される方をお知らせください。</p></div></div><div class="form-grid"><label>お相手のお名前<span class="required">必須</span><input id="pairName" name="pair_name" maxlength="60" placeholder="例：山田 花子" disabled></label><label>お相手の会員番号<span class="optional">お持ちの場合</span><input id="pairMemberNo" name="pair_member_no" inputmode="numeric" maxlength="7" pattern="[0-9]{7}" placeholder="数字7桁" disabled></label></div><p class="field-note">他のペア・ファミリーメンバー全員が退会された場合は、翌月1日から通常プランへ移行します。</p></div>
+        <div class="input-notice"><span aria-hidden="true">◇</span><p>カード情報はこの画面では入力しません。カード登録のときだけ決済代行会社の画面へ移動し、完了後は9ROUNDのサイトへ戻ります。</p></div>
         <div class="form-actions"><button class="secondary-button" id="backToPlans" type="button">戻る</button><button class="primary-button" id="toReview" type="button">入力内容を確認する <span aria-hidden="true">→</span></button></div>
-      </fieldset></form></div><aside class="panel summary" aria-labelledby="summaryTitle"><p class="eyebrow">YOUR MEMBERSHIP</p><h3 id="summaryTitle">選択中のプラン</h3><div id="planSummary" aria-live="polite"></div><p class="summary-note">初回会費とお支払総額は、利用開始日をもとに決済画面でご案内します。</p></aside></div>
+      </fieldset></form></div><aside class="panel summary" aria-labelledby="summaryTitle"><p class="eyebrow">YOUR MEMBERSHIP</p><h3 id="summaryTitle">選択中のプラン</h3><div id="planSummary" aria-live="polite"></div><p class="summary-note">日割り会費＝月会費 × 開始日を含む月末までの日数 ÷ その月の日数。1円未満切り捨て。25日以降の利用開始は、翌月会費も初回に含めます。</p></aside></div>
     </section>
 
     <section id="reviewStage" class="stage" aria-labelledby="reviewTitle" hidden><div class="section-heading"><div><p class="eyebrow">03 / CHECK YOUR MEMBERSHIP</p><h2 id="reviewTitle" tabindex="-1">お申込み内容を確認する</h2></div><button class="text-button" id="editDetails" type="button">入力内容を修正する</button></div><div class="review-layout"><div class="panel"><div class="review-block"><h3>プラン・ご利用開始日</h3><dl id="reviewPlan" class="review-list"></dl></div><div class="review-block"><h3>お客様情報</h3><dl id="reviewPerson" class="review-list"></dl></div></div><div class="panel terms-panel"><p class="eyebrow">BEFORE YOU START</p><h3>お申込みにあたって</h3><div id="selectedConditions" class="selected-conditions"></div><details class="terms"><summary>プラン・お申込みに関する注意事項</summary><div class="terms-copy"><ol>
@@ -57,7 +64,8 @@
       <li>他のプランへの移行をご希望の場合は、毎月20日の営業時間内までにジムスタッフへご連絡ください。期限までにご連絡がない場合、プランは自動更新となります。継続条件付きプランは、当該継続期間が経過するまでプラン変更できません。</li>
       <li>ペアの相手、またはファミリーの他の全メンバーが退会された場合は、翌月1日より通常プランとなります。</li>
       <li>契約期間内での会員種別変更に伴う差額の返金はお受けできません。</li>
-    </ol><p>継続条件付きプランで期限前に退会される場合は、初期費用・9Rオリジナルグローブ・基本料金について、通常プランとの差額を退会時に精算します。基本料金の差額は利用月数分が対象です。</p><p>会費は毎月末までの利用分の請求となります。外部環境の変化により会費を見直す場合は、事前にお知らせします。継続条件付きプランは、当該期間内に基本料金の見直しを行いません。</p></div></details><label class="consent"><input id="agreeTerms" type="checkbox"><span>選択したプランの料金・継続条件、およびお申込みに関する注意事項を確認しました。</span></label><label class="consent"><input id="agreePrivacy" type="checkbox"><span>入力した情報を、入会手続き・会員管理・ご連絡に利用することに同意します。</span></label><div class="signature"><span>ご署名（お名前）</span><strong id="signatureName"></strong><small id="signatureDate"></small></div><button id="toPayment" class="primary-button" type="button" disabled>カード登録は準備中です</button><p class="form-note">このプレビューから申込みや決済は行われません。入力内容は店舗へ送信されません。</p></div></div></section>
+    </ol><p>継続条件付きプランで期限前に退会される場合は、初期費用・9Rオリジナルグローブ・基本料金について、通常プランとの差額を退会時に精算します。基本料金の差額は利用月数分が対象です。</p><p>会費は毎月末までの利用分の請求となります。外部環境の変化により会費を見直す場合は、事前にお知らせします。継続条件付きプランは、当該期間内に基本料金の見直しを行いません。</p></div></details><label class="consent"><input id="agreeTerms" type="checkbox"><span>選択したプランの料金・継続条件、およびお申込みに関する注意事項を確認しました。</span></label><label class="consent"><input id="agreePrivacy" type="checkbox"><span>入力した情報を、入会手続き・会員管理・ご連絡に利用することに同意します。</span></label><div class="signature"><span>ご署名（お名前）</span><strong id="signatureName"></strong><small id="signatureDate"></small></div><button id="toPayment" class="primary-button" type="button" disabled>カード登録は準備中です</button><p class="form-note" id="submissionNote">送信機能を接続中です。現在は申込み・決済は行われません。</p><p class="form-note">カード情報は決済代行会社で管理します。登録後は9ROUNDへ戻り、結果をご案内します。</p></div></div></section>
+    <section id="receivedStage" class="stage" aria-labelledby="receivedTitle" hidden><div class="panel received-panel"><p class="eyebrow">YOUR MEMBERSHIP</p><h2 id="receivedTitle" tabindex="-1">お申込みを受け付けました</h2><p>カード登録・決済はまだ完了していません。店舗スタッフが内容を確認します。</p><dl id="receivedDetails" class="review-list"></dl><p class="field-note">入会の確定は、カード登録・お支払いの確認後となります。カード登録機能は準備中です。</p><a class="secondary-button" href="../trial/">無料体験のページへ</a></div></section>
     <section class="help-note"><span>YOUR NEXT ROUND</span><h2>ご不明な点は、店舗スタッフへ。</h2><p>プランや継続条件について、ご入会前にお気軽にご相談ください。</p></section>
   </main>
   <footer><div class="footer-brand">9ROUND <span>ARIO SOGA</span></div><span>© 9ROUND アリオ蘇我店</span></footer>
