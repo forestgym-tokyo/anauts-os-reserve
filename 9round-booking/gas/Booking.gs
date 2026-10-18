@@ -545,7 +545,7 @@ function nrSave9RoundTrial_(config, body) {
     const old = id ? rows.find(function (r) { return r.slot_id === id; }) : null;
     if (id && !old && !(trialRelease && id === "TRIAL:" + date + ":" + time)) nrBookingError_("INVALID_SLOT", "体験枠が見つかりません。");
     if (old && old.status === "DELETED") nrBookingError_("SLOT_DELETED", "削除済みの体験枠は、先に復元してください。");
-    if (rows.some(function (r) { return r.slot_id !== id && r.date === date && r.start_time === time && r.status === "OPEN" && status === "OPEN"; })) {
+    if (rows.some(function (r) { return r.slot_id !== id && r.date === date && r.start_time === time && (trialRelease || r.status === "OPEN" && status === "OPEN"); })) {
       nrBookingError_("DUPLICATE_TRIAL", "同じ日時の体験枠はすでにあります。");
     }
     const booked = trialRelease ? nrTrialCount_(config, old ? old.slot_id : id || "TRIAL:" + date + ":" + time) : old ? nrBookingCount_(nrBookingRows_(config, "bookings"), old.slot_id) : 0;

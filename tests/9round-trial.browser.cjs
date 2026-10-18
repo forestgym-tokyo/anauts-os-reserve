@@ -6,6 +6,7 @@ const { chromium } = require(process.env.ROUND9_PLAYWRIGHT_MODULE || "playwright
 const { fixture, payload } = require("./helpers/9round-trial-fixture.cjs");
 const root = path.resolve(__dirname, "..");
 const evidence = process.env.ROUND9_BROWSER_EVIDENCE || "/tmp/9round-trial-evidence";
+const fonts = process.env.ROUND9_BROWSER_FONT_DIR || "";
 fs.mkdirSync(evidence, { recursive: true });
 const e = fixture(), actions = [];
 let origin, createGate, cancelGate;
@@ -19,12 +20,16 @@ const server = http.createServer((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" }); res.end(JSON.stringify(e.call(body.action, body)));
     }); return;
   }
-  let file = path.resolve(root, "." + decodeURIComponent(url.pathname));
-  if (!file.startsWith(root + path.sep)) { res.writeHead(403); res.end(); return; }
+  const fontRequest = !!fonts && url.pathname.startsWith("/__trial-fonts/");
+  const directory = fontRequest ? path.resolve(fonts) : root;
+  let file = fontRequest ? path.resolve(directory, decodeURIComponent(url.pathname.slice("/__trial-fonts/".length))) : path.resolve(root, "." + decodeURIComponent(url.pathname));
+  if (!file.startsWith(directory + path.sep)) { res.writeHead(403); res.end(); return; }
   if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, "index.html");
   if (!fs.existsSync(file)) { res.writeHead(404); res.end(); return; }
-  const types = { ".html": "text/html;charset=utf-8", ".js": "text/javascript;charset=utf-8", ".css": "text/css;charset=utf-8", ".png": "image/png" };
-  res.writeHead(200, { "Content-Type": types[path.extname(file)] || "text/plain" }); res.end(fs.readFileSync(file));
+  const types = { ".html": "text/html;charset=utf-8", ".js": "text/javascript;charset=utf-8", ".css": "text/css;charset=utf-8", ".png": "image/png", ".woff2": "font/woff2" };
+  res.writeHead(200, { "Content-Type": types[path.extname(file)] || "text/plain" });
+  const content = fonts && path.extname(file) === ".html" ? fs.readFileSync(file, "utf8").replace("</head>", '<link rel="stylesheet" href="/__trial-fonts/400.css"><link rel="stylesheet" href="/__trial-fonts/700.css"><link rel="stylesheet" href="/__trial-fonts/800.css"><style>body{font-family:"Noto Sans JP",sans-serif!important}</style></head>') : fs.readFileSync(file);
+  res.end(content);
 });
 
 async function main() {
@@ -50,7 +55,7 @@ async function main() {
   async function closeFeedback(page) { await page.locator('#feedback[data-state="success"]').waitFor({ state: "visible" }); await page.locator("#feedbackClose").click(); }
   try {
     const disabled = await page(390, false); await disabled.goto(origin + "/9round-booking/trial/");
-    await disabled.locator("#notice").getByText("現在、予約受付の準備中です。", { exact: true }).waitFor();
+    await disabled.locator("#notice").getByText("現在、無料体験予約の準備中です。", { exact: true }).waitFor();
     assert.equal(actions.length, 0); await noOverflow(disabled, "disconnected mobile"); await disabled.context().close();
 
     const desktop = await page(1320); await desktop.goto(origin + "/9round-booking/trial/");
@@ -58,6 +63,7 @@ async function main() {
     await desktop.locator('[data-date="2026-10-18"]').click();
     assert.equal(await desktop.locator("#selectedDateLabel").textContent(), "10月18日（日） の体験枠");
     await desktop.locator("#slots .slot-button").first().click();
+    await desktop.evaluate(() => document.fonts.ready);
     await noOverflow(desktop, "desktop trial");
     await desktop.screenshot({ path: path.join(evidence, "trial-desktop.png"), fullPage: true });
     await desktop.locator("#partySize").selectOption("2"); await desktop.locator("#name").fill("体験 太郎");
@@ -78,6 +84,7 @@ async function main() {
     const link = confirmation.body.match(/https:\/\/[^\s]+#application_id=[^\s]+/)[0];
     const codeMails = actions.filter(a => a === "request9RoundTrialCode").length;
     await desktop.goto(origin + "/9round-booking/trial/" + new URL(link).hash);
+    await desktop.waitForFunction(() => location.hash === "");
     await desktop.locator("#resultPanel").waitFor({ state: "visible" });
     assert.equal(await desktop.evaluate(() => location.hash), "");
     assert.equal(actions.filter(a => a === "request9RoundTrialCode").length, codeMails);
@@ -96,6 +103,7 @@ async function main() {
       await mobile.locator("#slots .slot-button").first().waitFor(); await mobile.locator('[data-date="2026-10-18"]').click(); await mobile.locator("#slots .slot-button").first().click();
       await noOverflow(mobile, "trial width " + width);
       if (width === 390) {
+        await mobile.evaluate(() => document.fonts.ready);
         await mobile.screenshot({ path: path.join(evidence, "trial-mobile.png"), fullPage: true });
         await mobile.locator("#nextWeek").click(); await mobile.locator('[data-date="2026-10-24"]').click();
         assert.equal(await mobile.locator("#slots .slot-button").count(), 1);
@@ -113,6 +121,7 @@ async function main() {
     const card = staff.locator('.nr-slot.is-trial[data-slot-id="TRIAL:2026-10-18:10:15"]');
     await card.getByText("体験 太郎 様", { exact: true }).waitFor();
     assert.equal(await card.locator(".nr-count").textContent(), "2 / 2名");
+    await staff.evaluate(() => document.fonts.ready);
     await noOverflow(staff, "staff trial schedule");
     await card.screenshot({ path: path.join(evidence, "trial-staff-slot.png") });
     await card.getByRole("button", { name: "キャンセル", exact: true }).click();

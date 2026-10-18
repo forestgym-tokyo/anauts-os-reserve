@@ -34,7 +34,7 @@
     q("feedbackIcon").classList.add("is-complete"); q("feedbackIcon").textContent = error ? "!" : "✓";
     q("feedbackClose").hidden = false; q("feedback").dataset.state = error ? "error" : "success";
   }
-  function errorMessage(error) { return error.code === "ACTION_NOT_FOUND" ? "現在、無料体験予約の準備中です。" : error.message || "処理を完了できませんでした。"; }
+  function errorMessage(error) { return ["ACTION_NOT_FOUND", "BOOKING_DISABLED", "BOOKING_CONFIGURATION", "TRIAL_DISABLED", "TRIAL_CONFIGURATION"].indexOf(error.code) >= 0 ? "現在、無料体験予約の準備中です。" : error.message || "処理を完了できませんでした。"; }
   function slotButton(slot, forChange) {
     const button = node("button", "slot-button" + (!forChange && state.slot && state.slot.slot_id === slot.slot_id ? " is-selected" : ""));
     button.type = "button"; button.disabled = !slot.available || state.busy || (forChange && slot.remaining < state.application.party_size);
@@ -194,6 +194,9 @@
   q("feedback").addEventListener("cancel", function (event) { if (state.busy) event.preventDefault(); });
   const fragment = new URLSearchParams(location.hash.slice(1));
   if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+  // Mail apps can reuse an already open tab with a fragment-only navigation.
+  // Reload that explicit link so it is verified and immediately removed again.
+  window.addEventListener("hashchange", function () { if (location.hash) location.reload(); });
   async function start() {
     if (fragment.has("application_id") || fragment.has("trial_token")) {
       setBusy(true); notice("ご予約内容を確認しています。");

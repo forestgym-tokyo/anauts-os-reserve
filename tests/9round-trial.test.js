@@ -155,6 +155,7 @@ test("automatic trial slots can be stopped, deleted and restored only within the
   assert.equal(e.call("get9RoundTrialSlots", { date: body.date }).data.slots.some(s => s.slot_id === body.slot_id), false);
   assert.equal(e.call("restore9RoundBookingSlot", body).ok, true);
   assert.equal(e.call("get9RoundTrialSlots", { date: body.date }).data.slots[0].available, false);
+  assert.equal(e.call("save9RoundTrialSlot", { ...body, slot_id: "", status: "OPEN" }).code, "DUPLICATE_TRIAL");
   assert.equal(e.call("save9RoundTrialSlot", { ...body, status: "OPEN" }).ok, true);
   assert.equal(book(e, e.loginTrial()).ok, true);
   assert.equal(e.call("delete9RoundBookingSlot", body).code, "SLOT_HAS_BOOKINGS");
