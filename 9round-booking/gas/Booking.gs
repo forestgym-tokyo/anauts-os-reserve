@@ -23,7 +23,11 @@ const NR_BOOKING = Object.freeze({
     attendance: ["booking_id", "member_no", "checked_in_at", "staff_code", "status"],
     changes: ["old_booking_id", "new_booking_id", "new_slot_id", "created_at"],
     management_actions: ["action_id", "booking_id", "action_type", "staff_code", "created_at", "new_booking_id"],
-    mail: ["event_id", "booking_id", "event_type", "recipient_role", "recipient", "payload_json", "status", "created_at", "sent_at", "attempts", "last_error"]
+    mail: ["event_id", "booking_id", "event_type", "recipient_role", "recipient", "payload_json", "status", "created_at", "sent_at", "attempts", "last_error"],
+    trial_challenges: ["challenge_id", "email", "email_hash", "code_hash", "created_at", "expires_at", "attempts", "status"],
+    trial_sessions: ["token_hash", "customer_id", "email", "created_at", "expires_at", "status"],
+    trial_contacts: ["customer_id", "name", "email", "phone", "created_at", "updated_at"],
+    trial_applications: ["application_id", "request_id", "customer_id", "slot_id", "date", "start_time", "end_time", "party_size", "name", "companion_name", "phone", "email", "status", "consent_at", "created_at", "updated_at"]
   }
 });
 
@@ -325,7 +329,7 @@ function nrBookingTime_(minutes) {
   return String(Math.floor(minutes / 60)).padStart(2, "0") + ":" + String(minutes % 60).padStart(2, "0");
 }
 
-function nrBookingDailySlots_(date) {
+function nrBookingBaseSlots_(date) {
   const slots = [];
   [[615, 840], [975, 1245]].forEach(function (window) {
     for (let start = window[0]; start + 45 <= window[1]; start += 45) {
@@ -335,6 +339,12 @@ function nrBookingDailySlots_(date) {
     }
   });
   return slots;
+}
+
+function nrBookingDailySlots_(date) {
+  // Saturday workouts stop only when the separately configured trial release is enabled.
+  if (typeof nrTrialEnabled_ === "function" && nrTrialEnabled_() && nrTrialSaturday_(date)) return [];
+  return nrBookingBaseSlots_(date);
 }
 
 function nrBookingCount_(rows, slotId) {
@@ -445,10 +455,16 @@ function nrGet9RoundBoard_(config, body) {
   const blocks = nrBookingRows_(config, "blocks");
   const attendance = nrBookingRows_(config, "attendance");
   const fighters = nrBookingFighterNames_(config);
-  const trials = nrBookingRows_(config, "trials").filter(function (r) { return r.date === date; });
+  const trialRelease = typeof nrTrialEnabled_ === "function" && nrTrialEnabled_();
+  const trials = trialRelease ? nrTrialBoardSlots_(config, date) : nrBookingRows_(config, "trials").filter(function (r) { return r.date === date; });
   const canManageSlots = auth.permission === "ADMIN";
   const canRetryNotifications = ["ADMIN", "MANAGER"].indexOf(auth.permission) >= 0;
-  const slots = nrBookingDailySlots_(date).concat(trials).filter(function (slot) {
+  const daily = nrBookingDailySlots_(date);
+  // Keep already confirmed Saturday workouts visible to staff; never silently cancel them.
+  if (trialRelease && !daily.length) nrBookingBaseSlots_(date).forEach(function (slot) {
+    if (rows.some(function (r) { return r.slot_id === slot.slot_id && r.status === "CONFIRMED"; })) daily.push(Object.assign({}, slot, { status: "CLOSED" }));
+  });
+  const slots = daily.concat(trials).filter(function (slot) {
     return canManageSlots || (slot.status !== "DELETED" && !blocks.some(function (b) { return b.slot_id === slot.slot_id && b.status === "DELETED"; }));
   });
   return { date: date, can_manage: canManageSlots, can_manage_slots: canManageSlots,
@@ -459,12 +475,12 @@ function nrGet9RoundBoard_(config, body) {
     return { slot_id: slot.slot_id, kind: slot.kind, date: date, title: slot.title || "デイリーワークアウト",
       start_time: slot.start_time, end_time: slot.end_time, capacity: Number(slot.capacity),
       status: deleted ? "DELETED" : slot.kind === "DAILY" && blocks.some(function (b) { return b.slot_id === slot.slot_id && b.status === "BLOCKED"; }) ? "BLOCKED" : slot.status,
-      booked_count: nrBookingCount_(rows, slot.slot_id),
-      can_delete: canManageSlots && !deleted && nrBookingCount_(rows, slot.slot_id) === 0,
+      booked_count: trialRelease && slot.kind === "TRIAL" ? nrTrialCount_(config, slot.slot_id) : nrBookingCount_(rows, slot.slot_id),
+      can_delete: canManageSlots && !deleted && (trialRelease && slot.kind === "TRIAL" ? nrTrialCount_(config, slot.slot_id) : nrBookingCount_(rows, slot.slot_id)) === 0,
       can_restore: canManageSlots && deleted,
-      available: !deleted && slot.kind === "DAILY" && nrBookingBeforeDeadline_(slot) && nrBookingCount_(rows, slot.slot_id) < Number(slot.capacity) &&
+      available: !deleted && slot.status !== "CLOSED" && slot.kind === "DAILY" && nrBookingBeforeDeadline_(slot) && nrBookingCount_(rows, slot.slot_id) < Number(slot.capacity) &&
         !blocks.some(function (b) { return b.slot_id === slot.slot_id && b.status === "BLOCKED"; }),
-      members: rows.filter(function (r) { return r.slot_id === slot.slot_id && r.status === "CONFIRMED"; })
+      members: trialRelease && slot.kind === "TRIAL" ? nrTrialBoardMembers_(config, slot.slot_id) : rows.filter(function (r) { return r.slot_id === slot.slot_id && r.status === "CONFIRMED"; })
         .map(function (r) {
           const checkin = attendance.find(function (a) { return a.booking_id === r.booking_id && a.status === "ATTENDED"; });
           return { booking_id: r.booking_id, member_no: r.member_no, name: r.member_name,
@@ -517,7 +533,9 @@ function nrSave9RoundTrial_(config, body) {
     }
     if (Date.parse(date + "T" + time + ":00+09:00") <= Date.now()) nrBookingError_("SLOT_STARTED", "未来の体験枠を指定してください。");
     const capacity = Number(body.capacity === undefined ? 1 : body.capacity);
-    if (!Number.isInteger(capacity) || capacity < 1 || capacity > 4) nrBookingError_("INVALID_CAPACITY", "体験枠の定員は1〜4名で設定してください。");
+    if (!Number.isInteger(capacity) || capacity < 1 || capacity > 2) nrBookingError_("INVALID_CAPACITY", "体験枠の定員は1〜2名で設定してください。");
+    const trialRelease = typeof nrTrialEnabled_ === "function" && nrTrialEnabled_();
+    if (trialRelease) nrTrialRequirePlannedSlot_(config, date, time);
     const title = String(body.title || "体験").trim();
     if (!title || title.length > 60) nrBookingError_("INVALID_TITLE", "体験枠名は60文字以内で入力してください。");
     const status = String(body.status || "OPEN");
@@ -525,16 +543,16 @@ function nrSave9RoundTrial_(config, body) {
     const rows = nrBookingRows_(config, "trials");
     const id = String(body.slot_id || "");
     const old = id ? rows.find(function (r) { return r.slot_id === id; }) : null;
-    if (id && !old) nrBookingError_("INVALID_SLOT", "体験枠が見つかりません。");
+    if (id && !old && !(trialRelease && id === "TRIAL:" + date + ":" + time)) nrBookingError_("INVALID_SLOT", "体験枠が見つかりません。");
     if (old && old.status === "DELETED") nrBookingError_("SLOT_DELETED", "削除済みの体験枠は、先に復元してください。");
     if (rows.some(function (r) { return r.slot_id !== id && r.date === date && r.start_time === time && r.status === "OPEN" && status === "OPEN"; })) {
       nrBookingError_("DUPLICATE_TRIAL", "同じ日時の体験枠はすでにあります。");
     }
-    const booked = old ? nrBookingCount_(nrBookingRows_(config, "bookings"), old.slot_id) : 0;
-    if (booked > capacity || (booked && (old.date !== date || old.start_time !== time))) {
+    const booked = trialRelease ? nrTrialCount_(config, old ? old.slot_id : id || "TRIAL:" + date + ":" + time) : old ? nrBookingCount_(nrBookingRows_(config, "bookings"), old.slot_id) : 0;
+    if (booked > capacity || (booked && old && (old.date !== date || old.start_time !== time))) {
       nrBookingError_("TRIAL_HAS_BOOKINGS", "予約済みの体験枠の日時・定員を変更できません。");
     }
-    const slot = { slot_id: old ? old.slot_id : "TRIAL:" + nrBookingOpaque_(), kind: "TRIAL", date: date,
+    const slot = { slot_id: old ? old.slot_id : id || (trialRelease ? "TRIAL:" + date + ":" + time : "TRIAL:" + nrBookingOpaque_()), kind: "TRIAL", date: date,
       start_time: time, end_time: nrBookingTime_(start + 45), capacity: capacity, title: title, status: status,
       created_by: old ? old.created_by : auth.staff_code, updated_at: new Date().toISOString() };
     nrBookingWrite_(config, "trials", slot, old ? old._row : undefined);
@@ -574,6 +592,7 @@ function round9BookingApi_(action, body) {
       delete9RoundBookingSlot: nrDelete9RoundSlot_,
       restore9RoundBookingSlot: nrRestore9RoundSlot_
     };
+    if (typeof nrTrialHandlers_ === "function") Object.assign(handlers, nrTrialHandlers_());
     if (!handlers[action]) nrBookingError_("ACTION_NOT_FOUND", "指定された操作は利用できません。");
     return successResponse(handlers[action](config, body || {}));
   } catch (error) {

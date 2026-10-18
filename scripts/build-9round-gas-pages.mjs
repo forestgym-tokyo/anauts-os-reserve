@@ -4,7 +4,8 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const folder = path.join(root, "9round-booking");
-for (const [source, target] of [["index.html", "Member.html"], ["staff/index.html", "Staff.html"]]) {
+const pages = process.argv.includes("--staff-only") ? [["staff/index.html", "Staff.html"]] : [["index.html", "Member.html"], ["staff/index.html", "Staff.html"]];
+for (const [source, target] of pages) {
   const file = path.join(folder, source);
   let html = fs.readFileSync(file, "utf8");
   // Install assets belong to the top-level HTTPS app, never the GAS sandbox URL.

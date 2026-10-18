@@ -18,12 +18,16 @@ function nrBookingSetSlotDeleted_(config, body, deleted) {
   return nrBookingLocked_(function () {
     const date = nrBookingRequireDate_(config, body.date), id = String(body.slot_id || "");
     const daily = nrBookingDailySlots_(date).find(function (s) { return s.slot_id === id; });
-    const trial = daily ? null : nrBookingRows_(config, "trials").find(function (s) { return s.slot_id === id && s.date === date; });
+    let trial = daily ? null : nrBookingRows_(config, "trials").find(function (s) { return s.slot_id === id && s.date === date; });
+    if (!daily && !trial && typeof nrTrialEnabled_ === "function" && nrTrialEnabled_()) {
+      trial = nrTrialSlots_(config, date).find(function (s) { return s.slot_id === id; });
+      if (trial) trial.created_by = auth.staff_code;
+    }
     if (!daily && !trial) nrBookingError_("INVALID_SLOT", "対象日の枠を選び直してください。");
     const block = daily ? nrBookingRows_(config, "blocks").find(function (s) { return s.slot_id === id; }) : null;
     const wasDeleted = daily ? !!block && block.status === "DELETED" : trial.status === "DELETED";
     if (wasDeleted === deleted) return { slot_id: id, deleted: deleted, unchanged: true };
-    if (deleted && nrBookingCount_(nrBookingRows_(config, "bookings"), id)) {
+    if (deleted && (nrBookingCount_(nrBookingRows_(config, "bookings"), id) || (trial && typeof nrTrialEnabled_ === "function" && nrTrialEnabled_() && nrTrialCount_(config, id)))) {
       nrBookingError_("SLOT_HAS_BOOKINGS", "予約が入っている枠は削除できません。予約の変更・キャンセル、または受付のブロックをご利用ください。");
     }
     if (daily) {
