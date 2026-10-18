@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#080b12">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="description" content="9ROUND アリオ蘇我店のWEB入会。プラン・利用開始日・お申込み内容をご確認いただけます。">
+  <title>WEB入会 | 9ROUND アリオ蘇我店</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./plans.js" defer></script>
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <header class="site-header"><a class="brand" href="../trial/" aria-label="9ROUND アリオ蘇我店"><span>9</span>ROUND<small>ARIO SOGA</small></a><span class="header-label"><i></i> WEB MEMBERSHIP</span></header>
+  <main>
+    <div class="preview-note" role="note"><span>確認用プレビュー</span>現在はお申込み内容の確認までご利用いただけます。入会受付・カード登録・決済はまだ開始していません。</div>
+    <section class="hero" aria-labelledby="pageTitle"><div><p class="eyebrow">MAKE IT YOUR ROUTINE.</p><h1 id="pageTitle">あなたに合うプランで、<br><span>9ROUNDをはじめよう。</span></h1><p class="hero-description">プランを選んで、あなたのスタート日を。<br>お申込みに必要な情報を、順番にご確認いただけます。</p></div><div class="hero-aside"><span class="small-label">9ROUND ARIO SOGA</span><p>ここから始まる、<br>あなたの新しい習慣。</p><a href="../trial/">まずは無料体験へ <span aria-hidden="true">↗</span></a></div></section>
+    <ol class="steps" aria-label="入会手続きの流れ"><li class="is-current" data-step="1" aria-current="step"><span>01</span>プラン</li><li data-step="2"><span>02</span>お客様情報</li><li data-step="3"><span>03</span>内容確認</li><li data-step="4"><span>04</span>カード登録</li></ol>
+    <noscript><p class="notice">この画面をご利用いただくには、JavaScriptを有効にしてください。</p></noscript>
+    <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+
+    <section id="planStage" class="stage" aria-labelledby="planTitle">
+      <div class="section-heading"><div><p class="eyebrow">01 / CHOOSE YOUR MEMBERSHIP</p><h2 id="planTitle" tabindex="-1">プランを選ぶ</h2></div><span class="section-caption">2026年10月のお申込み</span></div>
+      <div class="campaign-banner" id="campaignBanner"><div><span class="campaign-label">OCTOBER CAMPAIGN</span><h3>プレミアムOne・Half<br class="mobile-break"> <span>合計で先着30名</span></h3><p>2つのキャンペーンプランで共通の定員です。</p></div><div class="campaign-deadline"><span>お申込み期限</span><strong>10.31<small>2026 SAT</small></strong></div></div>
+      <fieldset class="plan-options" id="planOptions"><legend class="sr-only">ご入会プラン</legend></fieldset>
+      <div class="plan-footnotes"><p>プレミアムOne・Halfは満3か月未満での退会はできません。継続条件の期間内に退会される場合は、通常プランとの差額精算があります。</p><p>キャンペーンの初期費用0円は、見学当日または事前WEB入会の場合の特典です。</p></div>
+      <div class="stage-navigation"><p>料金と継続条件をご確認のうえ、お進みください。</p><button class="primary-button" id="toDetails" type="button" disabled>このプランで進む <span aria-hidden="true">→</span></button></div>
+    </section>
+
+    <section id="detailsStage" class="stage" aria-labelledby="detailsTitle" hidden>
+      <div class="section-heading"><div><p class="eyebrow">02 / YOUR DETAILS</p><h2 id="detailsTitle" tabindex="-1">お客様情報を入力する</h2></div><button class="text-button" id="changePlan" type="button">プランを変更する</button></div>
+      <div class="details-layout"><div class="panel details-panel"><form id="memberForm" method="post" novalidate><fieldset id="memberFields" disabled>
+        <div class="form-section"><div class="form-section-heading"><span class="section-number">01</span><div><h3>ご利用開始日</h3><p>この日から、ご選択のプランで契約が始まります。</p></div></div><label for="startDate">利用開始日<span class="required">必須</span></label><input id="startDate" name="start_date" type="date" required><p class="field-note">10月中の利用開始日をお選びください。</p></div>
+        <div class="form-section"><div class="form-section-heading"><span class="section-number">02</span><div><h3>ご本人様について</h3><p>会員情報の登録に使用します。</p></div></div><div class="form-grid">
+          <label>お名前<span class="required">必須</span><input id="fullName" name="name" autocomplete="name" maxlength="60" placeholder="例：山田 太郎" required></label>
+          <label>フリガナ<span class="required">必須</span><input id="nameKana" name="name_kana" maxlength="100" placeholder="例：ヤマダ タロウ" required></label>
+          <label>生年月日<span class="required">必須</span><input id="birthDate" name="birth_date" type="date" autocomplete="bday" required></label>
+          <label>ファイターネーム<span class="optional">任意</span><input id="fighterName" name="fighter_name" maxlength="40" placeholder="お好きな呼び名"></label>
+        </div></div>
+        <div class="form-section"><div class="form-section-heading"><span class="section-number">03</span><div><h3>ご連絡先・ご住所</h3><p>確認メールを受け取れるメールアドレスをご入力ください。</p></div></div><div class="form-grid">
+          <label class="wide">メールアドレス<span class="required">必須</span><input id="memberEmail" name="email" type="email" inputmode="email" autocomplete="email" maxlength="254" placeholder="example@email.com" required></label>
+          <label>電話番号<span class="optional">任意</span><input id="memberPhone" name="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="25" placeholder="09012345678"></label>
+          <label>郵便番号<span class="required">必須</span><input id="postalCode" name="postal_code" inputmode="numeric" autocomplete="postal-code" maxlength="8" placeholder="260-0835" required></label>
+          <label class="wide">ご住所<span class="required">必須</span><input id="memberAddress" name="address" autocomplete="street-address" maxlength="200" placeholder="都道府県・市区町村・番地・建物名" required></label>
+        </div></div>
+        <div class="form-section" id="pairSection" hidden><div class="form-section-heading"><span class="section-number">04</span><div><h3>ペア・ファミリーの方</h3><p>一緒にご利用される方をお知らせください。</p></div></div><div class="form-grid"><label>お相手のお名前<span class="required">必須</span><input id="pairName" name="pair_name" maxlength="60" placeholder="例：山田 花子" disabled></label><label>お相手の会員番号<span class="optional">お持ちの場合</span><input id="pairMemberNo" name="pair_member_no" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" placeholder="数字6桁" disabled></label></div><p class="field-note">他のペア・ファミリーメンバー全員が退会された場合は、翌月1日から通常プランへ移行します。</p></div>
+        <div class="input-notice"><span aria-hidden="true">◇</span><p>カード情報はこの画面では入力しません。カード登録・お支払いは、決済代行会社の画面で行う予定です。</p></div>
+        <div class="form-actions"><button class="secondary-button" id="backToPlans" type="button">戻る</button><button class="primary-button" id="toReview" type="button">入力内容を確認する <span aria-hidden="true">→</span></button></div>
+      </fieldset></form></div><aside class="panel summary" aria-labelledby="summaryTitle"><p class="eyebrow">YOUR MEMBERSHIP</p><h3 id="summaryTitle">選択中のプラン</h3><div id="planSummary" aria-live="polite"></div><p class="summary-note">初回会費とお支払総額は、利用開始日をもとに決済画面でご案内します。</p></aside></div>
+    </section>
+
+    <section id="reviewStage" class="stage" aria-labelledby="reviewTitle" hidden><div class="section-heading"><div><p class="eyebrow">03 / CHECK YOUR MEMBERSHIP</p><h2 id="reviewTitle" tabindex="-1">お申込み内容を確認する</h2></div><button class="text-button" id="editDetails" type="button">入力内容を修正する</button></div><div class="review-layout"><div class="panel"><div class="review-block"><h3>プラン・ご利用開始日</h3><dl id="reviewPlan" class="review-list"></dl></div><div class="review-block"><h3>お客様情報</h3><dl id="reviewPerson" class="review-list"></dl></div></div><div class="panel terms-panel"><p class="eyebrow">BEFORE YOU START</p><h3>お申込みにあたって</h3><div id="selectedConditions" class="selected-conditions"></div><details class="terms"><summary>プラン・お申込みに関する注意事項</summary><div class="terms-copy"><ol>
+      <li>本申込書をスタッフが受理した時点をもって、内容に重大な不備がない限り、お申込み手続き完了となります。内容に不備があった場合には、必要に応じて加筆修正をお願いすることがあります。</li>
+      <li>お申込み受理後のキャンセル・返金は、いかなる理由であってもお受けできません。</li>
+      <li>他のプランへの移行をご希望の場合は、毎月20日の営業時間内までにジムスタッフへご連絡ください。期限までにご連絡がない場合、プランは自動更新となります。継続条件付きプランは、当該継続期間が経過するまでプラン変更できません。</li>
+      <li>ペアの相手、またはファミリーの他の全メンバーが退会された場合は、翌月1日より通常プランとなります。</li>
+      <li>契約期間内での会員種別変更に伴う差額の返金はお受けできません。</li>
+    </ol><p>継続条件付きプランで期限前に退会される場合は、初期費用・9Rオリジナルグローブ・基本料金について、通常プランとの差額を退会時に精算します。基本料金の差額は利用月数分が対象です。</p><p>会費は毎月末までの利用分の請求となります。外部環境の変化により会費を見直す場合は、事前にお知らせします。継続条件付きプランは、当該期間内に基本料金の見直しを行いません。</p></div></details><label class="consent"><input id="agreeTerms" type="checkbox"><span>選択したプランの料金・継続条件、およびお申込みに関する注意事項を確認しました。</span></label><label class="consent"><input id="agreePrivacy" type="checkbox"><span>入力した情報を、入会手続き・会員管理・ご連絡に利用することに同意します。</span></label><div class="signature"><span>ご署名（お名前）</span><strong id="signatureName"></strong><small id="signatureDate"></small></div><button id="toPayment" class="primary-button" type="button" disabled>カード登録は準備中です</button><p class="form-note">このプレビューから申込みや決済は行われません。入力内容は店舗へ送信されません。</p></div></div></section>
+    <section class="help-note"><span>YOUR NEXT ROUND</span><h2>ご不明な点は、店舗スタッフへ。</h2><p>プランや継続条件について、ご入会前にお気軽にご相談ください。</p></section>
+  </main>
+  <footer><div class="footer-brand">9ROUND <span>ARIO SOGA</span></div><span>© 9ROUND アリオ蘇我店</span></footer>
+</body>
+</html>
