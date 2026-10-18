@@ -27,7 +27,8 @@ const NR_BOOKING = Object.freeze({
     trial_challenges: ["challenge_id", "email", "email_hash", "code_hash", "created_at", "expires_at", "attempts", "status"],
     trial_sessions: ["token_hash", "customer_id", "email", "created_at", "expires_at", "status"],
     trial_contacts: ["customer_id", "name", "email", "phone", "created_at", "updated_at"],
-    trial_applications: ["application_id", "request_id", "customer_id", "slot_id", "date", "start_time", "end_time", "party_size", "name", "companion_name", "phone", "email", "status", "consent_at", "created_at", "updated_at"]
+    trial_applications: ["application_id", "request_id", "customer_id", "slot_id", "date", "start_time", "end_time", "party_size", "name", "companion_name", "phone", "email", "status", "consent_at", "created_at", "updated_at"],
+    mpg_bridge: ["hold_id", "kind", "reservation_id", "date", "start_time", "end_time", "status", "created_at", "updated_at"]
   }
 });
 
@@ -596,6 +597,7 @@ function round9BookingApi_(action, body) {
       restore9RoundBookingSlot: nrRestore9RoundSlot_
     };
     if (typeof nrTrialHandlers_ === "function") Object.assign(handlers, nrTrialHandlers_());
+    if (typeof nrCoordinate9RoundMpg_ === "function") handlers.coordinate9RoundMpg = nrCoordinate9RoundMpg_;
     if (!handlers[action]) nrBookingError_("ACTION_NOT_FOUND", "指定された操作は利用できません。");
     return successResponse(handlers[action](config, body || {}));
   } catch (error) {

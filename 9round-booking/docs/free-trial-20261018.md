@@ -21,6 +21,8 @@
 
 - 在席は`KAWAKAMI`の有効な`MPG`勤務予定から判断します。他スタッフや別店舗の勤務では並行受付にしません。川上さん担当（担当未記入を含む）の有効な`MPG_TRAINING_SUPPORT45`予約は時間重複で確認します。開始・終了の境界が一致するだけなら重複にしません。
 - 最後の確定予約の取消・日時変更で空いた時間は、もう一方の枠も自動で再表示します。管理者による停止・削除は維持します。
+- デイリーと体験の両方に確定予約がある時間は、川上さんのMPG勤務を48時間ルールの削除から保護します。片方だけの予約は保護対象にせず、勤務が消えた後は上表の先着条件を適用します。
+- 体験予約済みの時間は、MPGサポートの新規申込・日時変更を受け付けません。MPG側の保存処理が先に始まった時間は、体験の申込みを止めます。
 - 勤務予定の変更・削除後に両方の確定予約が残る場合は、公開側の体験枠を非表示にし、両枠の追加受付を停止します。スタッフ画面には両方の成立済み予約と担当確認の案内を残します。後からMPGトレーニングサポートが重なった体験も受付停止・担当確認にします。予約済みの人を自動で取り消しません。
 - 枠の非表示は予約情報から計算します。予約・勤務表・管理者の設定を削除する処理ではありません。
 - 日付・期限は日本時間。予約・変更・取消は開始1時間前までです。
@@ -41,32 +43,45 @@
 
 ## 本番反映前に必要な設定
 
-この変更をGitHubへ保存するだけでは受付を開始しません。GASの既存デプロイの新バージョン公開と次の設定が必要です。既存の予約データ、会員マスター、公開URLは維持します。
+GitHubへの保存だけでは受付を開始しません。独立9ROUND GASと既存MPG GASの両方を更新し、接続確認後に体験受付を有効化します。会員マスター・予約・公開URLを初期化しません。
 
-| プロパティ | 設定 |
+| プロパティ | 設置先・設定 |
 | --- | --- |
-| `ROUND9_TRIAL_ENABLED` | 最後に`true`。未設定・`false`の間は既存の通常予約を維持 |
-| `ROUND9_TRIAL_SHIFT_SPREADSHEET_ID` | `staff_shifts`を持つ既存A-nauts OSのスプレッドシートID。未設定時は既存スタッフ名簿のIDを使用 |
-| `ROUND9_TRIAL_STAFF_CODE` | `KAWAKAMI`。既存MPG自動生成と同じコード |
-| `ROUND9_TRIAL_URL` | 公開済み体験申込画面のHTTPS URL |
+| `ROUND9_TRIAL_ENABLED` | 9ROUND。最後に`true` |
+| `ROUND9_TRIAL_SHIFT_SPREADSHEET_ID` | 9ROUND。勤務表・`reservations`を持つ既存A-nauts OSのID。省略時は既存スタッフ名簿ID |
+| `ROUND9_TRIAL_STAFF_CODE` | 9ROUND。`KAWAKAMI` |
+| `ROUND9_TRIAL_URL` | 9ROUND。公開済み体験申込画面のHTTPS URL |
+| `ROUND9_MPG_BRIDGE_ENABLED` | 両GAS。9ROUND側、MPG側の順に`true`。MPG側で未設定・`false`なら既存動作を維持 |
+| `ROUND9_MPG_BRIDGE_SECRET` | 両GASに同じ32文字以上のランダムな共有鍵。HTML・GitHub・公開設定ファイルへ入れない |
+| `ROUND9_MPG_BRIDGE_URL` | MPGのみ。既存の独立9ROUND GASの`https://script.google.com/macros/s/.../exec` |
 
-1. 新規`Trials.gs`、更新した`Booking.gs`・`Workflows.gs`・`MailLinks.gs`・`SlotManagement.gs`・`Staff.html`を既存の独立9ROUND GASへ反映します。従来のGASファイルは削除しません。
-2. エディターから`prepare9RoundTrialStorage_()`を1回実行します。`nr_trial_contacts`・`nr_trial_applications`の不足分だけを追加します。旧コード用テーブルがある場合も削除しません。既存の初期化・本番準備は再実行しません。
-3. 既存GASの実行アカウントが勤務予定の参照元を読み取れること、`staff_shifts`の列構成、実際の川上さんの勤務日時・公開状態、`reservations`のサービス・担当・日付・開始時刻・状態を確認します。参照元のデータには書き込みません。MPG側の予約処理や48時間での勤務予定自動削除処理は変更していません。勤務予定が自動削除される場合も在席扱いが解除されるため、実運用の勤務表と削除条件を確認してください。両方の予約成立後に在席が解除された時間は担当者の調整が必要です。
-4. 公開ビルドに`trial/`を含めてGitHub Pagesへ反映します。`config.js`には確認済みの既存9ROUND API URLを設定します。
-5. テスト用のメール・架空情報で実メール受信、勤務予定、両側の先着申込・変更・取消・枠の再表示を確認します。テスト申込を取り消してから、最後に`ROUND9_TRIAL_ENABLED=true`として受付を開始します。
+1. 9ROUNDの体験受付を無効にしたまま、新規`Trials.gs`・`MpgBridge.gs`と更新した`Booking.gs`・`Workflows.gs`・`MailLinks.gs`・`SlotManagement.gs`・`Staff.html`を独立9ROUND GASへ反映します。従来のファイルは削除しません。
+2. 9ROUNDのエディターから`prepare9RoundTrialStorage_()`を実行し、`nr_trial_contacts`・`nr_trial_applications`・`nr_mpg_bridge`の不足分だけを追加します。既存の初期化・本番準備は再実行しません。
+3. 勤務表を参照する権限と列構成、川上さんの勤務日時・公開状態、`reservations`のサービス・担当・日付・開始時刻・状態を確認します。9ROUND GASはMPGの表へ直接書き込みません。
+4. MPG側に`64_9RoundMpgBridge.gs`、更新した`63_MpgShiftRules.gs`・`28_Availability.gs.js`・`29_Reservation.gs.js`・`32_UpdateReservation.gs.js`を反映します。既存のMPG公開ワークフローは、取得した本番コードへ必要な変更を重ねる方式を維持し、新しい連携ファイルと保存前後のフックも含めます。更新後も連携フラグはまだ無効のままにします。
+5. 両GASの共有鍵とMPG側のURLを設定し、9ROUND側の連携、MPG側の連携の順に有効化します。MPGエディターで`check9RoundMpgConnection()`を実行し、`ready:true`を確認します。公開APIには接続確認用の新しい管理ルートを作りません。
+6. テスト用のメール・架空情報で、両システムの申込順序、新規・日時変更・取消、勤務保護、48時間削除、実メール受信を確認します。既存の`cleanupUnbookedMpgShifts`の1時間トリガー・権限承認・実行履歴も確認します。
+7. 公開ビルドの`trial/`をGitHub Pagesへ反映します。テスト申込を取り消し、最後に9ROUND側の`ROUND9_TRIAL_ENABLED=true`として受付を開始します。体験機能は連携フラグ・共有鍵が未設定だと受付を開始しません。
 
-## 現行MPGシフトの48時間ルール
+## MPGと9ROUNDの競合制御
 
-[現行コード](https://github.com/forestgym-tokyo/anauts-os-reserve/blob/main/gas/63_MpgShiftRules.gs)では、各MPG枠の開始48時間前から未予約枠を削除対象にします。1時間ごとの`cleanupUnbookedMpgShifts`が`active=false`へ更新します。予約画面では定期処理の実行待ちでも48時間以内の枠を隠します。例えば木曜11:00の枠は火曜11:00から対象です。
+MPG側は共有鍵で署名したリクエストを独立9ROUND GASへ送り、9ROUNDの予約・体験と共通のScript Lockで判断します。キーはサーバー間だけで使い、時刻と本文を検証します。応答には氏名・電話・メールを含めません。
 
-MPG見学・トレーニングサポートの有効な予約がある枠は残します。9ROUND体験は現行MPG側の維持判定に含まれません。本変更はこの削除ルールを変更せず、実際に勤務が無効になった後に上記の先着条件を適用します。本番GASのトリガー設置・権限承認・稼働状況はGitHubのコードからは確認していません。
+MPGサポートの新規申込・日時変更は、カレンダーや予約表を変更する前に9ROUND側で対象時間を確保します。その時点で体験予約があれば、元の予約を保って拒否します。確保が先なら体験を受け付けません。日時変更中は移動前の時間も確保し、途中の書き換え後に元へ戻す際の競合を防ぎます。MPG側の保存またはロールバックを完了し、表の反映を確定してから確保を解除します。通信・設定エラー時に確認を省略して予約を進めません。
 
-MPGの予約処理と独立9ROUND GASは別のScript Lockです。体験の空き枠取得・新規申込・日時変更の都度、MPGトレーニングサポート予約を参照して受付を停止しますが、MPG側から9ROUNDへの予約競合確認や即時通知は追加していません。先に成立した体験へ後からMPG予約が入った場合は、次の取得時にスタッフへ重複を表示し、担当者の調整を必要とします。
+途中で実行が止まった場合は、枠を閉じたまま保持します。1時間のシフト清掃処理がMPG側のロックを取って15分以上経過した処理の確保を解除します。遅れて再送された古い確保要求は、解除済み記録により拒否します。MPG予約が成立済みなら解除後も実予約の参照で体験を閉じます。
+
+## MPGシフトの48時間ルール
+
+通常の未予約枠は、開始48時間前から削除対象です。例えば木曜11:00の枠は火曜11:00から対象で、1時間ごとの`cleanupUnbookedMpgShifts`が`active=false`へ更新します。MPG予約画面では処理待ちでも48時間以内の新規受付を表示しません。
+
+MPGの見学・サポート予約に加え、同じ時間にデイリーと体験の両方が確定している枠も残します。自動で勤務を無効化する直前にも9ROUND側で再検査し、両予約があれば削除しません。削除が先なら、実際の表更新を待たずに9ROUND側を先着受付へ切り替えるため、削除中に両方が新規成立する隙間を作りません。保護は対象時間だけに適用し、空の隣接枠は通常どおり削除します。連携確認に失敗した場合はシフトを削除しません。
+
+片方の予約がなくなれば保護対象から外れ、次の清掃で通常ルールを適用します。本番のトリガー設置・権限承認・稼働状況はGitHubからは確認していません。
 
 ```bash
 node scripts/build-9round-gas-pages.mjs --staff-only
-node --test tests/9round-booking.test.js tests/9round-trial.test.js
+node --test tests/9round-booking.test.js tests/9round-trial.test.js tests/9round-mpg-bridge.test.js tests/mpg-shift-rules.test.js
 node tests/9round-trial.browser.cjs
 ```
 

@@ -602,8 +602,10 @@ function mpgFindMpgTravelConflictForHeadOffice_(
 
 function filterMpgSlotsAgainstHeadOfficeReservations_(
   dateText,
-  slots
+  slots,
+  serviceCode
 ) {
+  if (typeof mpg9RoundFilterSupportSlots_ === "function") slots = mpg9RoundFilterSupportSlots_(dateText, slots, serviceCode);
   const reservationRows =
     getSheetData(APP_CONFIG.SHEETS.RESERVATIONS);
   const cutoffAt =
@@ -693,6 +695,7 @@ function mpgReservationKeySet_() {
     if (date && start) keys.add(date + "|" + start);
   });
 
+  if (typeof mpg9RoundProtectedShiftKeys_ === "function") mpg9RoundProtectedShiftKeys_().forEach(function (key) { keys.add(key); });
   return keys;
 }
 
@@ -798,6 +801,7 @@ function mpgGetShiftSheetTable_() {
 function mpgSetShiftRowsInactive_(rowNumbers, table) {
   if (!rowNumbers.length) return 0;
   table = table || mpgGetShiftSheetTable_();
+  if (typeof mpg9RoundRetirableShiftRows_ === "function") rowNumbers = mpg9RoundRetirableShiftRows_(rowNumbers, table);
 
   const activeIndex = table.headers.indexOf("active");
   const updatedIndex = table.headers.indexOf("updated_at");
@@ -1115,6 +1119,15 @@ function generateKawakamiMpgShifts(body) {
 }
 
 function cleanupUnbookedMpgShifts() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    if (typeof mpg9RoundRecoverPending_ === "function") mpg9RoundRecoverPending_();
+    return cleanupUnbookedMpgShiftsLocked_();
+  } finally { lock.releaseLock(); }
+}
+
+function cleanupUnbookedMpgShiftsLocked_() {
   const mpgStoreCode = getMpgStoreCode_();
   const reservations = mpgReservationKeySet_();
   const table = mpgGetShiftSheetTable_();

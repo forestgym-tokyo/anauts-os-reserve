@@ -6,7 +6,7 @@ const helper = { exports: {} };
 new Function("require", "__dirname", "module", "exports", source + "\nmodule.exports={environment};")(require, path.dirname(file), helper, helper.exports);
 
 function fixture() {
-  const e = helper.exports.environment({ realStaffAuth: true, properties: { ROUND9_TRIAL_ENABLED: "true", ROUND9_TRIAL_SHIFT_SPREADSHEET_ID: "test-staff-directory" } });
+  const e = helper.exports.environment({ realStaffAuth: true, properties: { ROUND9_TRIAL_ENABLED: "true", ROUND9_TRIAL_SHIFT_SPREADSHEET_ID: "test-staff-directory", ROUND9_MPG_BRIDGE_ENABLED: "true", ROUND9_MPG_BRIDGE_SECRET: "test-only-mpg-bridge-secret-at-least-32-characters" } });
   e.properties.ROUND9_BOOKING_TEST_EMAILS += ",trial0@example.invalid,trial1@example.invalid,trial2@example.invalid";
   e.directory.insertSheet("staff_shifts").rows = [
     ["staff_code", "store_code", "date", "start_time", "end_time", "active"],

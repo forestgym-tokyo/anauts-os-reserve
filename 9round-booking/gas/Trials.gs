@@ -5,6 +5,7 @@ function nrTrialEnabled_() {
 
 function nrTrialConfig_(config) {
   if (!nrTrialEnabled_()) nrBookingError_("TRIAL_DISABLED", "現在、無料体験予約の準備中です。");
+  nrMpgBridgeSettings_();
   const p = PropertiesService.getScriptProperties().getProperties();
   const sourceId = String(p.ROUND9_TRIAL_SHIFT_SPREADSHEET_ID || p.ROUND9_BOOKING_STAFF_DIRECTORY_ID || "").trim();
   const staffCode = String(p.ROUND9_TRIAL_STAFF_CODE || "KAWAKAMI").trim().toUpperCase();
@@ -22,7 +23,7 @@ function prepare9RoundTrialStorage_() {
   const config = nrBookingConfig_();
   return nrBookingLocked_(function () {
     const ss = SpreadsheetApp.openById(config.dataId);
-    ["trial_contacts", "trial_applications"].forEach(function (table) {
+    ["trial_contacts", "trial_applications", "mpg_bridge"].forEach(function (table) {
       let sheet = ss.getSheetByName("nr_" + table);
       if (!sheet) {
         sheet = ss.insertSheet("nr_" + table);
@@ -53,7 +54,7 @@ function nrTrialTime_(value) {
 }
 
 function nrTrialScheduleContext_(config) {
-  return { source: nrTrialReadSource_(config), bookings: nrBookingRows_(config, "bookings"), applications: nrBookingRows_(config, "trial_applications") };
+  return { source: nrTrialReadSource_(config), bookings: nrBookingRows_(config, "bookings"), applications: nrBookingRows_(config, "trial_applications"), bridge: nrBookingRows_(config, "mpg_bridge").filter(function (r) { return r.status === "ACTIVE"; }) };
 }
 
 function nrTrialAvailability_(config, date, context) {
@@ -65,7 +66,7 @@ function nrTrialAvailability_(config, date, context) {
       nrTrialDate_(s.date) === date && nrBookingStaffBoolean_(s.active) && (!publication || publication.status.toUpperCase() === "PUBLISHED");
   });
   return nrBookingBaseSlots_(date).map(function (slot) {
-    const supportBusy = source.reservations.some(function (r) {
+    const supportBusy = context.bridge.some(function (r) { return r.kind === "SUPPORT" && nrMpgOverlap_(r, slot); }) || source.reservations.some(function (r) {
       if (r.service_code.toUpperCase() !== "MPG_TRAINING_SUPPORT45" ||
           (r.staff_code && r.staff_code.toUpperCase() !== source.settings.staffCode) ||
           (r.store_code && r.store_code.toUpperCase() !== "MPG") || nrTrialDate_(r.reservation_date) !== date ||
@@ -73,7 +74,8 @@ function nrTrialAvailability_(config, date, context) {
       const start = nrTrialTime_(r.start_time), end = nrTrialTime_(r.end_time) || (start ? nrBookingTime_(Number(start.slice(0, 2)) * 60 + Number(start.slice(3)) + 45) : "");
       return start && end && start < slot.end_time && end > slot.start_time;
     });
-    const parallel = !supportBusy && shifts.some(function (s) { const start = nrTrialTime_(s.start_time), end = nrTrialTime_(s.end_time); return start && end && start <= slot.start_time && end >= slot.end_time; });
+    const retired = context.bridge.some(function (r) { return r.kind === "SHIFT_RETIRE" && nrMpgOverlap_(r, slot); });
+    const parallel = !retired && !supportBusy && shifts.some(function (s) { const start = nrTrialTime_(s.start_time), end = nrTrialTime_(s.end_time); return start && end && start <= slot.start_time && end >= slot.end_time; });
     const overlaps = function (r) { return r.date === date && r.status === "CONFIRMED" && r.start_time < slot.end_time && r.end_time > slot.start_time; };
     const daily = context.bookings.some(function (r) { return r.kind === "DAILY" && overlaps(r); });
     const trial = context.applications.some(overlaps);

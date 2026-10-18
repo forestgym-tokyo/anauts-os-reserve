@@ -129,6 +129,7 @@ function environment(options = {}) {
   vm.runInContext(read("9round-booking/gas/MailLinks.gs"), context);
   vm.runInContext(read("9round-booking/gas/SlotManagement.gs"), context);
   vm.runInContext(read("9round-booking/gas/Trials.gs"), context);
+  vm.runInContext(read("9round-booking/gas/MpgBridge.gs"), context);
   if (options.realStaffAuth) vm.runInContext(read("9round-booking/gas/StaffAuth.gs"), context);
   if (!options.noSetup) context.setup9RoundBookingStorage_();
   function call(action, body = {}) { const result = context.round9BookingApi_(action, body); assert.equal(locked, false, "lock must be released on all paths"); return plain(result); }

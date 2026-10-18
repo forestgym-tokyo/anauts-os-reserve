@@ -23,6 +23,34 @@ function replaceAllRequired_(file, before, after, minimum, label) {
   file.src = file.src.split(before).join(after);
 }
 
+// Cross-project coordination must surround the actual Calendar/Sheets mutation.
+function overlay9RoundCoordination_() {
+  const availability = read_("28_Availability.gs.js");
+  replaceOnce_(availability,
+    "filterMpgSlotsAgainstHeadOfficeReservations_(\n        targetDate,\n        slots\n      );",
+    "filterMpgSlotsAgainstHeadOfficeReservations_(\n        targetDate,\n        slots,\n        serviceCode\n      );", "28 9ROUND trial filter");
+  write_(availability);
+
+  const create = read_("29_Reservation.gs.js");
+  replaceOnce_(create, "  let createdEvent = null;", "  let createdEvent = null;\n  let nineRoundHold = null;", "29 9ROUND hold state");
+  replaceOnce_(create, "    const reservationId =\n      generateReservationId_();", "    const reservationId =\n      generateReservationId_();\n\n    if (typeof mpg9RoundAcquireSupport_ === \"function\") nineRoundHold = mpg9RoundAcquireSupport_({ service_code: serviceCode, staff_code: assignedStaff.staff_code,\n      reservation_id: reservationId, date: targetDate, start_time: startTime, end_time: formatReservationTime_(endAt) });", "29 9ROUND acquire before event");
+  replaceOnce_(create, '      "予約登録中にエラーが発生しました。",\n      "SYSTEM_ERROR",', '      error.mpg9RoundCode ? error.message : "予約登録中にエラーが発生しました。",\n      error.mpg9RoundCode || "SYSTEM_ERROR",', "29 9ROUND business error");
+  replaceOnce_(create, "  } finally {\n\n    try {\n      lock.releaseLock();", "  } finally {\n\n    if (typeof mpg9RoundReleaseSupportSafely_ === \"function\") mpg9RoundReleaseSupportSafely_(nineRoundHold);\n\n    try {\n      lock.releaseLock();", "29 9ROUND release after persistence");
+  write_(create);
+
+  const update = read_("32_UpdateReservation.gs.js");
+  replaceOnce_(update, "  let eventUpdated = false;", "  let eventUpdated = false;\n  let nineRoundHold = null;", "32 9ROUND hold state");
+  replaceOnce_(update, "    calendarEvent.setTitle(eventTitle);", "    if (typeof mpg9RoundAcquireSupport_ === \"function\") nineRoundHold = mpg9RoundAcquireSupport_({ service_code: serviceCode, staff_code: assignedStaff.staff_code,\n      reservation_id: reservationId, date: targetDate, start_time: startTime, end_time: formatReservationTime_(endAt),\n      previous: { staff_code: oldStaffCode, date: oldDate, start_time: oldStartTime, end_time: oldEndTime } });\n\n    calendarEvent.setTitle(eventTitle);", "32 9ROUND acquire before event");
+  replaceOnce_(update, '    return errorResponse("予約変更中にエラーが発生しました。", "SYSTEM_ERROR", {', '    return errorResponse(error.mpg9RoundCode ? error.message : "予約変更中にエラーが発生しました。", error.mpg9RoundCode || "SYSTEM_ERROR", {', "32 9ROUND business error");
+  replaceOnce_(update, "  } finally {\n    try {\n      lock.releaseLock();", "  } finally {\n    if (typeof mpg9RoundReleaseSupportSafely_ === \"function\") mpg9RoundReleaseSupportSafely_(nineRoundHold);\n    try {\n      lock.releaseLock();", "32 9ROUND release after rollback or commit");
+  write_(update);
+}
+
+if (process.argv.includes("--9round-only")) {
+  overlay9RoundCoordination_();
+  process.exit(0);
+}
+
 // 28_Availability: only shifts from the service's own store may create availability.
 {
   const file = read_("28_Availability.gs.js");
@@ -338,6 +366,7 @@ function roundUpAvailabilityTimeFromAnchor_(
 
   write_(file);
 }
+
 
 // 29_Reservation: reservation validation must use the same store-scoped shifts.
 {
@@ -1107,3 +1136,6 @@ function roundUpAvailabilityTimeFromAnchor_(
   );
   write_(file);
 }
+
+// Apply only after all existing MPG overlays have completed.
+overlay9RoundCoordination_();

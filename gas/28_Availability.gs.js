@@ -367,7 +367,8 @@ function getAvailableSlots(params) {
     ) {
       slots = filterMpgSlotsAgainstHeadOfficeReservations_(
         targetDate,
-        slots
+        slots,
+        serviceCode
       );
     }
 

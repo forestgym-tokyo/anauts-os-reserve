@@ -15,7 +15,7 @@ jobs:
         with:
           node-version: '22'
       - name: Server and existing booking regressions
-        run: node --test tests/9round-booking.test.js tests/9round-trial.test.js
+        run: node --test tests/9round-booking.test.js tests/9round-trial.test.js tests/9round-mpg-bridge.test.js tests/mpg-shift-rules.test.js
       - name: Install isolated browser driver
         run: npm install --prefix "$RUNNER_TEMP/9round-trial-browser" --no-package-lock --ignore-scripts playwright@1.51.1 @fontsource/noto-sans-jp@5.3.1
       - name: Browser interactions and design screenshots
