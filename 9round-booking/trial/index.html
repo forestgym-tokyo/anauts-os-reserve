@@ -46,10 +46,9 @@
             <label class="consent"><input id="consent" type="checkbox" required><span>入力情報を体験予約の受付・連絡に利用することに同意します。</span></label>
           </fieldset>
           <div class="total-line"><span>体験料金</span><strong>無料<span>¥0</span></strong></div>
-          <button id="sendCode" class="primary-button" type="submit" disabled>メールで確認コードを受け取る <span aria-hidden="true">→</span></button>
-          <p class="form-note">この操作ではまだ予約は確定しません。</p>
+          <button id="submitBooking" class="primary-button" type="submit" disabled>無料体験を予約する <span aria-hidden="true">→</span></button>
+          <p class="form-note">タップすると予約が確定し、確認メールをお送りします。</p>
         </form>
-        <form id="verificationForm" hidden><label for="code">メールに届いた6桁の確認コード</label><input id="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="000000" required><p id="verificationEmail" class="form-note"></p><button id="confirmBooking" class="primary-button" type="submit">無料体験を予約する <span aria-hidden="true">→</span></button><button id="editDetails" class="text-button" type="button">入力内容を変更する</button></form>
         <p class="secure-note"><span aria-hidden="true">◇</span> 会員番号・クレジットカードの登録は不要です。</p>
       </aside>
     </div>

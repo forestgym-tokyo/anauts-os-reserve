@@ -8,8 +8,8 @@ const root = path.resolve(__dirname, "..");
 const evidence = process.env.ROUND9_BROWSER_EVIDENCE || "/tmp/9round-trial-evidence";
 const fonts = process.env.ROUND9_BROWSER_FONT_DIR || "";
 fs.mkdirSync(evidence, { recursive: true });
-const e = fixture(), actions = [];
-let origin, createGate, cancelGate;
+const e = fixture(), actions = [], submissions = [];
+let origin, createGate, cancelGate, loseCreateResponseOnce = false;
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, "http://127.0.0.1");
   if (url.pathname === "/__trial_api" && req.method === "POST") {
@@ -17,7 +17,12 @@ const server = http.createServer((req, res) => {
       const body = JSON.parse(text); actions.push(body.action);
       if (body.action === "create9RoundTrialBooking" && createGate) await createGate;
       if (body.action === "cancel9RoundTrialBooking" && cancelGate) await cancelGate;
-      res.writeHead(200, { "Content-Type": "application/json" }); res.end(JSON.stringify(e.call(body.action, body)));
+      const result = e.call(body.action, body);
+      if (body.action === "create9RoundTrialBooking") {
+        submissions.push(body.request_id);
+        if (loseCreateResponseOnce) { loseCreateResponseOnce = false; res.writeHead(503); res.end(); return; }
+      }
+      res.writeHead(200, { "Content-Type": "application/json" }); res.end(JSON.stringify(result));
     }); return;
   }
   const fontRequest = !!fonts && url.pathname.startsWith("/__trial-fonts/");
@@ -68,13 +73,12 @@ async function main() {
     await desktop.screenshot({ path: path.join(evidence, "trial-desktop.png"), fullPage: true });
     await desktop.locator("#partySize").selectOption("2"); await desktop.locator("#name").fill("体験 太郎");
     await desktop.locator("#companionName").fill("体験 花子"); await desktop.locator("#email").fill("trial0@example.invalid");
-    await desktop.locator("#phone").fill("09012345678"); await desktop.locator("#consent").check(); await desktop.locator("#sendCode").click();
-    await desktop.locator("#verificationForm").waitFor({ state: "visible" });
-    await desktop.locator("#code").fill(e.sent.at(-1).body.match(/は (\d{6})/)[1]);
+    await desktop.locator("#phone").fill("09012345678"); await desktop.locator("#consent").check();
+    assert.equal(await desktop.locator("#verificationForm, #code").count(), 0);
     let releaseCreate; createGate = new Promise(resolve => { releaseCreate = resolve; });
-    await desktop.locator("#confirmBooking").click();
+    await desktop.locator("#submitBooking").click();
     await desktop.locator('#feedback[data-state="pending"]').waitFor({ state: "visible" });
-    await desktop.locator("#confirmBooking").dispatchEvent("click"); await desktop.keyboard.press("Escape");
+    await desktop.locator("#submitBooking").dispatchEvent("click"); await desktop.keyboard.press("Escape");
     assert.equal(await desktop.locator("#feedback").isVisible(), true);
     releaseCreate(); createGate = null; await closeFeedback(desktop);
     assert.equal(actions.filter(a => a === "create9RoundTrialBooking").length, 1);
@@ -98,6 +102,34 @@ async function main() {
     assert.equal(actions.filter(a => a === "cancel9RoundTrialBooking").length, 1);
     assert.equal(await desktop.locator("#resultTitle").textContent(), "キャンセルが完了しました");
 
+    // A lost reply after the server commits must be safely retryable without
+    // changing the request ID, duplicating the booking or sending more mail.
+    const retry = await page(390); await retry.goto(origin + "/9round-booking/trial/");
+    await retry.locator('[data-date="2026-10-19"]').click(); await retry.locator("#slots .slot-button").first().click();
+    await retry.locator("#name").fill("通信確認 太郎"); await retry.locator("#email").fill("trial2@example.invalid");
+    await retry.locator("#phone").fill("09012345678"); await retry.locator("#consent").check();
+    const beforeMail = e.sent.length; loseCreateResponseOnce = true;
+    await retry.locator("#submitBooking").click();
+    await retry.locator('#feedback[data-state="error"]').waitFor({ state: "visible" });
+    assert.match(await retry.locator("#feedbackTitle").textContent(), /予約結果を確認できませんでした/);
+    assert.equal(e.sent.length, beforeMail + 2); await retry.locator("#feedbackClose").click();
+    await retry.locator("#submitBooking").click(); await closeFeedback(retry);
+    assert.equal(submissions.at(-1), submissions.at(-2)); assert.equal(e.sent.length, beforeMail + 2);
+    const token = e.login(2), dailyQuery = { session_token: token, date: "2026-10-19" };
+    assert.equal(e.call("get9RoundWorkoutSlots", dailyQuery).data.slots.some(s => s.start_time === "10:15"), false);
+    await retry.locator("#cancelBooking").click(); await closeFeedback(retry);
+    assert.equal(e.call("get9RoundWorkoutSlots", dailyQuery).data.slots.some(s => s.start_time === "10:15"), true);
+    await retry.context().close();
+
+    // Two requests using a previously displayed empty slot cannot both win.
+    const raceDaily = { session_token: token, date: "2026-10-19", slot_id: "DAILY:2026-10-19:11:00" };
+    const raceTrial = payload(e.applicant(2), { date: "2026-10-19", slot_id: "TRIAL:2026-10-19:11:00", request_id: "browser-race-request-0001" });
+    const race = await desktop.evaluate(async ({ daily, trial }) => {
+      async function call(action, body) { return (await fetch("/__trial_api", { method: "POST", body: JSON.stringify({ action, ...body }) })).json(); }
+      return Promise.all([call("create9RoundWorkoutBooking", daily), call("create9RoundTrialBooking", trial)]);
+    }, { daily: raceDaily, trial: raceTrial });
+    assert.equal(race.filter(r => r.ok).length, 1); assert.ok(race.some(r => ["SLOT_BLOCKED", "TRIAL_UNAVAILABLE"].includes(r.code)));
+
     for (const width of [320, 390, 768]) {
       const mobile = await page(width); await mobile.goto(origin + "/9round-booking/trial/");
       await mobile.locator("#slots .slot-button").first().waitFor(); await mobile.locator('[data-date="2026-10-18"]').click(); await mobile.locator("#slots .slot-button").first().click();
@@ -106,13 +138,13 @@ async function main() {
         await mobile.evaluate(() => document.fonts.ready);
         await mobile.screenshot({ path: path.join(evidence, "trial-mobile.png"), fullPage: true });
         await mobile.locator("#nextWeek").click(); await mobile.locator('[data-date="2026-10-24"]').click();
-        assert.equal(await mobile.locator("#slots .slot-button").count(), 1);
-        assert.match(await mobile.locator("#slots .slot-button").textContent(), /13:15/);
+        assert.equal(await mobile.locator("#slots .slot-button").count(), 11);
+        assert.ok((await mobile.locator("#slots").textContent()).includes("13:15"));
       }
       await mobile.context().close();
     }
 
-    const preview = e.call("create9RoundTrialBooking", payload(e.loginTrial(1), { party_size: 2, companion_name: "体験 花子" }));
+    const preview = e.call("create9RoundTrialBooking", payload(e.applicant(1), { party_size: 2, companion_name: "体験 花子" }));
     assert.equal(preview.ok, true);
     const staff = await page(1100); await staff.goto(origin + "/9round-booking/staff/");
     await staff.locator("#staffEmail").fill("staff@example.invalid"); await staff.locator("#staffPassword").fill("test-only");
@@ -127,6 +159,7 @@ async function main() {
     await card.getByRole("button", { name: "キャンセル", exact: true }).click();
     await staff.locator(".nr-trial-dialog").getByText("キャンセルが完了しました。", { exact: true }).waitFor();
     assert.equal(e.call("get9RoundManagedTrialBooking", { application_id: preview.data.application_id, id_token: "staff" }).data.status, "CANCELLED");
+    assert.equal(actions.some(a => /(?:request|verify)9RoundTrialCode/.test(a)), false);
     assert.deepEqual(errors, []);
     console.log(JSON.stringify({ passed: true, serverActions: actions.length, widths: [320, 390, 768, 1100, 1320], screenshots: ["trial-desktop.png", "trial-mobile.png", "trial-staff-slot.png"] }));
   } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }

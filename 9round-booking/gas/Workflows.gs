@@ -59,7 +59,7 @@ function nrBookingRescheduleForMember_(config, body, member, staff) {
     const old = rows.find(function (r) { return r.booking_id === String(body.booking_id || "") && r.member_no === member.no; });
     if (!old) nrBookingError_("BOOKING_NOT_FOUND", "ご本人の予約を確認できません。");
     const date = nrBookingRequireDate_(config, body.date);
-    const slot = nrBookingDailySlots_(date).find(function (r) { return r.slot_id === body.slot_id; });
+    const slot = nrBookingDailySlots_(date, config).find(function (r) { return r.slot_id === body.slot_id; });
     if (!slot) nrBookingError_("INVALID_SLOT", "変更先の枠を選び直してください。");
     const id = nrBookingHash_(config, "reschedule:" + old.booking_id + ":" + slot.slot_id);
     if (old.status === "RESCHEDULED") {
@@ -68,6 +68,7 @@ function nrBookingRescheduleForMember_(config, body, member, staff) {
     }
     nrBookingRequireMutable_(config, old);
     if (old.slot_id === slot.slot_id) return { booking_id: old.booking_id, already_changed: true };
+    if (slot.auto_hidden || slot.status !== "OPEN") nrBookingError_("SLOT_BLOCKED", "変更先は体験予約のため受付を終了しました。元の予約は維持されています。");
     nrBookingRequireDeadline_(slot);
     nrBookingNotificationConfig_(config);
     if (rows.some(function (r) { return r.slot_id === slot.slot_id && r.member_no === member.no && r.status === "CONFIRMED"; })) {

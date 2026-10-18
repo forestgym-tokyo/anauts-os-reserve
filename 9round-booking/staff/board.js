@@ -69,6 +69,8 @@
       header.append(textElement("span", "nr-count", slot.booked_count + " / " + slot.capacity + "名"));
       article.append(header, textElement("p", "nr-kind", slot.kind === "TRIAL" ? "体験 · " + slot.title + (slot.status === "CLOSED" ? "（受付停止）" : "") : "デイリーワークアウト" + (slot.status === "BLOCKED" ? "（ブロック中）" : "")));
       if (slot.status === "DELETED") article.append(textElement("p", "nr-deleted-label", "削除済み"));
+      if (slot.mpg_conflict) article.append(textElement("p", "nr-message", "MPGトレーニングサポートと体験予約が重なっています。担当者を確認してください。"));
+      else if (slot.staffing_conflict) article.append(textElement("p", "nr-message", "勤務・予約状況が変わり、両方に予約があるため追加受付を停止しています。担当者を確認してください。"));
       if (slot.members.length) {
         const names = textElement("ul", "nr-names");
         slot.members.forEach(function (member) {

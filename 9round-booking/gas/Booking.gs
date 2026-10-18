@@ -341,9 +341,12 @@ function nrBookingBaseSlots_(date) {
   return slots;
 }
 
-function nrBookingDailySlots_(date) {
-  // Saturday workouts stop only when the separately configured trial release is enabled.
-  if (typeof nrTrialEnabled_ === "function" && nrTrialEnabled_() && nrTrialSaturday_(date)) return [];
+function nrBookingDailySlots_(date, config, context) {
+  if (config && typeof nrTrialEnabled_ === "function" && nrTrialEnabled_()) {
+    return nrTrialAvailability_(config, date, context).map(function (slot) {
+      return Object.assign({}, slot, { auto_hidden: slot.daily_hidden, status: slot.staffing_conflict ? "CLOSED" : "OPEN" });
+    });
+  }
   return nrBookingBaseSlots_(date);
 }
 
@@ -357,14 +360,14 @@ function nrGet9RoundSlots_(config, body) {
   const rows = nrBookingRows_(config, "bookings");
   const blocks = nrBookingRows_(config, "blocks");
   const attendance = nrBookingRows_(config, "attendance");
-  const slots = nrBookingDailySlots_(date).filter(function (slot) {
-    return !blocks.some(function (b) { return b.slot_id === slot.slot_id && b.status === "DELETED"; });
+  const slots = nrBookingDailySlots_(date, config).filter(function (slot) {
+    return !slot.auto_hidden && !blocks.some(function (b) { return b.slot_id === slot.slot_id && b.status === "DELETED"; });
   }).map(function (slot) {
     const mine = rows.find(function (r) { return r.slot_id === slot.slot_id && r.member_no === auth.member.no && r.status === "CONFIRMED"; });
     const count = nrBookingCount_(rows, slot.slot_id);
     const withinDeadline = nrBookingBeforeDeadline_(slot);
     const attended = !!mine && attendance.some(function (a) { return a.booking_id === mine.booking_id && a.status === "ATTENDED"; });
-    const blocked = blocks.some(function (b) { return b.slot_id === slot.slot_id && b.status === "BLOCKED"; });
+    const blocked = slot.status !== "OPEN" || blocks.some(function (b) { return b.slot_id === slot.slot_id && b.status === "BLOCKED"; });
     // Explicit projection: no other member's identity ever enters this response.
     return { slot_id: slot.slot_id, kind: slot.kind, start_time: slot.start_time, end_time: slot.end_time,
       capacity: 4, booked_count: count, is_booked: !!mine, booking_id: mine ? mine.booking_id : "",
@@ -380,13 +383,14 @@ function nrCreate9RoundBooking_(config, body) {
   return nrBookingLocked_(function () {
     const auth = nrBookingSession_(config, body);
     const date = nrBookingRequireDate_(config, body.date);
-    const slot = nrBookingDailySlots_(date).find(function (r) { return r.slot_id === body.slot_id; });
+    const slot = nrBookingDailySlots_(date, config).find(function (r) { return r.slot_id === body.slot_id; });
     if (!slot) nrBookingError_("INVALID_SLOT", "予約枠を選び直してください。");
     const rows = nrBookingRows_(config, "bookings");
     const mine = rows.find(function (r) {
       return r.slot_id === slot.slot_id && r.member_no === auth.member.no && r.status === "CONFIRMED";
     });
     if (mine) return { booking_id: mine.booking_id, already_booked: true };
+    if (slot.auto_hidden || slot.status !== "OPEN") nrBookingError_("SLOT_BLOCKED", "この時間は体験予約のため受付を終了しました。他の枠をお選びください。");
     if (nrBookingOutstanding_(config, auth.member.no, rows) >= NR_BOOKING.bookingLimit) {
       nrBookingError_("BOOKING_LIMIT", "未消化の予約は10コマまでです。予約の変更・取消は予約一覧から行えます。");
     }
@@ -456,16 +460,13 @@ function nrGet9RoundBoard_(config, body) {
   const attendance = nrBookingRows_(config, "attendance");
   const fighters = nrBookingFighterNames_(config);
   const trialRelease = typeof nrTrialEnabled_ === "function" && nrTrialEnabled_();
-  const trials = trialRelease ? nrTrialBoardSlots_(config, date) : nrBookingRows_(config, "trials").filter(function (r) { return r.date === date; });
+  const context = trialRelease ? nrTrialScheduleContext_(config) : null;
+  const trials = trialRelease ? nrTrialBoardSlots_(config, date, context) : nrBookingRows_(config, "trials").filter(function (r) { return r.date === date; });
   const canManageSlots = auth.permission === "ADMIN";
   const canRetryNotifications = ["ADMIN", "MANAGER"].indexOf(auth.permission) >= 0;
-  const daily = nrBookingDailySlots_(date);
-  // Keep already confirmed Saturday workouts visible to staff; never silently cancel them.
-  if (trialRelease && !daily.length) nrBookingBaseSlots_(date).forEach(function (slot) {
-    if (rows.some(function (r) { return r.slot_id === slot.slot_id && r.status === "CONFIRMED"; })) daily.push(Object.assign({}, slot, { status: "CLOSED" }));
-  });
+  const daily = nrBookingDailySlots_(date, config, context);
   const slots = daily.concat(trials).filter(function (slot) {
-    return canManageSlots || (slot.status !== "DELETED" && !blocks.some(function (b) { return b.slot_id === slot.slot_id && b.status === "DELETED"; }));
+    return !slot.auto_hidden && (canManageSlots || (slot.status !== "DELETED" && !blocks.some(function (b) { return b.slot_id === slot.slot_id && b.status === "DELETED"; })));
   });
   return { date: date, can_manage: canManageSlots, can_manage_slots: canManageSlots,
     can_manage_bookings: true, can_retry_notifications: canRetryNotifications,
@@ -474,6 +475,8 @@ function nrGet9RoundBoard_(config, body) {
     const deleted = slot.status === "DELETED" || blocks.some(function (b) { return b.slot_id === slot.slot_id && b.status === "DELETED"; });
     return { slot_id: slot.slot_id, kind: slot.kind, date: date, title: slot.title || "デイリーワークアウト",
       start_time: slot.start_time, end_time: slot.end_time, capacity: Number(slot.capacity),
+      staffing_conflict: !!slot.staffing_conflict,
+      mpg_conflict: slot.kind === "TRIAL" && !!slot.mpg_conflict,
       status: deleted ? "DELETED" : slot.kind === "DAILY" && blocks.some(function (b) { return b.slot_id === slot.slot_id && b.status === "BLOCKED"; }) ? "BLOCKED" : slot.status,
       booked_count: trialRelease && slot.kind === "TRIAL" ? nrTrialCount_(config, slot.slot_id) : nrBookingCount_(rows, slot.slot_id),
       can_delete: canManageSlots && !deleted && (trialRelease && slot.kind === "TRIAL" ? nrTrialCount_(config, slot.slot_id) : nrBookingCount_(rows, slot.slot_id)) === 0,

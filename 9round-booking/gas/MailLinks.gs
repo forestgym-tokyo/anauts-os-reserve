@@ -38,8 +38,8 @@ function nrGet9RoundMailSlots_(config, body) {
   const date = nrBookingRequireDate_(config, body.date);
   const bookings = nrBookingRows_(config, "bookings");
   const blocks = nrBookingRows_(config, "blocks");
-  return { date: date, slots: nrBookingDailySlots_(date).map(function (slot) {
-    const blocked = blocks.some(function (b) {
+  return { date: date, slots: nrBookingDailySlots_(date, config).filter(function (slot) { return !slot.auto_hidden; }).map(function (slot) {
+    const blocked = slot.status !== "OPEN" || blocks.some(function (b) {
       return b.slot_id === slot.slot_id && ["BLOCKED", "DELETED"].indexOf(b.status) >= 0;
     });
     const own = bookings.some(function (r) {

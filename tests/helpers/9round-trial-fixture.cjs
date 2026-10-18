@@ -19,18 +19,11 @@ function fixture() {
   ];
   e.directory.insertSheet("reservations").rows = [["staff_code", "service_code", "reservation_date", "start_time", "end_time", "status"]];
   e.directory.insertSheet("staff_shift_publications").rows = [["store_code", "target_month", "status"]];
-  function loginTrial(i = 0) {
-    const request = e.call("request9RoundTrialCode", { email: "trial" + i + "@example.invalid" });
-    if (!request.ok) throw Error(JSON.stringify(request));
-    const code = e.sent.at(-1).body.match(/は (\d{6})/)[1];
-    const verified = e.call("verify9RoundTrialCode", { challenge_id: request.data.challenge_id, code });
-    if (!verified.ok) throw Error(JSON.stringify(verified));
-    return verified.data.session_token;
-  }
-  return Object.assign(e, { loginTrial });
+  function applicant(i = 0) { return "trial" + i + "@example.invalid"; }
+  return Object.assign(e, { applicant });
 }
-function payload(session, extra = {}) {
-  return { session_token: session, request_id: "test-trial-request-0001", name: "体験 太郎", phone: "09012345678", party_size: 1,
+function payload(email, extra = {}) {
+  return { email, request_id: "test-trial-request-" + email.split("@")[0], name: "体験 太郎", phone: "09012345678", party_size: 1,
     consent: true, date: "2026-10-18", slot_id: "TRIAL:2026-10-18:10:15", ...extra };
 }
 module.exports = { fixture, payload };

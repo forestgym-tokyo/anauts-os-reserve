@@ -2,7 +2,7 @@
   "use strict";
   const q = function (id) { return document.getElementById(id); };
   const api = window.NineRoundBookingApi;
-  const state = { schedule: null, date: "", slot: null, week: 0, busy: false, challenge: "", session: "", request: "", application: null, details: null };
+  const state = { schedule: null, date: "", slot: null, week: 0, busy: false, request: "", submission: "", application: null };
   let loadSequence = 0;
   const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
   function dateObject(date) { return new Date(date + "T12:00:00+09:00"); }
@@ -14,9 +14,8 @@
   function step(n) { document.querySelectorAll("[data-step]").forEach(function (el) { el.classList.toggle("is-current", Number(el.dataset.step) === n); }); }
   function setBusy(value) {
     state.busy = value;
-    q("sendCode").disabled = value || !state.slot;
-    q("confirmBooking").disabled = value;
-    q("editDetails").disabled = value;
+    q("submitBooking").disabled = value || !state.slot;
+    q("detailsFields").disabled = value || !state.slot;
     q("previousWeek").disabled = value || !state.schedule || state.week === 0;
     q("nextWeek").disabled = value || !state.schedule || addDays(state.schedule.range.from, (state.week + 1) * 7) > state.schedule.range.to;
     q("reloadSchedule").disabled = value;
@@ -68,11 +67,11 @@
     setBusy(state.busy);
   }
   function chooseSlot(slot) {
-    state.slot = slot; state.request = "";
+    state.slot = slot;
     q("selection").replaceChildren();
     const content = node("div"); content.append(node("p", "", shortDate(slot.date)), node("strong", "", slot.start_time + " 開始"));
     q("selection").append(node("span", "selection-icon", "✓"), content);
-    q("detailsFields").disabled = false; q("sendCode").disabled = false;
+    q("detailsFields").disabled = false; q("submitBooking").disabled = false;
     q("partySize").options[1].disabled = slot.remaining < 2;
     if (Number(q("partySize").value) > slot.remaining) { q("partySize").value = "1"; syncParty(); }
     step(2); notice(""); renderSchedule();
@@ -108,38 +107,22 @@
       party_size: Number(q("partySize").value), companion_name: q("partySize").value === "2" ? q("companionName").value.trim() : "",
       consent: q("consent").checked, website: q("website").value };
   }
-  async function sendCode(event) {
+  async function submitBooking(event) {
     event.preventDefault();
     if (state.busy || !state.slot || !q("applicationForm").reportValidity()) return;
-    state.details = collectDetails(); state.session = ""; state.request = ""; setBusy(true); notice("");
-    q("sendCode").textContent = "確認コードを送信しています…";
-    try {
-      const result = await api("request9RoundTrialCode", { email: state.details.email, website: state.details.website });
-      state.challenge = result.challenge_id;
-      q("applicationForm").hidden = true; q("verificationForm").hidden = false;
-      q("verificationEmail").textContent = state.details.email + " にお送りしました。有効期限は10分です。";
-      q("code").value = ""; q("code").focus();
-    } catch (error) { notice(errorMessage(error), true); }
-    finally { q("sendCode").textContent = "メールで確認コードを受け取る →"; setBusy(false); }
-  }
-  async function confirmBooking(event) {
-    event.preventDefault();
-    if (state.busy || !state.slot || !q("verificationForm").reportValidity()) return;
+    const details = collectDetails(), submission = JSON.stringify([details, state.slot.date, state.slot.slot_id]);
+    // Reuse the same request after an uncertain network result, even if the user
+    // selects the same slot again. Changed details start a separate submission.
+    if (submission !== state.submission) { state.request = crypto.randomUUID(); state.submission = submission; }
     setBusy(true); notice(""); beginFeedback("予約しています…", shortDate(state.slot.date) + " " + state.slot.start_time + " 開始");
     try {
-      if (!state.session) {
-        const verified = await api("verify9RoundTrialCode", { challenge_id: state.challenge, code: q("code").value });
-        state.session = verified.session_token;
-      }
-      if (!state.request) state.request = crypto.randomUUID();
-      const result = await api("create9RoundTrialBooking", Object.assign({}, state.details, { session_token: state.session,
+      const result = await api("create9RoundTrialBooking", Object.assign({}, details, {
         request_id: state.request, date: state.slot.date, slot_id: state.slot.slot_id }));
       renderResult(result);
       finishFeedback("体験予約が完了しました", result.notification_pending ? "予約は確定しています。確認メールは送信待ちです。" : "確認メールをお送りしました。");
-      state.session = ""; state.challenge = "";
     } catch (error) {
-      if (error.code === "TRIAL_SESSION_EXPIRED") state.session = "";
       finishFeedback(error.code ? "予約を完了できませんでした" : "予約結果を確認できませんでした", errorMessage(error) + (!error.code ? "\n同じ申込は再度押しても重複しません。確認メールもご確認ください。" : ""), true);
+      if (["TRIAL_UNAVAILABLE", "TRIAL_FULL"].indexOf(error.code) >= 0) await loadSchedule(true);
     } finally { setBusy(false); }
   }
   function renderResult(result) {
@@ -181,9 +164,8 @@
     } catch (error) { finishFeedback("操作結果をご確認ください", errorMessage(error), true); }
     finally { setBusy(false); }
   }
-  q("applicationForm").addEventListener("submit", sendCode); q("verificationForm").addEventListener("submit", confirmBooking);
+  q("applicationForm").addEventListener("submit", submitBooking);
   q("partySize").addEventListener("change", syncParty);
-  q("editDetails").addEventListener("click", function () { if (state.busy) return; q("verificationForm").hidden = true; q("applicationForm").hidden = false; state.challenge = ""; state.session = ""; notice(""); });
   q("previousWeek").addEventListener("click", function () { if (!state.busy && state.week > 0) { state.week--; renderSchedule(); } });
   q("nextWeek").addEventListener("click", function () { if (!state.busy) { state.week++; renderSchedule(); } });
   q("reloadSchedule").addEventListener("click", function () { if (!state.busy) loadSchedule(true); });
