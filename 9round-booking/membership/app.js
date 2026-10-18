@@ -14,7 +14,9 @@
     model.plans.forEach(function (plan) {
       const label = el("label", "plan-choice"), radio = document.createElement("input");
       radio.type = "radio"; radio.name = "membership_plan"; radio.value = plan.id; radio.checked = plan.id === state.plan; radio.disabled = !open;
-      const card = el("span", "plan-card"); card.append(el("span", "plan-radio", "✓"), el("span", "plan-kicker", plan.english), el("h3", "", plan.name));
+      const card = el("span", "plan-card");
+      if (plan.campaign) card.append(el("span", "campaign-plan-label", "CAMPAIGN"));
+      card.append(el("span", "plan-radio", "✓"), el("span", "plan-kicker", plan.english), el("h3", "", plan.name));
       const price = el("span", "plan-price"), amount = el("strong", "", model.yen(plan.monthly).replace("円", "")); amount.append(el("span", "", "円")); price.append(el("small", "", "月額"), amount); card.append(price);
       card.append(el("span", "plan-badge" + (plan.campaign ? "" : " standard"), plan.campaign ? "基本料金 永久" + plan.discount + "%OFF" : "通常プラン"));
       const costs = el("dl", "plan-costs"); row(costs, "初期費用", model.yen(plan.initial)); row(costs, "9Rグローブ", model.yen(plan.gloves)); card.append(costs);
