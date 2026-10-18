@@ -4,12 +4,16 @@
   const policy = document.permissionsPolicy || document.featurePolicy;
   const cameraAllowed = !policy || typeof policy.allowsFeature !== "function" || policy.allowsFeature("camera");
   let root, stream = null, timer = null, scanning = false, busy = false, date = "", lastSeen = "", generation = 0;
+  let imageBusy = false, imageGeneration = 0, selectedImage = null, imageUrl = "";
   const q = function (s) { return root.querySelector(s); };
   function active() { return !!auth.idToken && date === window.NineRoundTokyoDate(); }
-  function notice(text, error) { q("#nrScanResult").textContent = text || ""; q("#nrScanResult").classList.toggle("is-error", !!error); }
+  function notice(text, error) { q("#nrScanResult").textContent = text || ""; q("#nrScanResult").classList.toggle("is-error", !!error); return { message: text, error: !!error }; }
+  function imageNotice(text, error) { q("#nrQrImageStatus").textContent = text || ""; q("#nrQrImageStatus").classList.toggle("is-error", !!error); q("#nrQrImageStatus").hidden = !text; }
   function controls() {
     if (!root) return;
-    root.querySelectorAll("button,input,select").forEach(function (el) { el.disabled = !active() || busy; });
+    root.querySelectorAll("button,input,select").forEach(function (el) { el.disabled = !active() || busy || imageBusy; });
+    q("#nrQrImageRetry").disabled = !active() || busy || imageBusy || !selectedImage;
+    q("#nrQrImage").setAttribute("aria-busy", String(imageBusy || busy));
     q("#nrCameraStart").hidden = scanning || !cameraAllowed; q("#nrCameraStop").hidden = !scanning;
     q("#nrCameraAvailability").hidden = cameraAllowed;
   }
@@ -22,29 +26,87 @@
   async function submit(text) {
     if (!active() || busy) return;
     text = String(text || "").trim(); q("#nrQrInput").value = "";
-    if (!/^NR9:[a-f0-9]{64}$/.test(text)) { notice("9ROUNDの会員QRを読み取ってください。", true); return; }
+    if (!/^NR9:[a-f0-9]{64}$/.test(text)) return notice("9ROUNDの会員QRを読み取ってください。", true);
     const identity = auth.generation, slot = q("#nrScanSlot").value, ownDate = date;
-    if (!slot) { notice("受講登録する枠を選んでください。", true); return; }
+    if (!slot) return notice("受講登録する枠を選んでください。", true);
     busy = true; controls(); notice("予約を確認して受講登録しています…");
     try {
       const data = await auth.request("checkIn9RoundMember", { date: ownDate, slot_id: slot, qr_text: text });
-      if (!auth.idToken || identity !== auth.generation) return;
-      notice(data.member_name + " 様 · " + data.start_time + (data.already_attended ? " は登録済みです。" : " を受講済みにしました。"));
+      if (!auth.idToken || identity !== auth.generation || ownDate !== date) return;
+      const result = notice(data.member_name + " 様 · " + data.start_time + (data.already_attended ? " は登録済みです。" : " を受講済みにしました。"));
       scanner.onRegistered();
-    } catch (error) { if (auth.idToken && identity === auth.generation) notice(error.message, true); }
+      return result;
+    } catch (error) { if (auth.idToken && identity === auth.generation && ownDate === date) return notice(error.message, true); }
     finally { if (identity === auth.generation) { busy = false; controls(); } }
   }
-  function decode(image, width, height) {
-    const scale = Math.min(1, 1000 / Math.max(width, height));
+  function decode(image, width, height, maximum) {
+    const scale = Math.min(1, (maximum || 1000) / Math.max(width, height));
     const canvas = q("#nrScanCanvas"); canvas.width = Math.max(1, Math.round(width * scale)); canvas.height = Math.max(1, Math.round(height * scale));
-    const ctx = canvas.getContext("2d", { willReadFrequently: true }); ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx || typeof window.jsQR !== "function") throw new Error("QR読み取り機能を準備できませんでした。画面を更新して、もう一度画像を選択してください。");
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
     const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    return window.jsQR(pixels.data, pixels.width, pixels.height, { inversionAttempts: "dontInvert" });
+    return window.jsQR(pixels.data, pixels.width, pixels.height, { inversionAttempts: maximum ? "attemptBoth" : "dontInvert" });
+  }
+  function resetImage() {
+    imageGeneration++; imageBusy = false; selectedImage = null;
+    if (imageUrl) URL.revokeObjectURL(imageUrl);
+    imageUrl = "";
+    q("#nrQrImage").value = "";
+    q("#nrQrImagePreview").removeAttribute("src"); q("#nrQrImagePreview").hidden = true;
+    q("#nrQrImageRetry").hidden = true; imageNotice("");
+  }
+  async function readImage(file) {
+    if (!file) return;
+    if (!active()) { imageNotice("本日の予約に切り替えてから、QR画像を選択してください。", true); return; }
+    if (busy || imageBusy) return;
+    selectedImage = file;
+    const identity = auth.generation, ownDate = date, task = ++imageGeneration;
+    const current = function () { return active() && identity === auth.generation && ownDate === date && task === imageGeneration; };
+    if (imageUrl) URL.revokeObjectURL(imageUrl);
+    imageUrl = "";
+    q("#nrQrImagePreview").removeAttribute("src"); q("#nrQrImagePreview").hidden = true;
+    q("#nrQrImageRetry").hidden = false;
+    if (file.size > 12 * 1024 * 1024) { imageNotice("12MB以内のQR画像を選択してください。", true); controls(); return; }
+    imageBusy = true; stop(); controls();
+    imageNotice("選択した画像を読み込んでいます…"); notice("QR画像を読み込んでいます…");
+    let url = "";
+    try {
+      url = URL.createObjectURL(file); imageUrl = url;
+      const image = await new Promise(function (resolve, reject) {
+        const img = new Image();
+        const timeout = setTimeout(function () { reject(new Error("画像の読み込みに時間がかかっています。同じ画像を再読み取りするか、別の画像を選択してください。")); }, 15000);
+        img.onload = function () { clearTimeout(timeout); resolve(img); };
+        img.onerror = function () { clearTimeout(timeout); reject(new Error("画像を開けませんでした。QRを表示した画面のスクリーンショット、またはPNG・JPEG画像を選択してください。")); };
+        img.src = url;
+      });
+      if (!current()) return;
+      q("#nrQrImagePreview").src = url; q("#nrQrImagePreview").hidden = false;
+      imageNotice("QR画像を読み取っています…");
+      let code = null;
+      for (const maximum of [1000, 1800, 2400]) {
+        await new Promise(function (resolve) { setTimeout(resolve, 0); });
+        if (!current()) return;
+        code = decode(image, image.naturalWidth, image.naturalHeight, maximum);
+        if (code) break;
+      }
+      if (!code) throw new Error("QRが見つかりません。QR全体を大きく表示したスクリーンショットを選択してください。");
+      if (!current()) return;
+      imageNotice("QRを読み取りました。予約を確認して受講登録しています…");
+      imageBusy = false;
+      const result = await submit(code.data);
+      if (current() && result) imageNotice(result.message, result.error);
+    } catch (error) {
+      if (current()) { const message = error.message || "画像を読み取れませんでした。別の画像を選択してください。"; imageNotice(message, true); notice(message, true); }
+    } finally {
+      if (task === imageGeneration) { imageBusy = false; controls(); }
+      if (url && imageUrl !== url) URL.revokeObjectURL(url);
+    }
   }
   function frame() {
     if (!scanning || !active()) { stop(); return; }
     const video = q("#nrCameraVideo");
-    if (!busy && video.readyState >= 2) {
+    if (!busy && !imageBusy && video.readyState >= 2) {
       try {
         const code = decode(video, video.videoWidth, video.videoHeight);
         if (code && code.data !== lastSeen) { lastSeen = code.data; submit(code.data); }
@@ -53,7 +115,7 @@
     timer = setTimeout(frame, 250);
   }
   async function start() {
-    if (!active() || busy || scanning) return;
+    if (!active() || busy || imageBusy || scanning) return;
     const identity = auth.generation, ownGeneration = ++generation;
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error("camera-unavailable");
@@ -78,7 +140,10 @@
         '<div class="nr-toolbar"><button id="nrCameraStart" type="button" class="nr-primary">カメラで読み取る</button><button id="nrCameraStop" type="button" hidden>カメラを停止</button><button id="nrScanNext" type="button">同じQRをもう一度</button></div>' +
         '<p id="nrCameraAvailability" hidden>この画面では保存済みのQR画像の選択、または店舗のQRリーダーをご利用ください。</p>' +
         '<video id="nrCameraVideo" autoplay playsinline muted hidden></video><canvas id="nrScanCanvas" hidden></canvas>' +
-        '<label>保存済みのQR画像を選択<input id="nrQrImage" type="file" accept="image/*"></label>' +
+        '<label>保存済みのQR画像を選択<input id="nrQrImage" type="file" accept="image/*" aria-describedby="nrQrImageStatus"></label>' +
+        '<p id="nrQrImageStatus" class="nr-message" role="status" aria-live="polite" hidden></p>' +
+        '<img id="nrQrImagePreview" alt="選択したQR画像" style="max-width:240px;max-height:300px;width:auto;height:auto;margin:12px 0;background:#fff" hidden>' +
+        '<button id="nrQrImageRetry" type="button" hidden>同じ画像を再読み取り</button>' +
         '<form id="nrQrForm"><label for="nrQrInput">店舗のQRリーダーで読み取る</label><div class="nr-reader-input"><input id="nrQrInput" type="text" autocomplete="off" maxlength="80" placeholder="ここを選択してQRを読み取ってください" required><button type="submit">受講登録</button></div></form>' +
         '<div id="nrScanResult" class="nr-message" role="status" aria-live="polite"></div>';
       container.append(root);
@@ -86,21 +151,8 @@
       q("#nrScanNext").addEventListener("click", function () { lastSeen = ""; q("#nrQrInput").focus(); });
       q("#nrScanSlot").addEventListener("change", function () { lastSeen = ""; notice(""); });
       q("#nrQrForm").addEventListener("submit", function (event) { event.preventDefault(); submit(q("#nrQrInput").value); });
-      q("#nrQrImage").addEventListener("change", async function () {
-        const file = q("#nrQrImage").files[0], identity = auth.generation;
-        q("#nrQrImage").value = "";
-        if (!file || !active() || busy) return;
-        if (file.size > 12 * 1024 * 1024) { notice("12MB以内のQR画像を選択してください。", true); return; }
-        const url = URL.createObjectURL(file);
-        try {
-          const image = await new Promise(function (resolve, reject) { const img = new Image(); img.onload = function () { resolve(img); }; img.onerror = reject; img.src = url; });
-          if (!active() || identity !== auth.generation) return;
-          const code = decode(image, image.naturalWidth, image.naturalHeight);
-          if (!code) { notice("QRが見つかりません。QR全体が入った画像を選択してください。", true); return; }
-          await submit(code.data);
-        } catch (_) { if (auth.idToken && identity === auth.generation) notice("画像を読み取れませんでした。別の画像を選択してください。", true); }
-        finally { URL.revokeObjectURL(url); }
-      });
+      q("#nrQrImage").addEventListener("change", function () { return readImage(q("#nrQrImage").files[0]); });
+      q("#nrQrImageRetry").addEventListener("click", function () { return readImage(selectedImage); });
       document.addEventListener("visibilitychange", function () { if (document.hidden) stop(); });
       window.addEventListener("pagehide", stop);
       controls();
@@ -108,7 +160,7 @@
     sync: function (slots, value) {
       if (!root) return;
       const previous = date === value ? q("#nrScanSlot").value : "";
-      if (date !== value) { stop(); lastSeen = ""; }
+      if (date !== value) { resetImage(); stop(); lastSeen = ""; }
       date = value; q("#nrScanSlot").replaceChildren();
       const daily = slots.filter(function (s) { return s.kind === "DAILY"; });
       daily.forEach(function (s) { const option = document.createElement("option"); option.value = s.slot_id; option.textContent = s.start_time; q("#nrScanSlot").append(option); });
@@ -117,6 +169,6 @@
       if (!active()) notice("受講登録する場合は、予約日を本日に切り替えてください。");
       controls();
     },
-    reset: function () { if (!root) return; stop(); busy = false; date = ""; lastSeen = ""; q("#nrQrInput").value = ""; q("#nrQrImage").value = ""; q("#nrScanCanvas").width = 1; q("#nrScanCanvas").height = 1; q("#nrScanSlot").replaceChildren(); notice(""); controls(); }
+    reset: function () { if (!root) return; resetImage(); stop(); busy = false; date = ""; lastSeen = ""; q("#nrQrInput").value = ""; q("#nrScanCanvas").width = 1; q("#nrScanCanvas").height = 1; q("#nrScanSlot").replaceChildren(); notice(""); controls(); }
   };
 })();
