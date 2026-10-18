@@ -3,6 +3,7 @@
   const q = function (s) { return document.querySelector(s); };
   const api = window.NineRoundBookingApi;
   const tools = window.NineRoundMemberTools;
+  const fighter = window.NineRoundFighter;
   const storageKey = "nr_booking_session_v1";
   let token = "", challenge = "", busy = false, sequence = 0;
   let range = { from: window.NineRoundTokyoDate(), to: "" };
@@ -68,10 +69,17 @@
       q("#previousDate").disabled = q("#bookingDate").value <= range.from;
       q("#nextDate").disabled = !!range.to && q("#bookingDate").value >= range.to;
     }
-    document.querySelectorAll("[data-book]").forEach(function (button) {
-      button.disabled = value || button.dataset.available !== "true";
-    });
+    updateBookingButtons();
     document.querySelectorAll("[data-cancel]").forEach(function (button) { button.disabled = value; });
+  }
+  function updateBookingButtons() {
+    const needsFighter = !fighter.registered && !tools.changing;
+    document.querySelectorAll("[data-book]").forEach(function (button) {
+      button.disabled = busy || needsFighter || button.dataset.available !== "true";
+    });
+    q(".tap-guide").textContent = needsFighter
+      ? "予約にはファイターネームの登録が必要です。上の登録欄で入力して保存してください。"
+      : "空いている枠をタップすると予約が完了します。";
   }
   function dayLabel(date, weekday) {
     return new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", month: "long", day: "numeric", weekday: weekday || "long" }).format(new Date(date + "T12:00:00+09:00"));
@@ -90,7 +98,7 @@
     button.type = "button";
     button.dataset.book = slot.slot_id;
     button.dataset.available = String(slot.available && (!limitReached || !!tools.changing));
-    button.disabled = button.dataset.available !== "true";
+    button.disabled = button.dataset.available !== "true" || (!fighter.registered && !tools.changing);
     button.append(element("span", "slot-time", slot.start_time));
     const count = element("span", "slot-count", "予約済み");
     count.append(element("b", "", slot.booked_count + " / " + slot.capacity + "名"));
@@ -148,6 +156,7 @@
   }
   async function reserve(slot, button) {
     if (busy || !token || !slot.available) return;
+    if (!tools.changing && !fighter.requireRegistration()) return;
     const ownToken = token, date = lastDate;
     const changing = tools.changing;
     setBusy(true); message("");
@@ -209,6 +218,7 @@
   }
   tools.onError = handleError;
   window.NineRoundFighter.onError = handleError;
+  fighter.onChange = updateBookingButtons;
   tools.onMessage = message;
   tools.reload = function () { return loadSlots(false); };
   tools.cancel = cancelBooking;
@@ -253,7 +263,7 @@
   });
   q("#bookingDate").value = range.from; q("#bookingDate").min = range.from;
   q("#bookingDate").addEventListener("change", function () { if (!busy && q("#bookingDate").value) loadSlots(true); });
-  q("#reload").addEventListener("click", function () { if (!busy) Promise.all([loadSlots(true), tools.refresh()]); });
+  q("#reload").addEventListener("click", function () { if (!busy) Promise.all([loadSlots(true), tools.refresh(), fighter.refresh()]); });
   function moveDate(offset) {
     if (busy) return;
     const date = new Date(q("#bookingDate").value + "T12:00:00+09:00");

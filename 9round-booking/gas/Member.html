@@ -147,9 +147,9 @@ body.has-booking-feedback{overflow:hidden}
 
     <section id="bookingPanel" class="panel booking-panel" hidden>
       <div class="verified-bar"><span><i aria-hidden="true">✓</i> 本人確認済み</span><button id="logout" type="button" class="text-button">ログアウト</button></div>
-      <details id="fighterPanel" class="member-details"><summary id="fighterSummary">ファイター登録</summary>
-        <p class="hint">あなたのファイターネームを登録してください。登録後も、ここからいつでも変更できます。</p>
-        <form id="fighterForm"><label for="fighterName">ファイターネーム（1〜24文字）</label><input id="fighterName" name="fighter_name" type="text" autocomplete="nickname" maxlength="48" placeholder="あなたのファイターネーム" required><button id="fighterSave" class="primary" type="submit">ファイター登録する →</button></form>
+      <details id="fighterPanel" class="member-details"><summary id="fighterSummary">ファイター登録（必須）</summary>
+        <p class="hint">予約にはファイターネームの登録が必須です。入力して保存してください。登録後も、ここからいつでも変更できます。</p>
+        <form id="fighterForm"><label for="fighterName">ファイターネーム（必須・1〜24文字）</label><input id="fighterName" name="fighter_name" type="text" autocomplete="nickname" maxlength="48" placeholder="あなたのファイターネーム" required><button id="fighterSave" class="primary" type="submit">ファイター登録する →</button></form>
         <p id="fighterStatus" class="hint" role="status" aria-live="polite"></p>
       </details>
       <details id="memberPassPanel" class="member-details"><summary>会員QRを表示（店舗で提示）</summary>
@@ -348,37 +348,61 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 (function () {
   "use strict";
   const q = function (s) { return document.querySelector(s); };
-  let token = "", sequence = 0, saving = false;
+  let token = "", sequence = 0, saving = false, registered = false;
   const fighter = window.NineRoundFighter = {
     onError: function () {},
+    onChange: function () {},
+    get registered() { return registered; },
+    refresh: function () { if (token && !saving) return load(); },
+    requireRegistration: function () {
+      if (registered) return true;
+      q("#fighterPanel").open = true;
+      q("#fighterName").focus();
+      return false;
+    },
     authenticate: function (value) {
       if (token === value) return;
-      token = value; sequence++; saving = false;
+      token = value; sequence++; saving = false; registered = false;
       q("#fighterGreeting").textContent = ""; q("#fighterGreeting").hidden = true;
       q("#fighterForm").reset(); q("#fighterStatus").textContent = "";
-      q("#fighterPanel").open = false; q("#fighterSummary").textContent = "ファイター登録";
+      q("#fighterPanel").open = !!token; q("#fighterSummary").textContent = "ファイター登録（必須）";
       q("#fighterSave").textContent = "ファイター登録する →"; q("#fighterSave").disabled = false;
+      fighter.onChange();
       if (token) load();
     }
   };
   function render(data) {
+    registered = !!data.registered;
     q("#fighterGreeting").textContent = data.display_name + "さん、";
     q("#fighterGreeting").hidden = false;
     q("#fighterName").value = data.fighter_name;
-    q("#fighterSummary").textContent = data.registered ? "ファイターネームを変更" : "ファイター登録";
+    q("#fighterSummary").textContent = data.registered ? "ファイターネームを変更" : "ファイター登録（必須）";
     q("#fighterSave").textContent = data.registered ? "ファイターネームを変更する →" : "ファイター登録する →";
+    fighter.onChange();
   }
   async function load() {
     const ownToken = token, seq = ++sequence;
+    q("#fighterStatus").textContent = "登録情報を確認しています…";
     try {
       const data = await window.NineRoundBookingApi("get9RoundFighterProfile", { session_token: ownToken });
       if (token !== ownToken || seq !== sequence) return;
       render(data); q("#fighterPanel").open = !data.registered;
-    } catch (error) { if (token === ownToken && seq === sequence) fighter.onError(error); }
+      q("#fighterStatus").textContent = data.registered ? "" : "予約にはファイターネームの登録が必要です。入力して保存してください。";
+    } catch (error) {
+      if (token === ownToken && seq === sequence) {
+        q("#fighterStatus").textContent = "登録情報を確認できませんでした。「再読込」からもう一度お試しください。";
+        fighter.onError(error);
+      }
+    }
   }
   q("#fighterForm").addEventListener("submit", async function (event) {
     event.preventDefault();
     if (!token || saving) return;
+    if (!q("#fighterName").value.trim()) {
+      q("#fighterStatus").textContent = "ファイターネームを入力してください。";
+      q("#fighterName").focus();
+      return;
+    }
     const ownToken = token, seq = ++sequence;
     saving = true; q("#fighterSave").disabled = true; q("#fighterStatus").textContent = "保存しています…";
     try {
@@ -511,6 +535,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   const q = function (s) { return document.querySelector(s); };
   const api = window.NineRoundBookingApi;
   const tools = window.NineRoundMemberTools;
+  const fighter = window.NineRoundFighter;
   const storageKey = "nr_booking_session_v1";
   let token = "", challenge = "", busy = false, sequence = 0;
   let range = { from: window.NineRoundTokyoDate(), to: "" };
@@ -576,10 +601,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       q("#previousDate").disabled = q("#bookingDate").value <= range.from;
       q("#nextDate").disabled = !!range.to && q("#bookingDate").value >= range.to;
     }
-    document.querySelectorAll("[data-book]").forEach(function (button) {
-      button.disabled = value || button.dataset.available !== "true";
-    });
+    updateBookingButtons();
     document.querySelectorAll("[data-cancel]").forEach(function (button) { button.disabled = value; });
+  }
+  function updateBookingButtons() {
+    const needsFighter = !fighter.registered && !tools.changing;
+    document.querySelectorAll("[data-book]").forEach(function (button) {
+      button.disabled = busy || needsFighter || button.dataset.available !== "true";
+    });
+    q(".tap-guide").textContent = needsFighter
+      ? "予約にはファイターネームの登録が必要です。上の登録欄で入力して保存してください。"
+      : "空いている枠をタップすると予約が完了します。";
   }
   function dayLabel(date, weekday) {
     return new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", month: "long", day: "numeric", weekday: weekday || "long" }).format(new Date(date + "T12:00:00+09:00"));
@@ -598,7 +630,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     button.type = "button";
     button.dataset.book = slot.slot_id;
     button.dataset.available = String(slot.available && (!limitReached || !!tools.changing));
-    button.disabled = button.dataset.available !== "true";
+    button.disabled = button.dataset.available !== "true" || (!fighter.registered && !tools.changing);
     button.append(element("span", "slot-time", slot.start_time));
     const count = element("span", "slot-count", "予約済み");
     count.append(element("b", "", slot.booked_count + " / " + slot.capacity + "名"));
@@ -656,6 +688,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   }
   async function reserve(slot, button) {
     if (busy || !token || !slot.available) return;
+    if (!tools.changing && !fighter.requireRegistration()) return;
     const ownToken = token, date = lastDate;
     const changing = tools.changing;
     setBusy(true); message("");
@@ -717,6 +750,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   }
   tools.onError = handleError;
   window.NineRoundFighter.onError = handleError;
+  fighter.onChange = updateBookingButtons;
   tools.onMessage = message;
   tools.reload = function () { return loadSlots(false); };
   tools.cancel = cancelBooking;
@@ -761,7 +795,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   });
   q("#bookingDate").value = range.from; q("#bookingDate").min = range.from;
   q("#bookingDate").addEventListener("change", function () { if (!busy && q("#bookingDate").value) loadSlots(true); });
-  q("#reload").addEventListener("click", function () { if (!busy) Promise.all([loadSlots(true), tools.refresh()]); });
+  q("#reload").addEventListener("click", function () { if (!busy) Promise.all([loadSlots(true), tools.refresh(), fighter.refresh()]); });
   function moveDate(offset) {
     if (busy) return;
     const date = new Date(q("#bookingDate").value + "T12:00:00+09:00");

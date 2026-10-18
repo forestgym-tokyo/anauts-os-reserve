@@ -133,13 +133,17 @@ function environment(options = {}) {
   if (options.realStaffAuth) vm.runInContext(read("9round-booking/gas/StaffAuth.gs"), context);
   if (!options.noSetup) context.setup9RoundBookingStorage_();
   function call(action, body = {}) { const result = context.round9BookingApi_(action, body); assert.equal(locked, false, "lock must be released on all paths"); return plain(result); }
-  function login(i = 0) {
+  function login(i = 0, registerFighter = true) {
     const email = "member" + i + "@example.invalid";
     const challenge = call("request9RoundBookingCode", { email });
     assert.equal(challenge.ok, true, JSON.stringify(challenge));
     const code = sent.at(-1).body.match(/は (\d{6})/)[1];
     const verified = call("verify9RoundBookingCode", { challenge_id: challenge.data.challenge_id, code });
     assert.equal(verified.ok, true, JSON.stringify(verified));
+    if (registerFighter) {
+      const saved = call("save9RoundFighterProfile", { session_token: verified.data.session_token, fighter_name: "FIGHTER " + i });
+      assert.equal(saved.ok, true, JSON.stringify(saved));
+    }
     return verified.data.session_token;
   }
   return { context, properties, data, master, directory, sent, opens, writes, call, login,
@@ -238,6 +242,8 @@ test("ok_unfinished members receive an OTP, can reserve and use their own QR", (
     assert.equal(verified.ok, true, status);
     const token = verified.data.session_token;
     assert.equal(e.call("get9RoundWorkoutSlots", { session_token: token, date: day }).ok, true, status);
+    assert.equal(reserve(e, token).code, "FIGHTER_NAME_REQUIRED", status);
+    assert.equal(e.call("save9RoundFighterProfile", { session_token: token, fighter_name: "SOGA FIGHTER" }).ok, true, status);
     assert.equal(reserve(e, token).ok, true, status);
     assert.equal(e.call("get9RoundMemberPass", { session_token: token }).ok, true, status);
   }
@@ -774,7 +780,7 @@ test("development upgrade adds only missing tables and preserves existing reserv
 });
 
 test("fighters register and rename only their own profile without changing the member master", () => {
-  const e = environment(), token = e.login(), other = e.login(1), masterBefore = plain(e.master.sheets.get("Members").rows);
+  const e = environment(), token = e.login(0, false), other = e.login(1, false), masterBefore = plain(e.master.sheets.get("Members").rows);
   assert.deepEqual(e.call("get9RoundFighterProfile", { session_token: token }).data,
     { fighter_name: "", display_name: "テスト会員0", registered: false });
   assert.equal(e.call("save9RoundFighterProfile", { session_token: token, member_no: "1000001", fighter_name: "  ソガの虎  " }).data.fighter_name, "ソガの虎");
@@ -785,6 +791,36 @@ test("fighters register and rename only their own profile without changing the m
   assert.deepEqual(plain(e.master.sheets.get("Members").rows), masterBefore);
   assert.ok(e.writes.every(name => name.startsWith("nr_")));
   for (const action of ["get9RoundFighterProfile", "save9RoundFighterProfile"]) assert.equal(e.call(action, { fighter_name: "forged", member_no: "1000000" }).code, "SESSION_EXPIRED");
+});
+
+test("new bookings require a saved fighter profile owned by the current authenticated member", () => {
+  const e = environment(), token = e.login(0, false);
+  e.login(1);
+  const bookingRows = plain(e.data.sheets.get("nr_bookings").rows), mailCount = e.sent.length;
+  const masterBefore = plain(e.master.sheets.get("Members").rows);
+  assert.equal(reserve(e, token, slotId, day, { member_no: "1000001", fighter_name: "FORGED" }).code, "FIGHTER_NAME_REQUIRED");
+  assert.deepEqual(plain(e.data.sheets.get("nr_bookings").rows), bookingRows);
+  assert.equal(e.sent.length, mailCount, "rejected reservations must not send booking notifications");
+  assert.equal(e.call("get9RoundWorkoutSlots", { session_token: token, date: day }).ok, true);
+  assert.equal(e.call("save9RoundFighterProfile", { session_token: token, fighter_name: "　 " }).code, "INVALID_FIGHTER_NAME");
+  assert.equal(reserve(e, token).code, "FIGHTER_NAME_REQUIRED");
+  assert.equal(e.call("save9RoundFighterProfile", { session_token: token, fighter_name: "ソガの虎" }).ok, true);
+  const result = reserve(e, token);
+  assert.equal(result.ok, true);
+  assert.match(e.sent.at(-1).body, /ファイターネーム: ソガの虎/);
+  assert.deepEqual(plain(e.master.sheets.get("Members").rows), masterBefore);
+});
+
+test("members without a fighter profile can still manage their existing bookings", () => {
+  const e = environment(), token = e.login();
+  const result = reserve(e, token), id = result.data.booking_id;
+  e.data.sheets.get("nr_fighters").rows.splice(1);
+  assert.equal(reserve(e, token).data.booking_id, id, "retry of an existing booking stays idempotent");
+  assert.equal(e.call("get9RoundMemberBookings", { session_token: token }).ok, true);
+  const changed = e.call("reschedule9RoundWorkoutBooking", { session_token: token, booking_id: id, date: day, slot_id: "DAILY:" + day + ":11:00" });
+  assert.equal(changed.ok, true);
+  assert.equal(e.call("cancel9RoundWorkoutBooking", { session_token: token, booking_id: changed.data.booking_id }).ok, true);
+  assert.equal(reserve(e, token).code, "FIGHTER_NAME_REQUIRED");
 });
 
 test("fighter validation supports Japanese and emoji, blocks controls and protects Sheets and mail HTML", () => {

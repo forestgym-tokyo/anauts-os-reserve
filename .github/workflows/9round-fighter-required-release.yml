@@ -1,0 +1,82 @@
+name: 9ROUND require fighter registration release
+
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/9round-fighter-required-release.yml]
+  pull_request:
+    paths:
+      - 9round-booking/**
+      - tests/9round-booking.test.js
+      - tests/9round-fighter-required.browser.cjs
+      - .github/workflows/9round-fighter-required-release.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: 9round-booking-production
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify reservation behavior
+        run: node --test tests/9round-booking.test.js tests/9round-trial.test.js tests/9round-mpg-bridge.test.js
+      - name: Install isolated browser test driver
+        run: npm install --prefix "$RUNNER_TEMP/9round-fighter-browser" --no-package-lock --ignore-scripts playwright@1.51.1
+      - name: Verify required registration and cancellation in the browser
+        env:
+          ROUND9_PLAYWRIGHT_MODULE: ${{ runner.temp }}/9round-fighter-browser/node_modules/playwright
+          ROUND9_CHROMIUM_PATH: /usr/bin/google-chrome
+        run: |
+          node tests/9round-fighter-required.browser.cjs
+          node tests/9round-cancel-feedback.browser.cjs
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Prepare existing credentials for the existing 9ROUND project
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+        run: |
+          test -n "$CLASPRC_JSON" || (echo "CLASPRC_JSON is missing" && exit 1)
+          printf '%s' "$CLASPRC_JSON" > "$HOME/.clasprc.json"
+          mkdir .9round-live
+          node - <<'NODE'
+          const fs = require("fs");
+          fs.writeFileSync(".clasp.json", JSON.stringify({
+            scriptId: "1bMtNarNVT3JKIDA-w_vmWKD-jfaODvBRtEL6qNCQF3HQkg_qsl4yVifq",
+            rootDir: ".9round-live"
+          }));
+          NODE
+          printf '%s\n' 'node_modules/**' '.github/**' > .claspignore
+      - name: Pull and preserve current live source
+        run: npx -y @google/clasp@3.4.1 pull
+      - name: Apply only the fighter registration changes
+        run: node scripts/gas-9round-fighter-required-overlay.mjs
+      - name: Push the preserved live source with the validated patch
+        run: npx -y @google/clasp@3.4.1 push --force
+      - name: Update the existing public deployment
+        run: >-
+          npx -y @google/clasp@3.4.1 update-deployment
+          AKfycbzVxf1HKZgXet5XrZjqQbzQ47dH8vMISf1mdEE_AH4m3EABceonv1V2OG0jtuIJLvkq
+          -d "Require fighter name before new workout bookings (2026-10-19)"
+      - name: Remove credentials
+        if: always()
+        run: rm -f "$HOME/.clasprc.json" .clasp.json

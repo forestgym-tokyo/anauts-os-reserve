@@ -391,6 +391,9 @@ function nrCreate9RoundBooking_(config, body) {
       return r.slot_id === slot.slot_id && r.member_no === auth.member.no && r.status === "CONFIRMED";
     });
     if (mine) return { booking_id: mine.booking_id, already_booked: true };
+    if (!nrBookingFighterProfile_(config, auth.member).registered) {
+      nrBookingError_("FIGHTER_NAME_REQUIRED", "予約にはファイターネームの登録が必要です。登録してから予約してください。");
+    }
     if (slot.auto_hidden || slot.status !== "OPEN") nrBookingError_("SLOT_BLOCKED", "この時間は体験予約のため受付を終了しました。他の枠をお選びください。");
     if (nrBookingOutstanding_(config, auth.member.no, rows) >= NR_BOOKING.bookingLimit) {
       nrBookingError_("BOOKING_LIMIT", "未消化の予約は10コマまでです。予約の変更・取消は予約一覧から行えます。");
