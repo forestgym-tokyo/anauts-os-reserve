@@ -65,7 +65,7 @@
       notice("対象枠を確認し、会員QRをカメラにかざしてください。"); controls(); frame();
     } catch (_) {
       stop();
-      if (auth.idToken && identity === auth.generation) notice("この画面ではカメラを使えません。QRの撮影・画像選択か店舗のQRリーダーをご利用ください。", true);
+      if (auth.idToken && identity === auth.generation) notice("この画面ではカメラを使えません。保存済みのQR画像の選択か店舗のQRリーダーをご利用ください。", true);
     }
   }
   const scanner = window.NineRoundScanner = {
@@ -76,9 +76,9 @@
       root.innerHTML = '<h2>会員QRで受講登録</h2><p>本日の対象枠を選び、会員QRを読み取ると受講済みになります。</p>' +
         '<label>受講登録する枠<select id="nrScanSlot"></select></label>' +
         '<div class="nr-toolbar"><button id="nrCameraStart" type="button" class="nr-primary">カメラで読み取る</button><button id="nrCameraStop" type="button" hidden>カメラを停止</button><button id="nrScanNext" type="button">同じQRをもう一度</button></div>' +
-        '<p id="nrCameraAvailability" hidden>この画面ではQRの撮影・画像選択、または店舗のQRリーダーをご利用ください。</p>' +
+        '<p id="nrCameraAvailability" hidden>この画面では保存済みのQR画像の選択、または店舗のQRリーダーをご利用ください。</p>' +
         '<video id="nrCameraVideo" autoplay playsinline muted hidden></video><canvas id="nrScanCanvas" hidden></canvas>' +
-        '<label>QRを撮影・画像を選択<input id="nrQrImage" type="file" accept="image/*" capture="environment"></label>' +
+        '<label>保存済みのQR画像を選択<input id="nrQrImage" type="file" accept="image/*"></label>' +
         '<form id="nrQrForm"><label for="nrQrInput">店舗のQRリーダーで読み取る</label><div class="nr-reader-input"><input id="nrQrInput" type="text" autocomplete="off" maxlength="80" placeholder="ここを選択してQRを読み取ってください" required><button type="submit">受講登録</button></div></form>' +
         '<div id="nrScanResult" class="nr-message" role="status" aria-live="polite"></div>';
       container.append(root);
