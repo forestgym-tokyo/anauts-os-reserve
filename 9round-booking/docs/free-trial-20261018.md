@@ -39,9 +39,9 @@
 
 1. 新規`Trials.gs`、更新した`Booking.gs`・`SlotManagement.gs`・`Staff.html`を既存の独立9ROUND GASへ反映します。従来のGASファイルは削除しません。
 2. エディターから`prepare9RoundTrialStorage_()`を1回実行します。`nr_trial_challenges`・`nr_trial_sessions`・`nr_trial_contacts`・`nr_trial_applications`の不足分だけを追加します。既存の初期化・本番準備は再実行しません。
-3. 既存GASの実行アカウントが勤務予定の参照元を読み取れること、`staff_shifts`の列構成、実際の川上さんの勤務日時を確認します。参照元のデータには書き込みません。既存のMPG確定予約との時間重複は体験を受付停止にします。このPRではMPG予約側から体験予約を見る双方向連携は追加していません。
+3. 既存GASの実行アカウントが勤務予定の参照元を読み取れること、`staff_shifts`の列構成、実際の川上さんの勤務日時を確認します。参照元のデータには書き込みません。既存のMPG確定予約との時間重複は体験を受付停止にします。このPRではMPG予約側から体験予約を見る双方向連携は追加していません。**本番で体験受付を有効にする前に、体験予約済みのMPG勤務枠を48時間ルールの削除から保護し、MPG側の予約受付も体験との競合を確認する連携が必要です。**
 4. 公開ビルドに`trial/`を含めてGitHub Pagesへ反映します。`config.js`には確認済みの既存9ROUND API URLを設定します。
-5. テスト用のメール・架空情報で実メール受信、勤務予定、予約・変更・取消を確認します。テスト申込を取り消してから、最後に`ROUND9_TRIAL_ENABLED=true`として受付を開始します。
+5. MPG側の上記連携を反映後、テスト用のメール・架空情報で実メール受信、勤務予定、予約・変更・取消を確認します。テスト申込を取り消してから、最後に`ROUND9_TRIAL_ENABLED=true`として受付を開始します。
 
 ```bash
 node scripts/build-9round-gas-pages.mjs --staff-only
