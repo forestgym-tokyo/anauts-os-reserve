@@ -4,7 +4,7 @@
   // This view is intentionally read-only and never publishes or writes confirmed staff shifts.
   const PAGE_ID="sogaCandidateCalendarView";
   const NAV_ID="sogaCandidateCalendarNav";
-  const CAL={month:"2026-11",data:null,loading:false,requestSerial:0};
+  const CAL={month:"2026-11",mode:"assignments",data:null,loading:false,requestSerial:0};
   const q=s=>document.querySelector(s);
   const escapeHtml=value=>String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const manager=()=>["ADMIN","MANAGER"].includes(String((typeof state!=="undefined"&&state.authUser?.permission)||"").toUpperCase());
@@ -48,13 +48,16 @@
       .soga-preview-day-title{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:8px;color:#fff;font-weight:900;font-size:13px}
       .soga-preview-day-title small{font-size:10px;font-weight:700;color:#9fb5a4}
       .soga-preview-block{display:flex;align-items:center;gap:5px;padding:6px 5px;margin:4px 0;border:1px solid #355241;border-left:3px solid var(--soga-person-color,#80c88c);border-radius:6px;background:color-mix(in srgb,var(--soga-person-color,#80c88c) 18%,#172d22);min-width:0;white-space:nowrap;font-size:10px;color:#fff;line-height:1.35}
-      .soga-preview-block.confirmed{border-left-color:#f3bd68;background:#36311d}
+      .soga-preview-block.confirmed{border-left-color:var(--soga-person-color,#80c88c);background:color-mix(in srgb,var(--soga-person-color,#80c88c) 25%,#172d22)}
       .soga-preview-block.trial{border-left-color:#e4a0e8;background:#332337}
       .soga-preview-block time{font-weight:900;font-variant-numeric:tabular-nums;flex:0 0 auto;letter-spacing:-.2px}
       .soga-preview-block b{font-weight:800;text-overflow:ellipsis;overflow:hidden;min-width:0}
       .soga-preview-empty{color:#647b6b;font-size:11px;margin-top:10px}
       .soga-preview-alert{color:#e7ba73;font-weight:900;padding:14px 0}
       .soga-preview-counter{color:#a5b8ac;font-size:12px}
+      .soga-preview-selector{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0}
+      .soga-preview-selector button{background:#14291f;border:1px solid #355944;color:#c4d7c9;border-radius:9px;padding:9px 15px;font-weight:800;cursor:pointer}
+      .soga-preview-selector button.is-active{background:#25613b;border-color:#72d68e;color:#fff}
       .soga-preview-saved{border:1px solid #458563;background:#0e2b1b;border-radius:13px;padding:14px 16px;margin:12px 0;line-height:1.7}
       .soga-preview-saved strong{color:#fff;display:block;margin-bottom:9px;font-weight:900}
       .soga-preview-saved .soga-preview-linkrow{display:flex;flex-wrap:wrap;gap:9px}
@@ -82,7 +85,7 @@
     section.id=PAGE_ID;
     section.className="view";
     section.innerHTML=`
-      <div class="page-heading"><div><p class="eyebrow">9ROUND ARIO SOGA · MANAGEMENT ONLY</p><h1>9ROUND 希望シフト予定表</h1><p>勤務時間をひとまとまりにした、未確定候補の月間プレビューです。</p></div></div>
+      <div class="page-heading"><div><p class="eyebrow">9ROUND ARIO SOGA · MANAGEMENT ONLY</p><h1>9ROUND 希望シフト予定表</h1><p>勤務時間をまとめた未公開シフト案と、元の提出希望を切り替えて確認できます。</p></div></div>
       <div class="soga-preview-saved" id="sogaPreviewProposalLinks"><strong>2026年11月の均等配分シフト案（各時間帯1名・スタッフ別カラー）</strong><div class="soga-preview-linkrow"><a href="https://docs.google.com/spreadsheets/d/1YCMXS_ngE34QvZw0-P_sVuvteOjDmvbz7mAFH4W-jzA/edit#gid=20261125" target="_blank" rel="noopener noreferrer">11月シフト予定表を開く ↗</a><a href="https://docs.google.com/spreadsheets/d/1YCMXS_ngE34QvZw0-P_sVuvteOjDmvbz7mAFH4W-jzA/edit#gid=20261126" target="_blank" rel="noopener noreferrer">スタッフ別勤務時間 ↗</a><a href="https://docs.google.com/spreadsheets/d/1YCMXS_ngE34QvZw0-P_sVuvteOjDmvbz7mAFH4W-jzA/edit#gid=20261124" target="_blank" rel="noopener noreferrer">勤務明細 ↗</a></div><p>未確定・スタッフ非公開。11月1日は店休。11月26日16:15〜17:45の未配置箇所は要調整です。</p></div>
       <div class="soga-preview-head">
         <div class="soga-preview-status">管理者・マネージャー専用／スタッフへは未公開　　<span id="sogaPreviewState">希望候補（未確定）</span></div>
@@ -94,6 +97,7 @@
         <button id="sogaPreviewNext" type="button" aria-label="翌月">翌月 ›</button>
         <button id="sogaPreviewReload" type="button">更新</button>
       </div>
+      <div class="soga-preview-selector"><button id="sogaPreviewAssignments" type="button" class="is-active">シフト案（未公開）</button><button id="sogaPreviewWishes" type="button">提出希望をすべて見る</button></div>
       <div id="sogaPreviewContent" aria-live="polite"></div>
       <p class="soga-preview-status" style="margin-top:13px">前半 10:15〜14:00 ／ 後半 16:15〜20:45 ／ ＊後半 17:45〜20:45。全日希望は前半・後半の2行で表示します。ここでは確定・公開処理は行いません。</p>
     `;
@@ -102,6 +106,8 @@
     q("#sogaPreviewPrev").addEventListener("click",()=>nextMonth(-1));
     q("#sogaPreviewNext").addEventListener("click",()=>nextMonth(1));
     q("#sogaPreviewReload").addEventListener("click",load);
+    q("#sogaPreviewAssignments").addEventListener("click",()=>{CAL.mode="assignments";render();});
+    q("#sogaPreviewWishes").addEventListener("click",()=>{CAL.mode="wishes";render();});
   }
   function groupRequests(data){
     const staff=new Map((data.staff||[]).map(row=>[String(row.staff_code),row]));
@@ -113,8 +119,8 @@
       if(date==="2026-11-01")return; // Store closure takes precedence over every request.
       entries.set(date+"|"+code+"|"+start,{date,code,start,end,status});
     };
-    (data.requests||[]).forEach(r=>ingest(r,"WISH"));
-    (data.assignments||[]).forEach(r=>ingest(r,r.assignment_type==="TRIAL"?"TRIAL":"SHIFT"));
+    if(CAL.mode==="wishes")(data.requests||[]).forEach(r=>ingest(r,"WISH"));
+    else (data.assignments||[]).forEach(r=>ingest(r,r.assignment_type==="TRIAL"?"TRIAL":"SHIFT"));
     const byPerson=new Map();
     entries.forEach(row=>{
       const key=row.date+"|"+row.code;
@@ -166,6 +172,8 @@
       q("#sogaPreviewContent").innerHTML='<div class="soga-preview-status">希望データを読み込んでいます…</div>';
       return;
     }
+    q("#sogaPreviewAssignments")?.classList.toggle("is-active",CAL.mode==="assignments");
+    q("#sogaPreviewWishes")?.classList.toggle("is-active",CAL.mode==="wishes");
     const grouped=groupRequests(CAL.data);
     const days=new Date(year,month,0).getDate();
     const offset=(new Date(year,month-1,1).getDay()+6)%7;
@@ -177,7 +185,7 @@
     }
     q("#sogaPreviewContent").innerHTML=`<div class="soga-preview-scroller"><div class="soga-preview-calendar">${weekdays.map(w=>'<div class="soga-preview-weekday">'+w+'</div>').join("")}${nodes.join("")}</div></div>`;
     q("#sogaPreviewTotal").textContent=grouped.personCount+"名／"+grouped.segmentCount+"勤務時間帯を表示";
-    q("#sogaPreviewState").textContent="下のカレンダーは全希望（シフト案とは別）・スタッフ色は10月までの設定を継承";
+    q("#sogaPreviewState").textContent=CAL.mode==="assignments"?"シフト調整案（317コマ／未公開）":"全スタッフの提出希望（元データ・変更なし）";
   }
   async function load(){
     if(!isOpen()||!manager()||CAL.loading)return;
