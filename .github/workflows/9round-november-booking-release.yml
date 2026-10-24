@@ -1,0 +1,67 @@
+name: 9ROUND November 2026 temporary booking period
+
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/9round-november-booking-release.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: 9round-booking-production
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify 9ROUND reservation rules and November closing date
+        run: node --test tests/9round-booking.test.js tests/9round-trial.test.js tests/9round-mpg-bridge.test.js
+      - name: Check overlay JavaScript
+        run: node --check scripts/gas-9round-november-booking-overlay.mjs
+
+  deploy:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Reuse existing Google Apps Script deployment credentials
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+        run: |
+          test -n "$CLASPRC_JSON" || (echo "CLASPRC_JSON is missing" && exit 1)
+          printf '%s' "$CLASPRC_JSON" > "$HOME/.clasprc.json"
+          mkdir .9round-live
+          node - <<'NODE'
+          const fs = require("fs");
+          fs.writeFileSync(".clasp.json", JSON.stringify({
+            scriptId: "1bMtNarNVT3JKIDA-w_vmWKD-jfaODvBRtEL6qNCQF3HQkg_qsl4yVifq",
+            rootDir: ".9round-live"
+          }));
+          NODE
+          printf '%s\n' 'node_modules/**' '.github/**' > .claspignore
+      - name: Preserve the current production Apps Script source
+        run: npx -y @google/clasp@3.4.1 pull
+      - name: Apply safe range and closure modifications
+        run: node scripts/gas-9round-november-booking-overlay.mjs
+      - name: Push verified source without resetting reservation data
+        run: npx -y @google/clasp@3.4.1 push --force
+      - name: Update the existing public deployment and keep its URL
+        run: >-
+          npx -y @google/clasp@3.4.1 update-deployment
+          AKfycbzVxf1HKZgXet5XrZjqQbzQ47dH8vMISf1mdEE_AH4m3EABceonv1V2OG0jtuIJLvkq
+          -d "Book through 2026-11-30; 2026-11-01 store closed"
+      - name: Remove credentials
+        if: always()
+        run: rm -f "$HOME/.clasprc.json" .clasp.json
