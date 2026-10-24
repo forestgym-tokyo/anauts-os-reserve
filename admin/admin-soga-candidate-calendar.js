@@ -4,7 +4,7 @@
   // This view is intentionally read-only and never publishes or writes confirmed staff shifts.
   const PAGE_ID="sogaCandidateCalendarView";
   const NAV_ID="sogaCandidateCalendarNav";
-  const CAL={month:"2026-11",mode:"assignments",data:null,loading:false,requestSerial:0};
+  const CAL={month:"2026-11",mode:"assignments",data:null,publication:null,loading:false,requestSerial:0};
   const q=s=>document.querySelector(s);
   const escapeHtml=value=>String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const manager=()=>["ADMIN","MANAGER"].includes(String((typeof state!=="undefined"&&state.authUser?.permission)||"").toUpperCase());
@@ -85,10 +85,10 @@
     section.id=PAGE_ID;
     section.className="view";
     section.innerHTML=`
-      <div class="page-heading"><div><p class="eyebrow">9ROUND ARIO SOGA · MANAGEMENT ONLY</p><h1>9ROUND 希望シフト予定表</h1><p>勤務時間をまとめた未公開シフト案と、元の提出希望を切り替えて確認できます。</p></div></div>
-      <div class="soga-preview-saved" id="sogaPreviewProposalLinks"><strong>2026年11月の均等配分シフト案（各時間帯1名・スタッフ別カラー）</strong><div class="soga-preview-linkrow"><a href="https://docs.google.com/spreadsheets/d/1YCMXS_ngE34QvZw0-P_sVuvteOjDmvbz7mAFH4W-jzA/edit#gid=20261125" target="_blank" rel="noopener noreferrer">11月シフト予定表を開く ↗</a><a href="https://docs.google.com/spreadsheets/d/1YCMXS_ngE34QvZw0-P_sVuvteOjDmvbz7mAFH4W-jzA/edit#gid=20261126" target="_blank" rel="noopener noreferrer">スタッフ別勤務時間 ↗</a><a href="https://docs.google.com/spreadsheets/d/1YCMXS_ngE34QvZw0-P_sVuvteOjDmvbz7mAFH4W-jzA/edit#gid=20261124" target="_blank" rel="noopener noreferrer">勤務明細 ↗</a></div><p>未確定・スタッフ非公開。11月1日は店休。11月26日16:15〜17:45の未配置箇所は要調整です。</p></div>
+      <div class="page-heading"><div><p class="eyebrow">9ROUND ARIO SOGA · MANAGEMENT ONLY</p><h1>9ROUND 希望シフト予定表</h1><p>勤務時間をまとめたシフトと元の提出希望を切り替えて確認できます。</p></div></div>
+      <div class="soga-preview-saved" id="sogaPreviewProposalLinks"><strong>2026年11月シフト（各時間帯1名・スタッフ別カラー）</strong><div class="soga-preview-linkrow"><a href="https://docs.google.com/spreadsheets/d/1YCMXS_ngE34QvZw0-P_sVuvteOjDmvbz7mAFH4W-jzA/edit#gid=20261125" target="_blank" rel="noopener noreferrer">11月シフト予定表を開く ↗</a><a href="https://docs.google.com/spreadsheets/d/1YCMXS_ngE34QvZw0-P_sVuvteOjDmvbz7mAFH4W-jzA/edit#gid=20261126" target="_blank" rel="noopener noreferrer">スタッフ別勤務時間 ↗</a><a href="https://docs.google.com/spreadsheets/d/1YCMXS_ngE34QvZw0-P_sVuvteOjDmvbz7mAFH4W-jzA/edit#gid=20261124" target="_blank" rel="noopener noreferrer">勤務明細 ↗</a></div><p id="sogaPreviewProposalNote">11月1日は店休。11月26日16:15〜17:45の未配置箇所は要調整です。</p></div>
       <div class="soga-preview-head">
-        <div class="soga-preview-status">管理者・マネージャー専用／スタッフへは未公開　　<span id="sogaPreviewState">希望候補（未確定）</span></div>
+        <div class="soga-preview-status">管理者・マネージャー専用／<span id="sogaPreviewPublishIndicator">公開状態を確認中</span>　<span id="sogaPreviewState">希望候補</span></div>
         <div id="sogaPreviewTotal" class="soga-preview-counter"></div>
       </div>
       <div class="soga-preview-month-bar card">
@@ -97,7 +97,7 @@
         <button id="sogaPreviewNext" type="button" aria-label="翌月">翌月 ›</button>
         <button id="sogaPreviewReload" type="button">更新</button>
       </div>
-      <div class="soga-preview-selector"><button id="sogaPreviewAssignments" type="button" class="is-active">シフト案（未公開）</button><button id="sogaPreviewWishes" type="button">提出希望をすべて見る</button></div>
+      <div class="soga-preview-selector"><button id="sogaPreviewAssignments" type="button" class="is-active">登録シフト</button><button id="sogaPreviewWishes" type="button">提出希望をすべて見る</button></div>
       <div id="sogaPreviewContent" aria-live="polite"></div>
       <p class="soga-preview-status" style="margin-top:13px">前半 10:15〜14:00 ／ 後半 16:15〜20:45 ／ ＊後半 17:45〜20:45。全日希望は前半・後半の2行で表示します。ここでは確定・公開処理は行いません。</p>
     `;
@@ -159,7 +159,7 @@
     const entries=blocks.get(date)||[];
     const body=closed?'<div class="soga-preview-alert">店休</div>':(entries.length?entries.map(r=>{
       const cls=r.status==="TRIAL"?"trial":(r.status==="SHIFT"?"confirmed":"");
-      const title=r.status==="WISH"?"希望候補":(r.status==="TRIAL"?"体験担当候補":"調整中");
+      const title=r.status==="WISH"?"希望候補":(r.status==="TRIAL"?"体験担当候補":(CAL.publication?.is_published?"公開済みシフト":"調整中"));
       return `<div class="soga-preview-block ${cls}" style="--soga-person-color:${escapeHtml(r.color||"#80c88c")}" title="${escapeHtml(title+" · "+r.name+" · "+r.start+"〜"+r.end)}"><time>${escapeHtml(r.start)}〜${escapeHtml(r.end)}</time><b>${escapeHtml(r.name)}</b></div>`;
     }).join(""):'<div class="soga-preview-empty">候補なし</div>');
     return `<div class="soga-preview-day ${closed?"is-closed":""}"><div class="soga-preview-day-title"><span>${day}日</span><small>${closed?"店休日":entries.length+"件"}</small></div>${body}</div>`;
@@ -185,25 +185,32 @@
     }
     q("#sogaPreviewContent").innerHTML=`<div class="soga-preview-scroller"><div class="soga-preview-calendar">${weekdays.map(w=>'<div class="soga-preview-weekday">'+w+'</div>').join("")}${nodes.join("")}</div></div>`;
     q("#sogaPreviewTotal").textContent=grouped.personCount+"名／"+grouped.segmentCount+"勤務時間帯を表示";
-    q("#sogaPreviewState").textContent=CAL.mode==="assignments"?"シフト調整案（317コマ／未公開）":"全スタッフの提出希望（元データ・変更なし）";
+    const published=CAL.publication?.is_published===true;
+    q("#sogaPreviewPublishIndicator").textContent=published?"スタッフへ公開済み":"公開前";
+    q("#sogaPreviewAssignments").textContent=published?"11月シフト（公開済み）":"シフト調整案（公開前）";
+    q("#sogaPreviewState").textContent=CAL.mode==="assignments"?(published?"確定シフト（公開済み）":"シフト調整案（未公開）"):"全スタッフの提出希望（元データ・変更なし）";
+    if(q("#sogaPreviewProposalNote"))q("#sogaPreviewProposalNote").textContent=(published?"スタッフ公開済み。":"スタッフ未公開。")+"11月1日は店休。11月26日16:15〜17:45は未配置です。";
   }
   async function load(){
     if(!isOpen()||!manager()||CAL.loading)return;
     const serial=++CAL.requestSerial;
     const month=CAL.month;
     CAL.data=null;
+    CAL.publication=null;
     render();
     CAL.loading=true;
     try{
-      const [result,staffResult]=await Promise.all([
+      const [result,staffResult,pubResult]=await Promise.all([
         apiGet("getSogaShiftBoard",{month,store_code:"SOGA"}),
-        apiGet("getStaff",{include_inactive:"false"})
+        apiGet("getStaff",{include_inactive:"false"}),
+        apiGet("getStaffShiftPublication",{month,store_code:"SOGA"})
       ]);
       if(serial!==CAL.requestSerial||month!==CAL.month)return;
       const source=result.data||{};
       const rows=Array.isArray(staffResult.data?.staff)?staffResult.data.staff:(Array.isArray(staffResult.data)?staffResult.data:[]);
       const colorsByCode=new Map(rows.map(p=>[String(p.staff_code||"").toUpperCase(),String(p.color||"")]));
       CAL.data={...source,staff:(source.staff||[]).map(p=>({...p,color:colorsByCode.get(String(p.staff_code||"").toUpperCase())||p.color||""}))};
+      CAL.publication=pubResult.data||null;
       render();
     }catch(e){
       if(serial===CAL.requestSerial)q("#sogaPreviewContent").innerHTML='<div class="soga-preview-status">希望予定表を読み込めませんでした：'+escapeHtml(e.message||"通信エラー")+"</div>";
