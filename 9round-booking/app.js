@@ -4,7 +4,7 @@
   const api = window.NineRoundBookingApi;
   const tools = window.NineRoundMemberTools;
   const fighter = window.NineRoundFighter;
-  const bookingEndDate = window.NineRoundWorkoutEndDate || "2026-11-30";
+  const bookingEndDate = window.NineRoundWorkoutEndDate || "2026-10-24";
   const storageKey = "nr_booking_session_v1";
   let token = "", challenge = "", busy = false, sequence = 0;
   let range = { from: window.NineRoundTokyoDate(), to: bookingEndDate };
