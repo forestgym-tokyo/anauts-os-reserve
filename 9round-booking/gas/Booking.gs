@@ -316,7 +316,7 @@ function nrBookingDate_(value) {
 
 function nrBookingRange_(config) {
   const today = Utilities.formatDate(new Date(), NR_BOOKING.timezone, "yyyy-MM-dd");
-  return { from: today, to: Utilities.formatDate(new Date(Date.parse(today + "T00:00:00+09:00") + (config.days - 1) * 86400000), NR_BOOKING.timezone, "yyyy-MM-dd") };
+  return { from: today, to: "2026-11-30" }; // Fixed temporary booking period; after this date from > to.
 }
 
 function nrBookingRequireDate_(config, value) {
@@ -343,6 +343,7 @@ function nrBookingBaseSlots_(date) {
 }
 
 function nrBookingDailySlots_(date, config, context) {
+  if (date === "2026-11-01") return []; // Store holiday: no daily workout bookings.
   if (config && typeof nrTrialEnabled_ === "function" && nrTrialEnabled_()) {
     return nrTrialAvailability_(config, date, context).map(function (slot) {
       return Object.assign({}, slot, { auto_hidden: slot.daily_hidden, status: slot.staffing_conflict ? "CLOSED" : "OPEN" });
