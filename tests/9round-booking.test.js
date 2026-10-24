@@ -447,6 +447,21 @@ test("date/time validation uses Japan time and rejects past, out-of-range and ma
   assert.equal(plain(e.context.nrBookingRange_({ days: 30 })).from, "2026-10-18");
 });
 
+test("temporary booking period covers November 30, closes after, and excludes November 1 holiday", () => {
+  const e = environment();
+  e.setNow("2026-10-24T00:00:00Z"); // 09:00 JST October 24.
+  const token = e.login();
+  const last = e.call("get9RoundWorkoutSlots", { session_token: token, date: "2026-11-30" });
+  assert.equal(last.ok, true);
+  assert.equal(last.data.range.to, "2026-11-30");
+  assert.equal(last.data.slots.length, 11);
+  assert.equal(e.call("get9RoundWorkoutSlots", { session_token: token, date: "2026-12-01" }).code, "DATE_OUT_OF_RANGE");
+  const closed = e.call("get9RoundWorkoutSlots", { session_token: token, date: "2026-11-01" });
+  assert.equal(closed.ok, true);
+  assert.equal(closed.data.slots.length, 0);
+  assert.equal(reserve(e, token, "DAILY:2026-11-01:10:15", "2026-11-01").code, "INVALID_SLOT");
+});
+
 test("standalone entry point accepts POST only and exposes no member data in GET", () => {
   const c = {
     round9BookingApi_: (action, body) => ({ action, body }),
