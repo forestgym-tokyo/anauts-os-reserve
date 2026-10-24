@@ -147,6 +147,7 @@
         String(a.start_time).localeCompare(String(b.start_time))||
         String(a.staff_code).localeCompare(String(b.staff_code)));
     }
+    window.anautsDisplayShiftBlocks_=displayShiftBlocks_;
     function sogaPrintSegments_(date,rows,people){
       const byStaff=new Map();
       rows.filter(x=>String(x.date)===date).forEach(row=>{
