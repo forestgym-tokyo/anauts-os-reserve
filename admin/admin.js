@@ -1386,15 +1386,20 @@ async function loadMyShiftView(){
       .sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.start_time).localeCompare(String(b.start_time)));
 
     renderMyShiftRows();
+    const publishedGroups=typeof window.anautsDisplayShiftBlocks_==="function"
+      ? window.anautsDisplayShiftBlocks_(state.myShiftRows)
+      : state.myShiftRows;
+    const publishedCount=publishedGroups.length;
+    const publishedUnit=state.myShiftRows.some(r=>String(r.store_code||"").toUpperCase()==="SOGA")?"時間帯":"件";
 
     if(isManagementUser()){
-      $("#myShiftStatusSummary").textContent=`勤務 ${state.myShiftRows.length}件 / 直接編集`;
+      $("#myShiftStatusSummary").textContent=`勤務 ${publishedCount}${publishedUnit} / 直接編集`;
       $("#myShiftRequestHistory").innerHTML='<div class="registered-shift-empty">ADMIN / MANAGERは変更申請不要です。</div>';
       resetMyShiftForm();
       return;
     }
 
-    $("#myShiftStatusSummary").textContent=`勤務 ${state.myShiftRows.length}件`;
+    $("#myShiftStatusSummary").textContent=`勤務 ${publishedCount}${publishedUnit}`;
 
     let requestRes={data:[]};
     try{requestRes=await apiGet("getMyShiftChangeRequests");}catch(_){ }
@@ -1403,7 +1408,7 @@ async function loadMyShiftView(){
     renderMyShiftRequestHistory();
 
     const pending=state.myShiftRequests.filter(r=>String(r.status||"").toUpperCase()==="PENDING").length;
-    $("#myShiftStatusSummary").textContent=`勤務 ${state.myShiftRows.length}件 / 承認待ち ${pending}件`;
+    $("#myShiftStatusSummary").textContent=`勤務 ${publishedCount}${publishedUnit} / 承認待ち ${pending}件`;
 
     resetMyShiftForm();
 
