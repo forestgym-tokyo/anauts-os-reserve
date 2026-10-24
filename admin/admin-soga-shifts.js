@@ -123,11 +123,25 @@
     });
     return failures;
   }
+  // KEVINは日曜勤務不可。希望として登録済みでも管理者の割当・公開時には拒否する。
+  function kevinSundayRuleViolations_(){
+    if(SG.storeCode!=="SOGA")return [];
+    const dates=new Set();
+    SG.assignments.forEach((type,keyValue)=>{
+      const [date,start,staffCode]=keyValue.split("|");
+      if(staffCode!=="KEVIN"||!/^\d{4}-\d{2}-\d{2}$/.test(date))return;
+      const day=new Date(date+"T12:00:00Z").getUTCDay();
+      if(day===0)dates.add(date);
+    });
+    return [...dates].sort();
+  }
   async function saveAssignments_(){
+    const sundayViolations=kevinSundayRuleViolations_();
+    if(sundayViolations.length){message_("KEVINは日曜日勤務不可です。該当日："+sundayViolations.join("、"),true);return}
     const violations=earlyFinishRuleViolations_();
     if(violations.length){message_("17:45までの担当者は当日の前半も必須です。修正対象："+violations.join("、"),true);return}
     if(!confirm(`${monthLabel_()}の調整内容 ${SG.assignments.size}件を保存しますか？`))return;const button=q("#sogaSaveAssignments");button.disabled=true;button.textContent="保存中…";try{const assignments=[];SG.assignments.forEach((type,k)=>{const [date,start,staffCode]=k.split("|"),slot=SG.slots.find(row=>row.start_time===start);if(slot)assignments.push({date,start_time:start,end_time:slot.end_time,staff_code:staffCode,assignment_type:type})});const result=await apiPost({action:"saveSogaShiftAssignments",month:SG.month,store_code:SG.storeCode,assignments});SG.dirty=false;message_(`調整内容を保存しました（${result.data?.saved_count||0}件／体験担当 ${result.data?.trial_count||0}件）。公開操作を行うまでスタッフには表示されません。`);await loadFinal_()}catch(error){message_(error.message||"調整内容を保存できませんでした。",true)}finally{button.disabled=false;button.textContent="調整内容を保存"}}
-  async function publishMonth_(){if(!administrator())return;const violations=earlyFinishRuleViolations_();if(violations.length){message_("17:45退勤者の前半勤務が不足しています："+violations.join("、"),true);return}if(SG.dirty){message_("未保存の調整があります。先に「調整内容を保存」を押してください。",true);return}if(!confirm(`${monthLabel_()}の予定と個人シフトをスタッフへ公開しますか？`))return;const button=q("#sogaPublishMonth");button.disabled=true;button.textContent="公開中…";try{await apiPost({action:"publishStaffShiftMonth",month:SG.month,store_code:SG.storeCode});message_(`${monthLabel_()}の予定と個人シフトを公開しました。`);await loadFinal_()}catch(error){message_(error.message||"シフトを公開できませんでした。",true);button.disabled=false;button.textContent="スタッフへ公開"}}
+  async function publishMonth_(){if(!administrator())return;const sundayViolations=kevinSundayRuleViolations_();if(sundayViolations.length){message_("KEVINは日曜日勤務不可です。該当日："+sundayViolations.join("、"),true);return}const violations=earlyFinishRuleViolations_();if(violations.length){message_("17:45退勤者の前半勤務が不足しています："+violations.join("、"),true);return}if(SG.dirty){message_("未保存の調整があります。先に「調整内容を保存」を押してください。",true);return}if(!confirm(`${monthLabel_()}の予定と個人シフトをスタッフへ公開しますか？`))return;const button=q("#sogaPublishMonth");button.disabled=true;button.textContent="公開中…";try{await apiPost({action:"publishStaffShiftMonth",month:SG.month,store_code:SG.storeCode});message_(`${monthLabel_()}の予定と個人シフトを公開しました。`);await loadFinal_()}catch(error){message_(error.message||"シフトを公開できませんでした。",true);button.disabled=false;button.textContent="スタッフへ公開"}}
 
 
   const PRINT_DAY_START_=10*60+15;
