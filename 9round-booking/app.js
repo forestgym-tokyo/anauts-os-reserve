@@ -4,7 +4,7 @@
   const api = window.NineRoundBookingApi;
   const tools = window.NineRoundMemberTools;
   const fighter = window.NineRoundFighter;
-  const bookingEndDate = window.NineRoundWorkoutEndDate || "2026-10-24";
+  const bookingEndDate = window.NineRoundWorkoutEndDate || "2026-11-30";
   const storageKey = "nr_booking_session_v1";
   let token = "", challenge = "", busy = false, sequence = 0;
   let range = { from: window.NineRoundTokyoDate(), to: bookingEndDate };
@@ -130,6 +130,10 @@
     q("#bookingDate").max = range.to;
     q("#dateHeading").textContent = dayLabel(data.date);
     q("#slotList").replaceChildren();
+    if (data.date === "2026-11-01") {
+      q("#slotList").append(element("p", "loading", "11月1日（日）は店休日のため、予約枠はありません。"));
+      return;
+    }
     [["MORNING", "午前 · 10:15–14:00", function (s) { return s.start_time < "14:00"; }],
       ["EVENING", "午後 · 16:15–20:45", function (s) { return s.start_time >= "16:15"; }]].forEach(function (group) {
       q("#slotList").append(element("h4", "period-heading", group[1]));
@@ -147,7 +151,7 @@
       q("#dateHeading").textContent = "暫定予約の受付は終了しました";
       q("#slotList").replaceChildren();
       q("#bookingLimitStatus").textContent = "";
-      message("10月25日（日）以降はデジムからご予約ください。");
+      message("暫定予約システムは11月30日（月）までの受付です。12月以降の予約方法は改めてご案内いたします。");
       setBusy(false);
       return;
     }
