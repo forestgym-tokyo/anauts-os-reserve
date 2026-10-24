@@ -47,7 +47,7 @@
       .soga-preview-day.is-closed{background:#26251f;border-color:#635b44}
       .soga-preview-day-title{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:8px;color:#fff;font-weight:900;font-size:13px}
       .soga-preview-day-title small{font-size:10px;font-weight:700;color:#9fb5a4}
-      .soga-preview-block{display:flex;align-items:center;gap:5px;padding:6px 5px;margin:4px 0;border:1px solid #355241;border-left:3px solid #80c88c;border-radius:6px;background:#172d22;min-width:0;white-space:nowrap;font-size:10px;color:#fff;line-height:1.35}
+      .soga-preview-block{display:flex;align-items:center;gap:5px;padding:6px 5px;margin:4px 0;border:1px solid #355241;border-left:3px solid var(--soga-person-color,#80c88c);border-radius:6px;background:color-mix(in srgb,var(--soga-person-color,#80c88c) 18%,#172d22);min-width:0;white-space:nowrap;font-size:10px;color:#fff;line-height:1.35}
       .soga-preview-block.confirmed{border-left-color:#f3bd68;background:#36311d}
       .soga-preview-block.trial{border-left-color:#e4a0e8;background:#332337}
       .soga-preview-block time{font-weight:900;font-variant-numeric:tabular-nums;flex:0 0 auto;letter-spacing:-.2px}
@@ -55,6 +55,12 @@
       .soga-preview-empty{color:#647b6b;font-size:11px;margin-top:10px}
       .soga-preview-alert{color:#e7ba73;font-weight:900;padding:14px 0}
       .soga-preview-counter{color:#a5b8ac;font-size:12px}
+      .soga-preview-saved{border:1px solid #458563;background:#0e2b1b;border-radius:13px;padding:14px 16px;margin:12px 0;line-height:1.7}
+      .soga-preview-saved strong{color:#fff;display:block;margin-bottom:9px;font-weight:900}
+      .soga-preview-saved .soga-preview-linkrow{display:flex;flex-wrap:wrap;gap:9px}
+      .soga-preview-saved a{display:inline-flex;align-items:center;padding:9px 14px;border-radius:9px;border:1px solid #71bb81;background:#275239;color:white!important;font-size:13px;font-weight:900;text-decoration:none}
+      .soga-preview-saved p{font-size:12px;color:#bed4c4;margin:9px 0 0}
+      .soga-preview-saved.is-hidden{display:none}
       @media(max-width:720px){.soga-preview-scroller{margin:0 -12px;max-width:calc(100% + 24px)}.soga-preview-head{align-items:flex-start}.soga-preview-calendar{min-width:1190px}}
       @media print{.topnav,.soga-preview-month-bar button,.soga-preview-status{display:none!important}.soga-preview-scroller{overflow:visible}.soga-preview-calendar{min-width:0;gap:3px}.soga-preview-day{background:white!important;color:#000;min-height:100px}.soga-preview-day-title,.soga-preview-block{color:#000!important}.soga-preview-block{white-space:normal}}
     `;
@@ -77,6 +83,7 @@
     section.className="view";
     section.innerHTML=`
       <div class="page-heading"><div><p class="eyebrow">9ROUND ARIO SOGA · MANAGEMENT ONLY</p><h1>9ROUND 希望シフト予定表</h1><p>勤務時間をひとまとまりにした、未確定候補の月間プレビューです。</p></div></div>
+      <div class="soga-preview-saved" id="sogaPreviewProposalLinks"><strong>2026年11月のシフト案（各時間帯1名・スタッフ別カラー）</strong><div class="soga-preview-linkrow"><a href="https://docs.google.com/spreadsheets/d/1YCMXS_ngE34QvZw0-P_sVuvteOjDmvbz7mAFH4W-jzA/edit#gid=20261125" target="_blank" rel="noopener noreferrer">11月シフト予定表を開く ↗</a><a href="https://docs.google.com/spreadsheets/d/1YCMXS_ngE34QvZw0-P_sVuvteOjDmvbz7mAFH4W-jzA/edit#gid=20261126" target="_blank" rel="noopener noreferrer">スタッフ別勤務時間 ↗</a><a href="https://docs.google.com/spreadsheets/d/1YCMXS_ngE34QvZw0-P_sVuvteOjDmvbz7mAFH4W-jzA/edit#gid=20261124" target="_blank" rel="noopener noreferrer">勤務明細 ↗</a></div><p>未確定・スタッフ非公開。11月1日は店休。11月25日16:15〜17:45の未配置箇所は要調整です。</p></div>
       <div class="soga-preview-head">
         <div class="soga-preview-status">管理者・マネージャー専用／スタッフへは未公開　　<span id="sogaPreviewState">希望候補（未確定）</span></div>
         <div id="sogaPreviewTotal" class="soga-preview-counter"></div>
@@ -122,6 +129,7 @@
       const complete=()=>{
         if(!current)return;
         current.name=labelPerson(staff.get(current.code),current.code);
+        const color=String(staff.get(current.code)?.color||"");current.color=/^#[0-9a-f]{6}$/i.test(color)?color:"#80c88c";
         if(!byDate.has(current.date))byDate.set(current.date,[]);
         byDate.get(current.date).push(current);
         segmentCount++;
@@ -146,13 +154,14 @@
     const body=closed?'<div class="soga-preview-alert">店休</div>':(entries.length?entries.map(r=>{
       const cls=r.status==="TRIAL"?"trial":(r.status==="SHIFT"?"confirmed":"");
       const title=r.status==="WISH"?"希望候補":(r.status==="TRIAL"?"体験担当候補":"調整中");
-      return `<div class="soga-preview-block ${cls}" title="${escapeHtml(title+" · "+r.name+" · "+r.start+"〜"+r.end)}"><time>${escapeHtml(r.start)}〜${escapeHtml(r.end)}</time><b>${escapeHtml(r.name)}</b></div>`;
+      return `<div class="soga-preview-block ${cls}" style="--soga-person-color:${escapeHtml(r.color||"#80c88c")}" title="${escapeHtml(title+" · "+r.name+" · "+r.start+"〜"+r.end)}"><time>${escapeHtml(r.start)}〜${escapeHtml(r.end)}</time><b>${escapeHtml(r.name)}</b></div>`;
     }).join(""):'<div class="soga-preview-empty">候補なし</div>');
     return `<div class="soga-preview-day ${closed?"is-closed":""}"><div class="soga-preview-day-title"><span>${day}日</span><small>${closed?"店休日":entries.length+"件"}</small></div>${body}</div>`;
   }
   function render(){
     const [year,month]=CAL.month.split("-").map(Number);
     q("#sogaPreviewMonth").textContent=year+"年"+month+"月";
+    q("#sogaPreviewProposalLinks")?.classList.toggle("is-hidden",CAL.month!=="2026-11");
     if(!CAL.data){
       q("#sogaPreviewContent").innerHTML='<div class="soga-preview-status">希望データを読み込んでいます…</div>';
       return;
@@ -168,7 +177,7 @@
     }
     q("#sogaPreviewContent").innerHTML=`<div class="soga-preview-scroller"><div class="soga-preview-calendar">${weekdays.map(w=>'<div class="soga-preview-weekday">'+w+'</div>').join("")}${nodes.join("")}</div></div>`;
     q("#sogaPreviewTotal").textContent=grouped.personCount+"名／"+grouped.segmentCount+"勤務時間帯を表示";
-    q("#sogaPreviewState").textContent="希望候補（未確定・閲覧専用）";
+    q("#sogaPreviewState").textContent="下のカレンダーは全希望（シフト案とは別）・スタッフ色は10月までの設定を継承";
   }
   async function load(){
     if(!isOpen()||!manager()||CAL.loading)return;
@@ -178,9 +187,15 @@
     render();
     CAL.loading=true;
     try{
-      const result=await apiGet("getSogaShiftBoard",{month,store_code:"SOGA"});
+      const [result,staffResult]=await Promise.all([
+        apiGet("getSogaShiftBoard",{month,store_code:"SOGA"}),
+        apiGet("getStaff",{include_inactive:"false"})
+      ]);
       if(serial!==CAL.requestSerial||month!==CAL.month)return;
-      CAL.data=result.data||{};
+      const source=result.data||{};
+      const rows=Array.isArray(staffResult.data?.staff)?staffResult.data.staff:(Array.isArray(staffResult.data)?staffResult.data:[]);
+      const colorsByCode=new Map(rows.map(p=>[String(p.staff_code||"").toUpperCase(),String(p.color||"")]));
+      CAL.data={...source,staff:(source.staff||[]).map(p=>({...p,color:colorsByCode.get(String(p.staff_code||"").toUpperCase())||p.color||""}))};
       render();
     }catch(e){
       if(serial===CAL.requestSerial)q("#sogaPreviewContent").innerHTML='<div class="soga-preview-status">希望予定表を読み込めませんでした：'+escapeHtml(e.message||"通信エラー")+"</div>";
