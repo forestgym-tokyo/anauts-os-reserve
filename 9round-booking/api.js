@@ -1,6 +1,6 @@
 (function () {
   "use strict";
-  const workoutEndDate = "2026-10-24";
+  const workoutEndDate = "2026-11-30";
   window.NineRoundWorkoutEndDate = workoutEndDate;
   function responseData(result, action) {
     if (!result || !result.ok) {
