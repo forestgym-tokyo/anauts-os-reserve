@@ -108,6 +108,45 @@
       const weeks=[];for(let i=0;i<days.length;i+=7)weeks.push(days.slice(i,i+7));
       return weeks;
     }
+
+    // 9ROUND stores 45-minute reservation slots; the staff UI presents a single
+    // continuous work period per person in each of the morning and afternoon.
+    // sourceRows retains every original shift_id for safe change-request handling.
+    function displayShiftBlocks_(rows){
+      const groups=[],byStaffAndPeriod=new Map();
+      for(const original of (Array.isArray(rows)?rows:[])){
+        const row={...original},date=String(row.date||"").slice(0,10);
+        const start=String(row.start_time||"").slice(0,5),end=String(row.end_time||"").slice(0,5);
+        const startMinutes=sogaPrintMinutes_(start),endMinutes=sogaPrintMinutes_(end);
+        const morning=startMinutes>=615&&endMinutes<=840;
+        const afternoon=startMinutes>=975&&endMinutes<=1245;
+        const valid=Number.isFinite(startMinutes)&&Number.isFinite(endMinutes)&&endMinutes>startMinutes;
+        if(String(row.store_code||"").toUpperCase()!=="SOGA"||!valid||(!morning&&!afternoon)){
+          groups.push({...row,sourceRows:[original]});continue;
+        }
+        const period=morning?"AM":"PM";
+        const key=[date,row.staff_code||"",row.store_code||"",period].join("|");
+        if(!byStaffAndPeriod.has(key))byStaffAndPeriod.set(key,[]);
+        byStaffAndPeriod.get(key).push({...row,start_time:start,end_time:end,sourceRows:[original]});
+      }
+      byStaffAndPeriod.forEach(list=>{
+        list.sort((a,b)=>String(a.start_time).localeCompare(String(b.start_time)));
+        let active=null;
+        for(const part of list){
+          if(active&&String(active.end_time)===String(part.start_time)){
+            active.end_time=part.end_time;
+            active.sourceRows.push(...part.sourceRows);
+          }else{
+            if(active)groups.push(active);
+            active={...part,sourceRows:[...part.sourceRows]};
+          }
+        }
+        if(active)groups.push(active);
+      });
+      return groups.sort((a,b)=>String(a.date).localeCompare(String(b.date))||
+        String(a.start_time).localeCompare(String(b.start_time))||
+        String(a.staff_code).localeCompare(String(b.staff_code)));
+    }
     function sogaPrintSegments_(date,rows,people){
       const byStaff=new Map();
       rows.filter(x=>String(x.date)===date).forEach(row=>{
@@ -124,10 +163,8 @@
         items.forEach(item=>{
           if(!current){current={...item,through:false};return}
           const adjacent=current.endMin===item.startMin;
-          const acrossBreak=current.endMin===SOGA_BREAK_START_&&item.startMin===SOGA_BREAK_END_;
-          if(adjacent||acrossBreak){
+          if(adjacent){
             current.endMin=item.endMin;
-            current.through=current.through||acrossBreak;
           }else{
             segments.push(current);
             current={...item,through:false};
@@ -256,7 +293,7 @@
       });
     }
     function renderMyShiftCalendar(){
-      ensureCalendarCss();const box=document.querySelector("#myShiftList"),rows=(state.myShiftRows||[]).filter(x=>x.active!==false);if(!box)return;
+      ensureCalendarCss();const box=document.querySelector("#myShiftList"),rows=displayShiftBlocks_((state.myShiftRows||[]).filter(x=>x.active!==false));if(!box)return;
       const p=document.querySelector("#myShiftView .page-heading p:last-child");
       if(p){
         if(sogaStaffRestricted_())p.textContent="9ROUND アリオ蘇我店の自分の確定シフトを確認できます。日付を押すと変更・削除申請ができます。";
@@ -290,10 +327,13 @@
       if(typeof myShiftMsg==="function")myShiftMsg(`当日・前日のシフト${actionLabel}はWeb申請できません。${phone}まで直接ご連絡ください。`,true);
     }
     function showMyDay(date){
-      const detail=document.querySelector("#myCalDetail"),rows=(state.myShiftRows||[]).filter(x=>x.active!==false&&x.date===date),mode=myShiftRule_(date);
+      const detail=document.querySelector("#myCalDetail"),rows=displayShiftBlocks_((state.myShiftRows||[]).filter(x=>x.active!==false&&x.date===date)),mode=myShiftRule_(date);
       document.querySelectorAll("#myShiftList [data-mydate]").forEach(c=>c.classList.toggle("my-shift-selected",c.dataset.mydate===date));
       detail.classList.remove("is-hidden");
       const actions=(x,i)=>{
+        if(String(x.store_code||"").toUpperCase()==="SOGA"&&x.sourceRows?.length>1){
+          return '<span style="font-size:12px;color:#b4ccbb">この時間帯の変更・削除は管理者にご連絡ください（予約枠単位の誤変更を防止します）。</span>';
+        }
         if(isManagementUser())return `<button class="ghost-button" data-my-edit="${i}">直接変更</button><button class="danger-ghost" data-my-delete="${i}">直接削除</button>`;
         if(mode==="PAST")return `<button class="ghost-button" type="button" disabled>変更申請不可</button><button class="danger-ghost" type="button" disabled>削除申請不可</button>`;
         if(mode==="PHONE")return `<button class="ghost-button" data-my-phone-edit="${i}">電話で変更連絡</button><button class="danger-ghost" data-my-phone-delete="${i}">電話で削除連絡</button>`;
@@ -556,7 +596,7 @@
       const printButton=document.querySelector("#mPrint");if(printButton){printButton.innerHTML=store==="SOGA"?"🖨 A4縦印刷 / PDF":"🖨 A4印刷";printButton.title=store==="SOGA"?"見本形式の9ROUNDシフトをA4縦1枚で印刷・PDF保存":"選択した部門・店舗の月間予定をA4一枚で印刷"}
     }
     function renderMonth(){
-      const board=document.querySelector("#mBoard"),a=filtered(),people=new Map(state.staff.map(x=>[String(x.staff_code),x])),ym=state.monthlyMonth,[y,m]=ym.split("-").map(Number),first=new Date(y,m-1,1),last=new Date(y,m,0).getDate(),offset=(first.getDay()+6)%7,total=Math.ceil((offset+last)/7)*7,today=localYmd(),by=new Map();
+      const board=document.querySelector("#mBoard"),a=displayShiftBlocks_(filtered()),people=new Map(state.staff.map(x=>[String(x.staff_code),x])),ym=state.monthlyMonth,[y,m]=ym.split("-").map(Number),first=new Date(y,m-1,1),last=new Date(y,m,0).getDate(),offset=(first.getDay()+6)%7,total=Math.ceil((offset+last)/7)*7,today=localYmd(),by=new Map();
       a.forEach(x=>{if(!by.has(x.date))by.set(x.date,[]);by.get(x.date).push(x)});
       let cells="";
       for(let i=0;i<total;i++){
@@ -569,7 +609,7 @@
       board.querySelectorAll("[data-mdate]").forEach(c=>c.onclick=()=>showDay(c.dataset.mdate));
     }
     function showDay(date){
-      const detail=document.querySelector("#mDetail"),people=new Map(state.staff.map(x=>[String(x.staff_code),x])),rows=filtered().filter(x=>x.date===date);
+      const detail=document.querySelector("#mDetail"),people=new Map(state.staff.map(x=>[String(x.staff_code),x])),rows=displayShiftBlocks_(filtered().filter(x=>x.date===date));
       detail.classList.remove("is-hidden");
       detail.innerHTML=`<h3>${esc(date)} の予定</h3>${rows.length?rows.map(x=>{const color=staffColor_(x,people);return `<div class="mcal-detail-row" style="--staff-color:${color}"><i class="mcal-detail-dot"></i><strong>${esc(String(x.start_time).slice(0,5))}〜${esc(String(x.end_time).slice(0,5))}</strong><span>${esc(personLabel(x,people))}</span><small class="mcal-detail-store">${esc(x.store_code||"")}</small></div>`}).join(""):'<div>予定はありません。</div>'}`;
       detail.scrollIntoView({behavior:"smooth",block:"nearest"});
