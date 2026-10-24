@@ -21,7 +21,14 @@
     const originalRender=renderMyShiftRows;
     renderMyShiftRows=function(){renderMyShiftCalendar();};
 
-    function ensureCalendarCss(){if(document.querySelector("#anautsCalendarCss"))return;const style=document.createElement("style");style.id="anautsCalendarCss";style.textContent=`.mcal-wrap{overflow-x:auto}.mcal{min-width:980px;border:1px solid #294037;border-radius:14px;overflow:hidden;background:#10231d}.mcal-week{display:grid;grid-template-columns:repeat(7,1fr);background:#183129}.mcal-week div{padding:10px;text-align:center;font-weight:900;color:#b9c9c2;border-right:1px solid #294037}.mcal-week div:last-child{border-right:0}.mcal-grid{display:grid;grid-template-columns:repeat(7,1fr)}.mcal-day{min-height:145px;padding:8px;border-right:1px solid #294037;border-top:1px solid #294037;background:#10231d;cursor:pointer}.mcal-day:nth-child(7n){border-right:0}.mcal-day.out{background:#0c1b16;opacity:.5}.mcal-day.today{box-shadow:inset 0 0 0 2px #7ed6a5}.mcal-day.my-shift-selected{background:#173f2a!important;box-shadow:inset 0 0 0 3px #63d179!important}.mcal-num{font-weight:900;color:#e7f1ed;margin-bottom:6px}.mcal-event{display:block;padding:5px 6px;margin:4px 0;border-left:4px solid var(--staff-color,#63d179);border-radius:7px;background:#24483b;color:#fff;font-size:11px;line-height:1.25;white-space:normal;overflow:hidden}.mcal-event b{display:block;font-size:12px}.mcal-event-name{display:flex;align-items:center;gap:5px;margin-top:3px}.mcal-event-dot,.mcal-detail-dot{display:inline-block;width:8px;height:8px;flex:0 0 8px;border-radius:999px;background:var(--staff-color,#63d179)}.mcal-event-store{display:block;margin-top:3px;color:#a9bab1;font-size:9px;font-weight:800;letter-spacing:.05em}.mcal-detail{margin-top:14px;padding:14px;border:1px solid #294037;border-radius:12px;background:#10231d}.mcal-detail h3{margin:0 0 10px}.mcal-detail-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-top:1px solid #294037}.mcal-detail-row:first-of-type{border-top:0}.mcal-detail-store{margin-left:auto;color:#91a198;font-size:11px;font-weight:800}.monthly-filter-group{justify-self:end;display:flex;align-items:flex-end;gap:8px}.monthly-filter-field{display:grid;gap:4px}.monthly-filter-field span{color:#91a198;font-size:10px;font-weight:900}.monthly-filter-field select{min-width:170px}.mycal-actions{display:flex;gap:7px;margin-top:8px;flex-wrap:wrap}.mycal-actions button{font-size:12px;padding:6px 9px}@media(max-width:900px){#monthlyScheduleView .schedule-toolbar{grid-template-columns:1fr auto}.monthly-filter-group{grid-column:1/-1;justify-self:stretch}.monthly-filter-field{flex:1}.monthly-filter-field select{width:100%;min-width:0}}@media(max-width:700px){.mcal{min-width:760px}.mcal-day{min-height:105px;padding:5px}.mcal-event{font-size:10px;padding:4px}.mcal-event b{font-size:10px}.monthly-filter-group{display:grid;grid-template-columns:1fr 1fr;width:100%}}`;document.head.appendChild(style)}
+    function ensureCalendarCss(){if(document.querySelector("#anautsCalendarCss"))return;const style=document.createElement("style");style.id="anautsCalendarCss";style.textContent=`.mcal-wrap{overflow-x:auto}.mcal{min-width:980px;border:1px solid #294037;border-radius:14px;overflow:hidden;background:#10231d}.mcal-week{display:grid;grid-template-columns:repeat(7,1fr);background:#183129}.mcal-week div{padding:10px;text-align:center;font-weight:900;color:#b9c9c2;border-right:1px solid #294037}.mcal-week div:last-child{border-right:0}.mcal-grid{display:grid;grid-template-columns:repeat(7,1fr)}.mcal-day{min-height:145px;padding:8px;border-right:1px solid #294037;border-top:1px solid #294037;background:#10231d;cursor:pointer}.mcal-day:nth-child(7n){border-right:0}.mcal-day.out{background:#0c1b16;opacity:.5}.mcal-day.today{box-shadow:inset 0 0 0 2px #7ed6a5}.mcal-day.my-shift-selected{background:#173f2a!important;box-shadow:inset 0 0 0 3px #63d179!important}.mcal-num{font-weight:900;color:#e7f1ed;margin-bottom:6px}.mcal-event{display:block;padding:5px 6px;margin:4px 0;border-left:4px solid var(--staff-color,#63d179);border-radius:7px;background:#24483b;color:#fff;font-size:11px;line-height:1.25;white-space:normal;overflow:hidden}.mcal-event b{display:block;font-size:12px}.mcal-event-name{display:flex;align-items:center;gap:5px;margin-top:3px}.mcal-event-dot,.mcal-detail-dot{display:inline-block;width:8px;height:8px;flex:0 0 8px;border-radius:999px;background:var(--staff-color,#63d179)}.mcal-event-store{display:block;margin-top:3px;color:#a9bab1;font-size:9px;font-weight:800;letter-spacing:.05em}.mcal-detail{margin-top:14px;padding:14px;border:1px solid #294037;border-radius:12px;background:#10231d}.mcal-detail h3{margin:0 0 10px}.mcal-detail-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-top:1px solid #294037}.mcal-detail-row:first-of-type{border-top:0}.mcal-detail-store{margin-left:auto;color:#91a198;font-size:11px;font-weight:800}.monthly-filter-group{justify-self:end;display:flex;align-items:flex-end;gap:8px}.monthly-filter-field{display:grid;gap:4px}.monthly-filter-field span{color:#91a198;font-size:10px;font-weight:900}.monthly-filter-field select{min-width:170px}.mycal-actions{display:flex;gap:7px;margin-top:8px;flex-wrap:wrap}.mycal-actions button{font-size:12px;padding:6px 9px}@media(max-width:900px){#monthlyScheduleView .schedule-toolbar{grid-template-columns:1fr auto}.monthly-filter-group{grid-column:1/-1;justify-self:stretch}.monthly-filter-field{flex:1}.monthly-filter-field select{width:100%;min-width:0}}@media(max-width:700px){.mcal{min-width:760px}.mcal-day{min-height:105px;padding:5px}.mcal-event{font-size:10px;padding:4px}.mcal-event b{font-size:10px}.monthly-filter-group{display:grid;grid-template-columns:1fr 1fr;width:100%}}`;style.textContent+=`
+      .soga-period-people{display:flex;flex-direction:column;gap:2px;min-width:0;margin-top:4px}
+      .soga-period-person{display:block;border-left:3px solid var(--staff-color,#63d179);padding-left:5px;line-height:1.4;font-weight:800;font-size:11px;overflow-wrap:anywhere}
+      .soga-period-person small{font-size:9px;color:#c9d9cd;white-space:normal}
+      .soga-period-gap{color:#e7ba73;font-size:9px;line-height:1.3;font-weight:800}
+      .soga-period-people.is-detail{flex:1}
+      .mcal-detail-row:has(.soga-period-people){align-items:flex-start;flex-wrap:wrap}
+      `;document.head.appendChild(style)}
 
     let monthlyLoadedMonth_=null;
     function canPrintMonthly_(){
@@ -586,6 +593,50 @@
       else if(f.startsWith("P:"))a=a.filter(x=>String(x.staff_code)===f.slice(2));
       return a.sort((x,y)=>String(x.date).localeCompare(String(y.date))||String(x.start_time).localeCompare(String(y.start_time))||String(x.staff_code).localeCompare(String(y.staff_code)));
     }
+
+    // A store-wide published calendar has exactly one line for each shift period
+    // (10:15-14:00 and 16:15-20:45), even when two staff hand over at 17:45.
+    // Personal shifts continue to show only the hours actually worked.
+    function sogaPeriodRows_(rows){
+      const byDate=new Map();
+      displayShiftBlocks_(rows).filter(x=>String(x.store_code||"").toUpperCase()==="SOGA").forEach(segment=>{
+        const from=sogaPrintMinutes_(segment.start_time),to=sogaPrintMinutes_(segment.end_time);
+        const pm=from>=975&&to<=1245;
+        const am=from>=615&&to<=840;
+        if(!am&&!pm)return;
+        const key=String(segment.date)+"|"+(am?"AM":"PM");
+        if(!byDate.has(key))byDate.set(key,[]);
+        byDate.get(key).push(segment);
+      });
+      return Array.from(byDate,([key,parts])=>{
+        const [date,half]=key.split("|"),morning=half==="AM";
+        return {date,store_code:"SOGA",isSogaPeriod:true,
+          start_time:morning?"10:15":"16:15",
+          end_time:morning?"14:00":"20:45",
+          parts:parts.sort((a,b)=>String(a.start_time).localeCompare(String(b.start_time)))};
+      }).sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.start_time).localeCompare(String(b.start_time)));
+    }
+    function sogaPeriodStaffHtml_(period,people,details){
+      const parts=period.parts||[],start=sogaPrintMinutes_(period.start_time),end=sogaPrintMinutes_(period.end_time);
+      let current=start;
+      const labels=[];
+      const hasFullGroup=String(document.querySelector("#mFilter")?.value||"ALL")==="ALL";
+      const gap=(from,to)=>{
+        if(!hasFullGroup||to<=from)return;
+        labels.push('<span class="soga-period-gap">'+esc(sogaPrintTime_(from))+'〜'+esc(sogaPrintTime_(to))+' 未配置</span>');
+      };
+      for(const part of parts){
+        const from=sogaPrintMinutes_(part.start_time),to=sogaPrintMinutes_(part.end_time);
+        if(from>current)gap(current,from);
+        const partColor=staffColor_(part,people);
+        const partial=from>start||to<end;
+        const times=partial?' <small>('+esc(part.start_time)+'〜'+esc(part.end_time)+')</small>':'';
+        labels.push('<span class="soga-period-person" style="--staff-color:'+esc(partColor)+'">'+esc(personLabel(part,people))+times+'</span>');
+        current=Math.max(current,to);
+      }
+      if(current<end)gap(current,end);
+      return '<span class="soga-period-people'+(details?' is-detail':'')+'">'+labels.join('')+'</span>';
+    }
     function personLabel(x,people){const p=people.get(String(x.staff_code))||{},n=p.display_name||p.staff_name||x.staff_name||x.staff_code;return n+(String(p.role).toUpperCase()==="TRAINER"?"トレーナー":"さん")}
     function staffColor_(x,people){const color=String(people.get(String(x.staff_code))?.color||"");return /^#[0-9a-f]{6}$/i.test(color)?color:"#63d179"}
     function syncMonthlyHeading_(){
@@ -597,22 +648,22 @@
       const printButton=document.querySelector("#mPrint");if(printButton){printButton.innerHTML=store==="SOGA"?"🖨 A4縦印刷 / PDF":"🖨 A4印刷";printButton.title=store==="SOGA"?"見本形式の9ROUNDシフトをA4縦1枚で印刷・PDF保存":"選択した部門・店舗の月間予定をA4一枚で印刷"}
     }
     function renderMonth(){
-      const board=document.querySelector("#mBoard"),a=displayShiftBlocks_(filtered()),people=new Map(state.staff.map(x=>[String(x.staff_code),x])),ym=state.monthlyMonth,[y,m]=ym.split("-").map(Number),first=new Date(y,m-1,1),last=new Date(y,m,0).getDate(),offset=(first.getDay()+6)%7,total=Math.ceil((offset+last)/7)*7,today=localYmd(),by=new Map();
+      const board=document.querySelector("#mBoard"),a=(sogaStaffRestricted_()||(document.querySelector("#mStore")?.value==="SOGA")?sogaPeriodRows_(filtered()):displayShiftBlocks_(filtered())),people=new Map(state.staff.map(x=>[String(x.staff_code),x])),ym=state.monthlyMonth,[y,m]=ym.split("-").map(Number),first=new Date(y,m-1,1),last=new Date(y,m,0).getDate(),offset=(first.getDay()+6)%7,total=Math.ceil((offset+last)/7)*7,today=localYmd(),by=new Map();
       a.forEach(x=>{if(!by.has(x.date))by.set(x.date,[]);by.get(x.date).push(x)});
       let cells="";
       for(let i=0;i<total;i++){
         const day=i-offset+1;
         if(day<1||day>last){cells+='<div class="mcal-day out"></div>';continue}
         const date=`${ym}-${String(day).padStart(2,"0")}`,rows=by.get(date)||[];
-        cells+=`<div class="mcal-day ${date===today?'today':''}" data-mdate="${date}"><div class="mcal-num">${day}</div>${rows.map(x=>{const color=staffColor_(x,people);return `<span class="mcal-event" style="--staff-color:${color}"><b>${esc(String(x.start_time).slice(0,5))}〜${esc(String(x.end_time).slice(0,5))}</b><span class="mcal-event-name"><i class="mcal-event-dot"></i>${esc(personLabel(x,people))}</span><small class="mcal-event-store">${esc(x.store_code||"")}</small></span>`}).join("")}</div>`;
+        cells+=`<div class="mcal-day ${date===today?'today':''}" data-mdate="${date}"><div class="mcal-num">${day}</div>${rows.map(x=>{const color=staffColor_(x,people);return `<span class="mcal-event" style="--staff-color:${color}"><b>${esc(String(x.start_time).slice(0,5))}〜${esc(String(x.end_time).slice(0,5))}</b>${x.isSogaPeriod?sogaPeriodStaffHtml_(x,people,false):`<span class="mcal-event-name"><i class="mcal-event-dot"></i>${esc(personLabel(x,people))}</span>`}<small class="mcal-event-store">${esc(x.store_code||"")}</small></span>`}).join("")}</div>`;
       }
       board.innerHTML=`<div class="mcal-wrap"><div class="mcal"><div class="mcal-week"><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div>土</div><div>日</div></div><div class="mcal-grid">${cells}</div></div></div>`;
       board.querySelectorAll("[data-mdate]").forEach(c=>c.onclick=()=>showDay(c.dataset.mdate));
     }
     function showDay(date){
-      const detail=document.querySelector("#mDetail"),people=new Map(state.staff.map(x=>[String(x.staff_code),x])),rows=displayShiftBlocks_(filtered().filter(x=>x.date===date));
+      const detail=document.querySelector("#mDetail"),people=new Map(state.staff.map(x=>[String(x.staff_code),x])),rows=(sogaStaffRestricted_()||(document.querySelector("#mStore")?.value==="SOGA")?sogaPeriodRows_(filtered().filter(x=>x.date===date)):displayShiftBlocks_(filtered().filter(x=>x.date===date)));
       detail.classList.remove("is-hidden");
-      detail.innerHTML=`<h3>${esc(date)} の予定</h3>${rows.length?rows.map(x=>{const color=staffColor_(x,people);return `<div class="mcal-detail-row" style="--staff-color:${color}"><i class="mcal-detail-dot"></i><strong>${esc(String(x.start_time).slice(0,5))}〜${esc(String(x.end_time).slice(0,5))}</strong><span>${esc(personLabel(x,people))}</span><small class="mcal-detail-store">${esc(x.store_code||"")}</small></div>`}).join(""):'<div>予定はありません。</div>'}`;
+      detail.innerHTML=`<h3>${esc(date)} の予定</h3>${rows.length?rows.map(x=>{const color=staffColor_(x,people);return `<div class="mcal-detail-row" style="--staff-color:${color}"><i class="mcal-detail-dot"></i><strong>${esc(String(x.start_time).slice(0,5))}〜${esc(String(x.end_time).slice(0,5))}</strong>${x.isSogaPeriod?sogaPeriodStaffHtml_(x,people,true):`<span>${esc(personLabel(x,people))}</span>`}<small class="mcal-detail-store">${esc(x.store_code||"")}</small></div>`}).join(""):'<div>予定はありません。</div>'}`;
       detail.scrollIntoView({behavior:"smooth",block:"nearest"});
     }
 
