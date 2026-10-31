@@ -30,7 +30,10 @@ for (const source of [questionnaire, polish]) {
 assert.doesNotMatch(questionnaire, /setTimeout\(boot\s*,/);
 assert.doesNotMatch(config, /admin-questionnaire-fix\.js/);
 assert.match(config, /admin-tour-ui-polish\.js\?v=[A-Za-z0-9.-]+/);
-assert.match(questionnaire, /id="tourAddressCorrect"/);
+assert.doesNotMatch(questionnaire, /id="tourAddressCorrect"/);
+assert.match(questionnaire, /id="tourPrintGuest"/);
+assert.match(questionnaire, /guest_index:guestIndex/);
+assert.match(questionnaire, /value="CONTACT_ONLY"/);
 assert.match(questionnaire, /class="tour-modal-x"/);
 assert.match(questionnaire, /action:"updateTourCustomerAddress"/);
 assert.match(questionnaire, /toUpperCase\(\)!=="CANCELLED"/);

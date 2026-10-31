@@ -12,11 +12,24 @@
 - `?preview=1` は公開日前後とも確定禁止。プレビュー付きAPIリクエストも拒否。
 - `/tour/` は2026-11-01 00:00 JSTに新UIへ切替。URLパラメーターとフラグメントを維持。
 
+## アンケートの印刷
+
+- TOURは氏名・メールアドレス・電話番号のみ差し込む。郵便番号・住所・予約日時の差込セルは必ず空欄にする。既存住所が記録されていても印刷しない。
+- 2名の予約では、管理画面のアンケート画面で「印刷する見学者」の①・②を選択。それぞれの表面・裏面（A4両面・長辺とじ、2ページ）を個別に作成する。
+- ファイル名とリクエストキャッシュに見学者番号を含め、①と②を取り違えない。生成後も切替可能で、作成済みの各PDFを再表示できる。
+- 見学者2は保存済みの構造化情報と、旧形式の「見学者2 氏名／電話番号／メールアドレス」備考に対応。情報のない②を指定した場合はPDFを作らずエラーにする。
+- 旧クライアントからTOURをFULL・ADDRESS_ONLYで要求されても、住所は印刷しない。COUNSEL非会員の既存FULL・ADDRESS_ONLY・BLANKは変更しない。
+- 本番では `46_TourQuestionnairePrint.js` と `46_1_TourQuestionnairePrintFast.js` の両方の差分を反映する。追加helperは共通46に置き、高速版も利用する。
+- 管理フロントは `admin/admin-questionnaire.js` と読み込みバージョンを更新。通常のPages公開より先にGASを反映する。
+
 ## 必要な接続と権限
 
-- Git HTTPSの読み取りは確認済み。GitHub API、公開Pages、Google Apps Scriptはクラウドプロキシの403で接続不可だった。
+- Gitの読み取り・修正ブランチへのpush、GitHub API、本番GASのgetServicesへの接続を確認済み。通信先追加の適用により、当初のプロキシ403は解消。
 - 環境ネットワーク設定に `api.github.com`、`forestgym-tokyo.github.io`、`script.google.com`、`script.googleusercontent.com`、`script.googleapis.com`、`oauth2.googleapis.com` を追加する。既存の許可先は保持する。
-- GitHubの当該リポジトリに対する書き込み権限、既存GASプロジェクトの編集・デプロイ権限が必要。ローカルのclasp認証ファイルは確認時点で存在しなかった。GitHub SecretsのCLASPRC_JSON/CLASP_JSONの利用可否は、APIが403のため未確認。認証情報をチャットやリポジトリに記載しない。
+- GitHubのリポジトリ書き込み権限は確認済み。既存GAS認証を使う読み取り専用Actions監査では、CLASPRC_JSON/CLASP_JSONの存在・形式の検証は成功したが、Googleから `GAS_REFRESH_TOKEN_REJECTED`（refresh token expired or revoked）が返った。本番ソースのpull・push・デプロイは未実施。
+- 同じGASプロジェクトへ編集・デプロイできるGoogleアカウントでclaspの再認証を行い、生成されたログイン設定をGitHub Actions Secret `CLASPRC_JSON` に安全に更新する。`CLASP_JSON` のプロジェクトIDは維持する。認証情報をチャットやリポジトリに記載しない。
+- 再認証のコマンドは `npx --yes @google/clasp@3.4.1 login`。GASを更新する既存Googleアカウントでログインし、生成された `~/.clasprc.json` を https://github.com/forestgym-tokyo/anauts-os-reserve/settings/secrets/actions の `CLASPRC_JSON` に登録する（値はチャットへ送らない）。
+- 再認証後は `.github/workflows/gas-source-readonly-audit.yml` を修正ブランチから実行し、接続を再確認してから本番差分反映へ進む。失敗診断: https://github.com/forestgym-tokyo/anauts-os-reserve/actions/runs/41164905466
 
 ## 反映順序（GAS → 設定 → 読み取り検証 → Pages）
 
@@ -91,8 +104,11 @@ node --test --test-reporter=tap tests/*.test.js
 export ROUND9_PLAYWRIGHT_MODULE=/workspace/.anauts-tools/node_modules/playwright
 export ROUND9_CHROMIUM_PATH=/usr/bin/chromium
 node tests/tfg-tour.browser.cjs
+node tests/tour-questionnaire-guests.browser.cjs
 ```
 
 Nodeテストには実際のGAS予約・空き枠・メール関数を利用し、Googleのサービス部分だけを架空データに置換。これは実Google環境での受信確認ではない。ブラウザーテストも本番APIには送信しない。証跡画像は既定で `/tmp/tfg-tour-evidence/`。
 
 追加テストは、締切の直前とちょうどの時刻、10:00始業、締切・予約・キャッシュ後の候補固定、書き込み直前に締切を越すケース、1〜2名必須情報、宛先重複、メール失敗と再送、スタッフ不在・他店舗・短時間勤務、シートとCalendarの競合、20:00〜21:00、プレビュー、320/390/768/1280px表示、0時切替、ライブ差分反映の冪等性と競合停止を含む。既存MPG・9ROUND・パーソナルのテストも全件実行する。
+
+アンケート追加後の検証結果: Node全253件が成功。印刷ブラウザーテストは320／390／1280pxで成功し、①②それぞれの作成、住所空欄、キャッシュの取り違え防止、1名・旧形式2名・COUNSEL互換性を確認。証跡画像: `/tmp/tfg-questionnaire-evidence/`。実際のGoogle PDF出力と本番印刷は認証失効のため未検証。

@@ -18,7 +18,8 @@
  * D39 見学日時
  *
  * print_mode:
- * FULL         = 全部転記
+ * CONTACT_ONLY = TOURの氏名・電話・メールのみ（住所は空欄）
+ * FULL         = COUNSELの全部転記
  * ADDRESS_ONLY = 住所のみ
  * BLANK        = すべて空欄
  */
@@ -45,7 +46,7 @@ function generateTourQuestionnairePdf(params) {
         params.reservation_id || ""
       ).trim();
 
-    const printMode =
+    let printMode =
       String(
         params.print_mode || "FULL"
       ).trim().toUpperCase();
@@ -61,6 +62,7 @@ function generateTourQuestionnairePdf(params) {
       ![
         "FULL",
         "ADDRESS_ONLY",
+        "CONTACT_ONLY",
         "BLANK"
       ].includes(printMode)
     ) {
@@ -90,8 +92,11 @@ function generateTourQuestionnairePdf(params) {
       );
     }
 
-    const reservation =
+    let reservation =
       reservationInfo.record || {};
+
+    reservation = selectTourQuestionnaireGuest_(reservation, params);
+    printMode = normalizeTourQuestionnairePrintMode_(reservation, printMode);
 
     const serviceCode =
       String(
@@ -266,7 +271,11 @@ function generateTourQuestionnairePdf(params) {
         );
 
 
-      if (printMode === "FULL") {
+      if (printMode === "CONTACT_ONLY") {
+        tempSheet.getRange("F3").setValue(customerName);
+        tempSheet.getRange("F6").setNumberFormat("@").setValue(customerPhoneForPrint).setHorizontalAlignment("left");
+        tempSheet.getRange("F7").setValue(customerEmailForPrint).setHorizontalAlignment("left");
+      } else if (printMode === "FULL") {
 
         tempSheet
           .getRange("F3")
@@ -622,7 +631,7 @@ function generateTourQuestionnairePdf(params) {
     return errorResponse(
       error.message ||
         "アンケートPDF生成中にエラーが発生しました。",
-      "TOUR_PRINT_ERROR",
+      error.tourPrintCode || "TOUR_PRINT_ERROR",
       {
         message:
           error.message
@@ -918,6 +927,67 @@ function formatTourPrintPhone_(
 }
 
 
+/** Read both structured November bookings and older two-guest notes. */
+function getTourQuestionnaireGuests_(reservation) {
+  const guests = [{
+    name: String(reservation.customer_name || "").trim(),
+    phone: String(reservation.customer_phone || "").trim(),
+    email: String(reservation.customer_email || "").trim()
+  }];
+  if (String(reservation.service_code || "").toUpperCase() !== "TOUR") return guests;
+
+  const note = String(reservation.note || ""), marker = "\nTFG_TOUR_DATA:";
+  const offset = note.lastIndexOf(marker);
+  let second = null;
+  if (offset >= 0) {
+    try {
+      const data = JSON.parse(note.slice(offset + marker.length));
+      if (Array.isArray(data.guests)) second = data.guests[1];
+    } catch (ignore) {}
+  }
+  if (!second) {
+    const name = note.match(/(?:^|\n)見学者2\s*氏名[：:]\s*([^\r\n]+)/);
+    const phone = note.match(/(?:^|\n)見学者2\s*電話番号[：:]\s*([^\r\n]+)/);
+    const email = note.match(/(?:^|\n)見学者2\s*メールアドレス[：:]\s*([^\r\n]+)/);
+    if (name) second = {name: name[1], phone: phone ? phone[1] : "", email: email ? email[1] : ""};
+  }
+  if (second && String(second.name || "").trim()) guests.push({
+    name: String(second.name || "").trim(),
+    phone: String(second.phone || "").trim(),
+    email: String(second.email || "").trim()
+  });
+  return guests;
+}
+
+function selectTourQuestionnaireGuest_(reservation, params) {
+  const index = params.guest_index === undefined ? 1 : Number(params.guest_index);
+  const guests = getTourQuestionnaireGuests_(reservation);
+  if ((index !== 1 && index !== 2) || !guests[index - 1]) {
+    const error = new Error("印刷する見学者を正しく選択してください。");
+    error.tourPrintCode = "INVALID_PRINT_GUEST";
+    throw error;
+  }
+  const guest = guests[index - 1];
+  return Object.assign({}, reservation, {
+    customer_name: guest.name,
+    customer_phone: guest.phone,
+    customer_email: guest.email,
+    questionnaire_guest_index: String(reservation.service_code || "").toUpperCase() === "TOUR" ? index : null
+  });
+}
+
+function normalizeTourQuestionnairePrintMode_(reservation, value) {
+  const mode = String(value || "FULL").trim().toUpperCase();
+  if (!["FULL", "ADDRESS_ONLY", "CONTACT_ONLY", "BLANK"].includes(mode) ||
+      (mode === "CONTACT_ONLY" && String(reservation.service_code || "").toUpperCase() !== "TOUR")) {
+    const error = new Error("印刷モードが正しくありません。");
+    error.tourPrintCode = "INVALID_PRINT_MODE";
+    throw error;
+  }
+  // Old clients requesting FULL/ADDRESS_ONLY must also leave TOUR addresses blank.
+  return String(reservation.service_code || "").toUpperCase() === "TOUR" && mode !== "BLANK" ? "CONTACT_ONLY" : mode;
+}
+
 function buildTourPrintFileName_(
   reservation,
   printMode
@@ -936,7 +1006,7 @@ function buildTourPrintFileName_(
       ? "全部"
       : printMode === "ADDRESS_ONLY"
         ? "住所のみ"
-        : "空欄";
+        : printMode === "CONTACT_ONLY" ? "連絡先" : "空欄";
 
   const dateText =
     Utilities.formatDate(
@@ -948,6 +1018,7 @@ function buildTourPrintFileName_(
   return (
     "店内見学アンケート_" +
     customerName +
+    (reservation.questionnaire_guest_index ? "_見学者" + reservation.questionnaire_guest_index : "") +
     "_" +
     modeLabel +
     "_" +

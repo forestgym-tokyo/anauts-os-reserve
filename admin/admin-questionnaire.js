@@ -3,10 +3,8 @@
  * 店内見学 UI v32.1
  *
  * TOUR予約行に「アンケート閲覧・印刷」を追加。
- * ラジオボタン:
- * - 全部
- * - 住所のみ
- * - すべて空欄
+ * TOURは氏名・メール・電話のみ転記し、住所は空欄。2名予約は印刷対象を選択。
+ * COUNSEL非会員は既存の印刷モードを維持。
  */
 (function(){
   "use strict";
@@ -69,6 +67,9 @@
       .tour-print-body{padding:18px 22px}
       .tour-print-reservation{background:#f6f7f8;border-radius:12px;padding:12px 14px;margin-bottom:16px;font-size:13px;line-height:1.7}
       .tour-print-options{display:grid;gap:10px}
+      .tour-print-guest-label{display:block;font-size:13px;font-weight:700;margin-bottom:6px}
+      .tour-print-guest-select{box-sizing:border-box;width:100%;padding:10px 12px;background:#fff;color:#111;border:1px solid #98a2b3;border-radius:8px;font:inherit}
+      .tour-print-guest-help{font-size:12px;line-height:1.6;color:#667085;margin-bottom:16px}
       .tour-print-option{display:flex;align-items:flex-start;gap:11px;padding:13px;border:1px solid #d9dde3;border-radius:12px;cursor:pointer}
       .tour-print-option:has(input:checked){border-color:#111;background:#f4f7f5;box-shadow:0 0 0 1px #111 inset}
       .tour-print-option input{margin-top:3px;transform:scale(1.18)}
@@ -239,7 +240,24 @@
     editor.querySelector("textarea").focus();
   }
 
+  function printGuests_(reservation){
+    const guests=[{name:String(reservation.customer_name||"").trim(),phone:String(reservation.customer_phone||"").trim(),email:String(reservation.customer_email||"").trim()}];
+    if(!isTour_(reservation))return guests;
+    const note=String(reservation.note||""),marker="\nTFG_TOUR_DATA:",offset=note.lastIndexOf(marker);
+    let second=null;
+    if(offset>=0){try{const saved=JSON.parse(note.slice(offset+marker.length));if(Array.isArray(saved.guests))second=saved.guests[1];}catch(ignore){}}
+    if(!second){
+      const name=note.match(/(?:^|\n)見学者2\s*氏名[：:]\s*([^\r\n]+)/);
+      const phone=note.match(/(?:^|\n)見学者2\s*電話番号[：:]\s*([^\r\n]+)/);
+      const email=note.match(/(?:^|\n)見学者2\s*メールアドレス[：:]\s*([^\r\n]+)/);
+      if(name)second={name:name[1],phone:phone?phone[1]:"",email:email?email[1]:""};
+    }
+    if(second&&String(second.name||"").trim())guests.push({name:String(second.name||"").trim(),phone:String(second.phone||"").trim(),email:String(second.email||"").trim()});
+    return guests;
+  }
+
   function openPrintModal(r){
+    const guests=printGuests_(r),tour=isTour_(r);
     closeModal();
     injectStyles();
 
@@ -250,14 +268,17 @@
         <button type="button" class="tour-modal-x" aria-label="閉じる">×</button>
         <div class="tour-print-head">
           <h2>${isCounselVisitor_(r) ? "ダイエット無料カウンセリング アンケート" : "店内見学アンケート"}</h2>
-          <p>転記内容を選択してPDFを作成します。</p>
+          <p>${tour?"氏名・メールアドレス・電話番号のみ転記します。住所・郵便番号は空欄です。":"転記内容を選択してPDFを作成します。"}</p>
         </div>
         <div class="tour-print-body">
           <div class="tour-print-reservation">
-            <strong>${escapeHtml(r.customer_name||(isCounselVisitor_(r) ? "カウンセリング予約者" : "見学者"))}</strong><br>
+            <strong id="tourPrintGuestName">${escapeHtml(r.customer_name||(isCounselVisitor_(r) ? "カウンセリング予約者" : "見学者"))}</strong><br>
             ${escapeHtml(r.date||r.reservation_date||"")} ${escapeHtml(r.start_time||"")}〜${escapeHtml(r.end_time||"")}
           </div>
-          <div class="tour-print-options">
+          ${guests.length>1?`<label class="tour-print-guest-label" for="tourPrintGuest">印刷する見学者</label>
+          <select id="tourPrintGuest" class="tour-print-guest-select">${guests.map((guest,index)=>`<option value="${index+1}">見学者${index===0?"①":"②"}：${escapeHtml(guest.name)}</option>`).join("")}</select>
+          <p class="tour-print-guest-help">見学者ごとに、表面・裏面の2ページを個別に作成・印刷できます。</p>`:""}
+          ${tour?`<input type="hidden" name="tourPrintMode" value="CONTACT_ONLY"><div class="tour-info-box">住所欄は空欄のまま出力します。</div>`:`          <div class="tour-print-options">
             <label class="tour-print-option">
               <input type="radio" name="tourPrintMode" value="FULL" checked>
               <span><strong>全部</strong><small>氏名・郵便番号・住所・電話番号・メールアドレス・予約日時を転記</small></span>
@@ -271,18 +292,19 @@
               <span><strong>すべて空欄</strong><small>予約情報を一切転記せず、原本のまま出力</small></span>
             </label>
           </div>
+`}
           <div class="tour-print-duplex">印刷設定：A4／両面印刷／長辺とじ<br>PDFは表面・裏面の2ページで生成されます。</div>
           <div class="tour-print-message" id="tourPrintMessage"></div>
         </div>
         <div class="tour-print-actions">
           <button type="button" class="ghost-button" id="tourPrintCancel">閉じる</button>
-          ${isTour_(r)?`<button type="button" id="tourAddressCorrect">住所訂正</button>`:``}
           <button type="button" class="primary-button" id="tourPrintGenerate">PDFを作成して閲覧・印刷</button>
         </div>
       </div>`;
 
     let generationInFlight=false;
     let generatedPdf=null;
+    const generatedPdfs=new Map();
     const generationRequestId=
       "tour-pdf-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,10);
 
@@ -296,11 +318,18 @@
     overlay.querySelector("#tourPrintCancel").onclick=()=>{
       if(!generationInFlight)closeModal();
     };
-    showCurrentAddress_(overlay.querySelector(".tour-print-modal"),r);
-    if(isTour_(r)){
-      overlay.querySelector("#tourAddressCorrect").onclick=()=>
-        openAddressEditor_(r,overlay.querySelector(".tour-print-modal"));
-    }
+    if(!tour)showCurrentAddress_(overlay.querySelector(".tour-print-modal"),r);
+    const guestSelect=overlay.querySelector("#tourPrintGuest");
+    const selectedGuestIndex=()=>Number(guestSelect?.value||1);
+    const selectedMode=()=>overlay.querySelector('input[name="tourPrintMode"]:checked')?.value||(tour?"CONTACT_ONLY":"FULL");
+    const syncSelection=()=>{
+      overlay.querySelector("#tourPrintGuestName").textContent=guests[selectedGuestIndex()-1].name||"見学者";
+      generatedPdf=generatedPdfs.get(selectedGuestIndex()+":"+selectedMode())||null;
+      overlay.querySelector("#tourPrintMessage").textContent="";
+      overlay.querySelector("#tourPrintGenerate").textContent=generatedPdf?"作成済みPDFを開く":"PDFを作成して閲覧・印刷";
+    };
+    if(guestSelect)guestSelect.addEventListener("change",syncSelection);
+    overlay.querySelectorAll('input[name="tourPrintMode"]').forEach(input=>input.addEventListener("change",syncSelection));
 
     overlay.querySelector("#tourPrintGenerate").onclick=async()=>{
       const btn=overlay.querySelector("#tourPrintGenerate");
@@ -312,7 +341,7 @@
       }
       if(generationInFlight)return;
 
-      const mode=overlay.querySelector('input[name="tourPrintMode"]:checked')?.value||"FULL";
+      const mode=selectedMode(),guestIndex=selectedGuestIndex();
       const modeInputs=[...overlay.querySelectorAll('input[name="tourPrintMode"]')];
       const addressButton=overlay.querySelector("#tourAddressCorrect");
 
@@ -320,6 +349,7 @@
       btn.disabled=true;
       btn.textContent="PDF作成中…";
       modeInputs.forEach(input=>{input.disabled=true});
+      if(guestSelect)guestSelect.disabled=true;
       if(addressButton)addressButton.disabled=true;
       msg.style.color="#475467";
       msg.textContent="PDFを作成しています。この画面のままお待ちください。";
@@ -329,12 +359,14 @@
         const j=await apiGet(PRINT_ACTION,{
           reservation_id:r.reservation_id,
           print_mode:mode,
-          request_id:generationRequestId
+          guest_index:guestIndex,
+          request_id:generationRequestId+"-g"+guestIndex+"-"+mode
         });
         const data=j.data||{};
         const fileUrl=String(data.file_url||"").trim();
         if(!fileUrl)throw new Error("保存済みPDFのURLを取得できませんでした。");
         generatedPdf=data;
+        generatedPdfs.set(guestIndex+":"+mode,data);
 
         const folderUrl=String(data.folder_url||"").trim();
         const driveFolder=String(data.drive_folder||"A-nauts OS Reserve/TourQuestionnaireTemp").trim();
@@ -357,10 +389,9 @@
         generationInFlight=false;
         btn.disabled=false;
         btn.textContent=generatedPdf?"作成済みPDFを開く":"PDFを作成して閲覧・印刷";
-        if(!generatedPdf){
-          modeInputs.forEach(input=>{input.disabled=false});
-          if(addressButton)addressButton.disabled=false;
-        }
+        modeInputs.forEach(input=>{input.disabled=false});
+        if(guestSelect)guestSelect.disabled=false;
+        if(addressButton)addressButton.disabled=false;
       }
     };
   }
@@ -663,7 +694,7 @@
         question.setAttribute("aria-label","質問・ご要望の対応履歴を開いて返信する");
         question.title="タップして対応履歴を確認・返信";
         question.innerHTML=
-          `<strong>質問・ご要望：</strong> ${escapeHtml(r.note||"なし").replace(/\n/g,"<br>")}`;
+          `<strong>質問・ご要望：</strong> ${escapeHtml(String(r.note||"なし").split("\nTFG_TOUR_DATA:")[0]).replace(/\n/g,"<br>")}`;
         question.onclick=e=>{
           e.preventDefault();
           e.stopPropagation();

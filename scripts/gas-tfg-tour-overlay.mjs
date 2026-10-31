@@ -9,7 +9,7 @@ const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const base='410406868548308d7e9745cd9f45689aa296f967';
 const live=path.resolve(process.argv[2]||'.gas-live');
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'tfg-tour-overlay-'));
-const files=['21_Service.gs.js','28_Availability.gs.js','29_Reservation.gs.js','40_ReservationMail.gs.js','60_StoreAwareAssignment.js'];
+const files=['21_Service.gs.js','28_Availability.gs.js','29_Reservation.gs.js','40_ReservationMail.gs.js','46_TourQuestionnairePrint.js','46_1_TourQuestionnairePrintFast.js','60_StoreAwareAssignment.js'];
 function occurrence(text,part){let n=0,pos=0;while((pos=text.indexOf(part,pos))>=0){n++;pos+=Math.max(1,part.length);}return n;}
 function applyHunks(source,patch,label){
  const hunks=patch.split(/^@@[^\n]*\n/m).slice(1);
