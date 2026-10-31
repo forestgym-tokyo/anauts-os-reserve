@@ -65,12 +65,26 @@ jobs:
           NODE
             exit 1
           fi
+          if ! npx -y @google/clasp@3.4.1 --json list-deployments > "$audit_dir/deployments.json" 2> "$audit_dir/deployments.error"; then
+            echo "::error title=GAS connection diagnosis::GAS_DEPLOYMENTS_READ_FAILED: Cannot verify the target deployment; no deployment performed"
+            exit 1
+          fi
           node -e '
             const fs=require("fs"), p=require("path");
             const d="gas";
             const files=fs.readdirSync(d);
             const has=(re)=>files.some(f=>re.test(f));
+            const deploymentText=fs.readFileSync("deployments.json","utf8");
+            const sources=files.filter(f=>/\.(js|gs)$/.test(f)).map(f=>({name:f,text:fs.readFileSync(p.join(d,f),"utf8")}));
+            const functionFiles=name=>sources.filter(f=>new RegExp("function\\s+"+name+"\\s*\\(").test(f.text)).map(f=>f.name);
+            const manifestPath=p.join(d,"appsscript.json");
+            const manifest=fs.existsSync(manifestPath)?JSON.parse(fs.readFileSync(manifestPath,"utf8")):{};
             const results={
+              expected_deployment_present: deploymentText.includes("AKfycbyvpQRxRpMRfpaQHtBar77dViCqPl-hdFW-2yMdozhN8RHtwcrFiNEM9cvEbny4x9q0"),
+              availability_files: functionFiles("getAvailableSlots"),
+              reservation_files: functionFiles("createReservation"),
+              execution_api_configured: !!manifest.executionApi,
+              matched_files: files.filter(f=>/^(21_|28_|29_|40_|46_|60_|99_)/.test(f)),
               fetched_files: files.length,
               exists_main: has(/99_Main\.(gs|js)$/),
               exists_tour_enrollment: has(/70_TourSameDayEnrollment\.(gs|js)$/),
@@ -81,9 +95,9 @@ jobs:
               prepared_web_enrollment_already_on_remote: has(/^94_TfgWebMembershipEnrollment\.(gs|js)$/)
             };
             // No remote source, filenames, IDs, or secrets in logs or artifacts.
-            console.log(JSON.stringify(results));
-            if (!results.exists_main || !results.exists_tour_enrollment || !results.manifest) {
-              console.error("Remote script structure does not match expected A-nauts OS project.");
+            console.log("::notice title=GAS source audit::"+JSON.stringify(results));
+            if (!results.expected_deployment_present || !results.availability_files.length || !results.reservation_files.length || !results.manifest) {
+              console.error("::error title=GAS project verification::Remote project does not contain the expected deployment and reservation functions; no deployment performed");
               process.exit(2);
             }
           '
