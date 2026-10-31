@@ -151,15 +151,33 @@ function sendReservationMail_(
   /*
    * お客様向けメール
    */
-  if (customerTemplate) {
+  const tour = serviceCode === "TOUR" && typeof tourBookingData_ === "function" ? tourBookingData_(reservation.note) : null;
+  if (tour) values.note = String(reservation.note || "").split("\nTFG_TOUR_DATA:")[0];
+  const recipients = tour && Array.isArray(tour.guests) ? tour.guests : [{name: reservation.customer_name, phone: reservation.customer_phone, email: customerEmail}];
+  const seen = {};
+  if (serviceCode === "TOUR") result.customer_mails = [];
+  for (const guest of recipients) {
+    const email = String(guest.email || "").trim(), key = email.toLowerCase();
+    if (!email || seen[key]) continue;
+    seen[key] = true;
+    const recipientValues = Object.assign({}, values, {customer_name: guest.name, customer_phone: guest.phone, customer_email: email});
+    if (tour) recipientValues.note = "見学人数：" + recipients.length + "名";
+    if (!customerTemplate) {
+      if (serviceCode === "TOUR") {
+        result.customer_mails.push({ok: false, to: email});
+        logError("sendTourReservationMail", "TOUR確認メールのテンプレートがありません。", {reservation_id: reservation.reservation_id});
+      }
+      continue;
+    }
+    try {
 
     result.customer_mail =
       sendReservationMailMessage_({
         reservation_id:
-          values.reservation_id,
+          recipientValues.reservation_id,
 
         service_code:
-          values.service_code,
+          recipientValues.service_code,
 
         event_type:
           eventType,
@@ -168,7 +186,7 @@ function sendReservationMail_(
           "CUSTOMER",
 
         to:
-          customerEmail,
+          email,
 
         cc:
           "",
@@ -192,7 +210,7 @@ function sendReservationMail_(
         subject:
           replaceReservationMailPlaceholders_(
             customerTemplate.subject,
-            values
+            recipientValues
           ),
 
         body:
@@ -201,11 +219,11 @@ function sendReservationMail_(
               removeReservationCustomerStaffLine_(
                 customerTemplate.body
               ),
-              values
+              recipientValues
             ),
             eventType,
-            values.manage_url,
-            values
+            recipientValues.manage_url,
+            recipientValues
           ),
 
         html_body:
@@ -214,13 +232,18 @@ function sendReservationMail_(
               removeReservationCustomerStaffLine_(
                 customerTemplate.body
               ),
-              values
+              recipientValues
             ),
             eventType,
-            values.manage_url,
-            values
+            recipientValues.manage_url,
+            recipientValues
           )
       });
+      if (serviceCode === "TOUR") result.customer_mails.push(result.customer_mail);
+    } catch (error) {
+      if (serviceCode !== "TOUR") throw error;
+      result.customer_mails.push({ok: false, to: email});
+    }
   }
 
   /*
@@ -371,16 +394,6 @@ function buildReservationAdminHtmlBody_(
     "RESERVATION_UPDATED",
     "RESERVATION_RESTORED"
   ];
-
-  const actionButtonBackground =
-    serviceCode === "MPG_TRAINING_SUPPORT45"
-      ? "#81d8d0"
-      : "#178447";
-
-  const actionButtonColor =
-    serviceCode === "MPG_TRAINING_SUPPORT45"
-      ? "#111111"
-      : "#ffffff";
 
   const escapedBody =
     escapeReservationMailHtml_(

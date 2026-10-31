@@ -11,7 +11,9 @@ function getServices() {
     service => service.active === true
   );
 
-  return successResponse(result);
+  return successResponse(result.map(function(service) {
+    return service.service_code === "TOUR" ? Object.assign({}, service, {duration: 60, slot_interval_minutes: 30, booking_min_hours: 1}) : service;
+  }));
 }
 
 

@@ -5,15 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#07100c">
   <meta name="referrer" content="strict-origin-when-cross-origin">
-  <meta name="description" content="The Forest Gym 八千代緑が丘店の店内見学予約。理想の自分へ、ここから。">
+  <meta name="description" content="The Forest Gym 八千代緑が丘店の店内見学予約。理想の自分へ、ここから一歩。">
   <title>店内見学予約 | The Forest Gym 八千代緑が丘店</title>
-  <link rel="stylesheet" href="./november.css?v=20261031">
-  <script src="./november.js?v=20261031" defer></script>
+  <link rel="stylesheet" href="./november.css?v=20261031-tour-v2">
+  <script src="./november.js?v=20261031-tour-v2" defer></script>
 </head>
 <body>
   <header class="site-header">
     <div class="wrap header-content">
-      <div class="brand">THE <em>FOREST</em> GYM<small>YACHIYO MIDORIGAOKA</small></div>
+      <div class="brand"><img src="./forest-gym-logo.png" alt="The Forest Gym 24h Fitness" width="410" height="185"><small>八千代緑が丘店</small></div>
       <span class="header-label">GYM TOUR BOOKING</span>
     </div>
   </header>
@@ -41,7 +41,7 @@
           <div><p class="eyebrow">CHOOSE YOUR TIME</p><h2 id="scheduleTitle">日付と時間を選ぶ</h2></div>
           <span class="light-pill">見学無料</span>
         </div>
-        <p class="section-description">9:00から30分刻みでご予約いただけます。最終枠は20:00〜21:00です。スタッフがご案内できる時間のみ選択できます。</p>
+        <p class="section-description">9:00から30分刻みでご予約いただけます。最終の開始時刻は20:00、見学時間は1時間です。スタッフがご案内できる時間のみ選択できます。</p>
         <div class="week-controls">
           <button id="previousWeek" class="nav-arrow" type="button" aria-label="前の7日間">‹</button>
           <strong id="weekLabel">空き状況を確認しています</strong>
@@ -59,10 +59,10 @@
       <section class="panel form-panel" aria-labelledby="formTitle">
         <p class="eyebrow">BOOK YOUR VISIT</p>
         <h2 id="formTitle">見学者情報</h2>
-        <div class="selection" id="selection"><span class="selection-icon" aria-hidden="true">↖</span><p>まずは、ご希望の<br>日時をお選びください。</p></div>
+        <div class="selection" id="selection"><p>まずは、ご希望の<br>日時をお選びください。</p></div>
         <form id="applicationForm" novalidate>
           <fieldset id="detailsFields" disabled>
-            <label for="partySize">見学人数<span class="required">必須</span>
+            <label for="partySize">見学人数<span class="required">必須</span><span class="party-help">（最大2名様まで同時見学可能です。）</span>
               <select id="partySize" name="party_size" required>
                 <option value="1">1名</option>
                 <option value="2">2名</option>
@@ -86,8 +86,7 @@
           </fieldset>
           <div id="formError" class="form-error" role="alert" hidden></div>
           <button id="submitBooking" class="primary-button" type="submit" disabled>この内容で見学予約する <span aria-hidden="true">→</span></button>
-          <p class="privacy">入力情報は見学予約の受付・ご連絡のみに使用します。予約確認メールは見学者1のメールアドレスへお送りします。</p>
-          <p class="secure-note">本人確認コード・会員番号・クレジットカードの登録は不要です。</p>
+          <p class="privacy">入力情報は見学予約の受付・ご連絡のみに使用します。予約確認メールは、入力いただいた見学者全員にお送りします。</p>
         </form>
       </section>
     </div>
