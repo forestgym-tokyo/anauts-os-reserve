@@ -26,7 +26,7 @@ if (Test-Path -LiteralPath $WixAppProjectPath) {
   throw 'The destination already exists. No existing Apps Script project will be overwritten. Choose a new ProjectFolder or inspect the previous installation.'
 }
 $WixAppSourcePath = Join-Path $PSScriptRoot 'app'
-foreach ($WixAppFile in @('Code.gs', 'Index.html', 'appsscript.json')) {
+foreach ($WixAppFile in @('Code.gs', 'Notifications.gs', 'Index.html', 'appsscript.json')) {
   if (-not (Test-Path -LiteralPath (Join-Path $WixAppSourcePath $WixAppFile))) {
     throw "Missing app file: $WixAppFile. Extract the entire ZIP first."
   }
@@ -44,10 +44,10 @@ try {
   if ([string]::IsNullOrWhiteSpace($WixAppNewConfig.scriptId)) {
     throw 'The NEW project ID could not be read. No upload was attempted.'
   }
-  foreach ($WixAppFile in @('Code.gs', 'Index.html', 'appsscript.json')) {
+  foreach ($WixAppFile in @('Code.gs', 'Notifications.gs', 'Index.html', 'appsscript.json')) {
     Copy-Item -LiteralPath (Join-Path $WixAppSourcePath $WixAppFile) -Destination (Join-Path $WixAppProjectPath $WixAppFile) -Force
   }
-  @('**', '!Code.gs', '!Index.html', '!appsscript.json') | Set-Content -LiteralPath '.claspignore' -Encoding Ascii
+  @('**', '!Code.gs', '!Notifications.gs', '!Index.html', '!appsscript.json') | Set-Content -LiteralPath '.claspignore' -Encoding Ascii
   & npx.cmd --yes '@google/clasp@3.4.1' push --force
   if ($LASTEXITCODE -ne 0) {
     throw 'The upload did not finish. Inspect the new project before retrying. No Wix publication was attempted.'
