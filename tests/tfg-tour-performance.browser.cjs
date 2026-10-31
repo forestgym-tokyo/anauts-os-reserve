@@ -25,11 +25,12 @@ async function until(check){const end=Date.now()+10000;while(!check()){if(Date.n
     stats.posts++;const payload=JSON.parse(request.postData());
     if(postMode==='pending')await post.promise;
     result=postMode==='rejected'?{ok:false,code:'SLOT_NOT_AVAILABLE'}:e.context.createReservationStoreAware_(payload);
-    if(postMode==='slow-mail')await post.promise;
+    if(['slow-mail','legacy','late-mail-failure'].includes(postMode))await post.promise;
+    if(postMode==='late-mail-failure')result.data.mail_status='pending';
     if(postMode==='lost'){stats.postFinished=true;return route.abort('failed');}
     stats.postFinished=true;
    }else if(url.searchParams.get('action')==='getTourBookingStatus'){
-    stats.status++;result=e.context.getTourBookingStatus_(Object.fromEntries(url.searchParams));
+    stats.status++;result=postMode==='legacy'?{ok:false,code:'UNKNOWN_ACTION'}:e.context.getTourBookingStatus_(Object.fromEntries(url.searchParams));
    }else{
     const start=url.searchParams.get('start_date'),days=Number(url.searchParams.get('days'));stats.ranges.push({start,days});
     if(holdRemaining&&days>1)await remaining.promise;
@@ -75,6 +76,21 @@ async function until(check){const end=Date.now()+10000;while(!check()){if(Date.n
     if(postMode==='slow-mail')assert.equal(c.stats.postFinished,false);
     assert.equal(await c.page.locator('#editPreview').isVisible(),false);
     checks.push(postMode==='slow-mail'?'committed receipt shows success before slow POST notification response':'lost POST response recovers the saved reservation without a second POST');
+   }finally{await c.close();}
+  }
+  {
+   const c=await open({postMode:'legacy'});try{
+    await c.fill();await c.page.locator('#submitBooking').click();await until(()=>c.stats.posts===1);await c.page.clock.runFor(1600);await until(()=>c.stats.status>=1);
+    assert.equal(await c.page.locator('#resultPanel').isVisible(),false);c.post.release();await c.page.locator('#resultPanel').waitFor({state:'visible'});
+    assert.equal(c.e.tables.reservations.length,1);checks.push('legacy GAS without receipt endpoint still completes through its original POST');
+   }finally{await c.close();}
+  }
+  {
+   const c=await open({postMode:'late-mail-failure'});try{
+    await c.fill();await c.page.locator('#submitBooking').click();await until(()=>c.stats.posts===1);await c.page.clock.runFor(1600);await c.page.locator('#resultPanel').waitFor({state:'visible'});
+    assert.equal(await c.page.locator('#notice').isVisible(),false);c.post.release();await c.page.locator('#notice').waitFor({state:'visible'});
+    assert.match(await c.page.locator('#notice').innerText(),/予約は完了.*メールの送信に失敗/);assert.equal(c.e.tables.reservations.length,1);
+    checks.push('notification failure reported after the receipt is displayed without undoing the booking');
    }finally{await c.close();}
   }
   {
