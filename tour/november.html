@@ -8,7 +8,7 @@
   <meta name="description" content="The Forest Gym 八千代緑が丘店の店内見学予約。理想の自分へ、ここから一歩。">
   <title>店内見学予約 | The Forest Gym 八千代緑が丘店</title>
   <link rel="stylesheet" href="./november.css?v=20261031-tour-v3">
-  <script src="./november.js?v=20261031-tour-v2" defer></script>
+  <script src="./november.js?v=20261031-preview-review" defer></script>
 </head>
 <body>
   <header class="site-header">
@@ -31,9 +31,10 @@
     <ol class="steps" aria-label="予約の流れ">
       <li class="is-current" data-step="1"><b>01</b> 日時を選択</li>
       <li data-step="2"><b>02</b> 見学者情報</li>
-      <li data-step="3"><b>03</b> 予約完了</li>
+      <li data-step="3"><b>03</b> <span id="lastStepLabel">予約完了</span></li>
     </ol>
 
+    <div id="modeNotice" class="notice" role="status" aria-live="polite" hidden></div>
     <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
     <div class="layout" id="bookingLayout">
       <section class="panel schedule-panel" aria-labelledby="scheduleTitle">
@@ -93,11 +94,11 @@
 
     <section id="resultPanel" class="panel result-panel" hidden aria-live="polite">
       <div class="success-icon" aria-hidden="true">✓</div>
-      <p class="eyebrow">YOUR FIRST STEP IS BOOKED.</p>
-      <h2>見学予約が完了しました</h2>
-      <p>ご予約ありがとうございます。<br>当日のご来店をスタッフ一同お待ちしています。</p>
+      <p id="resultEyebrow" class="eyebrow">YOUR FIRST STEP IS BOOKED.</p>
+      <h2 id="resultTitle">見学予約が完了しました</h2>
+      <p id="resultMessage">ご予約ありがとうございます。<br>当日のご来店をスタッフ一同お待ちしています。</p>
       <dl id="resultDetails"></dl>
-      <p>予約変更・キャンセルは店舗までお電話ください。</p>
+      <p id="resultNote">予約変更・キャンセルは店舗までお電話ください。</p>
       <button id="newBooking" class="primary-button" type="button">別の日時を確認する <span aria-hidden="true">→</span></button>
     </section>
 
