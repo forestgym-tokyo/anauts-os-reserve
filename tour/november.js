@@ -67,9 +67,9 @@ function renderSlots(){
     const active=available&&state.slot&&state.slot.date===state.date&&minute(state.slot.start_time)===t;
     const b=node("button","slot-button"+(active?" is-selected":""),undefined);
     b.type="button";b.disabled=busy||!available;
-    b.setAttribute("aria-label",fmtTime(t)+(available?" 予約可能":" 受付不可"));
+    b.setAttribute("aria-label",fmtTime(t)+"〜"+fmtTime(t+60)+(available?" 予約可能":" 受付不可"));
     b.setAttribute("aria-pressed",String(!!active));
-    b.append(node("strong","",fmtTime(t)),node("span","",available?(active?"選択中":"予約可"):"受付不可"));
+    b.append(node("strong","",fmtTime(t)),node("span","",("〜"+fmtTime(t+60)+" · ")+(available?(active?"選択中":"予約可"):"受付不可")));
     b.addEventListener("click",()=>chooseSlot(slot));
     box.append(b);
   }
@@ -89,7 +89,7 @@ function renderSelected(){
   }else{
     selection.append(node("span","selection-icon","✓"));
     const p=node("p");
-    p.append(node("span","","選択中の見学日時"),node("br"),node("strong","",shortDate(state.slot.date)+" "+fmtTime(minute(state.slot.start_time))+" 開始"));
+    p.append(node("span","","選択中の見学日時"),node("br"),node("strong","",shortDate(state.slot.date)+" "+fmtTime(minute(state.slot.start_time))+"〜"+fmtTime(minute(state.slot.start_time)+60)));
     selection.append(p);
   }
   updateBusy(busy);
@@ -211,7 +211,7 @@ async function submit(e){
     q("bookingLayout").hidden=true;
     q("resultPanel").hidden=false;
     const dl=q("resultDetails");dl.replaceChildren();
-    for(const [label,value] of [["見学日",shortDate(slot.date)],["開始時刻",fmtTime(minute(slot.start_time))],["見学人数",state.partySize+"名"],["予約番号",result.data?.reservation_id||"予約済み"]]){
+    for(const [label,value] of [["見学日",shortDate(slot.date)],["見学時間",fmtTime(minute(slot.start_time))+"〜"+fmtTime(minute(slot.start_time)+60)],["見学人数",state.partySize+"名"],["予約番号",result.data?.reservation_id||"予約済み"]]){
       dl.append(node("dt","",label),node("dd","",value));
     }
     setStep(3);q("resultPanel").scrollIntoView({behavior:"smooth",block:"start"});
