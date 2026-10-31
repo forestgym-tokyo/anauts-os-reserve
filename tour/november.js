@@ -8,10 +8,14 @@ const DAY_MS=86400000;
 const DAY_NAMES=["日","月","火","水","木","金","土"];
 const q=id=>document.getElementById(id);
 const DATE_RE=/^\d{4}-\d{2}-\d{2}$/;
+const SCHEDULE_TTL=60000;
+const SCHEDULE_STORAGE="tfg-tour-slots-v2"+(PREVIEW?"-preview":"");
+const scheduleCache=new Map();
 let sequence=0;
 let busy=false;
 let pendingRequest=null;
 let submissionUncertain=false;
+let scheduleCheckedAt=0;
 const state={today:todayJst(),weekStart:"",date:"",slot:null,days:[],maxDate:"",partySize:1,result:null};
 if(PREVIEW && state.today<"2026-11-01")state.today="2026-11-01";
 state.weekStart=state.today;
@@ -117,58 +121,89 @@ async function jsonGet(url,timeout=45000){
     return await r.json();
   }finally{clearTimeout(timer);}
 }
-async function getRange(from){
+async function getRange(from,days=7){
   const url=new URL(API);
   url.searchParams.set("action","getAvailableSlotsRange");
   url.searchParams.set("service_code",SERVICE);
   url.searchParams.set("start_date",from);
-  url.searchParams.set("days","7");
+  url.searchParams.set("days",String(days));
   url.searchParams.set("_",String(Date.now()));
   let previous;
   for(let n=0;n<2;n++){
     try{
-      const res=await jsonGet(url.toString());
-      if(res.ok&&Array.isArray(res.data?.results)&&res.data.results.length===7)return res.data.results;
+      const res=await jsonGet(url.toString(),20000);
+      if(res.ok&&Array.isArray(res.data?.results)&&res.data.results.length===days)return res.data.results;
       const error=new Error(res.message||"空き状況を取得できませんでした");
       error.code=res.code||"";
       throw error;
-    }catch(e){previous=e;if(n===0&&(e.name==="AbortError"||e.name==="TypeError"||e.code==="TOUR_AVAILABILITY_BUSY"))continue;break;}
+    }catch(e){previous=e;if(n===0&&e.code==="TOUR_AVAILABILITY_BUSY"){await new Promise(r=>setTimeout(r,1000));continue;}break;}
   }
   throw previous||new Error("空き状況の取得に失敗しました。");
 }
-function normalizeRange(res,from){
-  return Array.from({length:7},(_,i)=>{
+function normalizeRange(res,from,days=7){
+  return Array.from({length:days},(_,i)=>{
     const day=addDays(from,i),v=res[i];
     return{ok:!!v?.ok,message:v?.message||"",data:{date:day,slots:v?.ok&&Array.isArray(v.data?.slots)?v.data.slots:[]}};
   });
 }
-async function loadSchedule(options={}){
-  if(busy)return;
-  const seq=++sequence,from=state.weekStart,previousDate=state.date;
-  state.slot=null;state.days=[];
-  updateBusy(true);renderDates();renderSelected();
-  q("slots").replaceChildren(node("p","empty-state","スタッフの勤務予定と空き時間を確認しています…"));
-  notify("");
+function cachedDay(day){
+  const item=scheduleCache.get(day);
+  return item&&Date.now()-item.at>=0&&Date.now()-item.at<SCHEDULE_TTL?item.row:null;
+}
+function restoreScheduleCache(){
   try{
-    const received=await getRange(from);
-    if(seq!==sequence)return;
-    state.days=normalizeRange(received,from);
-    // 週を変えた場合は最初の日、再読込なら選択中の日付を維持
-    state.date=options.keepDay&&previousDate>=from&&previousDate<=addDays(from,6)?previousDate:from;
-    const row=state.days.find(x=>x.data.date===state.date);
-    if(!row?.ok) {
-      const firstOk=state.days.find(x=>x.ok&&x.data.date<=state.maxDate);
-      if(firstOk)state.date=firstOk.data.date;
+    const saved=JSON.parse(sessionStorage.getItem(SCHEDULE_STORAGE)||"[]");
+    if(Array.isArray(saved))for(const [day,item] of saved){
+      if(DATE_RE.test(day)&&item?.row?.ok&&item.row.data?.date===day&&Array.isArray(item.row.data.slots))scheduleCache.set(day,item);
     }
-    const failed=state.days.filter(x=>!x.ok&&x.data.date<=state.maxDate).length;
-    if(failed)notify(failed+"日分の空き状況を確認できませんでした。必要に応じて更新してください。",true);
-  }catch(err){
-    if(seq!==sequence)return;
-    state.days=Array.from({length:7},(_,i)=>({ok:false,message:"空き状況を取得できませんでした。更新ボタンから再度お試しください。",data:{date:addDays(from,i),slots:[]}}));
-    notify("空き状況を取得できませんでした。通信環境を確認してもう一度お試しください。",true);
-  }finally{
-    if(seq===sequence){updateBusy(false);renderDates();renderSlots();renderSelected();}
+  }catch(_){}
+}
+function saveScheduleCache(){
+  for(const [day] of scheduleCache)if(!cachedDay(day))scheduleCache.delete(day);
+  try{sessionStorage.setItem(SCHEDULE_STORAGE,JSON.stringify([...scheduleCache]));}catch(_){}
+}
+function clearScheduleCache(){scheduleCache.clear();try{sessionStorage.removeItem(SCHEDULE_STORAGE);}catch(_){}}
+function renderSchedule(){renderDates();renderSlots();renderSelected();}
+async function loadSchedule(options={}){
+  if(busy||state.result)return;
+  const seq=++sequence,from=state.weekStart,previousDate=state.date;
+  const dates=Array.from({length:7},(_,i)=>addDays(from,i));
+  const previousSlot=options.keepSlot?state.slot:null;
+  state.slot=null;
+  state.date=options.keepDay&&dates.includes(previousDate)?previousDate:from;
+  if(options.force)dates.forEach(day=>scheduleCache.delete(day));
+  state.days=dates.map(day=>cachedDay(day));
+  const missing=dates.filter((day,i)=>!state.days[i]&&day<=state.maxDate);
+  updateBusy(!cachedDay(state.date));renderSchedule();
+  notify("");
+  async function receive(start,count){
+    let rows;
+    try{
+      rows=normalizeRange(await getRange(start,count),start,count);
+      for(const row of rows)if(row.ok)scheduleCache.set(row.data.date,{at:Date.now(),row});
+      saveScheduleCache();
+    }catch(_){
+      rows=Array.from({length:count},(_,i)=>({ok:false,message:"空き状況を取得できませんでした。更新ボタンから再度お試しください。",data:{date:addDays(start,i),slots:[]}}));
+    }
+    if(seq!==sequence||state.result)return;
+    for(const row of rows){const index=dates.indexOf(row.data.date);if(index>=0)state.days[index]=row;}
+    if(!busy)renderSchedule();
   }
+  // The selected day's slots become usable without waiting for the rest of the week.
+  if(missing.includes(state.date)){await receive(state.date,1);missing.splice(missing.indexOf(state.date),1);}
+  if(seq!==sequence||state.result)return;
+  if(previousSlot){
+    const row=state.days.find(x=>x?.data?.date===previousSlot.date);
+    state.slot=row?.data.slots.find(s=>s.start_time===previousSlot.start_time&&canBook(s,previousSlot.date))||null;
+  }
+  updateBusy(false);renderSchedule();scheduleCheckedAt=Date.now();
+  // Adjacent missing days share one request; previously visited days use the short cache.
+  const groups=[];
+  for(const day of missing){const last=groups.at(-1);if(last&&addDays(last.start,last.count)===day)last.count++;else groups.push({start:day,count:1});}
+  await Promise.all(groups.map(group=>receive(group.start,group.count)));
+  if(seq!==sequence||state.result)return;
+  const failed=state.days.filter(x=>x&&!x.ok&&x.data.date<=state.maxDate).length;
+  if(failed)notify(failed+"日分の空き状況を確認できませんでした。更新ボタンから再度お試しください。",true);
 }
 function shiftWeek(n){
   if(busy)return;
@@ -184,6 +219,46 @@ function validGuest(i){
   if(!/^[+0-9()\-\s]{9,25}$/.test(phone)||phone.replace(/\D/g,"").length<9){formError("見学者"+i+"の電話番号を正しく入力してください。");q("phone"+i).focus();return null;}
   if(!email||!q("email"+i).checkValidity()){formError("見学者"+i+"のメールアドレスを正しく入力してください。");q("email"+i).focus();return null;}
   return{name,phone,email};
+}
+async function waitForBookingReceipt(payload,signal){
+  const end=Date.now()+60000;
+  while(!signal.aborted&&Date.now()<end){
+    await new Promise(resolve=>{
+      const done=()=>{clearTimeout(timer);signal.removeEventListener("abort",done);resolve();};
+      const timer=setTimeout(done,1500);signal.addEventListener("abort",done,{once:true});
+    });
+    if(signal.aborted)break;
+    try{
+      const url=new URL(API);
+      url.searchParams.set("action","getTourBookingStatus");
+      url.searchParams.set("request_id",payload.request_id);
+      const response=await jsonGet(url.toString(),7000);
+      const data=response.data;
+      if(response.ok&&data?.confirmed===true&&data.status==="RESERVED"&&data.reservation_id&&
+        data.date===payload.date&&data.start_time===payload.start_time&&data.party_size===payload.party_size)return response;
+    }catch(_){}
+  }
+  throw new Error("予約の処理を確認できませんでした。確認メールをご確認ください。");
+}
+async function registerBooking(payload){
+  const stop=new AbortController();
+  const receipt=waitForBookingReceipt(payload,stop.signal);
+  const request=fetch(API,{method:"POST",keepalive:true,headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload)})
+    .then(async response=>{
+      if(!response.ok)throw new Error("通信エラー（"+response.status+"）");
+      return response.json();
+    }).then(result=>{
+      if(result.ok&&state.result?.reservation_id===result.data?.reservation_id&&result.data?.mail_status==="pending")
+        notify("予約は完了しましたが、確認メールの送信に失敗しました。再度予約せず、店舗へお問い合わせください。",true);
+      return result;
+    }).catch(async error=>{
+      // If the POST connection drops after saving, recover its committed result.
+      try{return await receipt;}catch(_){throw error;}
+    });
+  try{
+    // The original POST continues delivering every guest's mail after the saved receipt wins.
+    return await Promise.race([request,receipt]);
+  }finally{stop.abort();}
 }
 async function submit(e){
   e.preventDefault();formError("");notify("");
@@ -214,15 +289,14 @@ async function submit(e){
   updateBusy(true);q("submitBooking").textContent="予約しています…";
   try{
     submissionUncertain=true;
-    const response=await fetch(API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload)});
-    if(!response.ok)throw new Error("通信エラー（"+response.status+"）");
-    const result=await response.json();
+    const result=await registerBooking(payload);
     submissionUncertain=false;
     if(!result.ok){
       const byCode={SLOT_NOT_AVAILABLE:"この時間は満枠になりました。別の時間を選んでください。",NO_WORKING_STAFF:"この時間に対応可能なスタッフがいません。別の時間を選んでください。",BOOKING_DEADLINE_PASSED:"この時間の予約受付は終了しました。",DATE_OUT_OF_PUBLIC_RANGE:"この日付は予約期間外です。"};
       throw new Error(byCode[result.code]||result.message||"予約できませんでした。");
     }
     pendingRequest=null;
+    clearScheduleCache();
     state.result={...result.data,party_size:state.partySize,name:one.name};
     q("bookingLayout").hidden=true;
     q("resultPanel").hidden=false;
@@ -240,6 +314,7 @@ async function submit(e){
   }finally{q("submitBooking").textContent="この内容で見学予約する →";updateBusy(false);}
 }
 function renderPreviewReview(slot,guests){
+  state.result={preview:true};
   const dl=q("resultDetails");dl.replaceChildren();
   const details=[["見学日",shortDate(slot.date)],["見学時間",fmtTime(minute(slot.start_time))],["見学人数",guests.length+"名"]];
   guests.forEach((guest,index)=>{
@@ -260,13 +335,14 @@ function configureAnalytics(){
 function init(){
   q("previousWeek").addEventListener("click",()=>shiftWeek(-1));
   q("nextWeek").addEventListener("click",()=>shiftWeek(1));
-  q("reloadSchedule").addEventListener("click",()=>loadSchedule({keepDay:true}));
+  q("reloadSchedule").addEventListener("click",()=>loadSchedule({keepDay:true,force:true}));
   q("partySize").addEventListener("change",updateParty);
   q("applicationForm").addEventListener("submit",submit);
-  q("newBooking").addEventListener("click",()=>{
+  q("editPreview").addEventListener("click",()=>{
+    if(!PREVIEW)return;
+    state.result=null;
     q("bookingLayout").hidden=false;q("resultPanel").hidden=true;
-    if(PREVIEW){renderSelected();setStep(state.slot?2:1);q("formTitle").scrollIntoView({behavior:"smooth",block:"start"});return;}
-    state.slot=null;state.date=state.today;state.weekStart=state.today;setStep(1);loadSchedule();q("scheduleTitle").scrollIntoView({behavior:"smooth",block:"start"});
+    renderSelected();setStep(state.slot?2:1);q("formTitle").scrollIntoView({behavior:"smooth",block:"start"});
   });
   updateParty();configureAnalytics();
   if(PREVIEW){
@@ -276,10 +352,13 @@ function init(){
     q("resultTitle").textContent="入力内容の確認";
     q("resultMessage").textContent="確認用画面です。予約は確定していません。";
     q("resultNote").textContent="この画面から予約・メール送信は行われません。";
-    q("newBooking").textContent="入力を修正する →";
+    q("editPreview").hidden=false;
   }
+  restoreScheduleCache();
   loadSchedule();
-  document.addEventListener("visibilitychange",()=>{if(!document.hidden&&!busy)loadSchedule({keepDay:true});});
+  document.addEventListener("visibilitychange",()=>{
+    if(!document.hidden&&!busy&&!state.result&&Date.now()-scheduleCheckedAt>=SCHEDULE_TTL)loadSchedule({keepDay:true,keepSlot:true});
+  });
 }
 init();
 })();

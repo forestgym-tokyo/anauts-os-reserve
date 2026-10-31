@@ -238,7 +238,7 @@ function getTourAvailableSlotsRangeBulk_(params) {
     return normalizeStoreAwareCode_(row && row.service_code) ===
       TOUR_WEEK_BULK_SERVICE_CODE_ &&
       isStoreAwareActive_(row && row.active);
-  });
+  }).map(function(row) { return normalizeTourWeekPeriod_(row); });
   const staffRows = measureTourWeekStep_(timings, "staff", function() {
     return readTourWeekRows_("staff");
   }).filter(function(row) {
@@ -261,7 +261,7 @@ function getTourAvailableSlotsRangeBulk_(params) {
       normalizeStoreAwareCode_(row && row.store_code) === storeCode &&
       isStoreAwareActive_(row && row.active) &&
       !!staffByCode[staffCode];
-  });
+  }).map(function(row) { return normalizeTourWeekPeriod_(row, "date"); });
   const reservations = measureTourWeekStep_(timings, "reservations", function() {
     return readTourWeekRows_("reservations");
   }).filter(function(row) {
@@ -269,6 +269,10 @@ function getTourAvailableSlotsRangeBulk_(params) {
       row && (row.reservation_date || row.date)
     );
     return wantedDates[date] === true && isStoreAwareActiveReservation_(row);
+  }).map(function(row) {
+    const normalized = normalizeTourWeekPeriod_(row);
+    normalized.reservation_date = normalizeStoreAwareDate_(row.reservation_date || row.date);
+    return normalized;
   });
 
   const calendarState = measureTourWeekStep_(timings, "calendar", function() {
@@ -328,6 +332,17 @@ function getTourAvailableSlotsRangeBulk_(params) {
   } finally {
     releaseTourWeekCalculation_(cacheKey);
   }
+}
+
+
+/** Convert Sheets Date cells once, before the day/slot loops repeatedly inspect them. */
+function normalizeTourWeekPeriod_(row, dateColumn) {
+  const normalized = Object.assign({}, row, {
+    start_time: normalizeStoreAwareTime_(row && row.start_time),
+    end_time: normalizeStoreAwareTime_(row && row.end_time)
+  });
+  if (dateColumn) normalized[dateColumn] = normalizeStoreAwareDate_(row && row[dateColumn]);
+  return normalized;
 }
 
 
@@ -534,7 +549,10 @@ function loadTourWeekCalendar_(service, dates) {
       row.calendar_name || row.name ||
       (calendar.getName ? calendar.getName() : "") || calendarId
     ),
-    events: events
+    // CalendarEvent accessors are service calls; read each event only once.
+    events: events.map(function(event) {
+      return {start: getTourWeekEventStart_(event), end: getTourWeekEventEnd_(event)};
+    })
   };
 }
 
@@ -578,6 +596,8 @@ function getTourWeekDayCode_(dateText) {
 
 function makeTourWeekDateTime_(dateText, timeText) {
   const timezone = Session.getScriptTimeZone() || "Asia/Tokyo";
+  // TOUR is in Japan (no DST). Avoid a Utilities.parseDate service call for every slot.
+  if (timezone === "Asia/Tokyo") return new Date(String(dateText) + "T" + String(timeText) + ":00+09:00");
   if (Utilities && typeof Utilities.parseDate === "function") {
     return Utilities.parseDate(
       String(dateText) + " " + String(timeText),
@@ -999,6 +1019,12 @@ function validateTourBookingCutoff_(params) {
  */
 function createReservationStoreAware_(params) {
   params = params || {};
+
+  if (normalizeStoreAwareCode_(params.service_code) === "TOUR" && typeof completeTourBooking_ === "function") {
+    // Core TOUR validation already checks the store, shifts, reservations and calendar
+    // under the booking lock. Avoid reading the same sheets three times beforehand.
+    return createReservationWithTrainerPolicy_(params);
+  }
 
   if (normalizeStoreAwareCode_(params.service_code) === "TOUR" && typeof validateTourGuests_ === "function") {
     try {
