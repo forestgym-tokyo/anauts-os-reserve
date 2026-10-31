@@ -1,5 +1,17 @@
 # The Forest Gym 見学予約：2026年11月版の反映
 
+## 本番反映結果（2026年10月31日・日本時間）
+
+- PR #108（手動デプロイ設定）とPR #107（アプリ修正）をマージ。アプリの反映コミットは `225c02a86d3dd8c08720f4cbe293b86612fce92d`。
+- 既存URLを維持してGASの公開版を186へ更新。変更前ソースは185として保存し、旧公開版184も保持。
+- TOURの60分・30分間隔・基本締切1時間を本番で確認。他13サービスの設定は変更前と一致。
+- Node全254件と、本番85枠の締切照合が成功。
+- 本番で1名・2名を登録し、指定2件への確認メール送信と両方の実受信を確認。最終20:00〜21:00、2名分の保存、同じリクエストの再送防止も成功。
+- 作成したテスト予約2件はどちらも取消済み。既存のお客様の予約は変更していない。
+- 実公開URLのスマホ・PC表示、プレビューからの送信禁止、日本時間11月1日0時の自動切替を確認。
+- 管理画面の最新版配信と、ローカルの実GAS関数を使った①②のPDF分離・住所空欄を確認。管理者ログインが必要な本番PDF生成と店舗プリンター出力は、スタッフ側の最終確認項目。
+- GAS反映記録：https://github.com/forestgym-tokyo/anauts-os-reserve/actions/runs/41168665166
+
 ## 変更内容
 
 - 提供ロゴを使用。ヘッダーは黒背景でThe・Gym・Fitnessを白、葉・Forest・24hは緑。ロゴ下の店舗名は表示しない。開始時刻のみ表示、1〜2名の必須入力。
@@ -27,9 +39,9 @@
 - Gitの読み取り・修正ブランチへのpush、GitHub API、本番GASのgetServicesへの接続を確認済み。通信先追加の適用により、当初のプロキシ403は解消。
 - 環境ネットワーク設定に `api.github.com`、`forestgym-tokyo.github.io`、`script.google.com`、`script.googleusercontent.com`、`script.googleapis.com`、`oauth2.googleapis.com` を追加する。既存の許可先は保持する。
 - GitHubのリポジトリ書き込み権限は確認済み。Google再認証後、GASソース取得と既存TOURデプロイの一致確認に成功。GASの実行APIは未設定のため、設定移行は既存Webアプリの初回サービス確認で行う。
-- 同じGASプロジェクトへ編集・デプロイできるGoogleアカウントでclaspの再認証を行い、生成されたログイン設定をGitHub Actions Secret `CLASPRC_JSON` に安全に更新する。`CLASP_JSON` のプロジェクトIDは維持する。認証情報をチャットやリポジトリに記載しない。
+- 認証が失効した場合は、同じGASプロジェクトへ編集・デプロイできるGoogleアカウントでclaspの再認証を行い、生成されたログイン設定をGitHub Actions Secret `CLASPRC_JSON` に安全に更新する。`CLASP_JSON` のプロジェクトIDは維持する。認証情報をチャットやリポジトリに記載しない。
 - 再認証のコマンドは `npx --yes @google/clasp@3.4.1 login`。GASを更新する既存Googleアカウントでログインし、生成された `~/.clasprc.json` を https://github.com/forestgym-tokyo/anauts-os-reserve/settings/secrets/actions の `CLASPRC_JSON` に登録する（値はチャットへ送らない）。
-- 再認証後は `.github/workflows/gas-source-readonly-audit.yml` を修正ブランチから実行し、接続を再確認してから本番差分反映へ進む。失敗診断: https://github.com/forestgym-tokyo/anauts-os-reserve/actions/runs/41164905466
+- 再認証後は `.github/workflows/gas-source-readonly-audit.yml` を修正ブランチから実行し、接続を再確認してから本番差分反映へ進む。接続・本番差分の検証記録: https://github.com/forestgym-tokyo/anauts-os-reserve/actions/runs/41167732747
 
 ## 反映ワークフロー
 
@@ -123,4 +135,4 @@ Nodeテストには実際のGAS予約・空き枠・メール関数を利用し�
 
 追加テストは、締切の直前とちょうどの時刻、10:00始業、締切・予約・キャッシュ後の候補固定、書き込み直前に締切を越すケース、1〜2名必須情報、宛先重複、メール失敗と再送、スタッフ不在・他店舗・短時間勤務、シートとCalendarの競合、20:00〜21:00、プレビュー、320/390/768/1280px表示、0時切替、ライブ差分反映の冪等性と競合停止を含む。既存MPG・9ROUND・パーソナルのテストも全件実行する。
 
-アンケート追加後の検証結果: Node全253件が成功。印刷ブラウザーテストは320／390／1280pxで成功し、①②それぞれの作成、住所空欄、キャッシュの取り違え防止、1名・旧形式2名・COUNSEL互換性を確認。証跡画像: `/tmp/tfg-questionnaire-evidence/`。実際のGoogle PDF出力と本番印刷は認証失効のため未検証。
+検証結果: Node全254件が成功。印刷ブラウザーテストは320／390／1280pxで成功し、①②それぞれの作成、住所空欄、キャッシュの取り違え防止、1名・旧形式2名・COUNSEL互換性を確認。証跡画像: `/tmp/tfg-questionnaire-evidence/`。管理者ログインが必要な本番PDF生成と店舗プリンター出力は、スタッフ側の最終確認項目。Google再認証と本番反映は完了。
