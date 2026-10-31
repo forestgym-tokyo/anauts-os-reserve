@@ -25,9 +25,13 @@ function minute(time){const x=String(time||"").match(/^(\d{1,2}):(\d{2})$/);retu
 function fmtTime(n){return String(Math.floor(n/60)).padStart(2,"0")+":"+String(n%60).padStart(2,"0");}
 function node(tag,className,text){const x=document.createElement(tag);if(className)x.className=className;if(text!==undefined)x.textContent=text;return x;}
 function notify(msg,error){const e=q("notice");e.textContent=msg||"";e.hidden=!msg;e.classList.toggle("error",!!error);}
+function updateModeNotice(){
+  const msg=PREVIEW?"確認用画面です。入力内容の確認までお試しいただけます。予約・メール送信は行われません。":Date.now()<GO_LIVE?"11月1日午前0時から予約を受け付けます。":"";
+  const e=q("modeNotice");if(e.textContent!==msg)e.textContent=msg;e.hidden=!msg;
+}
 function formError(msg){q("formError").textContent=msg;q("formError").hidden=!msg;}
 function setStep(i){document.querySelectorAll("[data-step]").forEach(x=>x.classList.toggle("is-current",Number(x.dataset.step)===i));}
-function updateBusy(flag){busy=!!flag;q("previousWeek").disabled=busy||state.weekStart<=state.today;q("nextWeek").disabled=busy||addDays(state.weekStart,7)>state.maxDate;q("reloadSchedule").disabled=busy;q("detailsFields").disabled=busy||!state.slot;q("submitBooking").disabled=busy||!state.slot||PREVIEW||Date.now()<GO_LIVE||submissionUncertain;q("bookingLayout").setAttribute("aria-busy",String(busy));}
+function updateBusy(flag){busy=!!flag;q("previousWeek").disabled=busy||state.weekStart<=state.today;q("nextWeek").disabled=busy||addDays(state.weekStart,7)>state.maxDate;q("reloadSchedule").disabled=busy;q("detailsFields").disabled=busy||!state.slot;q("submitBooking").disabled=busy||!state.slot||(!PREVIEW&&Date.now()<GO_LIVE)||submissionUncertain;q("bookingLayout").setAttribute("aria-busy",String(busy));updateModeNotice();}
 function canBook(slot,day){
   if(!slot||minute(slot.start_time)<540||minute(slot.start_time)>1200||minute(slot.start_time)%30!==0)return false;
   if(slot.date && slot.date!==day)return false;
@@ -184,8 +188,7 @@ function validGuest(i){
 async function submit(e){
   e.preventDefault();formError("");notify("");
   if(busy)return;
-  if(PREVIEW){formError("確認用画面では予約を確定できません。");return;}
-  if(Date.now()<GO_LIVE){formError("実際の予約は11月1日午前0時から受け付けます。");return;}
+  if(!PREVIEW&&Date.now()<GO_LIVE){formError("実際の予約は11月1日午前0時から受け付けます。");return;}
   if(q("website").value.trim())return;
   if(!state.slot||!canBook(state.slot,state.date)){formError("予約日時を選び直してください。");return;}
   const one=validGuest(1);
@@ -193,6 +196,7 @@ async function submit(e){
   const two=state.partySize===2?validGuest(2):null;
   if(state.partySize===2&&!two)return;
   const slot=state.slot;
+  if(PREVIEW){renderPreviewReview(slot,two?[one,two]:[one]);return;}
   const payload={
     action:"createReservation",service_code:SERVICE,
     date:slot.date,start_time:fmtTime(minute(slot.start_time)),
@@ -235,6 +239,16 @@ async function submit(e){
     if(submissionUncertain)formError("通信状況を確認できませんでした。再度予約する前に、確認メールをご確認ください。");
   }finally{q("submitBooking").textContent="この内容で見学予約する →";updateBusy(false);}
 }
+function renderPreviewReview(slot,guests){
+  const dl=q("resultDetails");dl.replaceChildren();
+  const details=[["見学日",shortDate(slot.date)],["見学時間",fmtTime(minute(slot.start_time))],["見学人数",guests.length+"名"]];
+  guests.forEach((guest,index)=>{
+    details.push(["見学者"+(index+1)+" 氏名",guest.name],["電話番号",guest.phone],["メールアドレス",guest.email]);
+  });
+  details.forEach(([label,value])=>dl.append(node("dt","",label),node("dd","",value)));
+  q("bookingLayout").hidden=true;q("resultPanel").hidden=false;
+  setStep(3);q("resultPanel").scrollIntoView({behavior:"smooth",block:"start"});
+}
 function configureAnalytics(){
   if(PREVIEW)return;
   window.dataLayer=window.dataLayer||[];
@@ -249,10 +263,21 @@ function init(){
   q("reloadSchedule").addEventListener("click",()=>loadSchedule({keepDay:true}));
   q("partySize").addEventListener("change",updateParty);
   q("applicationForm").addEventListener("submit",submit);
-  q("newBooking").addEventListener("click",()=>{q("bookingLayout").hidden=false;q("resultPanel").hidden=true;state.slot=null;state.date=state.today;state.weekStart=state.today;setStep(1);loadSchedule();q("scheduleTitle").scrollIntoView({behavior:"smooth",block:"start"});});
+  q("newBooking").addEventListener("click",()=>{
+    q("bookingLayout").hidden=false;q("resultPanel").hidden=true;
+    if(PREVIEW){renderSelected();setStep(state.slot?2:1);q("formTitle").scrollIntoView({behavior:"smooth",block:"start"});return;}
+    state.slot=null;state.date=state.today;state.weekStart=state.today;setStep(1);loadSchedule();q("scheduleTitle").scrollIntoView({behavior:"smooth",block:"start"});
+  });
   updateParty();configureAnalytics();
-  if(PREVIEW)notify("11月版の確認用画面です。予約の確定はできません。");
-  else if(Date.now()<GO_LIVE)notify("11月1日午前0時から予約を受け付けます。");
+  if(PREVIEW){
+    q("submitBooking").textContent="入力内容を確認する →";
+    q("lastStepLabel").textContent="入力内容の確認";
+    q("resultEyebrow").textContent="CHECK YOUR DETAILS.";
+    q("resultTitle").textContent="入力内容の確認";
+    q("resultMessage").textContent="確認用画面です。予約は確定していません。";
+    q("resultNote").textContent="この画面から予約・メール送信は行われません。";
+    q("newBooking").textContent="入力を修正する →";
+  }
   loadSchedule();
   document.addEventListener("visibilitychange",()=>{if(!document.hidden&&!busy)loadSchedule({keepDay:true});});
 }
