@@ -5,6 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#07110d">
   <title>A-nauts OS Reserve</title>
+  <!-- 2026/11/1 00:00 JST: 現行見学フォームから新UIへ自動切替 -->
+  <script>
+  (function(){
+    var SWITCH_AT=Date.parse("2026-10-31T15:00:00Z");
+    function switchTourUi(){
+      if(Date.now()>=SWITCH_AT){
+        location.replace("./november.html"+location.search+location.hash);
+      }
+    }
+    switchTourUi();
+    window.setInterval(switchTourUi,1000);
+  })();
+  </script>
   <!-- Google Analytics 4 -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-E3E38WJLME"></script>
   <script>
