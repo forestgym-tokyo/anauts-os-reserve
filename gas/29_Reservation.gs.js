@@ -87,7 +87,7 @@ function createReservation(params) {
         params.customer_type
       );
 
-    const note =
+    let note =
       normalizeReservationText_(
         params.note
       );
@@ -108,6 +108,18 @@ function createReservation(params) {
       getAvailabilityService_(
         serviceCode
       );
+
+    let tourData = null;
+    if (serviceCode === "TOUR") {
+      const previewError = params.preview === true || String(params.preview) === "1";
+      if (previewError) return errorResponse("確認用画面から予約は確定できません。", "PREVIEW_BOOKING_DISABLED");
+      tourData = validateTourGuests_(params);
+      const prior = findTourBookingRetry_(params, tourData);
+      if (prior) return prior;
+      const cutoff = validateTourBookingCutoff_(params);
+      if (cutoff) return cutoff;
+      note = buildTourBookingNote_(tourData);
+    }
 
     /*
      * サービス別フォーム条件
@@ -510,13 +522,19 @@ function createReservation(params) {
      * 予約時間全体を実効シフト内に含む
      * スタッフだけを抽出
      */
-    const workingStaff =
+    let workingStaff =
       shifts.filter(shift =>
         shift.start_at.getTime() <=
           startAt.getTime() &&
         shift.end_at.getTime() >=
           endAt.getTime()
       );
+
+    if (serviceCode === "TOUR") {
+      const fresh = loadStoreAwareSnapshot_(false, {service_code: serviceCode, date: targetDate});
+      const eligible = getStoreAwareCandidates_(fresh, service, targetDate, startTime, formatReservationTime_(endAt), requestedStaffCode, "");
+      workingStaff = workingStaff.filter(function(shift) { return eligible.some(function(candidate) { return candidate.staff_code === shift.staff_code; }); });
+    }
 
     if (workingStaff.length === 0) {
       return errorResponse(
@@ -726,6 +744,11 @@ function createReservation(params) {
         note:
           note
       });
+
+    if (serviceCode === "TOUR") {
+      const finalCutoff = validateTourBookingCutoff_(params);
+      if (finalCutoff) return finalCutoff;
+    }
 
     createdEvent =
       calendar.createEvent(
@@ -1064,11 +1087,16 @@ function createReservation(params) {
       result
     );
 
-    sendReservationMailSafely_(
+    const notification = sendReservationMailSafely_(
       reservationRecord,
       "RESERVATION_CREATED",
       "createReservation"
     );
+
+    if (tourData) {
+      result.party_size = tourData.guests.length;
+      result.mail_status = notification && notification.customer_mails && notification.customer_mails.every(function(item) { return item.ok; }) ? "sent" : "pending";
+    }
 
     if (
       String(
@@ -1123,8 +1151,8 @@ function createReservation(params) {
     );
 
     return errorResponse(
-      error.mpg9RoundCode ? error.message : "予約登録中にエラーが発生しました。",
-      error.mpg9RoundCode || "SYSTEM_ERROR",
+      error.mpg9RoundCode || error.tourCode ? error.message : "予約登録中にエラーが発生しました。",
+      error.mpg9RoundCode || error.tourCode || "SYSTEM_ERROR",
       {
         message:
           error.message

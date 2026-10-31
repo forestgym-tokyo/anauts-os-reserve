@@ -10,6 +10,8 @@ const q=id=>document.getElementById(id);
 const DATE_RE=/^\d{4}-\d{2}-\d{2}$/;
 let sequence=0;
 let busy=false;
+let pendingRequest=null;
+let submissionUncertain=false;
 const state={today:todayJst(),weekStart:"",date:"",slot:null,days:[],maxDate:"",partySize:1,result:null};
 if(PREVIEW && state.today<"2026-11-01")state.today="2026-11-01";
 state.weekStart=state.today;
@@ -25,13 +27,15 @@ function node(tag,className,text){const x=document.createElement(tag);if(classNa
 function notify(msg,error){const e=q("notice");e.textContent=msg||"";e.hidden=!msg;e.classList.toggle("error",!!error);}
 function formError(msg){q("formError").textContent=msg;q("formError").hidden=!msg;}
 function setStep(i){document.querySelectorAll("[data-step]").forEach(x=>x.classList.toggle("is-current",Number(x.dataset.step)===i));}
-function updateBusy(flag){busy=!!flag;q("previousWeek").disabled=busy||state.weekStart<=state.today;q("nextWeek").disabled=busy||addDays(state.weekStart,7)>state.maxDate;q("reloadSchedule").disabled=busy;q("detailsFields").disabled=busy||!state.slot;q("submitBooking").disabled=busy||!state.slot;q("bookingLayout").setAttribute("aria-busy",String(busy));}
+function updateBusy(flag){busy=!!flag;q("previousWeek").disabled=busy||state.weekStart<=state.today;q("nextWeek").disabled=busy||addDays(state.weekStart,7)>state.maxDate;q("reloadSchedule").disabled=busy;q("detailsFields").disabled=busy||!state.slot;q("submitBooking").disabled=busy||!state.slot||PREVIEW||Date.now()<GO_LIVE||submissionUncertain;q("bookingLayout").setAttribute("aria-busy",String(busy));}
 function canBook(slot,day){
   if(!slot||minute(slot.start_time)<540||minute(slot.start_time)>1200||minute(slot.start_time)%30!==0)return false;
   if(slot.date && slot.date!==day)return false;
   if(Number(slot.capacity==null?1:slot.capacity)<=0)return false;
   const start=Date.parse(day+"T"+fmtTime(minute(slot.start_time))+":00+09:00");
-  return Number.isFinite(start)&&start>Date.now()+90*60000;
+  const deadline=Date.parse(slot.booking_deadline_at||"");
+  // Missing authoritative deadline means the backend has not been upgraded: fail closed.
+  return Number.isFinite(start)&&Number.isFinite(deadline)&&Date.now()<deadline;
 }
 function renderDates(){
   const strip=q("dateStrip");strip.replaceChildren();
@@ -67,9 +71,9 @@ function renderSlots(){
     const active=available&&state.slot&&state.slot.date===state.date&&minute(state.slot.start_time)===t;
     const b=node("button","slot-button"+(active?" is-selected":""),undefined);
     b.type="button";b.disabled=busy||!available;
-    b.setAttribute("aria-label",fmtTime(t)+"〜"+fmtTime(t+60)+(available?" 予約可能":" 受付不可"));
+    b.setAttribute("aria-label",fmtTime(t)+(available?" 予約可能":" 受付不可"));
     b.setAttribute("aria-pressed",String(!!active));
-    b.append(node("strong","",fmtTime(t)),node("span","",("〜"+fmtTime(t+60)+" · ")+(available?(active?"選択中":"予約可"):"受付不可")));
+    b.append(node("strong","",fmtTime(t)),node("span","",(available?(active?"選択中":"予約可"):"受付不可")));
     b.addEventListener("click",()=>chooseSlot(slot));
     box.append(b);
   }
@@ -84,12 +88,12 @@ function chooseSlot(slot){
 function renderSelected(){
   const selection=q("selection");selection.replaceChildren();
   if(!state.slot){
-    selection.append(node("span","selection-icon","↖"),node("p","","まずは、ご希望の日時をお選びください。"));
+    selection.append(node("p","","まずは、ご希望の日時をお選びください。"));
     setStep(1);
   }else{
     selection.append(node("span","selection-icon","✓"));
     const p=node("p");
-    p.append(node("span","","選択中の見学日時"),node("br"),node("strong","",shortDate(state.slot.date)+" "+fmtTime(minute(state.slot.start_time))+"〜"+fmtTime(minute(state.slot.start_time)+60)));
+    p.append(node("span","","選択中の見学日時"),node("br"),node("strong","",shortDate(state.slot.date)+" "+fmtTime(minute(state.slot.start_time))));
     selection.append(p);
   }
   updateBusy(busy);
@@ -180,7 +184,8 @@ function validGuest(i){
 async function submit(e){
   e.preventDefault();formError("");notify("");
   if(busy)return;
-  if(PREVIEW||Date.now()<GO_LIVE){formError("この画面は11月版の確認用です。実際の予約は11月1日午前0時から受け付けます。");return;}
+  if(PREVIEW){formError("確認用画面では予約を確定できません。");return;}
+  if(Date.now()<GO_LIVE){formError("実際の予約は11月1日午前0時から受け付けます。");return;}
   if(q("website").value.trim())return;
   if(!state.slot||!canBook(state.slot,state.date)){formError("予約日時を選び直してください。");return;}
   const one=validGuest(1);
@@ -194,32 +199,40 @@ async function submit(e){
     customer_type:"VISITOR",
     customer_name:one.name,customer_email:one.email,customer_phone:one.phone,
     party_size:state.partySize,
+    guests:two?[one,two]:[one],
     note:state.partySize===2
       ?"見学人数：2名\n見学者2 氏名："+two.name+"\n見学者2 電話番号："+two.phone+"\n見学者2 メールアドレス："+two.email
       :"見学人数：1名"
   };
+  const fingerprint=JSON.stringify(payload);
+  if(!pendingRequest||pendingRequest.fingerprint!==fingerprint)pendingRequest={fingerprint,id:crypto.randomUUID()};
+  payload.request_id=pendingRequest.id;
   updateBusy(true);q("submitBooking").textContent="予約しています…";
   try{
+    submissionUncertain=true;
     const response=await fetch(API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload)});
     if(!response.ok)throw new Error("通信エラー（"+response.status+"）");
     const result=await response.json();
+    submissionUncertain=false;
     if(!result.ok){
       const byCode={SLOT_NOT_AVAILABLE:"この時間は満枠になりました。別の時間を選んでください。",NO_WORKING_STAFF:"この時間に対応可能なスタッフがいません。別の時間を選んでください。",BOOKING_DEADLINE_PASSED:"この時間の予約受付は終了しました。",DATE_OUT_OF_PUBLIC_RANGE:"この日付は予約期間外です。"};
       throw new Error(byCode[result.code]||result.message||"予約できませんでした。");
     }
+    pendingRequest=null;
     state.result={...result.data,party_size:state.partySize,name:one.name};
     q("bookingLayout").hidden=true;
     q("resultPanel").hidden=false;
     const dl=q("resultDetails");dl.replaceChildren();
-    for(const [label,value] of [["見学日",shortDate(slot.date)],["見学時間",fmtTime(minute(slot.start_time))+"〜"+fmtTime(minute(slot.start_time)+60)],["見学人数",state.partySize+"名"],["予約番号",result.data?.reservation_id||"予約済み"]]){
+    for(const [label,value] of [["見学日",shortDate(slot.date)],["見学時間",fmtTime(minute(slot.start_time))],["見学人数",state.partySize+"名"],["予約番号",result.data?.reservation_id||"予約済み"]]){
       dl.append(node("dt","",label),node("dd","",value));
     }
+    if(result.data?.mail_status==="pending")notify("予約は完了しましたが、確認メールの送信に失敗しました。再度予約せず、店舗へお問い合わせください。",true);
     setStep(3);q("resultPanel").scrollIntoView({behavior:"smooth",block:"start"});
     if(typeof window.gtag==="function")window.gtag("event","visit_reservation_complete",{service_code:"TOUR",party_size:state.partySize});
   }catch(err){
     formError(err.message||"予約の処理を確認できませんでした。確認メールが届いているかご確認ください。");
     // 通信切断時の二重登録を防ぐため、再送前に空き状況を確認していただく。
-    if(err.name==="TypeError")formError("通信状況を確認できませんでした。再度予約する前に、確認メールをご確認ください。");
+    if(submissionUncertain)formError("通信状況を確認できませんでした。再度予約する前に、確認メールをご確認ください。");
   }finally{q("submitBooking").textContent="この内容で見学予約する →";updateBusy(false);}
 }
 function configureAnalytics(){
@@ -238,7 +251,8 @@ function init(){
   q("applicationForm").addEventListener("submit",submit);
   q("newBooking").addEventListener("click",()=>{q("bookingLayout").hidden=false;q("resultPanel").hidden=true;state.slot=null;state.date=state.today;state.weekStart=state.today;setStep(1);loadSchedule();q("scheduleTitle").scrollIntoView({behavior:"smooth",block:"start"});});
   updateParty();configureAnalytics();
-  if(PREVIEW&&Date.now()<GO_LIVE)notify("11月版のデザイン確認用です。予約の確定はできません。");
+  if(PREVIEW)notify("11月版の確認用画面です。予約の確定はできません。");
+  else if(Date.now()<GO_LIVE)notify("11月1日午前0時から予約を受け付けます。");
   loadSchedule();
   document.addEventListener("visibilitychange",()=>{if(!document.hidden&&!busy)loadSchedule({keepDay:true});});
 }

@@ -7,11 +7,19 @@ function getServices() {
     APP_CONFIG.SHEETS.SERVICES
   );
 
+  const tour = services.find(service => service.service_code === "TOUR" && service.active === true);
+  if (tour && (Number(tour.booking_min_hours) !== 1 || Number(tour.duration) !== 60 || Number(tour.slot_interval_minutes) !== 30)) {
+    // One-time release migration under the existing script lock; never recreate sheets.
+    configureTfgTourBookingRules_();
+  }
+
   const result = services.filter(
     service => service.active === true
   );
 
-  return successResponse(result);
+  return successResponse(result.map(function(service) {
+    return service.service_code === "TOUR" ? Object.assign({}, service, {duration: 60, slot_interval_minutes: 30, booking_min_hours: 1}) : service;
+  }));
 }
 
 

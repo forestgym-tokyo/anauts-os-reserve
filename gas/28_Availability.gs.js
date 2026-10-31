@@ -372,7 +372,7 @@ function getAvailableSlots(params) {
       );
     }
 
-    return successResponse({
+    const response = successResponse({
       service_code: serviceCode,
       service_name:
         service.service_name ||
@@ -410,6 +410,7 @@ function getAvailableSlots(params) {
         slots.length,
       slots: slots
     });
+    return serviceCode === "TOUR" ? applyTourBookingCutoffToAvailability_(response, params) : response;
 
   } catch (error) {
 
@@ -458,7 +459,9 @@ function getAvailabilityService_(
     );
   }
 
-  return service;
+  return serviceCode === "TOUR"
+    ? Object.assign({}, service, {duration: 60, slot_interval_minutes: 30, booking_min_hours: 1})
+    : service;
 }
 
 

@@ -9,10 +9,10 @@ const DIET_COUNSELING_SUBMIT_DISPLAY_LIMIT_MS = 9000;
 const DIET_COUNSELING_CONFIRM_INITIAL_DELAY_MS = 250;
 const DIET_COUNSELING_CONFIRM_POLL_MS = 500;
 const DIET_COUNSELING_BACKGROUND_CONFIRM_LIMIT_MS = 60000;
-const TOUR_WEEK_CACHE_PREFIX = "anauts-tour-week-v1:";
+const TOUR_WEEK_CACHE_PREFIX = "anauts-tour-week-v2:";
 const TOUR_WEEK_CACHE_MAX_AGE_MS = 60 * 60 * 1000;
 const TOUR_BACKGROUND_REFRESH_MS = 60 * 60 * 1000;
-const TOUR_BOOKING_CUTOFF_MS = 90 * 60 * 1000;
+// TOUR deadlines are provided by the server, including the first-candidate rule.
 
 const ROUTES = {
   personal: {
@@ -1142,7 +1142,8 @@ function isTourSlotBookableNow_(slot, fallbackDate = "") {
   const normalizedStart = start.length === 4 ? "0" + start : start;
   const startAt = new Date(date + "T" + normalizedStart + ":00+09:00");
   if (Number.isNaN(startAt.getTime())) return false;
-  return startAt.getTime() > Date.now() + TOUR_BOOKING_CUTOFF_MS;
+  const deadline = Date.parse(slot.booking_deadline_at || "");
+  return Number.isFinite(deadline) && Date.now() < deadline;
 }
 
 function getRenderableSlots_(result) {

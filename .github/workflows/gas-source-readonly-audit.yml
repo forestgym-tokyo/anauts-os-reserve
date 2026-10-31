@@ -1,0 +1,114 @@
+name: GAS source read-only audit
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/gas-source-readonly-audit.yml'
+      - 'gas/94_TfgWebMembershipEnrollment.gs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate existing clasp credential configuration
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+          CLASP_JSON: ${{ secrets.CLASP_JSON }}
+        run: |
+          if [ -z "$CLASPRC_JSON" ] || [ -z "$CLASP_JSON" ]; then
+            echo "::error::Required clasp credentials are not configured. No deployment performed."
+            exit 1
+          fi
+          node -e '
+            const p=JSON.parse(process.env.CLASP_JSON);
+            if (!p.scriptId || p.rootDir!=="gas") throw Error("CLASP_JSON must contain scriptId and rootDir=gas");
+            console.log("Clasp configuration structure valid (project ID not logged).");
+          '
+      - name: Read remote project into ephemeral workspace only
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+          CLASP_JSON: ${{ secrets.CLASP_JSON }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          audit_dir="$(mktemp -d)"
+          trap 'rm -rf "$audit_dir"' EXIT
+          mkdir -p "$audit_dir/gas"
+          printf '%s' "$CLASPRC_JSON" > "$HOME/.clasprc.json"
+          printf '%s' "$CLASP_JSON" > "$audit_dir/.clasp.json"
+          cd "$audit_dir"
+          if ! npx -y @google/clasp@3.4.1 pull > "$audit_dir/clasp-result.log" 2>&1; then
+            node - "$audit_dir/clasp-result.log" <<'NODE'
+          const fs = require("fs");
+          const text = fs.readFileSync(process.argv[2], "utf8");
+          const reasons = [
+            [/invalid_grant|expired or revoked/i, "GAS_REFRESH_TOKEN_REJECTED: Google refresh token expired or revoked"],
+            [/invalid_client|unauthorized_client/i, "GAS_OAUTH_CLIENT_REJECTED: OAuth client configuration is unusable"],
+            [/has not enabled.*Apps Script API|Apps Script API.*disabled|SERVICE_DISABLED|has not been used/i, "GAS_API_DISABLED: Apps Script API must be enabled for the existing account/project"],
+            [/caller does not have permission|PERMISSION_DENIED|access_denied/i, "GAS_PERMISSION_DENIED: Existing account cannot read the configured script"],
+            [/not found|Requested entity was not found/i, "GAS_PROJECT_NOT_FOUND: Configured script is unavailable to the existing account"],
+            [/not logged in|Are you logged in|API credentials|invalid credential/i, "GAS_LOGIN_UNAVAILABLE: Existing clasp login cannot be used"],
+            [/ENOTFOUND|ECONNREFUSED|ETIMEDOUT/i, "GAS_RUNNER_NETWORK_ERROR: Network failure in the GitHub runner"]
+          ];
+          const reason = reasons.find(([pattern]) => pattern.test(text));
+          console.error("::error title=GAS connection diagnosis::" + (reason ? reason[1] : "GAS_PULL_FAILED: Remote source read failed; no source was modified"));
+          NODE
+            exit 1
+          fi
+          if ! npx -y @google/clasp@3.4.1 --json list-deployments > "$audit_dir/deployments.json" 2> "$audit_dir/deployments.error"; then
+            echo "::error title=GAS connection diagnosis::GAS_DEPLOYMENTS_READ_FAILED: Cannot verify the target deployment; no deployment performed"
+            exit 1
+          fi
+          node -e '
+            const fs=require("fs"), p=require("path");
+            const d="gas";
+            const files=fs.readdirSync(d);
+            const has=(re)=>files.some(f=>re.test(f));
+            const deploymentText=fs.readFileSync("deployments.json","utf8");
+            const sources=files.filter(f=>/\.(js|gs)$/.test(f)).map(f=>({name:f,text:fs.readFileSync(p.join(d,f),"utf8")}));
+            const functionFiles=name=>sources.filter(f=>new RegExp("function\\s+"+name+"\\s*\\(").test(f.text)).map(f=>f.name);
+            const manifestPath=p.join(d,"appsscript.json");
+            const manifest=fs.existsSync(manifestPath)?JSON.parse(fs.readFileSync(manifestPath,"utf8")):{};
+            const results={
+              expected_deployment_present: deploymentText.includes("AKfycbyvpQRxRpMRfpaQHtBar77dViCqPl-hdFW-2yMdozhN8RHtwcrFiNEM9cvEbny4x9q0"),
+              availability_files: functionFiles("getAvailableSlots"),
+              reservation_files: functionFiles("createReservation"),
+              execution_api_configured: !!manifest.executionApi,
+              matched_files: files.filter(f=>/^(21_|28_|29_|40_|46_|60_|99_)/.test(f)),
+              fetched_files: files.length,
+              exists_main: has(/99_Main\.(gs|js)$/),
+              exists_tour_enrollment: has(/70_TourSameDayEnrollment\.(gs|js)$/),
+              exists_9round_interview: has(/^89.*9RoundInterview.*\.(gs|js)$/),
+              exists_tfg_settlement_core: has(/^91_TfgSettlementApproval\.(gs|js)$/),
+              exists_tfg_settlement_web: has(/^92_TfgSettlementApprovalWebApp\.(gs|js)$/),
+              manifest: has(/^appsscript\.json$/),
+              prepared_web_enrollment_already_on_remote: has(/^94_TfgWebMembershipEnrollment\.(gs|js)$/)
+            };
+            // Only bounded project metadata; no source or credentials in logs or artifacts.
+            console.log("::notice title=GAS source audit::"+JSON.stringify(results));
+            if (!results.expected_deployment_present || !results.availability_files.length || !results.reservation_files.length || !results.manifest) {
+              console.error("::error title=GAS project verification::Remote project does not contain the expected deployment and reservation functions; no deployment performed");
+              process.exit(2);
+            }
+          '
+      - name: Verify TOUR regressions
+        run: node --test --test-reporter=tap tests/*.test.js
+      - name: Stage reviewed TOUR changes without updating production
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+          CLASP_JSON: ${{ secrets.CLASP_JSON }}
+        run: node scripts/tfg-tour-gas-release.mjs preflight
+      - name: Confirm read-only run
+        run: echo "Audit complete. No push, commit, deployment, or artifact upload performed."

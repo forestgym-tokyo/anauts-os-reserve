@@ -34,7 +34,9 @@ function overlay9RoundCoordination_() {
   const create = read_("29_Reservation.gs.js");
   replaceOnce_(create, "  let createdEvent = null;", "  let createdEvent = null;\n  let nineRoundHold = null;", "29 9ROUND hold state");
   replaceOnce_(create, "    const reservationId =\n      generateReservationId_();", "    const reservationId =\n      generateReservationId_();\n\n    if (typeof mpg9RoundAcquireSupport_ === \"function\") nineRoundHold = mpg9RoundAcquireSupport_({ service_code: serviceCode, staff_code: assignedStaff.staff_code,\n      reservation_id: reservationId, date: targetDate, start_time: startTime, end_time: formatReservationTime_(endAt) });", "29 9ROUND acquire before event");
+  if (!create.src.includes("error.mpg9RoundCode || error.tourCode")) {
   replaceOnce_(create, '      "予約登録中にエラーが発生しました。",\n      "SYSTEM_ERROR",', '      error.mpg9RoundCode ? error.message : "予約登録中にエラーが発生しました。",\n      error.mpg9RoundCode || "SYSTEM_ERROR",', "29 9ROUND business error");
+  }
   replaceOnce_(create, "  } finally {\n\n    try {\n      lock.releaseLock();", "  } finally {\n\n    if (typeof mpg9RoundReleaseSupportSafely_ === \"function\") mpg9RoundReleaseSupportSafely_(nineRoundHold);\n\n    try {\n      lock.releaseLock();", "29 9ROUND release after persistence");
   write_(create);
 

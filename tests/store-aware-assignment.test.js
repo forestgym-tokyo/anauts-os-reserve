@@ -20,6 +20,7 @@ assert.match(main, /case "getAvailableSlotsRange":[\s\S]*?return getAvailableSlo
 assert.match(yoshimaru, /getAvailableSlots\(dayParams\)/);
 
 const tables = {
+  service_hours: [["service_code", "day_of_week", "start_time", "end_time", "active"], ["TOUR", "ALL", "09:00", "21:00", true]],
   services: [
     ["service_code", "store_code", "duration", "provider_role", "category"],
     ["TOUR", "YACHIYO", 60, "STAFF", "VISIT"]
@@ -171,7 +172,7 @@ const available = context.getAvailableSlotsStoreAware_({
 });
 assert.equal(available.ok, true);
 assert.deepEqual(
-  JSON.parse(JSON.stringify(available.data.slots)),
+  JSON.parse(JSON.stringify(available.data.slots)).map(({booking_deadline_at, ...slot}) => slot),
   [{ date: "2026-09-02", start_time: "17:30", end_time: "18:30" }],
   "SOGA勤務はYACHIYOの予約可能枠にしてはいけない"
 );
@@ -179,7 +180,8 @@ assert.deepEqual(sheetReads, {
   services: 1,
   staff: 1,
   staff_shifts: 1,
-  reservations: 1
+  reservations: 1,
+  service_hours: 1
 });
 assert.equal(cacheSeconds.get("store-aware-static-v3"), 300);
 assert.equal(cacheSeconds.get("store-aware-generation-v3"), 21600);
@@ -204,13 +206,13 @@ const availableRange = context.getAvailableSlotsRangeStoreAware_({
   tour_week_bulk: "0"
 });
 assert.deepEqual(
-  JSON.parse(JSON.stringify(availableRange.data.results[0].data.slots)),
+  JSON.parse(JSON.stringify(availableRange.data.results[0].data.slots)).map(({booking_deadline_at, ...slot}) => slot),
   [{ date: "2026-09-02", start_time: "17:30", end_time: "18:30" }],
   "7日分一括取得でもSOGA勤務をYACHIYO枠にしてはいけない"
 );
 assert.deepEqual(
   sheetReads,
-  { services: 1, staff: 1, staff_shifts: 1, reservations: 1 },
+  { services: 1, staff: 1, staff_shifts: 1, reservations: 1, service_hours: 2 },
   "一覧用の静的・動的データは短時間キャッシュを再利用する"
 );
 
@@ -293,7 +295,7 @@ const sharedRange = context.getAvailableSlotsRangeStoreAware_({
 assert.equal(sharedRange.ok, true);
 assert.deepEqual(
   sharedReads,
-  { services: 1, staff_shifts: 1, staff: 1, reservations: 1 },
+  { services: 1, staff_shifts: 1, staff: 1, reservations: 1, service_hours: 1 },
   "既存空き枠計算と店舗判定で同じシート読込を共有する"
 );
 

@@ -21,11 +21,12 @@ const STORE_AWARE_GENERATION_CACHE_SECONDS_ = 21600;
 const STORE_AWARE_MAX_SCOPE_DAYS_ = 31;
 const TOUR_WEEK_BULK_ENABLED_ = true;
 const TOUR_WEEK_BULK_SERVICE_CODE_ = "TOUR";
-const TOUR_WEEK_BULK_CACHE_VERSION_ = "tour-week-bulk-v3";
+const TOUR_WEEK_BULK_CACHE_VERSION_ = "tour-week-bulk-v4-first-slot";
 const TOUR_WEEK_GENERATION_CACHE_KEY_ = "tour-week-generation-v1";
 const TOUR_WEEK_GENERATION_PROPERTY_ = "tour-week-generation-v1";
 const TOUR_WEEK_GENERATION_CACHE_SECONDS_ = 21600;
-const TOUR_WEEK_BULK_CACHE_SECONDS_ = 300;
+const TOUR_WEEK_BULK_CACHE_SECONDS_ = 3600;
+const TOUR_BOOKING_CUTOFF_MINUTES_ = 60;
 const TOUR_WEEK_BULK_STALE_CACHE_SECONDS_ = 21600;
 const TOUR_WEEK_BULK_INFLIGHT_SECONDS_ = 420;
 const TOUR_WEEK_BULK_LOCK_WAIT_MILLISECONDS_ = 500;
@@ -43,9 +44,10 @@ const STORE_AWARE_INACTIVE_RESERVATION_STATUSES_ = Object.freeze([
 function getAvailableSlotsStoreAware_(params) {
   params = params || {};
 
-  return runStoreAwareWithRequestSheetCache_(function() {
+  const response = runStoreAwareWithRequestSheetCache_(function() {
     return getAvailableSlotsStoreAwareImpl_(params);
   });
+  return applyTourBookingCutoffToAvailability_(response, params);
 }
 
 
@@ -77,7 +79,7 @@ function getAvailableSlotsStoreAwareImpl_(params) {
 function getAvailableSlotsRangeStoreAware_(params) {
   params = params || {};
 
-  return runStoreAwareWithRequestSheetCache_(function() {
+  const response = runStoreAwareWithRequestSheetCache_(function() {
     if (
       typeof shouldUseTrialAutoTrainerRange_ === "function" &&
       shouldUseTrialAutoTrainerRange_(params)
@@ -98,6 +100,7 @@ function getAvailableSlotsRangeStoreAware_(params) {
     }
     return getAvailableSlotsRangeStoreAwareImpl_(params);
   });
+  return applyTourBookingCutoffToAvailability_(response, params);
 }
 
 
@@ -214,9 +217,9 @@ function getTourAvailableSlotsRangeBulk_(params) {
     }
 
   const storeCode = normalizeStoreAwareCode_(service.store_code);
-  const duration = Math.max(1, Number(service.duration || 60));
-  const interval = Math.max(1, Number(service.slot_interval_minutes || 30));
-  const bookingMinHours = Math.max(0, Number(service.booking_min_hours || 0));
+  const duration = 60;
+  const interval = 30;
+  const bookingMinHours = TOUR_BOOKING_CUTOFF_MINUTES_ / 60;
   const publicDays = Math.max(1, Number(service.public_days || 30));
   const providerRoles = normalizeStoreAwareText_(service.provider_role)
     .split(",")
@@ -338,6 +341,7 @@ function buildTourWeekDay_(
   calendarState,
   options
 ) {
+  const firstSlot = getTourFirstCandidateStart_(date, {services: [service], staff: Object.keys(staffByCode).map(function(k) { return staffByCode[k]; }), staff_shifts: shifts}, serviceHours);
   const dayCode = getTourWeekDayCode_(date);
   const dayHours = (serviceHours || []).filter(function(row) {
     const code = normalizeStoreAwareCode_(row && row.day_of_week);
@@ -367,8 +371,8 @@ function buildTourWeekDay_(
     dayHours.forEach(function(hours) {
       const hoursStart = normalizeStoreAwareTime_(hours && hours.start_time);
       const hoursEnd = normalizeStoreAwareTime_(hours && hours.end_time);
-      let cursor = tourWeekTimeToMinutes_(hoursStart);
-      const limit = tourWeekTimeToMinutes_(hoursEnd);
+      let cursor = Math.max(540, Math.ceil(tourWeekTimeToMinutes_(hoursStart) / 30) * 30);
+      const limit = Math.min(1260, tourWeekTimeToMinutes_(hoursEnd));
 
       if (!isFinite(cursor) || !isFinite(limit) || cursor >= limit) return;
 
@@ -436,6 +440,7 @@ function buildTourWeekDay_(
     service_code: normalizeStoreAwareCode_(service && service.service_code),
     service_name: normalizeStoreAwareText_(service && service.service_name),
     date: date,
+    first_slot_start_time: firstSlot,
     duration_minutes: options.duration,
     interval_minutes: options.interval,
     booking_min_hours: options.bookingMinHours,
@@ -899,12 +904,111 @@ function filterStoreAwareSlotData_(data, params, snapshot, service) {
 }
 
 
+function isTourBookingCutoffTarget_(serviceCodeValue) {
+  return normalizeStoreAwareCode_(serviceCodeValue) === TOUR_WEEK_BULK_SERVICE_CODE_;
+}
+
+
+/** First candidate is determined BEFORE deadlines, reservations and calendar filtering. */
+function getTourFirstCandidateStart_(date, snapshot, hours) {
+  snapshot = snapshot || loadStoreAwareSnapshot_(false, {service_code: "TOUR", date: date});
+  const service = findStoreAwareService_(snapshot, "TOUR");
+  if (!service) return "";
+  const dayCode = getTourWeekDayCode_(date);
+  hours = (hours || readStoreAwareSheet_("service_hours")).filter(function(row) {
+    const day = normalizeStoreAwareCode_(row.day_of_week);
+    return normalizeStoreAwareCode_(row.service_code) === "TOUR" &&
+      isStoreAwareActive_(row.active) && (day === "ALL" || day === dayCode);
+  });
+  const staff = {};
+  (snapshot.staff || []).forEach(function(row) {
+    if (isStoreAwareActive_(row.active) && isStoreAwareRoleAllowed_(row, service) && isStoreAwareServiceAllowed_(row, service))
+      staff[normalizeStoreAwareCode_(row.staff_code)] = row;
+  });
+  const shifts = (snapshot.shifts || snapshot.staff_shifts || []).filter(function(row) {
+    return normalizeStoreAwareDate_(row.date) === date && isStoreAwareActive_(row.active) &&
+      normalizeStoreAwareCode_(row.store_code) === normalizeStoreAwareCode_(service.store_code) &&
+      staff[normalizeStoreAwareCode_(row.staff_code)];
+  });
+  for (let t = 540; t <= 1200; t += 30) {
+    const start = tourWeekMinutesToTime_(t), end = tourWeekMinutesToTime_(t + 60);
+    if (hours.some(function(h) { return storeAwareCovers_(normalizeStoreAwareTime_(h.start_time), normalizeStoreAwareTime_(h.end_time), start, end); }) &&
+        shifts.some(function(h) { return storeAwareCovers_(normalizeStoreAwareTime_(h.start_time), normalizeStoreAwareTime_(h.end_time), start, end); })) return start;
+  }
+  return "";
+}
+
+function getTourSlotDeadline_(date, start, first) {
+  const minutes = start === first ? 120 : 60;
+  return new Date(makeTourWeekDateTime_(date, start).getTime() - minutes * 60000);
+}
+
+function filterTourBookingCutoffSlotData_(data, fallbackDate, now) {
+  data = data || {};
+  const date = data.date || fallbackDate;
+  const first = Object.prototype.hasOwnProperty.call(data, "first_slot_start_time")
+    ? data.first_slot_start_time : getTourFirstCandidateStart_(date, loadStoreAwareSnapshot_(true, {service_code: "TOUR", date: date}));
+  const slots = (data.slots || []).filter(function(slot) {
+    const start = normalizeStoreAwareTime_(slot.start_time);
+    return first && start >= "09:00" && start <= "20:00" && /:(00|30)$/.test(start) &&
+      now.getTime() < getTourSlotDeadline_(date, start, first).getTime();
+  }).map(function(slot) {
+    return Object.assign({}, slot, {booking_deadline_at: getTourSlotDeadline_(date, normalizeStoreAwareTime_(slot.start_time), first).toISOString()});
+  });
+  return Object.assign({}, data, {slots: slots, available_slot_count: slots.length,
+    booking_min_hours: 1, first_slot_start_time: first, booking_open_at: formatTourWeekDateTime_(new Date(now.getTime() + 3600000))});
+}
+
+function applyTourBookingCutoffToAvailability_(response, params) {
+  params = params || {};
+  if (!isTourBookingCutoffTarget_(params.service_code)) return response;
+  const payload = parseStoreAwareResponse_(response);
+  if (!payload || !payload.ok || !payload.data) return response;
+  const now = new Date(), data = payload.data;
+  if (Array.isArray(data.results)) {
+    return successResponse(Object.assign({}, data, {results: data.results.map(function(result, index) {
+      if (!result || !result.ok) return result;
+      const date = result.data && result.data.date || addStoreAwareUtcDays_(params.start_date || params.date, index);
+      return Object.assign({}, result, {data: filterTourBookingCutoffSlotData_(result.data, date, now)});
+    })}));
+  }
+  return successResponse(filterTourBookingCutoffSlotData_(data, params.date || params.start_date, now));
+}
+
+function validateTourBookingCutoff_(params) {
+  params = params || {};
+  if (!isTourBookingCutoffTarget_(params.service_code)) return null;
+  if (params.preview === true || String(params.preview) === "1")
+    return errorResponse("確認用画面から予約は確定できません。", "PREVIEW_BOOKING_DISABLED");
+  const date = normalizeStoreAwareDate_(params.date || params.reservation_date);
+  const start = normalizeStoreAwareTime_(params.start_time);
+  if (!date || !start) return null;
+  if (start < "09:00" || start > "20:00" || !/:(00|30)$/.test(start))
+    return errorResponse("予約開始時刻は9:00〜20:00の30分刻みです。", "INVALID_TOUR_START_TIME");
+  const first = getTourFirstCandidateStart_(date);
+  if (!first) return errorResponse("対応可能なスタッフがいません。", "NO_WORKING_STAFF");
+  if (new Date().getTime() < getTourSlotDeadline_(date, start, first).getTime()) return null;
+  return errorResponse("この時間の予約受付は終了しました。最初の枠は2時間前、以降は1時間前に受付終了です。", "BOOKING_DEADLINE_PASSED",
+    {date: date, start_time: start, first_slot_start_time: first, cutoff_minutes: start === first ? 120 : 60});
+}
+
+
 /**
  * 予約確定直前にも同じ店舗条件を再確認する。
  * STAFF系サービスは、同一店舗で勤務している候補を明示して既存作成処理へ渡す。
  */
 function createReservationStoreAware_(params) {
   params = params || {};
+
+  if (normalizeStoreAwareCode_(params.service_code) === "TOUR" && typeof validateTourGuests_ === "function") {
+    try {
+      if (params.preview === true || String(params.preview) === "1") return errorResponse("確認用画面から予約は確定できません。", "PREVIEW_BOOKING_DISABLED");
+      const prior = findTourBookingRetry_(params, validateTourGuests_(params));
+      if (prior) return prior;
+    } catch (error) { return errorResponse(error.message, error.tourCode || "VALIDATION_ERROR"); }
+  }
+  const cutoffError = validateTourBookingCutoff_(params);
+  if (cutoffError) return cutoffError;
 
   return runStoreAwareWithRequestSheetCache_(function() {
     return createReservationStoreAwareImpl_(params);
@@ -1079,9 +1183,10 @@ function countStoreAwareAssignments_(reservations, staffCode, date) {
 
 function findStoreAwareService_(snapshot, serviceCodeValue) {
   const serviceCode = normalizeStoreAwareCode_(serviceCodeValue);
-  return (snapshot.services || []).find(function(service) {
+  const found = (snapshot.services || []).find(function(service) {
     return normalizeStoreAwareCode_(service && service.service_code) === serviceCode;
   }) || null;
+  return found && serviceCode === "TOUR" ? Object.assign({}, found, {duration: 60, slot_interval_minutes: 30, booking_min_hours: 1}) : found;
 }
 
 

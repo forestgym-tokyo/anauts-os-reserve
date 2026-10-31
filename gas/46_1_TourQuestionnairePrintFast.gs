@@ -15,13 +15,13 @@ function generateTourQuestionnairePdfFast(params) {
     params = params || {};
 
     const reservationId = String(params.reservation_id || "").trim();
-    const printMode = String(params.print_mode || "FULL").trim().toUpperCase();
+    let printMode = String(params.print_mode || "FULL").trim().toUpperCase();
 
     if (!reservationId) {
       return errorResponse("reservation_idを指定してください。", "VALIDATION_ERROR");
     }
 
-    if (!["FULL", "ADDRESS_ONLY", "BLANK"].includes(printMode)) {
+    if (!["FULL", "ADDRESS_ONLY", "CONTACT_ONLY", "BLANK"].includes(printMode)) {
       return errorResponse("印刷モードが正しくありません。", "INVALID_PRINT_MODE", { print_mode: printMode });
     }
 
@@ -29,8 +29,31 @@ function generateTourQuestionnairePdfFast(params) {
       .trim()
       .replace(/[^A-Za-z0-9_-]/g, "")
       .slice(0, 80);
+    const reservationInfo = findReservationRowById_(reservationId);
+    if (!reservationInfo) {
+      return errorResponse("指定された予約が見つかりません。", "RESERVATION_NOT_FOUND", { reservation_id: reservationId });
+    }
+
+    let reservation = reservationInfo.record || {};
+    reservation = selectTourQuestionnaireGuest_(reservation, params);
+    printMode = normalizeTourQuestionnairePrintMode_(reservation, printMode);
+    const serviceCode = String(reservation.service_code || "").trim().toUpperCase();
+    const customerType = String(reservation.customer_type || "").trim().toUpperCase();
+    const memberNo = String(reservation.member_no || "").trim();
+    const isTour = serviceCode === "TOUR";
+    const isCounselVisitor = serviceCode === "COUNSEL" && (
+      customerType === "VISITOR" || (customerType !== "MEMBER" && !memberNo)
+    );
+
+    if (!isTour && !isCounselVisitor) {
+      return errorResponse("この予約はアンケート作成対象ではありません。", "QUESTIONNAIRE_NOT_AVAILABLE", {
+        service_code: serviceCode,
+        customer_type: customerType
+      });
+    }
+
     const requestCacheKey = requestId
-      ? ["tour_pdf_v1", requestId, reservationId, printMode].join("_").slice(0, 240)
+      ? ["tour_pdf_contacts_v2", requestId, reservationId, reservation.questionnaire_guest_index || 1, printMode].join("_").slice(0, 240)
       : "";
     const requestCache = CacheService.getScriptCache();
 
@@ -45,27 +68,6 @@ function generateTourQuestionnairePdfFast(params) {
           }
         } catch (ignore) {}
       }
-    }
-
-    const reservationInfo = findReservationRowById_(reservationId);
-    if (!reservationInfo) {
-      return errorResponse("指定された予約が見つかりません。", "RESERVATION_NOT_FOUND", { reservation_id: reservationId });
-    }
-
-    const reservation = reservationInfo.record || {};
-    const serviceCode = String(reservation.service_code || "").trim().toUpperCase();
-    const customerType = String(reservation.customer_type || "").trim().toUpperCase();
-    const memberNo = String(reservation.member_no || "").trim();
-    const isTour = serviceCode === "TOUR";
-    const isCounselVisitor = serviceCode === "COUNSEL" && (
-      customerType === "VISITOR" || (customerType !== "MEMBER" && !memberNo)
-    );
-
-    if (!isTour && !isCounselVisitor) {
-      return errorResponse("この予約はアンケート作成対象ではありません。", "QUESTIONNAIRE_NOT_AVAILABLE", {
-        service_code: serviceCode,
-        customer_type: customerType
-      });
     }
 
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
@@ -100,7 +102,11 @@ function generateTourQuestionnairePdfFast(params) {
     const customerEmailForPrint = customerEmail ? " " + customerEmail : "";
     const visitDateTime = formatTourPrintVisitDateTime_(reservation);
 
-    if (printMode === "FULL") {
+    if (printMode === "CONTACT_ONLY") {
+      page1.getRange("F3").setValue(customerName);
+      page1.getRange("F6").setNumberFormat("@").setValue(customerPhoneForPrint).setHorizontalAlignment("left");
+      page1.getRange("F7").setValue(customerEmailForPrint).setHorizontalAlignment("left");
+    } else if (printMode === "FULL") {
       page1.getRange("F3").setValue(customerName);
       page1.getRange("G4").setValue(postalCode);
       page1.getRange("F5").setValue(address);
@@ -147,6 +153,7 @@ function generateTourQuestionnairePdfFast(params) {
     const resultData = {
       reservation_id: reservationId,
       print_mode: printMode,
+      guest_index: reservation.questionnaire_guest_index || 1,
       filename: fileName,
       mime_type: "application/pdf",
       file_id: fileId,
@@ -186,7 +193,7 @@ function generateTourQuestionnairePdfFast(params) {
     logError("generateTourQuestionnairePdf", error.message, { stack: error.stack });
     return errorResponse(
       error.message || "アンケートPDF生成中にエラーが発生しました。",
-      "TOUR_PRINT_ERROR",
+      error.tourPrintCode || "TOUR_PRINT_ERROR",
       { message: error.message }
     );
   } finally {
