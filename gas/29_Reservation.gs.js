@@ -25,12 +25,15 @@ function createReservation(params) {
 
   let createdEvent = null;
   let nineRoundHold = null;
+  let restoreTourReads = null;
 
   try {
 
     lock.waitLock(30000);
 
     params = params || {};
+    // Read each sheet once, after acquiring the lock. Never reuse pre-lock availability.
+    if (String(params.service_code || "").trim() === "TOUR") restoreTourReads = beginTourBookingReadCache_();
 
     const serviceCode =
       normalizeReservationText_(
@@ -1081,6 +1084,14 @@ function createReservation(params) {
         calendarMaster.calendar_id
     };
 
+    if (tourData) {
+      SpreadsheetApp.flush();
+      // The event and both sheet writes are committed. Later notification failures
+      // must not delete the calendar event after a confirmation receipt is visible.
+      createdEvent = null;
+      return completeTourBooking_(params, tourData, reservationRecord, result, lock);
+    }
+
     logInfo(
       "createReservation",
       "予約登録成功",
@@ -1167,6 +1178,8 @@ function createReservation(params) {
       lock.releaseLock();
     } catch (error) {
       // ロック未取得時などは何もしない
+    } finally {
+      if (restoreTourReads) restoreTourReads();
     }
   }
 }
@@ -2338,7 +2351,9 @@ function appendReservationObject_(
    * これにより090...などが数値化されず、
    * 先頭0を保持したまま保存される。
    */
-  headers.forEach(function(
+  if (String(record.service_code || "").trim() === "TOUR") {
+    formatTourReservationTextCells_(sheet, rowNumber, headers, textHeaders);
+  } else headers.forEach(function(
     header,
     index
   ) {

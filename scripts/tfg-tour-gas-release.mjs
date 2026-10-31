@@ -9,7 +9,7 @@ import {fileURLToPath} from 'node:url';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const phase=process.argv[2]||'preflight';
 const deploymentId='AKfycbyvpQRxRpMRfpaQHtBar77dViCqPl-hdFW-2yMdozhN8RHtwcrFiNEM9cvEbny4x9q0';
-const permitted=new Set(['21_Service.gs.js','28_Availability.gs.js','29_Reservation.gs.js','40_ReservationMail.gs.js','46_TourQuestionnairePrint.js','46_1_TourQuestionnairePrintFast.js','60_StoreAwareAssignment.js','94_TfgTourBooking.js']);
+const permitted=new Set(['21_Service.gs.js','28_Availability.gs.js','29_Reservation.gs.js','40_ReservationMail.gs.js','46_TourQuestionnairePrint.js','46_1_TourQuestionnairePrintFast.js','60_StoreAwareAssignment.js','94_TfgTourBooking.js','95_TfgTourPerformance.js','99_Main.js']);
 const revision=String(spawnSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).stdout||'').trim();
 let scratch,authFile,project,oldVersion,newVersion,backupVersion,updated=false;
 function notice(message){console.log('::notice title=TFG GAS release::'+message);if(process.env.GITHUB_STEP_SUMMARY)fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,message+'\n\n');}
@@ -51,7 +51,7 @@ try{
  clasp(['pull']);const baselineSource=path.join(baseline,'gas'),before=hashes(baselineSource);
  project=projectFile(stage,config.scriptId);const stageSource=path.join(stage,'gas');fs.cpSync(baselineSource,stageSource,{recursive:true});
  const overlay=spawnSync(process.execPath,[path.join(root,'scripts/gas-tfg-tour-overlay.mjs'),stageSource],{cwd:root,encoding:'utf8',maxBuffer:16*1024*1024});
- if(overlay.status!==0){const detail=String(overlay.stderr||'').match(/Error: (Live source drift or ambiguous patch: [^;\n]+|Required live file missing: [^\n]+|Duplicate[^\n]+|94 module[^\n]+)/);fail('Staging overlay failed: '+(detail?detail[1]:'review required'));}
+  if(overlay.status!==0){const detail=String(overlay.stderr||'').match(/Error: (Live source drift or ambiguous patch: [^;\n]+|Required live file missing: [^\n]+|Duplicate[^\n]+|9[45] module[^\n]+)/);fail('Staging overlay failed: '+(detail?detail[1]:'review required'));}
  const after=hashes(stageSource),changes=Object.keys(after).filter(file=>before[file]!==after[file]);
  if(Object.keys(before).some(file=>!Object.hasOwn(after,file)))fail('Staging removed an existing GAS file');
  if(changes.some(file=>!permitted.has(file)))fail('Staging changed a file outside the TOUR release scope');
@@ -67,7 +67,7 @@ try{
   const backup=json(clasp(['create-version','Before TFG tour release '+revision.slice(0,7)]),'backup version');backupVersion=backup.versionNumber;if(!Number.isInteger(backupVersion))fail('Native source backup could not be confirmed');
   notice('native_backup_version='+backupVersion+'; rollback_version='+oldVersion);
   clasp(['push','--force']);notice('source_push_completed=true');
-  const deployed=json(clasp(['update-deployment',deploymentId,'-d','TFG tour deadlines, two-visitor mail and questionnaires '+revision.slice(0,7)]),'deployment');
+  const deployed=json(clasp(['update-deployment',deploymentId,'-d','TFG tour booking speed and committed receipt '+revision.slice(0,7)]),'deployment');
   if(deployed.deploymentId!==deploymentId||!Number.isInteger(deployed.versionNumber))fail('Deployment update could not be confirmed');
   newVersion=deployed.versionNumber;updated=true;notice('deployment_updated=true; deployed_version='+newVersion+'; rollback_version='+oldVersion);
   await verifyServices();notice('published_service_check_passed=true; duration=60; interval=30; minimum_hours=1; deployed_version='+newVersion);

@@ -360,6 +360,8 @@ function doGet(e) {
         return getReservation(
           params
         );
+      case "getTourBookingStatus":
+        return getTourBookingStatus_(params);
       case "getDietCounselingReservationStatus":
         return getDietCounselingReservationStatus_(params);
       case "getDietCounselingFormContext":
