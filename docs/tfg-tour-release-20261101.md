@@ -26,10 +26,22 @@
 
 - Gitの読み取り・修正ブランチへのpush、GitHub API、本番GASのgetServicesへの接続を確認済み。通信先追加の適用により、当初のプロキシ403は解消。
 - 環境ネットワーク設定に `api.github.com`、`forestgym-tokyo.github.io`、`script.google.com`、`script.googleusercontent.com`、`script.googleapis.com`、`oauth2.googleapis.com` を追加する。既存の許可先は保持する。
-- GitHubのリポジトリ書き込み権限は確認済み。既存GAS認証を使う読み取り専用Actions監査では、CLASPRC_JSON/CLASP_JSONの存在・形式の検証は成功したが、Googleから `GAS_REFRESH_TOKEN_REJECTED`（refresh token expired or revoked）が返った。本番ソースのpull・push・デプロイは未実施。
+- GitHubのリポジトリ書き込み権限は確認済み。Google再認証後、GASソース取得と既存TOURデプロイの一致確認に成功。GASの実行APIは未設定のため、設定移行は既存Webアプリの初回サービス確認で行う。
 - 同じGASプロジェクトへ編集・デプロイできるGoogleアカウントでclaspの再認証を行い、生成されたログイン設定をGitHub Actions Secret `CLASPRC_JSON` に安全に更新する。`CLASP_JSON` のプロジェクトIDは維持する。認証情報をチャットやリポジトリに記載しない。
 - 再認証のコマンドは `npx --yes @google/clasp@3.4.1 login`。GASを更新する既存Googleアカウントでログインし、生成された `~/.clasprc.json` を https://github.com/forestgym-tokyo/anauts-os-reserve/settings/secrets/actions の `CLASPRC_JSON` に登録する（値はチャットへ送らない）。
 - 再認証後は `.github/workflows/gas-source-readonly-audit.yml` を修正ブランチから実行し、接続を再確認してから本番差分反映へ進む。失敗診断: https://github.com/forestgym-tokyo/anauts-os-reserve/actions/runs/41164905466
+
+## 反映ワークフロー
+
+`.github/workflows/tfg-tour-release.yml` は手動実行専用。レビュー済みの `release_ref`（コミットSHA）と `phase=preflight` で事前確認し、成功後に同じコミットSHAを `phase=deploy` で反映する。ワークフローのmainへの登録はPRによるレビュー・承認を経て行う。
+
+- 事前確認では本番を変更しない。認証情報は一時ファイルとして使用し、値をログへ出さない。
+- 既存デプロイIDと公開版を照合し、ライブ専用ファイルとマニフェストを保持する。
+- GAS全体の構文と対象外ファイルの変更・削除がないことを確認する。
+- 書き込み直前にライブコードと公開版が変わっていないか再照合する。
+- Google側に変更前の不変バージョンを保存してから、既存URLのままデプロイする。
+- 初回getServicesでTOURの3設定を移行し、60分・30分間隔・基本1時間を検証。公開検証失敗時は元の公開版へ戻す。
+- GAS確認後にのみPRをmainへ反映し、Pagesの公開を確認する。
 
 ## 反映順序（GAS → 設定 → 読み取り検証 → Pages）
 
@@ -65,7 +77,7 @@ npx --yes @google/clasp@3.4.1 update-deployment \
 
 ### 2. servicesシートの旧1.5時間設定を更新
 
-既存Apps Scriptエディターで `configureTfgTourBookingRules_` を一度実行。
+新しい `getServices` の初回確認時に、旧設定が残っている場合だけ `configureTfgTourBookingRules_` を実行する。追加のGoogleログインや手作業の設定変更は不要。必要な場合は既存Apps Scriptエディターから同じ移行関数を実行できる。
 
 - TOUR行の `booking_min_hours=1`、`duration=60`、`slot_interval_minutes=30` の3セルだけを更新。
 - シートの再作成・予約削除・他サービス更新はしない。

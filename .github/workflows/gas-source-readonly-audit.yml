@@ -16,6 +16,8 @@ jobs:
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -94,12 +96,19 @@ jobs:
               manifest: has(/^appsscript\.json$/),
               prepared_web_enrollment_already_on_remote: has(/^94_TfgWebMembershipEnrollment\.(gs|js)$/)
             };
-            // No remote source, filenames, IDs, or secrets in logs or artifacts.
+            // Only bounded project metadata; no source or credentials in logs or artifacts.
             console.log("::notice title=GAS source audit::"+JSON.stringify(results));
             if (!results.expected_deployment_present || !results.availability_files.length || !results.reservation_files.length || !results.manifest) {
               console.error("::error title=GAS project verification::Remote project does not contain the expected deployment and reservation functions; no deployment performed");
               process.exit(2);
             }
           '
+      - name: Verify TOUR regressions
+        run: node --test --test-reporter=tap tests/*.test.js
+      - name: Stage reviewed TOUR changes without updating production
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+          CLASP_JSON: ${{ secrets.CLASP_JSON }}
+        run: node scripts/tfg-tour-gas-release.mjs preflight
       - name: Confirm read-only run
         run: echo "Audit complete. No push, commit, deployment, or artifact upload performed."

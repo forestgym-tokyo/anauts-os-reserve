@@ -1,0 +1,44 @@
+name: TFG tour GAS release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_ref:
+        description: "Reviewed release commit or branch to test and deploy"
+        type: string
+        default: fix/tfg-tour-november-booking
+        required: true
+      phase:
+        description: "Preflight preserves production; deploy updates the verified existing GAS deployment"
+        type: choice
+        options: [preflight, deploy]
+        default: preflight
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: anauts-main-gas-production
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.release_ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify reservation and questionnaire regressions
+        run: node --test --test-reporter=tap tests/*.test.js
+      - name: Preserve live files and verify or update the existing deployment
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+          CLASP_JSON: ${{ secrets.CLASP_JSON }}
+          RELEASE_PHASE: ${{ inputs.phase }}
+        run: node scripts/tfg-tour-gas-release.mjs "$RELEASE_PHASE"
