@@ -95,3 +95,23 @@ test('TOUR bulk normalizes Sheets dates once and constructs Tokyo times without 
  assert.equal(normalized.date,'2026-11-01');assert.equal(normalized.start_time,'09:00');assert.equal(normalized.end_time,'10:00');assert.ok(source.date instanceof Date);
  assert.equal(e.context.makeTourWeekDateTime_('2026-11-01','09:00').toISOString(),'2026-11-01T00:00:00.000Z');assert.equal(calls,0);
 });
+
+test('TOUR booking reuses sheet handles only during its locked request and restores on exit',()=>{
+ const e=fixture(),calls=[];const original=name=>{calls.push(name);return {name};};e.context.getSheet=original;
+ const restore=e.context.beginTourBookingReadCache_();
+ try{assert.equal(e.context.getSheet('reservations'),e.context.getSheet('reservations'));assert.equal(e.context.getSheet('staff').name,'staff');assert.deepEqual(calls,['reservations','staff']);}finally{restore();}
+ assert.equal(e.context.getSheet,original);e.context.getSheet('reservations');assert.equal(calls.length,3);
+});
+
+test('booking queries just the requested interval and excludes irrelevant calendar accessor calls',()=>{
+ const e=fixture(),from=new Date('2026-11-01T00:00:00Z'),to=new Date('2026-11-01T01:00:00Z');let checked=false;
+ const calendar={getEvents(start,end){assert.equal(start,from);assert.equal(end,to);checked=true;return [{getStartTime:()=>from,getEndTime:()=>to,getTitle(){throw Error('unnecessary title read');},getId(){throw Error('unnecessary ID read');}}];}};
+ const periods=e.context.getTourBookingCalendarPeriods_(calendar,from,to);assert.equal(checked,true);assert.equal(periods[0].start_at,from);assert.equal(periods[0].end_at,to);
+});
+
+test('spanning and all-day calendar events still block the requested TOUR interval',()=>{
+ for(const [start,end] of [['2026-11-01T08:00:00+09:00','2026-11-01T12:00:00+09:00'],['2026-11-01T00:00:00+09:00','2026-11-02T00:00:00+09:00']]){
+  const e=fixture();e.events.push(e.event(start,end));assert.equal(e.context.createReservation(e.payload()).code,'SLOT_NOT_AVAILABLE');assert.equal(e.tables.reservations.length,0);
+ }
+ const e=fixture();e.events.push(e.event('2026-11-01T08:00:00+09:00','2026-11-01T09:00:00+09:00'));e.events.push(e.event('2026-11-01T10:00:00+09:00','2026-11-01T11:00:00+09:00'));assert.equal(e.context.createReservation(e.payload()).ok,true);
+});

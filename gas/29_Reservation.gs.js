@@ -596,8 +596,9 @@ function createReservation(params) {
      * ロック取得後にカレンダーを再取得して
      * 予約枠を再判定する
      */
-    const busyPeriods =
-      getAvailabilityCalendarEvents_(
+    const busyPeriods = serviceCode === "TOUR"
+      ? getTourBookingCalendarPeriods_(calendar, startAt, endAt)
+      : getAvailabilityCalendarEvents_(
         calendar,
         targetDate
       );

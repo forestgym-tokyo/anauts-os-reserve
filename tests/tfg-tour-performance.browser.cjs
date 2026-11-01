@@ -46,25 +46,23 @@ async function until(check){const end=Date.now()+10000;while(!check()){if(Date.n
  }
  try{
   {
-   const c=await open({holdRemaining:true});try{
-    assert.equal(c.stats.ranges[0].days,1);assert.equal(c.stats.rangeCompleted,1);
-    await c.fill();assert.equal(await c.page.locator('#submitBooking').isEnabled(),true);
-    await c.page.locator('#submitBooking').click();await c.page.locator('#resultPanel').waitFor({state:'visible'});
-    assert.equal(c.stats.posts,1);assert.equal(c.stats.rangeCompleted,1);
-    assert.equal(await c.page.getByRole('button',{name:/別の日時|他の日時/}).count(),0);
-    const before=c.stats.ranges.length;await c.page.clock.runFor(61000);await c.page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
-    assert.equal(c.stats.ranges.length,before);checks.push('selected day usable and bookable while remaining six days are still loading; completed booking never reloads');
+   const c=await open();try{
+    assert.equal(c.stats.ranges.length,1);assert.equal(c.stats.ranges[0].days,7);assert.equal(c.stats.rangeCompleted,1);
+    await c.fill();await c.page.locator('#submitBooking').click();await c.page.locator('#resultPanel').waitFor({state:'visible'});
+    assert.equal(c.stats.posts,1);const before=c.stats.ranges.length;
+    await c.page.clock.runFor(61000);await c.page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
+    assert.equal(c.stats.ranges.length,before);checks.push('one request loads all seven days; completed booking never reloads');
    }finally{await c.close();}
   }
   {
    const c=await open();try{
-    await until(()=>c.stats.rangeCompleted===2);await c.page.locator('.date-button').last().click();await c.page.locator('.slot-button').first().waitFor();
-    await c.page.locator('#nextWeek').click();await until(()=>c.stats.rangeCompleted===4);await c.page.locator('.slot-button').first().waitFor();
+    await until(()=>c.stats.rangeCompleted===1);await c.page.locator('.date-button').last().click();await c.page.locator('.slot-button').first().waitFor();
+    await c.page.locator('#nextWeek').click();await until(()=>c.stats.rangeCompleted===2);await c.page.locator('.slot-button').first().waitFor();
     const before=c.stats.ranges.length;await c.page.locator('#previousWeek').click();await c.page.locator('.slot-button').first().waitFor();assert.equal(c.stats.ranges.length,before);
     await c.page.reload();await c.page.locator('.slot-button').first().waitFor();assert.equal(c.stats.ranges.length,before);
     await c.fill();await c.page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));assert.equal(c.stats.ranges.length,before);assert.equal(await c.page.locator('#submitBooking').isEnabled(),true);
-    await c.page.locator('#reloadSchedule').click();await until(()=>c.stats.rangeCompleted===6);assert.equal(c.stats.ranges.length,before+2);
-    await c.page.clock.runFor(61000);await c.page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await until(()=>c.stats.rangeCompleted===8);
+    await c.page.locator('#reloadSchedule').click();await until(()=>c.stats.rangeCompleted===3);assert.equal(c.stats.ranges.length,before+1);
+    await c.page.clock.runFor(61000);await c.page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await until(()=>c.stats.rangeCompleted===4);
     checks.push('returning to a week or reloading uses the one-minute cache; explicit refresh and expiry fetch fresh slots');
    }finally{await c.close();}
   }

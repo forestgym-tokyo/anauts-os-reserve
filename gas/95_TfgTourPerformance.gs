@@ -3,6 +3,13 @@ function beginTourBookingReadCache_() {
   const originalRead = getSheetData;
   const originalMailRead = getReservationMailRows_;
   const rows = Object.create(null);
+  const originalGetSheet = typeof getSheet === "function" ? getSheet : null;
+  const sheets = Object.create(null);
+  if (originalGetSheet) getSheet = function(name) {
+    const key = String(name);
+    if (!Object.prototype.hasOwnProperty.call(sheets, key)) sheets[key] = originalGetSheet(name);
+    return sheets[key];
+  };
   getSheetData = function(name) {
     const key = String(name);
     if (!Object.prototype.hasOwnProperty.call(rows, key)) rows[key] = originalRead(name);
@@ -10,6 +17,7 @@ function beginTourBookingReadCache_() {
   };
   getReservationMailRows_ = function(name) { return getSheetData(name); };
   return function() {
+    if (originalGetSheet) getSheet = originalGetSheet;
     getSheetData = originalRead;
     getReservationMailRows_ = originalMailRead;
   };
@@ -68,4 +76,11 @@ function formatTourReservationTextCells_(sheet, rowNumber, headers, textHeaders)
     if (textHeaders.has(header)) addresses.push("R" + rowNumber + "C" + (index + 1));
   });
   if (addresses.length) sheet.getRangeList(addresses).setNumberFormat("@");
+}
+
+/** Query only the requested interval, under the booking lock, including spanning/all-day events. */
+function getTourBookingCalendarPeriods_(calendar, startAt, endAt) {
+  return calendar.getEvents(startAt, endAt).map(function(event) {
+    return {start_at: event.getStartTime(), end_at: event.getEndTime()};
+  });
 }

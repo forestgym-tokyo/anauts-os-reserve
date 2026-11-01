@@ -21,3 +21,10 @@ test('upgrade from deployed v186 preserves live-only router code and can be appl
 test('a conflicting pre-existing performance module aborts without changing live files',()=>{
  const dir=fixture();try{fs.writeFileSync(path.join(dir,'95_TfgTourPerformance.js'),'// unknown production module\n');const before=files.map(f=>fs.readFileSync(path.join(dir,f),'utf8'));assert.throws(()=>run(dir),/95 module already exists/);assert.deepEqual(files.map(f=>fs.readFileSync(path.join(dir,f),'utf8')),before);}finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
+test('upgrades the live v188 performance module while preserving unrelated live additions',()=>{
+ const dir=fixture();try{
+  for(const file of files)fs.writeFileSync(path.join(dir,file),execFileSync('git',['show','d78ccb6cb2495f5761186c0abe2d8513fac9ecf7:gas/'+file],{cwd:root}));
+  fs.writeFileSync(path.join(dir,'95_TfgTourPerformance.js'),execFileSync('git',['show','d78ccb6cb2495f5761186c0abe2d8513fac9ecf7:gas/95_TfgTourPerformance.gs'],{cwd:root,encoding:'utf8'})+'\n// unrelated performance addition\n');
+  run(dir);assert.equal(fs.readFileSync(path.join(dir,'95_TfgTourPerformance.js'),'utf8'),fs.readFileSync(path.join(root,'gas/95_TfgTourPerformance.gs'),'utf8')+'\n// unrelated performance addition\n');run(dir);
+ }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});

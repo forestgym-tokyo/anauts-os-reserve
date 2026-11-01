@@ -50,7 +50,15 @@ try{
  const modulePath=path.join(live,moduleName);
  if(fs.existsSync(modulePath)&&fs.readFileSync(modulePath,'utf8')!==moduleSource)throw Error('94 module already exists with different content');
  const performanceName='95_TfgTourPerformance.js',performancePath=path.join(live,performanceName),performanceSource=fs.readFileSync(path.join(root,'gas','95_TfgTourPerformance.gs'),'utf8');
- if(fs.existsSync(performancePath)&&fs.readFileSync(performancePath,'utf8')!==performanceSource)throw Error('95 module already exists with different content');
+ let stagedPerformance=performanceSource;
+ if(fs.existsSync(performancePath)){
+  const currentPerformance=fs.readFileSync(performancePath,'utf8');
+  if(currentPerformance!==performanceSource){
+   const priorPerformance=execFileSync('git',['show','d78ccb6cb2495f5761186c0abe2d8513fac9ecf7:gas/95_TfgTourPerformance.gs'],{cwd:root,encoding:'utf8'});
+   try{stagedPerformance=applyHunks(currentPerformance,patchBetween(priorPerformance,performanceSource,5),performanceName);}
+   catch(_){throw Error('95 module already exists with different content');}
+  }
+ }
  // Prevent duplicate GAS global declarations from alternate source naming.
  for(const name of fs.readdirSync(live)){
   if(name!==moduleName&&/\.(js|gs)$/.test(name)&&fs.readFileSync(path.join(live,name),'utf8').includes('function validateTourGuests_('))throw Error('Duplicate TOUR module: '+name);
@@ -58,7 +66,7 @@ try{
   if(name!==performanceName&&/\.(js|gs)$/.test(name)&&fs.readFileSync(path.join(live,name),'utf8').includes('function beginTourBookingReadCache_('))throw Error('Duplicate TOUR performance module: '+name);
  }
  pending.push([modulePath,moduleSource]);
- pending.push([performancePath,performanceSource]);
+ pending.push([performancePath,stagedPerformance]);
  for(const [target,source] of pending)fs.writeFileSync(target,source);
  console.log(JSON.stringify({status:'patched',files:pending.map(([file])=>path.basename(file))}));
 }finally{fs.rmSync(temp,{recursive:true,force:true});}

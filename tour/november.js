@@ -189,18 +189,17 @@ async function loadSchedule(options={}){
     for(const row of rows){const index=dates.indexOf(row.data.date);if(index>=0)state.days[index]=row;}
     if(!busy)renderSchedule();
   }
-  // The selected day's slots become usable without waiting for the rest of the week.
-  if(missing.includes(state.date)){await receive(state.date,1);missing.splice(missing.indexOf(state.date),1);}
+  // Read the week once: each range request otherwise rereads the same sheets and calendar.
+  // Existing days remain visible while only the missing contiguous ranges are fetched.
+  const groups=[];
+  for(const day of missing){const last=groups.at(-1);if(last&&addDays(last.start,last.count)===day)last.count++;else groups.push({start:day,count:1});}
+  await Promise.all(groups.map(group=>receive(group.start,group.count)));
   if(seq!==sequence||state.result)return;
   if(previousSlot){
     const row=state.days.find(x=>x?.data?.date===previousSlot.date);
     state.slot=row?.data.slots.find(s=>s.start_time===previousSlot.start_time&&canBook(s,previousSlot.date))||null;
   }
   updateBusy(false);renderSchedule();scheduleCheckedAt=Date.now();
-  // Adjacent missing days share one request; previously visited days use the short cache.
-  const groups=[];
-  for(const day of missing){const last=groups.at(-1);if(last&&addDays(last.start,last.count)===day)last.count++;else groups.push({start:day,count:1});}
-  await Promise.all(groups.map(group=>receive(group.start,group.count)));
   if(seq!==sequence||state.result)return;
   const failed=state.days.filter(x=>x&&!x.ok&&x.data.date<=state.maxDate).length;
   if(failed)notify(failed+"日分の空き状況を確認できませんでした。更新ボタンから再度お試しください。",true);
