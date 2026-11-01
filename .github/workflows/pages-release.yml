@@ -1,0 +1,41 @@
+name: Publish website
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages-production
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use the supported Actions publishing route
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: site } = await github.request('GET /repos/{owner}/{repo}/pages', context.repo);
+            if (site.build_type !== 'workflow') {
+              await github.request('PUT /repos/{owner}/{repo}/pages', {
+                ...context.repo, build_type: 'workflow'
+              });
+            }
+      - uses: actions/configure-pages@v5
+      - uses: actions/jekyll-build-pages@v1
+        with:
+          source: ./
+          destination: ./_site
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: ./_site
+      - name: Publish the existing website
+        id: deployment
+        uses: actions/deploy-pages@v4
