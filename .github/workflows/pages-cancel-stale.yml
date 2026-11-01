@@ -1,0 +1,25 @@
+name: Cancel stale Pages deployment
+on:
+  workflow_dispatch:
+    inputs:
+      deployment_id:
+        description: 'Pages deployment ID reported as blocking a new release'
+        required: true
+        type: string
+permissions:
+  pages: write
+jobs:
+  cancel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        env:
+          PAGES_DEPLOYMENT_ID: ${{ inputs.deployment_id }}
+        with:
+          script: |
+            const id = process.env.PAGES_DEPLOYMENT_ID;
+            if (!/^[a-f0-9]{40}$|^\d+$/.test(id)) throw new Error('Invalid Pages deployment ID');
+            await github.request('POST /repos/{owner}/{repo}/pages/deployments/{pages_deployment_id}/cancel', {
+              ...context.repo, pages_deployment_id: id
+            });
+            core.info('Stale Pages deployment cancellation requested.');
