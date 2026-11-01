@@ -357,7 +357,7 @@
       try{
         if(typeof apiGet!=="function")throw new Error("管理画面APIを利用できません。");
         const j=await apiGet(PRINT_ACTION,{
-          reservation_id:r.reservation_id,
+          reservation_id:blank?"":r.reservation_id,
           print_mode:mode,
           guest_index:guestIndex,
           request_id:generationRequestId+"-g"+guestIndex+"-"+mode
