@@ -1,4 +1,4 @@
-name: Cancel stale Pages deployment
+name: Recover stale Pages deployment
 on:
   workflow_dispatch:
     inputs:
@@ -19,7 +19,13 @@ jobs:
           script: |
             const id = process.env.PAGES_DEPLOYMENT_ID;
             if (!/^[a-f0-9]{40}$|^\d+$/.test(id)) throw new Error('Invalid Pages deployment ID');
-            await github.request('POST /repos/{owner}/{repo}/pages/deployments/{pages_deployment_id}/cancel', {
-              ...context.repo, pages_deployment_id: id
-            });
-            core.info('Stale Pages deployment cancellation requested.');
+            try {
+              await github.request('POST /repos/{owner}/{repo}/pages/deployments/{pages_deployment_id}/cancel', {
+                ...context.repo, pages_deployment_id: id
+              });
+            } catch (error) {
+              if (!String(error.message).includes("as it's finished")) throw error;
+              core.info('The previous deployment has already finished.');
+            }
+            await github.request('POST /repos/{owner}/{repo}/pages/builds', context.repo);
+            core.info('Requested a fresh build of the configured Pages branch.');
