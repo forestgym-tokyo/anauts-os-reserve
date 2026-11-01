@@ -10,3 +10,15 @@ test('same-named guests have distinct numbered filenames',()=>{const e=fixture()
 test('COUNSEL visitor FULL, ADDRESS_ONLY and BLANK behavior is preserved',()=>{for(const mode of ['FULL','ADDRESS_ONLY','BLANK']){const e=fixture({service_code:'COUNSEL',customer_type:'VISITOR'});assert.equal(e.run({print_mode:mode}).ok,true);assert.equal(e.printed[0].F5,mode==='BLANK'?'':e.reservation.address);assert.equal(e.printed[0].F3,mode==='FULL'?'見学 太郎 さま':'');assert.equal(e.printed[0].F7,mode==='FULL'?' one@example.invalid':'');}const e=fixture({service_code:'COUNSEL',customer_type:'VISITOR'});assert.equal(e.run({guest_index:2}).code,'INVALID_PRINT_GUEST');});
 test('blank TOUR output clears every variable cell after printing another visitor',()=>{const e=fixture();e.run({guest_index:2});assert.equal(e.run({print_mode:'BLANK',guest_index:1}).ok,true);assert.ok(Object.values(e.printed[1]).every(value=>value===''));});
 test('recipient selection leaves original booking data unchanged',()=>{const e=fixture(),before=plain(e.reservation);e.run({guest_index:2});assert.deepEqual(plain(e.reservation),before);});
+test('standalone blank form needs no booking lookup and clears all personal and visit fields',()=>{
+ const e=fixture();e.run({guest_index:2});
+ e.context.findReservationRowById_=()=>{throw new Error('must not read bookings');};
+ const result=e.run({reservation_id:'',print_mode:'BLANK',request_id:'blank-form'});
+ assert.equal(result.ok,true,JSON.stringify(result));assert.equal(result.data.reservation_id,'');assert.equal(result.data.print_mode,'BLANK');assert.equal(result.data.pages,2);
+ assert.ok(Object.values(e.printed[1]).every(value=>value===''));
+ assert.equal(e.run({reservation_id:'',print_mode:'BLANK',request_id:'blank-form'}).data.file_id,result.data.file_id);
+ assert.equal(e.printed.length,2);
+});
+test('reservation-free output rejects modes that could include personal details',()=>{
+ for(const print_mode of ['FULL','CONTACT_ONLY','ADDRESS_ONLY']){const e=fixture();assert.equal(e.run({reservation_id:'',print_mode}).code,'VALIDATION_ERROR');assert.equal(e.files.size,0);}
+});

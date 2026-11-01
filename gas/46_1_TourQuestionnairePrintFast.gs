@@ -17,7 +17,7 @@ function generateTourQuestionnairePdfFast(params) {
     const reservationId = String(params.reservation_id || "").trim();
     let printMode = String(params.print_mode || "FULL").trim().toUpperCase();
 
-    if (!reservationId) {
+    if (!reservationId && printMode !== "BLANK") {
       return errorResponse("reservation_idを指定してください。", "VALIDATION_ERROR");
     }
 
@@ -29,13 +29,17 @@ function generateTourQuestionnairePdfFast(params) {
       .trim()
       .replace(/[^A-Za-z0-9_-]/g, "")
       .slice(0, 80);
-    const reservationInfo = findReservationRowById_(reservationId);
+    // Blank forms do not read or inherit any reservation data.
+    const standaloneBlank = !reservationId && printMode === "BLANK";
+    const reservationInfo = standaloneBlank
+      ? { record: { service_code: "TOUR" } }
+      : findReservationRowById_(reservationId);
     if (!reservationInfo) {
       return errorResponse("指定された予約が見つかりません。", "RESERVATION_NOT_FOUND", { reservation_id: reservationId });
     }
 
     let reservation = reservationInfo.record || {};
-    reservation = selectTourQuestionnaireGuest_(reservation, params);
+    if (!standaloneBlank) reservation = selectTourQuestionnaireGuest_(reservation, params);
     printMode = normalizeTourQuestionnairePrintMode_(reservation, printMode);
     const serviceCode = String(reservation.service_code || "").trim().toUpperCase();
     const customerType = String(reservation.customer_type || "").trim().toUpperCase();

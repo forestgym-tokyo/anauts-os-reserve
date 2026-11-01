@@ -256,7 +256,7 @@
     return guests;
   }
 
-  function openPrintModal(r){
+  function openPrintModal(r,blank=false){
     const guests=printGuests_(r),tour=isTour_(r);
     closeModal();
     injectStyles();
@@ -268,17 +268,17 @@
         <button type="button" class="tour-modal-x" aria-label="閉じる">×</button>
         <div class="tour-print-head">
           <h2>${isCounselVisitor_(r) ? "ダイエット無料カウンセリング アンケート" : "店内見学アンケート"}</h2>
-          <p>${tour?"氏名・メールアドレス・電話番号のみ転記します。住所・郵便番号は空欄です。":"転記内容を選択してPDFを作成します。"}</p>
+          <p>${blank?"氏名・連絡先・住所・予約日時を空欄で出力します。":tour?"氏名・メールアドレス・電話番号のみ転記します。住所・郵便番号は空欄です。":"転記内容を選択してPDFを作成します。"}</p>
         </div>
         <div class="tour-print-body">
-          <div class="tour-print-reservation">
+          <div class="tour-print-reservation"${blank?' hidden':''}>
             <strong id="tourPrintGuestName">${escapeHtml(r.customer_name||(isCounselVisitor_(r) ? "カウンセリング予約者" : "見学者"))}</strong><br>
             ${escapeHtml(r.date||r.reservation_date||"")} ${escapeHtml(r.start_time||"")}〜${escapeHtml(r.end_time||"")}
           </div>
           ${guests.length>1?`<label class="tour-print-guest-label" for="tourPrintGuest">印刷する見学者</label>
           <select id="tourPrintGuest" class="tour-print-guest-select">${guests.map((guest,index)=>`<option value="${index+1}">見学者${index===0?"①":"②"}：${escapeHtml(guest.name)}</option>`).join("")}</select>
           <p class="tour-print-guest-help">見学者ごとに、表面・裏面の2ページを個別に作成・印刷できます。</p>`:""}
-          ${tour?`<input type="hidden" name="tourPrintMode" value="CONTACT_ONLY"><div class="tour-info-box">住所欄は空欄のまま出力します。</div>`:`          <div class="tour-print-options">
+          ${blank?`<input type="hidden" name="tourPrintMode" value="BLANK">`:tour?`<input type="hidden" name="tourPrintMode" value="CONTACT_ONLY"><div class="tour-info-box">住所欄は空欄のまま出力します。</div>`:`          <div class="tour-print-options">
             <label class="tour-print-option">
               <input type="radio" name="tourPrintMode" value="FULL" checked>
               <span><strong>全部</strong><small>氏名・郵便番号・住所・電話番号・メールアドレス・予約日時を転記</small></span>
@@ -321,7 +321,7 @@
     if(!tour)showCurrentAddress_(overlay.querySelector(".tour-print-modal"),r);
     const guestSelect=overlay.querySelector("#tourPrintGuest");
     const selectedGuestIndex=()=>Number(guestSelect?.value||1);
-    const selectedMode=()=>overlay.querySelector('input[name="tourPrintMode"]:checked')?.value||(tour?"CONTACT_ONLY":"FULL");
+    const selectedMode=()=>blank?"BLANK":overlay.querySelector('input[name="tourPrintMode"]:checked')?.value||(tour?"CONTACT_ONLY":"FULL");
     const syncSelection=()=>{
       overlay.querySelector("#tourPrintGuestName").textContent=guests[selectedGuestIndex()-1].name||"見学者";
       generatedPdf=generatedPdfs.get(selectedGuestIndex()+":"+selectedMode())||null;
@@ -720,6 +720,9 @@
     }
     if(window.__questionnaireUiV39Installed)return;
     window.__questionnaireUiV39Installed=true;
+
+    const blankButton=document.getElementById("blankTourQuestionnaire");
+    if(blankButton)blankButton.onclick=()=>openPrintModal({service_code:"TOUR"},true);
 
     const original=window.renderStaffSchedule;
     window.renderStaffSchedule=function(d){
