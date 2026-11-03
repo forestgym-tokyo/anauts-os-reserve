@@ -121,17 +121,18 @@ async function jsonGet(url,timeout=45000){
     return await r.json();
   }finally{clearTimeout(timer);}
 }
-async function getRange(from,days=7){
+async function getRange(from,days=7,legacy=false){
   const url=new URL(API);
   url.searchParams.set("action","getAvailableSlotsRange");
   url.searchParams.set("service_code",SERVICE);
   url.searchParams.set("start_date",from);
   url.searchParams.set("days",String(days));
+  if(legacy)url.searchParams.set("tour_week_bulk","0");
   url.searchParams.set("_",String(Date.now()));
   let previous;
   for(let n=0;n<2;n++){
     try{
-      const res=await jsonGet(url.toString(),20000);
+      const res=await jsonGet(url.toString(),legacy?45000:20000);
       if(res.ok&&Array.isArray(res.data?.results)&&res.data.results.length===days)return res.data.results;
       const error=new Error(res.message||"空き状況を取得できませんでした");
       error.code=res.code||"";
@@ -145,6 +146,38 @@ function normalizeRange(res,from,days=7){
     const day=addDays(from,i),v=res[i];
     return{ok:!!v?.ok,message:v?.message||"",data:{date:day,slots:v?.ok&&Array.isArray(v.data?.slots)?v.data.slots:[]}};
   });
+}
+
+function hasBookableSlots(rows){
+  return rows.some(row=>row.ok&&row.data.slots.some(slot=>canBook(slot,row.data.date)));
+}
+// The weekly fast path can time out or return no candidates despite published shifts.
+// Preserve the backend's authoritative cutoff and calendar checks when falling back.
+async function getRangeResilient(from,days){
+  try{
+    const primary=normalizeRange(await getRange(from,days),from,days);
+    if(hasBookableSlots(primary))return primary;
+    try{
+      const legacy=normalizeRange(await getRange(from,days,true),from,days);
+      if(hasBookableSlots(legacy))return legacy;
+    }catch(_){}
+    return primary;
+  }catch(_){
+    // Bound fallback requests so a failed 7-day calculation does not blank the whole week.
+    const rows=[];
+    for(let offset=0;offset<days;offset+=2){
+      const day=addDays(from,offset),count=Math.min(2,days-offset);
+      try{
+        rows.push(...normalizeRange(await getRange(day,count,true),day,count));
+      }catch(_){
+        for(let i=0;i<count;i++)rows.push({
+          ok:false,message:"空き状況を取得できませんでした。更新ボタンから再度お試しください。",
+          data:{date:addDays(day,i),slots:[]}
+        });
+      }
+    }
+    return rows;
+  }
 }
 function cachedDay(day){
   const item=scheduleCache.get(day);
@@ -179,7 +212,7 @@ async function loadSchedule(options={}){
   async function receive(start,count){
     let rows;
     try{
-      rows=normalizeRange(await getRange(start,count),start,count);
+      rows=await getRangeResilient(start,count);
       for(const row of rows)if(row.ok)scheduleCache.set(row.data.date,{at:Date.now(),row});
       saveScheduleCache();
     }catch(_){
