@@ -193,13 +193,14 @@ function campaignProgress_(items,withdrawalDate){
   const w=String(withdrawalDate||"").match(/^(\d{4})-(\d{2})-/);
   if(!m||!w)return null;
 
-  const suspensionCount=rows.filter(x=>String(x&&x.status||"").trim()==="休会").length;
+  const suspensionCount=rows.filter(x=>String(x&&x.status||"").trim()==="休会"&&String(x&&x.label||"").trim()!=="初月会費").length;
   const baseIndex=Number(m[1])*12+(Number(m[2])-1);
   const baseAchievementIndex=baseIndex+12;
   const achievementIndex=baseAchievementIndex+suspensionCount;
   const withdrawalIndex=Number(w[1])*12+(Number(w[2])-1);
   const baseRemaining=Math.max(0,baseAchievementIndex-withdrawalIndex);
-  const remaining=Math.max(0,achievementIndex-withdrawalIndex);
+  const beforeExemptionDay=withdrawalIndex===achievementIndex&&Number(String(withdrawalDate).slice(8,10))<new Date(Number(m[1]),Number(m[2])+12+suspensionCount,0).getDate();
+  const remaining=Math.max(0,achievementIndex-withdrawalIndex,beforeExemptionDay?1:0);
   const suspensionAdded=Math.max(0,remaining-baseRemaining);
   const achievementYear=Math.floor(achievementIndex/12);
   const achievementMonth=(achievementIndex%12)+1;
@@ -211,9 +212,9 @@ function renderCampaignRemaining_(){
   const p=campaignProgress_(settlement&&settlement.items,settlement&&settlement.withdrawalDate);
   if(!p){el.classList.add("hidden");el.innerHTML="";return;}
   if(p.remaining>0){
-    el.innerHTML=`キャンペーン条件達成まで：<strong>残り${p.remaining}か月</strong>　達成月：${p.achievementYear}年${p.achievementMonth}月<span class="sub">休会がある場合、現時点までの休会期間は加味されています。</span>`;
+    el.innerHTML=`キャンペーン条件達成まで：<strong>残り${p.remaining}か月</strong>　達成月：${p.achievementYear}年${p.achievementMonth}月<span class="sub">入会初月と休会月を除く12か月が経過した月末に、精算金は免除されます。</span>`;
   }else{
-    el.innerHTML=`<strong>キャンペーン条件達成済み</strong>　達成月：${p.achievementYear}年${p.achievementMonth}月<span class="sub">休会がある場合、現時点までの休会期間は加味されています。</span>`;
+    el.innerHTML=`<strong>キャンペーン条件達成済み</strong>　達成月：${p.achievementYear}年${p.achievementMonth}月<span class="sub">入会初月と休会月を除く12か月が経過した月末に、精算金は免除されます。</span>`;
   }
   el.classList.remove("hidden");
 }

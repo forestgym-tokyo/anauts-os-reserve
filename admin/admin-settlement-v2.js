@@ -26,7 +26,7 @@ function cutoffInfo(now=new Date()){
 function monthsBetween(joinDate,withdrawalDate){
   const j=new Date(joinDate+"T00:00:00"),w=new Date(withdrawalDate+"T00:00:00");
   const out=[]; let y=j.getFullYear(),m=j.getMonth();
-  while(y<w.getFullYear()||m<=w.getMonth()){
+  while(y<w.getFullYear()||(y===w.getFullYear()&&m<=w.getMonth())){
     out.push({y,m});
     m++; if(m>11){m=0;y++}
   }
@@ -112,23 +112,28 @@ function recalculateCampaign_(){
   if(!current)return;
   let sequence=0,completed=0;
   const months=current.items.filter(x=>x.kind==="MONTH");
-  months.forEach(item=>{
+  months.forEach((item,index)=>{
     if(item.status==="休会"){
       item.paid=550; item.normal=550; item.settlement=0;
       item.paymentSequence=null;
       item.note="休会期間（差額なし・継続条件の回数に含めない）";
       return;
     }
-    sequence++;
-    item.paymentSequence=sequence;
+    const isFirstMonth=index===0;
+    if(!isFirstMonth)sequence++;
+    item.paymentSequence=isFirstMonth?null:sequence;
     item.normal=Number(item.baseNormal||0);
     item.paid=Number(item.basePaid||0);
     if(item.isFinalMonth&&cutoffInfo().beforeFinalCharge)item.paid=0;
-    if(item.paid>0)completed++;
+    if(!isFirstMonth&&item.paid>0)completed++;
     item.settlement=sequence<=12?Math.max(0,item.normal-item.paid):0;
-    item.note=sequence<=12?`キャンペーン決済 ${sequence}/12`:"継続条件達成後";
+    item.note=isFirstMonth?"日割り差額（継続条件の回数に含めない）":sequence<=12?`キャンペーン決済 ${sequence}/12`:"継続条件達成後";
   });
-  const campaignCompleted=completed>=12;
+  // 入会初月と休会月を除く12か月の月末を免除境界とする。
+  const [jy,jm]=current.joinDate.split("-").map(Number);
+  const suspensionCount=months.filter((item,index)=>index>0&&item.status==="休会").length;
+  const exemptionDate=new Date(jy,jm+12+suspensionCount,0);
+  const campaignCompleted=new Date(current.withdrawalDate+"T00:00:00")>=exemptionDate;
   current.completedPayments=completed;
   current.campaignCompleted=campaignCompleted;
   current.items.filter(x=>x.kind==="INITIAL"||x.kind==="BENEFIT").forEach(item=>{
@@ -158,7 +163,7 @@ function render(){
   $("#settlementTotal").textContent=yen(total);
   $("#settlementDeadlineBadge").textContent="有効期限 "+current.expiry.toLocaleString("ja-JP",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"});
   const campaignText=current.campaignCompleted
-    ?"12回の決済条件を満たしているため、キャンペーン差額の精算はありません。"
+    ?"入会初月と休会月を除く12か月が経過しているため、キャンペーン差額の精算はありません。"
     :`決済済み ${current.completedPayments}/12回。`;
   $("#settlementPaymentGuide").textContent=current.paymentMethod==="BANK_TRANSFER"
     ?campaignText+(current.campaignCompleted?"":"未達のためキャンペーン差額を精算します。")+" 口座振替会員：承認後、みずほ銀行 新浦安支店 普通 1917298 A-nauts株式会社 へ振込が必要です。"
@@ -233,11 +238,12 @@ function campaignProgressForPreview_(items,withdrawalDate){
   if(!first||!w)return null;
   const m=String(first.target||"").match(/(\d{4})年(\d{1,2})月/);
   if(!m)return null;
-  const suspensionCount=rows.filter(x=>String(x&&x.status||"").trim()==="休会").length;
+  const suspensionCount=rows.filter(x=>String(x&&x.status||"").trim()==="休会"&&String(x&&x.label||"").trim()!=="初月会費").length;
   const achievementIndex=Number(m[1])*12+(Number(m[2])-1)+12+suspensionCount;
   const withdrawalIndex=Number(w[1])*12+(Number(w[2])-1);
+  const beforeExemptionDay=withdrawalIndex===achievementIndex&&Number(String(withdrawalDate).slice(8,10))<new Date(Number(m[1]),Number(m[2])+12+suspensionCount,0).getDate();
   return{
-    remaining:Math.max(0,achievementIndex-withdrawalIndex),
+    remaining:Math.max(0,achievementIndex-withdrawalIndex,beforeExemptionDay?1:0),
     year:Math.floor(achievementIndex/12),
     month:(achievementIndex%12)+1,
     suspensionCount:suspensionCount
@@ -251,7 +257,7 @@ function buildMemberPreviewHtml_(){
   const campaignProgressHtml=campaignProgress
     ? `<div style="margin-top:9px;padding:11px 13px;border-radius:11px;background:#f8fbf9;border:1px solid #dfe9e3;font-size:13px;color:#294b3b">
         ${campaignProgress.remaining>0
-          ? `キャンペーン条件達成まで：<strong>残り${campaignProgress.remaining}か月</strong>　達成月：${campaignProgress.year}年${campaignProgress.month}月<div style="margin-top:2px;color:#66746d;font-size:11px">休会がある場合、現時点までの休会期間は加味されています。</div>`
+          ? `キャンペーン条件達成まで：<strong>残り${campaignProgress.remaining}か月</strong>　達成月：${campaignProgress.year}年${campaignProgress.month}月<div style="margin-top:2px;color:#66746d;font-size:11px">入会初月と休会月を除く12か月が経過した月末に、精算金は免除されます。</div>`
           : `<strong>キャンペーン条件達成済み</strong>（達成月：${campaignProgress.year}年${campaignProgress.month}月）`}
       </div>`
     : "";

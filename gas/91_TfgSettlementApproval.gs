@@ -169,32 +169,7 @@ function createTfgSettlement_(body){
     const sourceItems=legacyFlatPlan
       ? items.filter(function(x){return String((x&&x.label)||"").trim()!=="選べる特典";})
       : items;
-    const normalized=sourceItems.map(function(x){
-      let normal=Number(x.normal||0);
-      let paid=Number(x.paid||0);
-      if(!Number.isFinite(normal)||!Number.isFinite(paid)||normal<0||paid<0)throw new Error("精算明細の金額が不正です。");
-      let settlement=Math.max(0,normal-paid);
-      const status=String(x.status||"").trim();
-      const paymentSequence=x.paymentSequence==null?null:Number(x.paymentSequence);
-      const isFinalMonth=x.isFinalMonth===true||tfgSettlementIsWithdrawalMonth_(x.target,withdrawalDate);
-      if(status==="休会"){
-        normal=550;
-        paid=550;
-        settlement=0;
-      }else if(legacyFlatPlan&&String(x.label||"").trim()==="初月会費"){
-        normal=paid;
-        settlement=0;
-      }else if(legacyFlatPlan&&String(x.label||"").trim()==="月会費"){
-        normal=legacyNormalMonthly;
-        settlement=0;
-      }else if(paymentSequence!==null&&paymentSequence>12){
-        settlement=0;
-      }else if(isFinalMonth&&beforeFinalMonthCharge){
-        paid=0;
-        settlement=Math.max(0,normal);
-      }
-      return{target:String(x.target||""),label:String(x.label||""),paid:paid,normal:normal,settlement:settlement,note:String(x.note||""),status:status,paymentSequence:paymentSequence,isFinalMonth:isFinalMonth};
-    });
+    const normalized=tfgSettlementNormalizeItems_(sourceItems,withdrawalDate,beforeFinalMonthCharge,legacyFlatPlan,legacyNormalMonthly);
     const total=normalized.reduce(function(s,x){return s+x.settlement},0);
     if(total<0)throw new Error("精算金額が不正です。");
     const token=Utilities.getUuid()+Utilities.getUuid().replace(/-/g,"");
@@ -216,6 +191,45 @@ function createTfgSettlement_(body){
   }catch(e){return tfgSettlementJson_({ok:false,code:"CREATE_ERROR",message:e.message||"精算承認データを作成できませんでした。"});}
 }
 
+function tfgSettlementNormalizeItems_(sourceItems,withdrawalDate,beforeFinalMonthCharge,legacyFlatPlan,legacyNormalMonthly){
+  let sequence=0;
+  const normalized=sourceItems.map(function(x){
+      let normal=Number(x.normal||0);
+      let paid=Number(x.paid||0);
+      if(!Number.isFinite(normal)||!Number.isFinite(paid)||normal<0||paid<0)throw new Error("精算明細の金額が不正です。");
+      let settlement=Math.max(0,normal-paid);
+      const status=String(x.status||"").trim();
+      const label=String(x.label||"").trim();
+      const isMonth=label==="初月会費"||label==="月会費"||x.kind==="MONTH";
+      const firstMonth=label==="初月会費";
+      const paymentSequence=isMonth&&!firstMonth&&status!=="休会"?++sequence:null;
+      const isFinalMonth=x.isFinalMonth===true||tfgSettlementIsWithdrawalMonth_(x.target,withdrawalDate);
+      if(status==="休会"){
+        normal=550;
+        paid=550;
+        settlement=0;
+      }else if(legacyFlatPlan&&String(x.label||"").trim()==="初月会費"){
+        normal=paid;
+        settlement=0;
+      }else if(legacyFlatPlan&&String(x.label||"").trim()==="月会費"){
+        normal=legacyNormalMonthly;
+        settlement=0;
+      }else if(paymentSequence!==null&&paymentSequence>12){
+        settlement=0;
+      }else if(isFinalMonth&&beforeFinalMonthCharge){
+        paid=0;
+        settlement=Math.max(0,normal);
+      }
+      return{target:String(x.target||""),label:String(x.label||""),paid:paid,normal:normal,settlement:settlement,note:String(x.note||""),status:status,paymentSequence:paymentSequence,isFinalMonth:isFinalMonth};
+    });
+  const progress=tfgSettlementCampaignProgress_(normalized,withdrawalDate);
+  // 休会月を除く12か月経過で精算免除。画面から渡された精算額・回数は信用しない。
+  if(progress&&progress.remainingMonths===0){
+    normalized.forEach(function(item){item.settlement=0;});
+  }
+  return normalized;
+}
+
 function tfgSettlementCampaignProgress_(items,withdrawalDate){
   const rows=Array.isArray(items)?items:[];
   let first=null;
@@ -230,14 +244,15 @@ function tfgSettlementCampaignProgress_(items,withdrawalDate){
 
   let suspensionCount=0;
   rows.forEach(function(row){
-    if(String((row&&row.status)||"").trim()==="休会")suspensionCount++;
+    if(String((row&&row.status)||"").trim()==="休会"&&String((row&&row.label)||"").trim()!=="初月会費")suspensionCount++;
   });
 
   const baseIndex=first.year*12+(first.month-1);
   const achievementIndex=baseIndex+12+suspensionCount;
   const withdrawalIndex=Number(w[1])*12+(Number(w[2])-1);
+  const beforeExemptionDay=withdrawalIndex===achievementIndex&&Number(String(withdrawalDate).slice(8,10))<new Date(first.year,first.month+12+suspensionCount,0).getDate();
   return{
-    remainingMonths:Math.max(0,achievementIndex-withdrawalIndex),
+    remainingMonths:Math.max(0,achievementIndex-withdrawalIndex,beforeExemptionDay?1:0),
     achievementYear:Math.floor(achievementIndex/12),
     achievementMonth:(achievementIndex%12)+1,
     suspensionCount:suspensionCount
@@ -280,7 +295,7 @@ function sendTfgSettlementApproval_(body){
       "「この内容で承認する」または「キャンペーン条件達成まで見送る」を選択してください。",
       "",
       campaignProgressLine,
-      campaignProgress?"休会がある場合、現時点までの休会期間は加味されています。":"",
+      campaignProgress?"入会初月と休会月を除く12か月が経過した月末に、精算金は免除されます。":"",
       "承認URLの有効期限："+expiryText,
       paymentText,
       "",
@@ -312,7 +327,7 @@ function sendTfgSettlementApproval_(body){
       : '';
     const campaignHtml=campaignProgressLine
       ? '<p style="margin:18px 0 0;font-weight:700">'+escHtml(campaignProgressLine)+'</p>'
-        +(campaignProgress?'<p style="margin:4px 0 16px;font-size:13px;color:#5f6d66">休会がある場合、現時点までの休会期間は加味されています。</p>':'')
+        +(campaignProgress?'<p style="margin:4px 0 16px;font-size:13px;color:#5f6d66">入会初月と休会月を除く12か月が経過した月末に、精算金は免除されます。</p>':'')
       : '';
     const draftHtml=[
       '<div style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Noto Sans JP,Arial,sans-serif;color:#17231d;line-height:1.8;font-size:14px">',
@@ -510,7 +525,7 @@ function tfgSettlementSendDeferredConfirmation_(row,now){
     "受付日時："+now,
     "当初退会予定："+row.withdrawalDate,
     progressLine,
-    progressLine?"休会がある場合、現時点までの休会期間は加味されています。":"",
+    progressLine?"入会初月と休会月を除く12か月が経過した月末に、精算金は免除されます。":"",
     "",
     "【重要】",
     "・今回の見送りにより、退会申請のご予約がある場合はキャンセルとなります。",
@@ -523,7 +538,7 @@ function tfgSettlementSendDeferredConfirmation_(row,now){
   ].filter(function(line){return line!==""||true;}).join("\n");
 
   const progressHtml=progressLine
-    ?"<p><strong>"+tfgSettlementMailEscHtml_(progressLine)+"</strong><br><span style='font-size:13px;color:#5f6d66'>休会がある場合、現時点までの休会期間は加味されています。</span></p>"
+    ?"<p><strong>"+tfgSettlementMailEscHtml_(progressLine)+"</strong><br><span style='font-size:13px;color:#5f6d66'>入会初月と休会月を除く12か月が経過した月末に、精算金は免除されます。</span></p>"
     :"";
   const htmlBody=[
     "<div style='font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Noto Sans JP,Arial,sans-serif;color:#17231d;line-height:1.8;font-size:14px'>",
