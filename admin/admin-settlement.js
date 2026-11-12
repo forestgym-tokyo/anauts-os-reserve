@@ -100,23 +100,28 @@ function recalculateCampaign_(){
   if(!current)return;
   let sequence=0,completed=0;
   const months=current.items.filter(x=>x.kind==="MONTH");
-  months.forEach(item=>{
+  months.forEach((item,index)=>{
     if(item.status==="休会"){
       item.paid=550; item.normal=550; item.settlement=0;
       item.paymentSequence=null;
-      item.note="休会期間（差額なし・継続条件の回数に含めない）";
+      item.note="休会期間（差額なし・満12か月の継続期間に含めない）";
       return;
     }
-    sequence++;
-    item.paymentSequence=sequence;
+    const isFirstMonth=index===0;
+    if(!isFirstMonth)sequence++;
+    item.paymentSequence=isFirstMonth?null:sequence;
     item.normal=Number(item.baseNormal||0);
     item.paid=Number(item.basePaid||0);
     if(item.isFinalMonth&&cutoffInfo().beforeFinalCharge)item.paid=0;
-    if(item.paid>0)completed++;
+    if(!isFirstMonth&&item.paid>0)completed++;
     item.settlement=sequence<=12?Math.max(0,item.normal-item.paid):0;
-    item.note=sequence<=12?`キャンペーン決済 ${sequence}/12`:"継続条件達成後";
+    item.note=isFirstMonth?"日割り差額（満12か月の継続期間に含めない）":sequence<=12?`継続月数 ${sequence}/12か月`:"継続条件達成後";
   });
-  const campaignCompleted=completed>=12;
+  // 入会初月と休会月を除く12か月の月末を免除境界とする。
+  const [jy,jm]=current.joinDate.split("-").map(Number);
+  const suspensionCount=months.filter((item,index)=>index>0&&item.status==="休会").length;
+  const exemptionDate=new Date(jy,jm+12+suspensionCount,0);
+  const campaignCompleted=new Date(current.withdrawalDate+"T00:00:00")>=exemptionDate;
   current.completedPayments=completed;
   current.campaignCompleted=campaignCompleted;
   current.items.filter(x=>x.kind==="INITIAL"||x.kind==="BENEFIT").forEach(item=>{
@@ -145,8 +150,8 @@ function render(){
   $("#settlementTotal").textContent=yen(total);
   $("#settlementDeadlineBadge").textContent="有効期限 "+current.expiry.toLocaleString("ja-JP",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"});
   const campaignText=current.campaignCompleted
-    ?"12回の決済条件を満たしているため、キャンペーン差額の精算はありません。"
-    :`決済済み ${current.completedPayments}/12回。未達のためキャンペーン差額を精算します。`;
+    ?"入会初月と休会月を除いた満12か月が経過しているため、キャンペーン差額の精算はありません。"
+    :"入会初月と休会月を除いた満12か月が継続条件です。未達のためキャンペーン差額を精算します。";
   $("#settlementPaymentGuide").textContent=campaignText+" "+(current.paymentMethod==="BANK_TRANSFER"
     ?"口座振替会員：承認後、みずほ銀行 新浦安支店 普通 1917298 A-nauts株式会社 へ振込が必要です。"
     :"クレジットカードで精算します。");
@@ -154,17 +159,27 @@ function render(){
   $("#settlementDraft").disabled=false;
   $("#settlementPreviewButton").disabled=false;
   $("#settlementSend").disabled=true;
-  draft=null;
+  clearDraft_();
 }
 function show(text,isError=false){
   const el=$("#settlementMessage"); if(!el)return;
   el.textContent=text; el.classList.remove("is-hidden"); el.style.color=isError?"#ff8e8e":"#79dc8c";
 }
+function clearDraft_(){
+  draft=null;
+  $("#settlementFallbackUrl")?.classList.add("is-hidden");
+  const field=$("#settlementFallbackUrlText"),link=$("#settlementPreviewLink");
+  if(field)field.value="";
+  if(link){link.removeAttribute("href");link.classList.add("is-hidden");}
+  if($("#settlementSend"))$("#settlementSend").disabled=true;
+}
 async function createDraft(){
   if(!current)return;
+  clearDraft_();
   const btn=$("#settlementDraft"); btn.disabled=true; btn.textContent="下書き保存中…";
   try{
     if(typeof apiPost!=="function")throw new Error("管理APIを読み込めませんでした。");
+    const expectedTotal=current.items.reduce((sum,item)=>sum+Number(item.settlement||0),0);
     const payload={
       action:"createTfgSettlement",
       memberNo:current.memberNo,
@@ -174,6 +189,8 @@ async function createDraft(){
       items:current.items.map(x=>({target:x.target,label:x.label,paid:x.paid,normal:x.normal,settlement:x.settlement,note:x.note,status:x.status||"",paymentSequence:x.paymentSequence||null,isFinalMonth:!!x.isFinalMonth}))
     };
     const r=await apiPost(payload);
+    const savedTotal=r.data?.total;
+    if(typeof savedTotal!=="number"||!Number.isFinite(savedTotal)||savedTotal!==expectedTotal)throw new Error("計算額と保存額が一致しないため、承認メールは作成していません。管理者に確認してください。");
     draft={settlementId:r.data?.settlementId||"",approvalUrl:r.data?.approvalUrl||""};
     const fallback=$("#settlementFallbackUrl"),fallbackText=$("#settlementFallbackUrlText");
     const previewUrl=draft.approvalUrl+(draft.approvalUrl.includes("?")?"&":"?")+"preview="+Date.now();
