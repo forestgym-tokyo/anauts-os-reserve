@@ -830,6 +830,13 @@
       <label><span>氏名</span><input id="settlementMemberName"></label>
       <label><span>登録メールアドレス</span><input id="settlementEmail" type="email"></label>
       <label><span>スタート日</span><input id="settlementJoinDate" type="date"></label>
+      <label><span>退会時期</span>
+        <select id="settlementWithdrawalTiming">
+          <option value="NORMAL">通常の期日</option>
+          <option value="PREVIOUS_MONTH">通常より1か月前（例外対応）</option>
+        </select>
+        <small style="display:block;margin-top:6px;color:#91a198">退会を1か月早めると認めた場合に選択し、精算明細を再計算してください。退会予定日は計算後に表示します。</small>
+      </label>
       <label><span>会員プラン</span>
         <select id="settlementPlan">
           <option value="REGULAR">REGULAR</option>
@@ -919,7 +926,7 @@
 <script src="./admin-questionnaire.js?v=20261101-blank-tour-v2" defer>
 </script>
 <script src="./admin-counseling-links.js?v=20260915-diet-counseling-v1" defer></script>
-<script src="./admin-settlement-v2.js?v=20261112-full-twelve-months" defer></script>
+<script src="./admin-settlement-v2.js?v=20261112-withdrawal-timing" defer></script>
 <script src="./admin-monthly-v58.js?v=20261024-soga-am-pm-two-rows-v2" defer></script>
 <script src="./admin-soga-shifts.js?v=20261024-kevin-sunday-rule-v3" defer></script>
 <script src="./admin-soga-candidate-calendar.js?v=20261024-published-shifts-v3" defer></script>

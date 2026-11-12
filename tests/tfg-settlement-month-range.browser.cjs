@@ -20,6 +20,8 @@ const server=http.createServer((req,res)=>{
  const results=[],errors=[];
  try{
   const scenarios=[
+   {at:"2026-11-12T03:00:00Z",join:"2026-11-01",months:1,last:"2026年11月",total:"11,330円",timing:"PREVIOUS_MONTH",memberNo:"160708",date:"2026-11-30"},
+   {at:"2026-11-12T03:00:00Z",join:"2026-10-01",months:2,last:"2026年11月",total:"13,860円",timing:"PREVIOUS_MONTH",memberNo:"160710",date:"2026-11-30"},
    {at:"2026-11-05T03:00:00Z",join:"2026-11-01",months:1,last:"2026年11月",total:"11,330円"},
    {at:"2026-11-12T03:00:00Z",join:"2026-11-01",months:2,last:"2026年12月",total:"18,810円"},
    {at:"2026-12-05T03:00:00Z",join:"2026-11-01",months:2,last:"2026年12月",total:"13,860円"},
@@ -40,6 +42,7 @@ const server=http.createServer((req,res)=>{
       window.fixtureCalls=[];
       window.apiPost=async payload=>{
        window.fixtureCalls.push(payload.action);
+       if(payload.action==="createTfgSettlement")window.fixturePayload=payload;
        if(payload.action==="createTfgSettlement")return {ok:true,data:{settlementId:"FIXTURE-SETTLEMENT",approvalUrl:"https://example.invalid/approval?token=fixture-token",total:window.fixtureOverrideTotal?window.fixtureSavedTotal:payload.items.reduce((sum,item)=>sum+Number(item.settlement||0),0)+(window.fixtureMismatch?1:0)}};
        if(payload.action==="sendTfgSettlementApproval")return {ok:true,data:{gmailDraftId:"fixture-draft"}};
        throw Error("Unexpected API action: "+payload.action);
@@ -50,6 +53,10 @@ const server=http.createServer((req,res)=>{
       document.querySelector("#settlementView").style.display="block";
       for(const [id,value] of Object.entries({settlementMemberNo:"123456",settlementMemberName:"計算確認用",settlementEmail:"test@example.invalid",settlementJoinDate:join,settlementPlan:"REGULAR",settlementBenefit:"NONE",settlementFirstPaid:"4950",settlementInitialPaid:"0"}))document.getElementById(id).value=value;
      },scenario.join);
+     if(scenario.timing){
+      await page.locator("#settlementWithdrawalTiming").selectOption(scenario.timing);
+      await page.evaluate(no=>document.querySelector("#settlementMemberNo").value=no,scenario.memberNo);
+     }
      const started=Date.now();await page.locator("#settlementCalculate").click({timeout:5000});
      await page.locator("#settlementPreview").waitFor({state:"visible",timeout:5000});
      const elapsed=Date.now()-started,rows=page.locator("#settlementRows [data-status]");
@@ -67,6 +74,12 @@ const server=http.createServer((req,res)=>{
      assert.ok((await page.locator("#settlementInlineMemberPreviewBody").innerText()).includes(total));
      await page.locator("#settlementDraft").click();await page.waitForFunction(()=>document.querySelector("#settlementMessage").textContent.includes("Gmailの下書きに保存"));
      assert.deepEqual(await page.evaluate(()=>fixtureCalls),["createTfgSettlement","sendTfgSettlementApproval"]);
+     if(scenario.timing){
+      assert.match(await page.locator("#settlementDeadlineBadge").innerText(),new RegExp(scenario.date));
+      assert.equal(await page.evaluate(()=>fixturePayload.withdrawalTiming),scenario.timing);
+      assert.equal(await page.evaluate(()=>fixturePayload.memberNo),scenario.memberNo);
+      assert.match(await page.locator("#settlementInlineMemberPreviewBody").innerText(),new RegExp(scenario.date));
+     }
      await page.evaluate(()=>{window.fixtureMismatch=true;});
      await page.locator("#settlementDraft").click();await page.waitForFunction(()=>document.querySelector("#settlementMessage").textContent.includes("計算額と保存額が一致しない"));
      assert.deepEqual(await page.evaluate(()=>fixtureCalls),["createTfgSettlement","sendTfgSettlementApproval","createTfgSettlement"]);

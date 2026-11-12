@@ -9,19 +9,20 @@ const planRates={
 let current=null;
 let draft=null;
 
-function cutoffInfo(now=new Date()){
+function cutoffInfo(now=new Date(),withdrawalTiming="NORMAL"){
   const y=now.getFullYear(),m=now.getMonth(),d=now.getDate(),h=now.getHours(),min=now.getMinutes(),sec=now.getSeconds();
   const before9=d<9||(d===9&&(h<20||(h===20&&min===0&&sec===0)));
   const after9=!before9;
   let wy=y,wm=m;
   if(after9){wm+=1;if(wm>11){wm=0;wy++}}
+  if(withdrawalTiming==="PREVIOUS_MONTH"){wm-=1;if(wm<0){wm=11;wy--}}
   const last=new Date(wy,wm+1,0).getDate();
   const withdrawalDate=`${wy}-${String(wm+1).padStart(2,"0")}-${String(last).padStart(2,"0")}`;
   let expiry;
   if(before9) expiry=new Date(y,m,9,20,0,1);
   else if(d<=26) expiry=new Date(y,m,27,0,0,0);
   else expiry=new Date(y,m+1,9,20,0,0);
-  return {withdrawalDate,expiry,beforeFinalCharge:after9&&d<=26};
+  return {withdrawalDate,expiry,beforeFinalCharge:withdrawalTiming!=="PREVIOUS_MONTH"&&after9&&d<=26};
 }
 function monthsBetween(joinDate,withdrawalDate){
   const j=new Date(joinDate+"T00:00:00"),w=new Date(withdrawalDate+"T00:00:00");
@@ -88,7 +89,9 @@ function calc(){
   const paymentMethod=$("#settlementPaymentMethod").value;
   if(!/^\d{6}$/.test(memberNo)){show("会員番号は6桁の数字で入力してください。",true);return}
   if(!memberName||!email||!joinDate){show("氏名・メールアドレス・スタート日を入力してください。",true);return}
-  const cut=cutoffInfo(),months=monthsBetween(joinDate,cut.withdrawalDate);
+  const withdrawalTiming=$("#settlementWithdrawalTiming").value;
+  const cut=cutoffInfo(new Date(),withdrawalTiming),months=monthsBetween(joinDate,cut.withdrawalDate);
+  if(joinDate>cut.withdrawalDate){show("退会予定日がスタート日より前になるため計算できません。",true);return}
   const items=[];
   items.push({target:"—",label:"初期費用",paid:initialPaid,normal:8800,settlement:Math.max(0,8800-initialPaid),note:"入会金・事務手数料",kind:"INITIAL",basePaid:initialPaid,baseNormal:8800});
   const benefitValue=benefitAmount(benefit,rate,joinDate,plan);
@@ -104,7 +107,7 @@ function calc(){
     if(isFinal&&cut.beforeFinalCharge)paid=0;
     items.push({target,label:"月会費",paid,normal:rate.normal,settlement:Math.max(0,rate.normal-paid),note:"",kind:"MONTH",isFinalMonth:isFinal,status:"通常",basePaid:paid,baseNormal:rate.normal});
   });
-  current={memberNo,memberName,email,joinDate,plan,benefit,paymentMethod,withdrawalDate:cut.withdrawalDate,expiry:cut.expiry,items};
+  current={withdrawalTiming,beforeFinalCharge:cut.beforeFinalCharge,memberNo,memberName,email,joinDate,plan,benefit,paymentMethod,withdrawalDate:cut.withdrawalDate,expiry:cut.expiry,items};
   recalculateCampaign_();
   render();
 }
@@ -124,7 +127,7 @@ function recalculateCampaign_(){
     item.paymentSequence=isFirstMonth?null:sequence;
     item.normal=Number(item.baseNormal||0);
     item.paid=Number(item.basePaid||0);
-    if(item.isFinalMonth&&cutoffInfo().beforeFinalCharge)item.paid=0;
+    if(item.isFinalMonth&&current.beforeFinalCharge)item.paid=0;
     if(!isFirstMonth&&item.paid>0)completed++;
     item.settlement=sequence<=12?Math.max(0,item.normal-item.paid):0;
     item.note=isFirstMonth?"日割り差額（満12か月の継続期間に含めない）":sequence<=12?`継続月数 ${sequence}/12か月`:"継続条件達成後";
@@ -161,7 +164,7 @@ function render(){
   }));
   const total=current.items.reduce((s,x)=>s+x.settlement,0);
   $("#settlementTotal").textContent=yen(total);
-  $("#settlementDeadlineBadge").textContent="有効期限 "+current.expiry.toLocaleString("ja-JP",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"});
+  $("#settlementDeadlineBadge").textContent="退会予定 "+current.withdrawalDate+" ／ 有効期限 "+current.expiry.toLocaleString("ja-JP",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"});
   const campaignText=current.campaignCompleted
     ?"入会初月と休会月を除いた満12か月が経過しているため、キャンペーン差額の精算はありません。"
     :"入会初月と休会月を除いた満12か月が継続条件です。";
@@ -203,6 +206,7 @@ async function createDraft(){
       joinDate:current.joinDate,
       plan:current.plan,
       paymentMethod:current.paymentMethod,
+      withdrawalTiming:current.withdrawalTiming,
       items:current.items.map(x=>({target:x.target,label:x.label,paid:x.paid,normal:x.normal,settlement:x.settlement,note:x.note,status:x.status||"",paymentSequence:x.paymentSequence||null,isFinalMonth:!!x.isFinalMonth}))
     };
     const r=await apiPost(payload);
@@ -435,6 +439,7 @@ function initSettlementUi_(){
   $("#settlementMemberNo")?.addEventListener("input",()=>scheduleSettlementMemberLookup_(false));
   $("#settlementMemberNo")?.addEventListener("blur",()=>scheduleSettlementMemberLookup_(true));
   $("#settlementCalculate")?.addEventListener("click",calc);
+  $("#settlementWithdrawalTiming")?.addEventListener("change",resetSettlementAfterMemberChange_);
   ["input","change","keyup","blur"].forEach(evt=>$("#settlementFirstPaid")?.addEventListener(evt,refreshFirstNormal_));
   ["change","input"].forEach(evt=>{
     $("#settlementPlan")?.addEventListener(evt,refreshFirstNormal_);

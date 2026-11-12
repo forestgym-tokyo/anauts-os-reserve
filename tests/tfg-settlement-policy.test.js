@@ -116,7 +116,7 @@ function fixture(joinDate,withdrawalDate,{pause=false,unpaid=false}={}){
   return {joinDate,withdrawalDate,items};
 }
 function adminCalculate(source,data,unpaid){
-  const scope=vm.createContext({current:structuredClone(data),cutoffInfo:()=>({beforeFinalCharge:unpaid})});
+  const scope=vm.createContext({current:{...structuredClone(data),beforeFinalCharge:unpaid},cutoffInfo:()=>({beforeFinalCharge:unpaid})});
   vm.runInContext(extractFunction(source,"recalculateCampaign_")+";recalculateCampaign_();",scope);
   return scope.current;
 }
@@ -248,4 +248,25 @@ test("suspension in the already-excluded joining month does not extend exemption
   const data=fixture("2026-01-15","2027-01-31");data.items[2].status="休会";
   for(const source of [adminSource,legacyAdminSource])assert.equal(adminCalculate(source,data,false).campaignCompleted,true);
   assert.equal(serverCalculate(data,false).reduce((s,x)=>s+x.settlement,0),0);
+});
+
+test("previous-month exception keeps UI and server dates aligned across year and leap boundaries",()=>{
+  const scope=vm.createContext({
+    tfgSettlementJstParts_:d=>[d.getFullYear(),d.getMonth()+1,d.getDate(),d.getHours(),d.getMinutes(),d.getSeconds()]
+  });
+  vm.runInContext(extractFunction(adminSource,"cutoffInfo")+extractFunction(gasSource,"tfgSettlementWithdrawalDate_"),scope);
+  for(const [at,expected] of [
+    [new Date(2026,10,12,12),"2026-11-30"],
+    [new Date(2026,0,5,12),"2025-12-31"],
+    [new Date(2024,2,5,12),"2024-02-29"],
+    [new Date(2026,10,9,20,0,0),"2026-10-31"],
+    [new Date(2026,10,9,20,0,1),"2026-11-30"]
+  ]){
+    const normal=scope.cutoffInfo(at);
+    const earlier=scope.cutoffInfo(at,"PREVIOUS_MONTH");
+    assert.equal(earlier.withdrawalDate,expected);
+    assert.equal(scope.tfgSettlementWithdrawalDate_(at,"PREVIOUS_MONTH"),expected);
+    assert.equal(earlier.beforeFinalCharge,false);
+    assert.equal(earlier.expiry.getTime(),normal.expiry.getTime());
+  }
 });
