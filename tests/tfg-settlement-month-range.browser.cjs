@@ -79,6 +79,9 @@ const server=http.createServer((req,res)=>{
       assert.equal(await page.evaluate(()=>fixturePayload.finalMonthBilling),scenario.billing);
       assert.equal(await page.evaluate(()=>fixturePayload.memberNo),scenario.memberNo);
       assert.equal(await page.locator("#settlementRows tr").last().locator("td").last().innerText(),"0円");
+      assert.equal(await page.locator("#settlementRows tr").last().locator("td").nth(4).innerText(),"0円");
+      assert.match(await page.locator("#settlementInlineMemberPreviewBody").innerText(),/実質退会日：2026-11-30/);
+      assert.equal(await page.evaluate(()=>fixturePayload.items.at(-1).normal),0);
       assert.match(await page.locator("#settlementInlineMemberPreviewBody").innerText(),/最終月請求なし（0円）/);
       assert.match(await page.locator("#settlementInlineMemberPreviewBody").innerText(),new RegExp(scenario.date));
      }
@@ -103,6 +106,7 @@ const server=http.createServer((req,res)=>{
       assert.equal(await page.locator("#settlementPreview").isVisible(),false);
       await page.locator("#settlementCalculate").click();
       assert.equal(await page.locator("#settlementRows tr").last().locator("td").last().innerText(),"7,480円");
+      assert.equal(await page.locator("#settlementRows tr").last().locator("td").nth(4).innerText(),"7,480円");
      }
      results.push({timezoneId,at:scenario.at,months:scenario.months,total,calculation_ms:elapsed});
     }finally{await context.close();}

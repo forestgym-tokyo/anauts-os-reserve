@@ -5,7 +5,7 @@ import {fileURLToPath} from 'node:url';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const folder=path.resolve(process.argv[2]||'.gas-live');
-const baseline='10283e8';
+const baseline='2fb8e6a';
 const source='gas/91_TfgSettlementApproval.gs';
 const matches=fs.readdirSync(folder).filter(name=>/^91_TfgSettlementApproval(?:\.gs)?\.(js|gs)$/.test(name));
 if(matches.length!==1)throw new Error('Expected exactly one existing settlement module');
