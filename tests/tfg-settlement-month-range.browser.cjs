@@ -40,7 +40,7 @@ const server=http.createServer((req,res)=>{
       window.fixtureCalls=[];
       window.apiPost=async payload=>{
        window.fixtureCalls.push(payload.action);
-       if(payload.action==="createTfgSettlement")return {ok:true,data:{settlementId:"FIXTURE-SETTLEMENT",approvalUrl:"https://example.invalid/approval?token=fixture-token",total:payload.items.reduce((sum,item)=>sum+Number(item.settlement||0),0)+(window.fixtureMismatch?1:0)}};
+       if(payload.action==="createTfgSettlement")return {ok:true,data:{settlementId:"FIXTURE-SETTLEMENT",approvalUrl:"https://example.invalid/approval?token=fixture-token",total:window.fixtureOverrideTotal?window.fixtureSavedTotal:payload.items.reduce((sum,item)=>sum+Number(item.settlement||0),0)+(window.fixtureMismatch?1:0)}};
        if(payload.action==="sendTfgSettlementApproval")return {ok:true,data:{gmailDraftId:"fixture-draft"}};
        throw Error("Unexpected API action: "+payload.action);
       };
@@ -73,6 +73,14 @@ const server=http.createServer((req,res)=>{
      assert.equal(await page.locator("#settlementFallbackUrl").isVisible(),false);
      assert.equal(await page.locator("#settlementFallbackUrlText").inputValue(),"");
      assert.equal(await page.locator("#settlementSend").isDisabled(),true);
+     if(timezoneId==="Asia/Makassar"&&scenario.total==="0円"&&!scenario.pause){
+      for(const malformed of [null,"","0",false]){
+       await page.evaluate(value=>{window.fixtureOverrideTotal=true;window.fixtureSavedTotal=value;},malformed);
+       await page.locator("#settlementDraft").click();await page.waitForFunction(()=>document.querySelector("#settlementMessage").textContent.includes("計算額と保存額が一致しない"));
+       assert.equal(await page.evaluate(()=>fixtureCalls.filter(action=>action==="sendTfgSettlementApproval").length),1);
+       assert.equal(await page.locator("#settlementFallbackUrl").isVisible(),false);
+      }
+     }
      if(scenario.at.startsWith("2026-11-12")&&scenario.months===2)await page.screenshot({path:path.join(evidence,timezoneId.replace("/","-")+".png"),fullPage:true});
      results.push({timezoneId,at:scenario.at,months:scenario.months,total,calculation_ms:elapsed});
     }finally{await context.close();}

@@ -30,4 +30,5 @@ jobs:
         env:
           CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
           CLASP_JSON: ${{ secrets.CLASP_JSON }}
-        run: node scripts/tfg-settlement-gas-release.mjs '${{ inputs.phase }}'
+          RELEASE_PHASE: ${{ inputs.phase }}
+        run: node scripts/tfg-settlement-gas-release.mjs "$RELEASE_PHASE"

@@ -206,8 +206,8 @@ async function createDraft(){
       items:current.items.map(x=>({target:x.target,label:x.label,paid:x.paid,normal:x.normal,settlement:x.settlement,note:x.note,status:x.status||"",paymentSequence:x.paymentSequence||null,isFinalMonth:!!x.isFinalMonth}))
     };
     const r=await apiPost(payload);
-    const savedTotal=Number(r.data?.total);
-    if(!Number.isFinite(savedTotal)||savedTotal!==expectedTotal)throw new Error("計算額と保存額が一致しないため、承認メールは作成していません。管理者に確認してください。");
+    const savedTotal=r.data?.total;
+    if(typeof savedTotal!=="number"||!Number.isFinite(savedTotal)||savedTotal!==expectedTotal)throw new Error("計算額と保存額が一致しないため、承認メールは作成していません。管理者に確認してください。");
     draft={settlementId:r.data?.settlementId||"",approvalUrl:r.data?.approvalUrl||""};
     const fallback=$("#settlementFallbackUrl"),fallbackText=$("#settlementFallbackUrlText");
     const previewUrl=draft.approvalUrl+(draft.approvalUrl.includes("?")?"&":"?")+"preview="+Date.now();
