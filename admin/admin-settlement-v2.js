@@ -26,7 +26,7 @@ function cutoffInfo(now=new Date()){
 function monthsBetween(joinDate,withdrawalDate){
   const j=new Date(joinDate+"T00:00:00"),w=new Date(withdrawalDate+"T00:00:00");
   const out=[]; let y=j.getFullYear(),m=j.getMonth();
-  while(y<w.getFullYear()||m<=w.getMonth()){
+  while(y<w.getFullYear()||(y===w.getFullYear()&&m<=w.getMonth())){
     out.push({y,m});
     m++; if(m>11){m=0;y++}
   }
