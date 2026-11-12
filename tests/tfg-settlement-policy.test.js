@@ -250,23 +250,30 @@ test("suspension in the already-excluded joining month does not extend exemption
   assert.equal(serverCalculate(data,false).reduce((s,x)=>s+x.settlement,0),0);
 });
 
-test("previous-month exception keeps UI and server dates aligned across year and leap boundaries",()=>{
-  const scope=vm.createContext({
-    tfgSettlementJstParts_:d=>[d.getFullYear(),d.getMonth()+1,d.getDate(),d.getHours(),d.getMinutes(),d.getSeconds()]
-  });
-  vm.runInContext(extractFunction(adminSource,"cutoffInfo")+extractFunction(gasSource,"tfgSettlementWithdrawalDate_"),scope);
-  for(const [at,expected] of [
-    [new Date(2026,10,12,12),"2026-11-30"],
-    [new Date(2026,0,5,12),"2025-12-31"],
-    [new Date(2024,2,5,12),"2024-02-29"],
-    [new Date(2026,10,9,20,0,0),"2026-10-31"],
-    [new Date(2026,10,9,20,0,1),"2026-11-30"]
-  ]){
-    const normal=scope.cutoffInfo(at);
-    const earlier=scope.cutoffInfo(at,"PREVIOUS_MONTH");
-    assert.equal(earlier.withdrawalDate,expected);
-    assert.equal(scope.tfgSettlementWithdrawalDate_(at,"PREVIOUS_MONTH"),expected);
-    assert.equal(earlier.beforeFinalCharge,false);
-    assert.equal(earlier.expiry.getTime(),normal.expiry.getTime());
+
+test("zero final month billing waives only the last month in both UI and stored calculations",()=>{
+  for(const withdrawal of ["2026-07-31","2026-12-31"])for(const unpaid of [false,true])for(const pause of [false,true]){
+    const data=fixture("2026-07-14",withdrawal);
+    data.finalMonthBilling="ZERO";
+    if(pause)data.items.at(-1).status="休会";
+    const normal=adminCalculate(adminSource,{...data,finalMonthBilling:"NORMAL"},unpaid);
+    const ui=adminCalculate(adminSource,data,unpaid);
+    const scope=vm.createContext({items:structuredClone(data.items),date:withdrawal,unpaid});
+    vm.runInContext(extractFunction(gasSource,"tfgSettlementIsWithdrawalMonth_")+extractFunction(gasSource,"tfgSettlementCampaignProgress_")+extractFunction(gasSource,"tfgSettlementNormalizeItems_")+';this.saved=tfgSettlementNormalizeItems_(items,date,unpaid,false,0,"ZERO");',scope);
+    assert.equal(ui.items.at(-1).settlement,0);
+    assert.match(ui.items.at(-1).note,/最終月請求なし（0円）/);
+    assert.deepEqual(Array.from(ui.items,x=>x.settlement),Array.from(scope.saved,x=>x.settlement));
+    assert.deepEqual(ui.items.slice(0,-1),normal.items.slice(0,-1));
+    assert.equal(ui.withdrawalDate,withdrawal);
+    assert.equal(ui.items.at(-1).paid,normal.items.at(-1).paid);
   }
+});
+
+test("server zero billing does not waive an earlier month with a forged final-month flag",()=>{
+  const data=fixture("2026-07-14","2026-12-31");
+  data.items[3].isFinalMonth=true;
+  const scope=vm.createContext({items:data.items});
+  vm.runInContext(extractFunction(gasSource,"tfgSettlementIsWithdrawalMonth_")+extractFunction(gasSource,"tfgSettlementCampaignProgress_")+extractFunction(gasSource,"tfgSettlementNormalizeItems_")+';this.saved=tfgSettlementNormalizeItems_(items,"2026-12-31",false,false,0,"ZERO");',scope);
+  assert.ok(scope.saved[3].settlement>0);
+  assert.equal(scope.saved.at(-1).settlement,0);
 });

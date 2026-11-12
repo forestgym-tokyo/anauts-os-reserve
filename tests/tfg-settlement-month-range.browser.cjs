@@ -20,8 +20,8 @@ const server=http.createServer((req,res)=>{
  const results=[],errors=[];
  try{
   const scenarios=[
-   {at:"2026-11-12T03:00:00Z",join:"2026-11-01",months:1,last:"2026年11月",total:"11,330円",timing:"PREVIOUS_MONTH",memberNo:"160708",date:"2026-11-30"},
-   {at:"2026-11-12T03:00:00Z",join:"2026-10-01",months:2,last:"2026年11月",total:"13,860円",timing:"PREVIOUS_MONTH",memberNo:"160710",date:"2026-11-30"},
+   {at:"2026-11-12T03:00:00Z",join:"2026-11-01",months:2,last:"2026年12月",total:"11,330円",billing:"ZERO",memberNo:"160708",date:"2026-12-31"},
+   {at:"2026-11-12T03:00:00Z",join:"2026-10-01",months:3,last:"2026年12月",total:"13,860円",billing:"ZERO",memberNo:"160710",date:"2026-12-31"},
    {at:"2026-11-05T03:00:00Z",join:"2026-11-01",months:1,last:"2026年11月",total:"11,330円"},
    {at:"2026-11-12T03:00:00Z",join:"2026-11-01",months:2,last:"2026年12月",total:"18,810円"},
    {at:"2026-12-05T03:00:00Z",join:"2026-11-01",months:2,last:"2026年12月",total:"13,860円"},
@@ -53,8 +53,8 @@ const server=http.createServer((req,res)=>{
       document.querySelector("#settlementView").style.display="block";
       for(const [id,value] of Object.entries({settlementMemberNo:"123456",settlementMemberName:"計算確認用",settlementEmail:"test@example.invalid",settlementJoinDate:join,settlementPlan:"REGULAR",settlementBenefit:"NONE",settlementFirstPaid:"4950",settlementInitialPaid:"0"}))document.getElementById(id).value=value;
      },scenario.join);
-     if(scenario.timing){
-      await page.locator("#settlementWithdrawalTiming").selectOption(scenario.timing);
+     if(scenario.billing){
+      await page.locator("#settlementFinalMonthBilling").selectOption(scenario.billing);
       await page.evaluate(no=>document.querySelector("#settlementMemberNo").value=no,scenario.memberNo);
      }
      const started=Date.now();await page.locator("#settlementCalculate").click({timeout:5000});
@@ -74,10 +74,12 @@ const server=http.createServer((req,res)=>{
      assert.ok((await page.locator("#settlementInlineMemberPreviewBody").innerText()).includes(total));
      await page.locator("#settlementDraft").click();await page.waitForFunction(()=>document.querySelector("#settlementMessage").textContent.includes("Gmailの下書きに保存"));
      assert.deepEqual(await page.evaluate(()=>fixtureCalls),["createTfgSettlement","sendTfgSettlementApproval"]);
-     if(scenario.timing){
+     if(scenario.billing){
       assert.match(await page.locator("#settlementDeadlineBadge").innerText(),new RegExp(scenario.date));
-      assert.equal(await page.evaluate(()=>fixturePayload.withdrawalTiming),scenario.timing);
+      assert.equal(await page.evaluate(()=>fixturePayload.finalMonthBilling),scenario.billing);
       assert.equal(await page.evaluate(()=>fixturePayload.memberNo),scenario.memberNo);
+      assert.equal(await page.locator("#settlementRows tr").last().locator("td").last().innerText(),"0円");
+      assert.match(await page.locator("#settlementInlineMemberPreviewBody").innerText(),/最終月請求なし（0円）/);
       assert.match(await page.locator("#settlementInlineMemberPreviewBody").innerText(),new RegExp(scenario.date));
      }
      await page.evaluate(()=>{window.fixtureMismatch=true;});
@@ -95,6 +97,13 @@ const server=http.createServer((req,res)=>{
       }
      }
      if(scenario.at.startsWith("2026-11-12")&&scenario.months===2)await page.screenshot({path:path.join(evidence,timezoneId.replace("/","-")+".png"),fullPage:true});
+     if(scenario.billing){
+      await page.locator("#settlementFinalMonthBilling").selectOption("NORMAL");
+      assert.equal(await page.locator("#settlementDraft").isDisabled(),true);
+      assert.equal(await page.locator("#settlementPreview").isVisible(),false);
+      await page.locator("#settlementCalculate").click();
+      assert.equal(await page.locator("#settlementRows tr").last().locator("td").last().innerText(),"7,480円");
+     }
      results.push({timezoneId,at:scenario.at,months:scenario.months,total,calculation_ms:elapsed});
     }finally{await context.close();}
    }
