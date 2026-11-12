@@ -1,7 +1,7 @@
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
 const {test}=require('node:test'),{execFileSync}=require('node:child_process');
 const root=path.resolve(__dirname,'..'),name='91_TfgSettlementApproval.js';
-const baseline=execFileSync('git',['show','10283e8:gas/91_TfgSettlementApproval.gs'],{cwd:root,encoding:'utf8'});
+const baseline=execFileSync('git',['show','2fb8e6a:gas/91_TfgSettlementApproval.gs'],{cwd:root,encoding:'utf8'});
 const desired=fs.readFileSync(path.join(root,'gas/91_TfgSettlementApproval.gs'),'utf8');
 const run=folder=>execFileSync(process.execPath,[path.join(root,'scripts/gas-tfg-settlement-policy-overlay.mjs'),folder],{encoding:'utf8',stdio:'pipe'});
 test('settlement overlay preserves unrelated live files and code and is repeatable',()=>{
@@ -17,7 +17,7 @@ test('settlement overlay preserves unrelated live files and code and is repeatab
 test('unknown edits to the live normalization block abort without writing',()=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'tfg-settlement-drift-'));
  try{
-  const changed=baseline.replace('const withdrawalDate=tfgSettlementWithdrawalDate_(now,withdrawalTiming);','const withdrawalDate=null;');assert.notEqual(changed,baseline);
+  const changed=baseline.replace('note+="／最終月請求なし（0円）";','note="drift";');assert.notEqual(changed,baseline);
   fs.writeFileSync(path.join(dir,name),changed);assert.throws(()=>run(dir),/Live settlement source differs/);assert.equal(fs.readFileSync(path.join(dir,name),'utf8'),changed);
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });

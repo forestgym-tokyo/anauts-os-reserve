@@ -228,8 +228,10 @@ function tfgSettlementNormalizeItems_(sourceItems,withdrawalDate,beforeFinalMont
         note=status==="休会"?"休会期間（差額なし・満12か月の継続期間に含めない）":firstMonth?"日割り差額（満12か月の継続期間に含めない）":paymentSequence<=12?"継続月数 "+paymentSequence+"/12か月":"継続条件達成後";
       }
       if(isMonth&&tfgSettlementIsWithdrawalMonth_(x.target,withdrawalDate)&&finalMonthBilling==="ZERO"){
+        normal=0;
         settlement=0;
-        note+="／最終月請求なし（0円）";
+        const effectiveDate=new Date(Date.UTC(Number(withdrawalDate.slice(0,4)),Number(withdrawalDate.slice(5,7))-1,0)).toISOString().slice(0,10);
+        note+="／最終月請求なし（0円）／実質退会日："+effectiveDate;
       }
       return{target:String(x.target||""),label:String(x.label||""),paid:paid,normal:normal,settlement:settlement,note:note,status:status,paymentSequence:paymentSequence,isFinalMonth:isFinalMonth};
     });

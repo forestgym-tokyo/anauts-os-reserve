@@ -133,8 +133,10 @@ function recalculateCampaign_(){
   });
   if(current.finalMonthBilling==="ZERO"){
     months.filter(item=>item.isFinalMonth).forEach(item=>{
+      item.normal=0;
       item.settlement=0;
-      item.note+="／最終月請求なし（0円）";
+      const effectiveDate=new Date(Date.UTC(Number(current.withdrawalDate.slice(0,4)),Number(current.withdrawalDate.slice(5,7))-1,0)).toISOString().slice(0,10);
+      item.note+="／最終月請求なし（0円）／実質退会日："+effectiveDate;
     });
   }
   // 入会初月と休会月を除く12か月の月末を免除境界とする。
@@ -285,7 +287,7 @@ function buildMemberPreviewHtml_(){
   const rows=current.items.map(x=>`
     <tr>
       <td style="padding:10px 6px;border-bottom:1px solid #e2e9e5;font-size:12px">${escapePreview_(x.target||"—")}</td>
-      <td style="padding:10px 6px;border-bottom:1px solid #e2e9e5;font-size:12px">${escapePreview_(x.status==="休会"?"休会費":(x.label||""))}${String(x.note||"").includes("最終月請求なし（0円）")?'<small style="display:block;color:#66746d">最終月請求なし（0円）</small>':""}</td>
+      <td style="padding:10px 6px;border-bottom:1px solid #e2e9e5;font-size:12px">${escapePreview_(x.status==="休会"?"休会費":(x.label||""))}${String(x.note||"").includes("最終月請求なし（0円）")?`<small style="display:block;color:#66746d">${escapePreview_(x.note)}</small>`:""}</td>
       <td style="padding:10px 6px;border-bottom:1px solid #e2e9e5;font-size:12px;text-align:right;white-space:nowrap">${yen(x.paid)}</td>
       <td style="padding:10px 6px;border-bottom:1px solid #e2e9e5;font-size:12px;text-align:right;white-space:nowrap">${yen(x.normal)}</td>
       <td style="padding:10px 6px;border-bottom:1px solid #e2e9e5;font-size:12px;text-align:right;white-space:nowrap"><strong>${yen(x.settlement)}</strong></td>

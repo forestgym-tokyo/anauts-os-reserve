@@ -261,6 +261,9 @@ test("zero final month billing waives only the last month in both UI and stored 
     const scope=vm.createContext({items:structuredClone(data.items),date:withdrawal,unpaid});
     vm.runInContext(extractFunction(gasSource,"tfgSettlementIsWithdrawalMonth_")+extractFunction(gasSource,"tfgSettlementCampaignProgress_")+extractFunction(gasSource,"tfgSettlementNormalizeItems_")+';this.saved=tfgSettlementNormalizeItems_(items,date,unpaid,false,0,"ZERO");',scope);
     assert.equal(ui.items.at(-1).settlement,0);
+    assert.equal(ui.items.at(-1).normal,0);
+    assert.equal(scope.saved.at(-1).normal,0);
+    assert.match(ui.items.at(-1).note,withdrawal==="2026-12-31"?/実質退会日：2026-11-30/:/実質退会日：2026-06-30/);
     assert.match(ui.items.at(-1).note,/最終月請求なし（0円）/);
     assert.deepEqual(Array.from(ui.items,x=>x.settlement),Array.from(scope.saved,x=>x.settlement));
     assert.deepEqual(ui.items.slice(0,-1),normal.items.slice(0,-1));
