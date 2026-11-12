@@ -5,13 +5,13 @@ import {fileURLToPath} from 'node:url';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const folder=path.resolve(process.argv[2]||'.gas-live');
-const baseline='c529821b9a19c8fadb3b8fd10c5305e54e420f15';
+const baseline='ceaa1de';
 const source='gas/91_TfgSettlementApproval.gs';
 const matches=fs.readdirSync(folder).filter(name=>/^91_TfgSettlementApproval(?:\.gs)?\.(js|gs)$/.test(name));
 if(matches.length!==1)throw new Error('Expected exactly one existing settlement module');
 const filename=matches[0];
 const result=spawnSync('git',['diff',baseline,'--',source],{cwd:root,encoding:'utf8'});
-if(result.status!==0||!result.stdout.includes('tfgSettlementNormalizeItems_'))throw new Error('Reviewed settlement patch is unavailable');
+if(result.status!==0||!result.stdout.includes('PREVIOUS_MONTH'))throw new Error('Reviewed settlement patch is unavailable');
 const patch=result.stdout.replaceAll('a/'+source,'a/'+filename).replaceAll('b/'+source,'b/'+filename);
 const alreadyApplied=spawnSync('git',['apply','--reverse','--check','--ignore-space-change','-'],{cwd:folder,input:patch,encoding:'utf8'});
 if(alreadyApplied.status===0){

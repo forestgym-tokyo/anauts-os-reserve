@@ -156,7 +156,9 @@ function createTfgSettlement_(body){
     const memberName=String(body.memberName||"").trim();
     const email=String(body.email||"").trim().toLowerCase();
     const now=new Date();
-    const withdrawalDate=tfgSettlementWithdrawalDate_(now);
+    const withdrawalTiming=String(body.withdrawalTiming||"NORMAL");
+    if(["NORMAL","PREVIOUS_MONTH"].indexOf(withdrawalTiming)<0)throw new Error("退会時期が不正です。");
+    const withdrawalDate=tfgSettlementWithdrawalDate_(now,withdrawalTiming);
     const items=Array.isArray(body.items)?body.items:[];
     const joinDate=String(body.joinDate||"").trim();
     const plan=String(body.plan||"").trim().toUpperCase();
@@ -165,7 +167,8 @@ function createTfgSettlement_(body){
     const paymentMethod=tfgSettlementNormalizePaymentMethod_(body.paymentMethod);
     if(!/^\d{6}$/.test(memberNo))throw new Error("会員番号は6桁の数字で入力してください。");
     if(!memberName||!/^\S+@\S+\.\S+$/.test(email)||!items.length)throw new Error("氏名・メール・精算明細が必要です。");
-    const beforeFinalMonthCharge=tfgSettlementIsBeforeMonthlyCharge_(now);
+    if(joinDate&&joinDate>withdrawalDate)throw new Error("退会予定日がスタート日より前です。");
+    const beforeFinalMonthCharge=withdrawalTiming!=="PREVIOUS_MONTH"&&tfgSettlementIsBeforeMonthlyCharge_(now);
     const sourceItems=legacyFlatPlan
       ? items.filter(function(x){return String((x&&x.label)||"").trim()!=="選べる特典";})
       : items;
@@ -689,11 +692,11 @@ function tfgSettlementIsWithdrawalMonth_(target,withdrawalDate){
   const ym1=d[1]+"-"+d[2],ym2=d[1]+"年"+Number(d[2])+"月",ym3=d[1]+"/"+Number(d[2]);
   return t.indexOf(ym1)>=0||t.indexOf(ym2)>=0||t.indexOf(ym3)>=0;
 }
-function tfgSettlementWithdrawalDate_(now){
+function tfgSettlementWithdrawalDate_(now,withdrawalTiming){
   const p=tfgSettlementJstParts_(now);
   const y=p[0],m=p[1],d=p[2],h=p[3],min=p[4],sec=p[5];
   const afterCutoff=d>9||(d===9&&(h>20||(h===20&&(min>0||sec>0))));
-  const first=new Date(Date.UTC(y,m-1+(afterCutoff?1:0),1));
+  const first=new Date(Date.UTC(y,m-1+(afterCutoff?1:0)-(withdrawalTiming==="PREVIOUS_MONTH"?1:0),1));
   const ty=first.getUTCFullYear(),tm=first.getUTCMonth()+1;
   const lastDay=new Date(Date.UTC(ty,tm,0)).getUTCDate();
   return String(ty)+"-"+String(tm).padStart(2,"0")+"-"+String(lastDay).padStart(2,"0");
