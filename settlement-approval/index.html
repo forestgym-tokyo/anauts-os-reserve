@@ -223,7 +223,7 @@ function renderSettlement(){
   $("withdrawalDate").textContent=settlement.withdrawalDate||"—";
   $("total").textContent=yen(settlement.total);
   renderCampaignRemaining_();
-  $("items").innerHTML=(settlement.items||[]).map(x=>`<tr><td>${esc(x.target||"—")}</td><td>${esc(x.status==="休会"?"休会費":(x.label||""))}</td><td class="num">${yen(x.paid)}</td><td class="num">${yen(x.normal)}</td><td class="num"><strong>${yen(x.settlement)}</strong></td></tr>`).join("");
+  $("items").innerHTML=(settlement.items||[]).map(x=>`<tr><td>${esc(x.target||"—")}</td><td>${esc(x.status==="休会"?"休会費":(x.label||""))}${String(x.note||"").includes("最終月請求なし（0円）")?'<small style="display:block">最終月請求なし（0円）</small>':""}</td><td class="num">${yen(x.paid)}</td><td class="num">${yen(x.normal)}</td><td class="num"><strong>${yen(x.settlement)}</strong></td></tr>`).join("");
   const bank=settlement.paymentMethod==="BANK_TRANSFER";
   $("cardPayment").classList.toggle("hidden",bank);
   $("bankPayment").classList.toggle("hidden",!bank);

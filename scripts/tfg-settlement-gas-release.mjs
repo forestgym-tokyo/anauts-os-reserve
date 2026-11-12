@@ -67,7 +67,7 @@ try{
   const backup=json(clasp(['create-version','Before TFG settlement release '+revision.slice(0,7)]),'backup version');backupVersion=backup.versionNumber;if(!Number.isInteger(backupVersion))fail('Native source backup could not be confirmed');
   notice('native_backup_version='+backupVersion+'; rollback_version='+oldVersion);
   clasp(['push','--force']);notice('source_push_completed=true');
-  const deployed=json(clasp(['update-deployment',deploymentId,'-d','TFG settlement: previous-month withdrawal option '+revision.slice(0,7)]),'deployment');
+  const deployed=json(clasp(['update-deployment',deploymentId,'-d','TFG settlement: zero final month billing '+revision.slice(0,7)]),'deployment');
   if(deployed.deploymentId!==deploymentId||!Number.isInteger(deployed.versionNumber))fail('Deployment update could not be confirmed');
   newVersion=deployed.versionNumber;updated=true;notice('deployment_updated=true; deployed_version='+newVersion+'; rollback_version='+oldVersion);
   await verifyServices();notice('published_service_check_passed=true; deployed_version='+newVersion);

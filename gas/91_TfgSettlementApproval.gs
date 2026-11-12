@@ -156,9 +156,9 @@ function createTfgSettlement_(body){
     const memberName=String(body.memberName||"").trim();
     const email=String(body.email||"").trim().toLowerCase();
     const now=new Date();
-    const withdrawalTiming=String(body.withdrawalTiming||"NORMAL");
-    if(["NORMAL","PREVIOUS_MONTH"].indexOf(withdrawalTiming)<0)throw new Error("退会時期が不正です。");
-    const withdrawalDate=tfgSettlementWithdrawalDate_(now,withdrawalTiming);
+    const finalMonthBilling=String(body.finalMonthBilling||"NORMAL");
+    if(["NORMAL","ZERO"].indexOf(finalMonthBilling)<0)throw new Error("最終月の請求額が不正です。");
+    const withdrawalDate=tfgSettlementWithdrawalDate_(now);
     const items=Array.isArray(body.items)?body.items:[];
     const joinDate=String(body.joinDate||"").trim();
     const plan=String(body.plan||"").trim().toUpperCase();
@@ -168,11 +168,11 @@ function createTfgSettlement_(body){
     if(!/^\d{6}$/.test(memberNo))throw new Error("会員番号は6桁の数字で入力してください。");
     if(!memberName||!/^\S+@\S+\.\S+$/.test(email)||!items.length)throw new Error("氏名・メール・精算明細が必要です。");
     if(joinDate&&joinDate>withdrawalDate)throw new Error("退会予定日がスタート日より前です。");
-    const beforeFinalMonthCharge=withdrawalTiming!=="PREVIOUS_MONTH"&&tfgSettlementIsBeforeMonthlyCharge_(now);
+    const beforeFinalMonthCharge=tfgSettlementIsBeforeMonthlyCharge_(now);
     const sourceItems=legacyFlatPlan
       ? items.filter(function(x){return String((x&&x.label)||"").trim()!=="選べる特典";})
       : items;
-    const normalized=tfgSettlementNormalizeItems_(sourceItems,withdrawalDate,beforeFinalMonthCharge,legacyFlatPlan,legacyNormalMonthly);
+    const normalized=tfgSettlementNormalizeItems_(sourceItems,withdrawalDate,beforeFinalMonthCharge,legacyFlatPlan,legacyNormalMonthly,finalMonthBilling);
     const total=normalized.reduce(function(s,x){return s+x.settlement},0);
     if(total<0)throw new Error("精算金額が不正です。");
     const token=Utilities.getUuid()+Utilities.getUuid().replace(/-/g,"");
@@ -194,7 +194,7 @@ function createTfgSettlement_(body){
   }catch(e){return tfgSettlementJson_({ok:false,code:"CREATE_ERROR",message:e.message||"精算承認データを作成できませんでした。"});}
 }
 
-function tfgSettlementNormalizeItems_(sourceItems,withdrawalDate,beforeFinalMonthCharge,legacyFlatPlan,legacyNormalMonthly){
+function tfgSettlementNormalizeItems_(sourceItems,withdrawalDate,beforeFinalMonthCharge,legacyFlatPlan,legacyNormalMonthly,finalMonthBilling){
   let sequence=0;
   const normalized=sourceItems.map(function(x){
       let normal=Number(x.normal||0);
@@ -226,6 +226,10 @@ function tfgSettlementNormalizeItems_(sourceItems,withdrawalDate,beforeFinalMont
       let note=String(x.note||"");
       if(isMonth){
         note=status==="休会"?"休会期間（差額なし・満12か月の継続期間に含めない）":firstMonth?"日割り差額（満12か月の継続期間に含めない）":paymentSequence<=12?"継続月数 "+paymentSequence+"/12か月":"継続条件達成後";
+      }
+      if(isMonth&&tfgSettlementIsWithdrawalMonth_(x.target,withdrawalDate)&&finalMonthBilling==="ZERO"){
+        settlement=0;
+        note+="／最終月請求なし（0円）";
       }
       return{target:String(x.target||""),label:String(x.label||""),paid:paid,normal:normal,settlement:settlement,note:note,status:status,paymentSequence:paymentSequence,isFinalMonth:isFinalMonth};
     });
@@ -692,11 +696,11 @@ function tfgSettlementIsWithdrawalMonth_(target,withdrawalDate){
   const ym1=d[1]+"-"+d[2],ym2=d[1]+"年"+Number(d[2])+"月",ym3=d[1]+"/"+Number(d[2]);
   return t.indexOf(ym1)>=0||t.indexOf(ym2)>=0||t.indexOf(ym3)>=0;
 }
-function tfgSettlementWithdrawalDate_(now,withdrawalTiming){
+function tfgSettlementWithdrawalDate_(now){
   const p=tfgSettlementJstParts_(now);
   const y=p[0],m=p[1],d=p[2],h=p[3],min=p[4],sec=p[5];
   const afterCutoff=d>9||(d===9&&(h>20||(h===20&&(min>0||sec>0))));
-  const first=new Date(Date.UTC(y,m-1+(afterCutoff?1:0)-(withdrawalTiming==="PREVIOUS_MONTH"?1:0),1));
+  const first=new Date(Date.UTC(y,m-1+(afterCutoff?1:0),1));
   const ty=first.getUTCFullYear(),tm=first.getUTCMonth()+1;
   const lastDay=new Date(Date.UTC(ty,tm,0)).getUTCDate();
   return String(ty)+"-"+String(tm).padStart(2,"0")+"-"+String(lastDay).padStart(2,"0");
