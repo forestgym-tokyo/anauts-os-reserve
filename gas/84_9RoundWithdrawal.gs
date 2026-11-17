@@ -14,7 +14,7 @@ const ROUND9_WITHDRAWAL_CONFIG = Object.freeze({
   DEADLINE_DAY: 20,
   DEADLINE_HOUR: 21,
   LOG_SHEET_DEFAULT: "退会申請",
-  ACTIVE_STATUSES: ["ok", "kyukai", "契約中", "休会中"],
+  ACTIVE_STATUSES: ["ok", "ok_unfinished", "complete", "kyukai", "契約中", "休会中"],
   ADMIN_RECIPIENTS: [
     "9round.ariosoga@gmail.com",
     "info@theforestgym.com"
