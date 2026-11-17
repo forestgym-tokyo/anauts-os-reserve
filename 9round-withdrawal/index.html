@@ -60,18 +60,53 @@
 <script>
 const GAS_URL="https://script.google.com/macros/s/AKfycbyT8G6rQ-9LFosbFlzSYj4OM0PrCG_KD7bddVxQ65RLMkfYrjmBZ2ebCvL54ncGJSZ2/exec";
 const $=id=>document.getElementById(id),form=$("withdrawalForm"),submitBtn=$("submitBtn"),memberNoInput=$("memberNo"),emailInput=$("email"),memberStatus=$("memberStatus"),withdrawalDateDisplay=$("withdrawalDateDisplay"),reasonSelect=$("reasonSelect"),otherField=$("otherField"),otherReason=$("otherReason"),resultBox=$("resultBox"),resultMessage=$("resultMessage");
-let memberVerified=false,currentWithdrawalDate="";
+let memberVerified=false,verifiedMemberKey="",memberCheckRequestId=0,currentWithdrawalDate="";
 reasonSelect.addEventListener("change",()=>{const other=reasonSelect.value==="その他";otherField.classList.toggle("hidden",!other);otherReason.required=other});
-memberNoInput.addEventListener("input",()=>{memberNoInput.value=memberNoInput.value.replace(/\D/g,"").slice(0,7);resetMemberVerification()});
+memberNoInput.addEventListener("input",()=>{memberNoInput.value=memberNoInput.value.normalize("NFKC").replace(/\D/g,"").slice(0,7);resetMemberVerification()});
 emailInput.addEventListener("input",resetMemberVerification);memberNoInput.addEventListener("blur",checkMember);emailInput.addEventListener("blur",checkMember);
-function resetMemberVerification(){memberVerified=false;memberStatus.className="";memberStatus.textContent=""}
+function normalizedMemberNo(){return memberNoInput.value.normalize("NFKC").replace(/\D/g,"").slice(0,7)}
+function normalizedEmail(){return emailInput.value.normalize("NFKC").replace(/[\u200B-\u200D\uFEFF]/g,"").trim().toLowerCase()}
+function currentMemberKey(){return normalizedMemberNo()+"|"+normalizedEmail()}
+function resetMemberVerification(){memberCheckRequestId++;memberVerified=false;verifiedMemberKey="";memberStatus.className="";memberStatus.textContent=""}
 function validKana(v){return /^[ァ-ヶーｦ-ﾟA-Za-zＡ-Ｚａ-ｚ\s]+$/.test(v)}
 async function postApi(payload){const r=await fetch(GAS_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload)});if(!r.ok)throw new Error("HTTP "+r.status);return r.json()}
 function formatWithdrawalDate(v){const m=String(v||"").match(/^(\d{4})-(\d{2})-(\d{2})$/);return m?Number(m[1])+"年"+Number(m[2])+"月末（"+Number(m[1])+"年"+Number(m[2])+"月"+Number(m[3])+"日）":v}
 async function loadWithdrawalDate(){withdrawalDateDisplay.textContent="読み込み中...";try{const d=await postApi({action:"get9RoundWithdrawalDate"});if(!d.ok||!d.data||!d.data.withdrawalDate)throw new Error(d.message||"退会期日を取得できませんでした。");currentWithdrawalDate=d.data.withdrawalDate;withdrawalDateDisplay.textContent=d.data.label||formatWithdrawalDate(currentWithdrawalDate)}catch(e){console.error(e);currentWithdrawalDate="";withdrawalDateDisplay.textContent="退会期日を取得できません"}}
-async function checkMember(){const memberNo=memberNoInput.value.trim(),email=emailInput.value.trim();if(memberNo.length!==7||!email)return;memberVerified=false;memberStatus.className="";memberStatus.textContent="会員情報を確認しています...";try{const d=await postApi({action:"check9RoundWithdrawalMember",memberNo,email});if(d.ok){memberVerified=true;memberStatus.className="member-ok";memberStatus.textContent="会員情報を確認しました"+(d.data&&d.data.memberName?"："+d.data.memberName+" 様":"");if(d.data&&d.data.withdrawalDate){currentWithdrawalDate=d.data.withdrawalDate;withdrawalDateDisplay.textContent=d.data.withdrawalDateLabel||formatWithdrawalDate(currentWithdrawalDate)}}else{memberStatus.className="member-error";memberStatus.textContent=d.message||"会員情報を確認できませんでした。"}}catch(e){console.error(e);memberStatus.className="member-error";memberStatus.textContent="会員情報を確認できませんでした。"}}
+async function checkMember(){
+  const memberNo=normalizedMemberNo(),email=normalizedEmail();
+  if(!/^\d{7}$/.test(memberNo)||!email||!email.includes("@"))return false;
+  const key=memberNo+"|"+email;
+  if(memberVerified&&verifiedMemberKey===key)return true;
+  const requestId=++memberCheckRequestId;
+  memberVerified=false;verifiedMemberKey="";
+  memberStatus.className="";
+  memberStatus.textContent="会員情報を確認しています...";
+  try{
+    const d=await postApi({action:"check9RoundWithdrawalMember",memberNo,email});
+    if(requestId!==memberCheckRequestId||key!==currentMemberKey())return false;
+    if(!d.ok){
+      memberStatus.className="member-error";
+      memberStatus.textContent=d.message||"会員情報を確認できませんでした。";
+      return false;
+    }
+    memberVerified=true;verifiedMemberKey=key;
+    memberStatus.className="member-ok";
+    memberStatus.textContent="会員情報を確認しました"+(d.data&&d.data.memberName?"："+d.data.memberName+" 様":"");
+    if(d.data&&d.data.withdrawalDate){
+      currentWithdrawalDate=d.data.withdrawalDate;
+      withdrawalDateDisplay.textContent=d.data.withdrawalDateLabel||formatWithdrawalDate(currentWithdrawalDate);
+    }
+    return true;
+  }catch(e){
+    if(requestId!==memberCheckRequestId||key!==currentMemberKey())return false;
+    console.error(e);
+    memberStatus.className="member-error";
+    memberStatus.textContent="通信エラーのため会員情報を確認できませんでした。再度お試しください。";
+    return false;
+  }
+}
 function setSubmitting(active){submitBtn.disabled=active;submitBtn.innerHTML=active?'送信中です...<span class="submit-sub">PLEASE WAIT</span>':'退会申請を送信する<span class="submit-sub">SUBMIT WITHDRAWAL REQUEST</span>'}
-form.addEventListener("submit",async e=>{e.preventDefault();const lastName=$("lastName").value.trim(),firstName=$("firstName").value.trim(),lastKana=$("lastKana").value.trim(),firstKana=$("firstKana").value.trim(),memberNo=memberNoInput.value.trim(),email=emailInput.value.trim(),phone=$("phone").value.trim(),reason=reasonSelect.value,reasonDetail=otherReason.value.trim();if(!validKana(lastKana)||!validKana(firstKana)){alert("フリガナはカタカナまたはアルファベットで入力してください。");return}if(memberNo.length!==7){alert("会員番号は7桁の数字で入力してください。");return}if(!currentWithdrawalDate){alert("退会期日を取得できていません。ページを再読み込みしてください。");return}if(!memberVerified){await checkMember();if(!memberVerified){alert("会員番号と登録メールアドレスをご確認ください。");return}}if(reason==="その他"&&!reasonDetail){alert("退会理由をご記載ください。");return}setSubmitting(true);try{const d=await postApi({action:"submit9RoundWithdrawal",lastName,firstName,lastKana,firstKana,memberNo,email,phone,reason,otherReason:reasonDetail,confirm1:$("confirm1").checked,confirm2:$("confirm2").checked,confirm3:$("confirm3").checked,confirm4:$("confirm4").checked});if(!d.ok)throw new Error(d.message||"退会申請を送信できませんでした。");const label=d.data&&d.data.withdrawalDateLabel?d.data.withdrawalDateLabel:formatWithdrawalDate(d.data&&d.data.withdrawalDate?d.data.withdrawalDate:currentWithdrawalDate);resultMessage.textContent=(d.message||"登録メールアドレスへ受付メールを送信しました。")+" 退会期日："+label;form.classList.add("hidden");resultBox.classList.add("show");window.scrollTo({top:0,behavior:"smooth"})}catch(err){console.error(err);alert(err.message||"退会申請の送信中にエラーが発生しました。")}finally{setSubmitting(false)}});
+form.addEventListener("submit",async e=>{e.preventDefault();const lastName=$("lastName").value.trim(),firstName=$("firstName").value.trim(),lastKana=$("lastKana").value.trim(),firstKana=$("firstKana").value.trim(),memberNo=normalizedMemberNo(),email=normalizedEmail(),phone=$("phone").value.trim(),reason=reasonSelect.value,reasonDetail=otherReason.value.trim();if(!validKana(lastKana)||!validKana(firstKana)){alert("フリガナはカタカナまたはアルファベットで入力してください。");return}if(memberNo.length!==7){alert("会員番号は7桁の数字で入力してください。");return}if(!currentWithdrawalDate){alert("退会期日を取得できていません。ページを再読み込みしてください。");return}if(!memberVerified||verifiedMemberKey!==currentMemberKey()){if(!(await checkMember())||verifiedMemberKey!==currentMemberKey())return}if(reason==="その他"&&!reasonDetail){alert("退会理由をご記載ください。");return}setSubmitting(true);try{const d=await postApi({action:"submit9RoundWithdrawal",lastName,firstName,lastKana,firstKana,memberNo,email,phone,reason,otherReason:reasonDetail,confirm1:$("confirm1").checked,confirm2:$("confirm2").checked,confirm3:$("confirm3").checked,confirm4:$("confirm4").checked});if(!d.ok)throw new Error(d.message||"退会申請を送信できませんでした。");const label=d.data&&d.data.withdrawalDateLabel?d.data.withdrawalDateLabel:formatWithdrawalDate(d.data&&d.data.withdrawalDate?d.data.withdrawalDate:currentWithdrawalDate);resultMessage.textContent=(d.message||"登録メールアドレスへ受付メールを送信しました。")+" 退会期日："+label;form.classList.add("hidden");resultBox.classList.add("show");window.scrollTo({top:0,behavior:"smooth"})}catch(err){console.error(err);alert(err.message||"退会申請の送信中にエラーが発生しました。")}finally{setSubmitting(false)}});
 loadWithdrawalDate();
 </script>
 </body>
