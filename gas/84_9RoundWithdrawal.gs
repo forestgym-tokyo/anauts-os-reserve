@@ -395,7 +395,24 @@ function format9RoundWithdrawalDateLabel_(value) {
   );
 }
 
+// 9ROUND_Memberに紐づくWeb Appは、古いScript Propertiesより実際の紐づけ先を優先する。
+// 他店舗のGASから呼び出す場合のみ、従来どおり設定済みSpreadsheet IDを使用する。
 function get9RoundMasterSpreadsheet_() {
+  const bound = SpreadsheetApp.getActiveSpreadsheet();
+  if (bound) {
+    const boundSheet = bound.getSheetById(1780986215);
+    if (boundSheet && boundSheet.getLastColumn() > 0) {
+      try {
+        validate9RoundMemberHeaders_(
+          boundSheet.getRange(1, 1, 1, boundSheet.getLastColumn()).getDisplayValues()[0]
+        );
+        return bound;
+      } catch (_) {
+        // 別のスプレッドシートが偶然同じGIDを持つ場合は設定IDにフォールバックする。
+      }
+    }
+  }
+
   const id = String(
     PropertiesService.getScriptProperties().getProperty("ROUND9_MEMBER_MASTER_ID") || ""
   ).trim();
@@ -411,18 +428,24 @@ function get9RoundMasterSpreadsheet_() {
 
 function get9RoundMemberMasterSheet_() {
   const ss = get9RoundMasterSpreadsheet_();
+  // シート名変更や誤った保存設定に影響されないよう、実際の会員マスターGIDを優先する。
+  const masterById = ss.getSheetById(1780986215);
+  if (masterById) {
+    validate9RoundMemberHeaders_(
+      masterById.getRange(1, 1, 1, masterById.getLastColumn()).getDisplayValues()[0]
+    );
+    return masterById;
+  }
+
   const configuredName = String(
     PropertiesService.getScriptProperties().getProperty("ROUND9_MEMBER_MASTER_SHEET_NAME") || ""
   ).trim();
-
   const sheet = configuredName
     ? ss.getSheetByName(configuredName)
     : ss.getSheets()[0];
-
   if (!sheet) {
     throw new Error("9ROUND会員マスターのシートを確認できません。");
   }
-
   return sheet;
 }
 
