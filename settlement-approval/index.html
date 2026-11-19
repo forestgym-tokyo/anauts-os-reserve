@@ -309,7 +309,7 @@ $("approve").addEventListener("click",async()=>{
   btn.disabled=true;btn.textContent="承認処理中…";
   try{
     if(demo==="card"||demo==="bank"){
-      setTimeout(()=>showDone(new Date().toLocaleString("ja-JP")),250);
+      setTimeout(()=>showDone(new Date().toLocaleString("ja-JP",{timeZone:"Asia/Tokyo"})),250);
       return;
     }
     const d=await api({action:"approveTfgSettlement",token,memberNo:$("memberNo").value.trim(),email:$("email").value.trim(),consent1:true,consent2:true,consent3:true});
@@ -328,7 +328,7 @@ $("defer").addEventListener("click",async()=>{
   $("approve").disabled=true;
   try{
     if(demo==="card"||demo==="bank"){
-      setTimeout(()=>showDeferred(new Date().toLocaleString("ja-JP")),250);
+      setTimeout(()=>showDeferred(new Date().toLocaleString("ja-JP",{timeZone:"Asia/Tokyo"})),250);
       return;
     }
     const d=await api({

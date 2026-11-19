@@ -20,7 +20,7 @@ function cliError(text){
  if(/permission|PERMISSION_DENIED|access_denied/i.test(text))return 'Google account lacks the required operation permission';
  if(/SERVICE_DISABLED|has not enabled|has not been used/i.test(text))return 'Required Google API is disabled';
  if(/live source drift|ambiguous patch/i.test(text))return 'Live source differs from the reviewed patch';
- if(/quota|too many versions|maximum number of versions/i.test(text))return 'Google version or request quota exceeded';
+ if(/quota|too many.*versions|(?:max|maximum|limit)[^\n]{0,100}versions|versions[^\n]{0,100}(?:limit|maximum)|RESOURCE_EXHAUSTED/i.test(text))return 'Google version or request quota exceeded';
  return 'operation failed; no credential details logged';
 }
 function clasp(args,projectFile=project){
@@ -33,6 +33,27 @@ function projectFile(folder,scriptId){fs.mkdirSync(path.join(folder,'gas'),{recu
 function hashes(folder){const output={};function visit(directory,prefix=''){for(const entry of fs.readdirSync(directory,{withFileTypes:true})){const relative=path.posix.join(prefix,entry.name),file=path.join(directory,entry.name);if(entry.isDirectory())visit(file,relative);else if(entry.isFile())output[relative]=crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');else fail('Unexpected non-regular source file');}}visit(folder);return output;}
 function equal(a,b){return JSON.stringify(Object.entries(a).sort())===JSON.stringify(Object.entries(b).sort());}
 function currentDeployment(){const entries=json(clasp(['list-deployments']),'deployments');if(!Array.isArray(entries))fail('Unexpected deployment list');const current=entries.find(item=>item.deploymentId===deploymentId);if(!current||!Number.isInteger(current.versionNumber)||current.versionNumber<1)fail('Expected existing versioned settlement deployment was not found');return current;}
+function inspectVersionCapacity(scriptId){
+ const listed=json(clasp(['list-versions']),'version inventory');
+ const versions=Array.isArray(listed)?listed:listed.versions;
+ if(!Array.isArray(versions))fail('Unexpected version inventory');
+ notice('version_count='+versions.length+'; latest_version='+Math.max(...versions.map(item=>Number(item.versionNumber)||0)));
+ if(versions.length<199)return;
+ const deployments=json(clasp(['list-deployments']),'protected deployments');
+ const protectedVersions=new Set(deployments.map(item=>item.versionNumber));
+ const available=new Set(versions.map(item=>item.versionNumber));
+ for(const [candidate,retained] of [[199,198],[197,196]]){
+  if(!available.has(candidate)||!available.has(retained)||protectedVersions.has(candidate))continue;
+  const snapshots=[];
+  for(const number of [candidate,retained]){
+   const file=projectFile(path.join(scratch,'version-'+number),scriptId);
+   clasp(['pull','--versionNumber',String(number)],file);
+   snapshots.push(hashes(path.join(path.dirname(file),'gas')));
+  }
+  if(equal(snapshots[0],snapshots[1]))notice('unused_duplicate_version='+candidate+'; retained_identical_version='+retained);
+ }
+ notice('project_editor_url=https://script.google.com/home/projects/'+scriptId+'/edit');
+}
 async function verifyServices(){
  for(let attempt=0;attempt<4;attempt++){
   const url=new URL('https://script.google.com/macros/s/'+deploymentId+'/exec');url.searchParams.set('action','getServices');url.searchParams.set('_',String(Date.now()));
@@ -59,15 +80,25 @@ try{
  const scripts=fs.readdirSync(stageSource).filter(file=>/\.(js|gs)$/.test(file)).sort().map(file=>fs.readFileSync(path.join(stageSource,file),'utf8'));
  try{new vm.Script(scripts.join('\n;\n'));}catch{fail('Combined staged GAS source has a syntax or declaration conflict');}
  notice('preflight_passed=true; retained_files='+Object.keys(before).length+'; changed_files='+changes.join(','));
+ inspectVersionCapacity(config.scriptId);
+ const publishedProject=projectFile(path.join(scratch,'published-snapshot'),config.scriptId);
+ clasp(['pull','--versionNumber',String(oldVersion)],publishedProject);
+ const publishedMatchesLive=equal(before,hashes(path.join(scratch,'published-snapshot/gas')));
+ notice('published_snapshot_matches_live='+publishedMatchesLive+'; published_version='+oldVersion);
  if(phase==='deploy'){
   // Re-read before writing to avoid overwriting source changed since this run began.
   const recheck=projectFile(path.join(scratch,'recheck'),config.scriptId);clasp(['pull'],recheck);
   if(!equal(before,hashes(path.join(scratch,'recheck/gas'))))fail('Live source changed during preflight; nothing pushed');
   if(currentDeployment().versionNumber!==oldVersion)fail('Existing deployment changed during preflight; nothing pushed');
-  const backup=json(clasp(['create-version','Before TFG settlement release '+revision.slice(0,7)]),'backup version');backupVersion=backup.versionNumber;if(!Number.isInteger(backupVersion))fail('Native source backup could not be confirmed');
+  if(publishedMatchesLive){
+   backupVersion=oldVersion;
+   notice('native_backup_reused=true; verified_identical_published_version='+oldVersion);
+  }else{
+   const backup=json(clasp(['create-version','Before TFG settlement release '+revision.slice(0,7)]),'backup version');backupVersion=backup.versionNumber;if(!Number.isInteger(backupVersion))fail('Native source backup could not be confirmed');
+  }
   notice('native_backup_version='+backupVersion+'; rollback_version='+oldVersion);
   clasp(['push','--force']);notice('source_push_completed=true');
-  const deployed=json(clasp(['update-deployment',deploymentId,'-d','TFG settlement: three full months minimum '+revision.slice(0,7)]),'deployment');
+  const deployed=json(clasp(['update-deployment',deploymentId,'-d','TFG settlement: unpaid monthly fees by charge date '+revision.slice(0,7)]),'deployment');
   if(deployed.deploymentId!==deploymentId||!Number.isInteger(deployed.versionNumber))fail('Deployment update could not be confirmed');
   newVersion=deployed.versionNumber;updated=true;notice('deployment_updated=true; deployed_version='+newVersion+'; rollback_version='+oldVersion);
   await verifyServices();notice('published_service_check_passed=true; deployed_version='+newVersion);

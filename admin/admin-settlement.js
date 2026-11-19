@@ -22,19 +22,20 @@ function minimumWithdrawalDate_(joinDate,items=[]){
   return new Date(Date.UTC(Math.floor(end/12),end%12+1,0)).toISOString().slice(0,10);
 }
 function cutoffInfo(now=new Date(),joinDate="",items=[]){
-  const y=now.getFullYear(),m=now.getMonth(),d=now.getDate(),h=now.getHours(),min=now.getMinutes(),sec=now.getSeconds();
+  const japan=new Date(now.getTime()+9*60*60*1000);
+  const y=japan.getUTCFullYear(),m=japan.getUTCMonth(),d=japan.getUTCDate(),h=japan.getUTCHours(),min=japan.getUTCMinutes(),sec=japan.getUTCSeconds();
   const before9=d<9||(d===9&&(h<20||(h===20&&min===0&&sec===0)));
   const after9=!before9;
   let wy=y,wm=m;
   if(after9){wm+=1;if(wm>11){wm=0;wy++}}
-  const last=new Date(wy,wm+1,0).getDate();
+  const last=new Date(Date.UTC(wy,wm+1,0)).getUTCDate();
   let withdrawalDate=`${wy}-${String(wm+1).padStart(2,"0")}-${String(last).padStart(2,"0")}`;
   const cutoffWithdrawalDate=withdrawalDate;
   if(joinDate)withdrawalDate=[withdrawalDate,minimumWithdrawalDate_(joinDate,items)].sort().pop();
   let expiry;
-  if(before9) expiry=new Date(y,m,9,20,0,1);
-  else if(d<=26) expiry=new Date(y,m,27,0,0,0);
-  else expiry=new Date(y,m+1,9,20,0,0);
+  if(before9) expiry=new Date(Date.UTC(y,m,9,11,0,1));
+  else if(d<=26) expiry=new Date(Date.UTC(y,m,26,15,0,0));
+  else expiry=new Date(Date.UTC(y,m+1,9,11,0,0));
   return {withdrawalDate,cutoffWithdrawalDate,expiry,beforeFinalCharge:after9&&d<=26};
 }
 function monthsBetween(joinDate,withdrawalDate){
@@ -45,6 +46,13 @@ function monthsBetween(joinDate,withdrawalDate){
     m++; if(m>11){m=0;y++}
   }
   return out;
+}
+function isBeforeMonthlyCharge_(target,now=new Date()){
+  const month=String(target||"").match(/^(\d{4})年(\d{1,2})月$/);
+  if(!month)throw new Error("月会費の対象月が不正です。");
+  // 対象月の前月27日0時（日本時間）までは未決済。
+  const chargeAt=Date.UTC(Number(month[1]),Number(month[2])-2,27,-9);
+  return now.getTime()<chargeAt;
 }
 function rateFor(plan,joinDate){
   const d=String(joinDate||"");
@@ -94,7 +102,7 @@ function calc(){
     ?Object.assign({},current.monthStatuses,Object.fromEntries(current.items.filter(item=>item.kind==="MONTH").map(item=>[item.target,item.status])))
     :{};
   const known=Object.entries(monthStatuses).map(([target,status])=>({target,status,kind:"MONTH"}));
-  const cut=cutoffInfo(new Date(),joinDate,known),months=monthsBetween(joinDate,cut.withdrawalDate);
+  const calculatedAt=new Date(),cut=cutoffInfo(calculatedAt,joinDate,known),months=monthsBetween(joinDate,cut.withdrawalDate);
   const items=[];
   items.push({target:"—",label:"初期費用",paid:initialPaid,normal:8800,settlement:Math.max(0,8800-initialPaid),note:"入会金・事務手数料",kind:"INITIAL",basePaid:initialPaid,baseNormal:8800});
   const benefitValue=benefitAmount(benefit,rate,joinDate,plan);
@@ -107,10 +115,9 @@ function calc(){
     }
     const isFinal=i===months.length-1;
     let paid=rate.campaign;
-    if(isFinal&&cut.beforeFinalCharge)paid=0;
     items.push({target,label:"月会費",paid,normal:rate.normal,settlement:Math.max(0,rate.normal-paid),note:"",kind:"MONTH",isFinalMonth:isFinal,status:monthStatuses[target]||"通常",basePaid:paid,baseNormal:rate.normal});
   });
-  current={monthStatuses,cutoffWithdrawalDate:cut.cutoffWithdrawalDate,beforeFinalCharge:cut.beforeFinalCharge,memberNo,memberName,email,joinDate,plan,benefit,paymentMethod,withdrawalDate:cut.withdrawalDate,expiry:cut.expiry,items};
+  current={calculatedAt,monthStatuses,cutoffWithdrawalDate:cut.cutoffWithdrawalDate,memberNo,memberName,email,joinDate,plan,benefit,paymentMethod,withdrawalDate:cut.withdrawalDate,expiry:cut.expiry,items};
   recalculateCampaign_();
   render();
 }
@@ -131,9 +138,11 @@ function recalculateCampaign_(){
   if(!current)return;
   let sequence=0,completed=0;
   const months=current.items.filter(x=>x.kind==="MONTH");
+  const legacyFlatPlan=current.joinDate<"2026-03-01"&&["DAY","NIGHT365"].includes(current.plan);
   months.forEach((item,index)=>{
+    const pending=index>0&&isBeforeMonthlyCharge_(item.target,current.calculatedAt);
     if(item.status==="休会"){
-      item.paid=550; item.normal=550; item.settlement=0;
+      item.paid=pending?0:550; item.normal=550; item.settlement=0;
       item.paymentSequence=null;
       item.note="休会期間（差額なし・満3か月と満12か月の継続期間に含めない）";
       return;
@@ -143,9 +152,9 @@ function recalculateCampaign_(){
     item.paymentSequence=isFirstMonth?null:sequence;
     item.normal=Number(item.baseNormal||0);
     item.paid=Number(item.basePaid||0);
-    if(item.isFinalMonth&&current.beforeFinalCharge)item.paid=0;
+    if(pending)item.paid=0;
     if(!isFirstMonth&&item.paid>0)completed++;
-    item.settlement=sequence<=12?Math.max(0,item.normal-item.paid):0;
+    item.settlement=!legacyFlatPlan&&sequence<=12?Math.max(0,item.normal-item.paid):0;
     item.note=isFirstMonth?"日割り差額（満12か月の継続期間に含めない）":sequence<=12?`継続月数 ${sequence}/12か月`:"継続条件達成後";
   });
   // 入会初月と休会月を除く12か月の月末を免除境界とする。
@@ -180,7 +189,7 @@ function render(){
   }));
   const total=current.items.reduce((s,x)=>s+x.settlement,0);
   $("#settlementTotal").textContent=yen(total);
-  $("#settlementDeadlineBadge").textContent="有効期限 "+current.expiry.toLocaleString("ja-JP",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"});
+  $("#settlementDeadlineBadge").textContent="有効期限（日本時間） "+current.expiry.toLocaleString("ja-JP",{timeZone:"Asia/Tokyo",month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"});
   const campaignText=current.campaignCompleted
     ?"入会初月と休会月を除いた満12か月が経過しているため、キャンペーン差額の精算はありません。"
     :"入会初月と休会月を除いた満12か月が継続条件です。未達のためキャンペーン差額を精算します。";
@@ -219,6 +228,7 @@ async function createDraft(){
       memberName:current.memberName,
       email:current.email,
       joinDate:current.joinDate,
+      calculatedAt:current.calculatedAt.toISOString(),
       plan:current.plan,
       withdrawalDate:expectedWithdrawalDate,
       paymentMethod:current.paymentMethod,

@@ -21,21 +21,21 @@ function extractFunction(source,name){
 test("9th 20:00 exactly is still current-month withdrawal; one second later is next month",()=>{
   const scope=vm.createContext({});
   vm.runInContext(extractFunction(adminSource,"cutoffInfo")+";this.cutoffInfo=cutoffInfo;",scope);
-  const exact=scope.cutoffInfo(new Date(2026,8,9,20,0,0));
-  const after=scope.cutoffInfo(new Date(2026,8,9,20,0,1));
+  const exact=scope.cutoffInfo(new Date("2026-09-09T11:00:00Z"));
+  const after=scope.cutoffInfo(new Date("2026-09-09T11:00:01Z"));
   assert.equal(exact.withdrawalDate,"2026-09-30");
   assert.equal(after.withdrawalDate,"2026-10-31");
-  assert.equal(exact.expiry.getTime(),new Date(2026,8,9,20,0,1).getTime());
+  assert.equal(exact.expiry.getTime(),new Date("2026-09-09T11:00:01Z").getTime());
 });
 
-test("final month is zero only after the 9th cutoff and through the 26th",()=>{
+test("withdrawal cutoff metadata retains its 9th and 27th boundaries",()=>{
   const scope=vm.createContext({});
   vm.runInContext(extractFunction(adminSource,"cutoffInfo")+";this.cutoffInfo=cutoffInfo;",scope);
-  assert.equal(scope.cutoffInfo(new Date(2026,8,5,12,0,0)).beforeFinalCharge,false);
-  assert.equal(scope.cutoffInfo(new Date(2026,8,9,20,0,0)).beforeFinalCharge,false);
-  assert.equal(scope.cutoffInfo(new Date(2026,8,9,20,0,1)).beforeFinalCharge,true);
-  assert.equal(scope.cutoffInfo(new Date(2026,8,26,23,59,59)).beforeFinalCharge,true);
-  assert.equal(scope.cutoffInfo(new Date(2026,8,27,0,0,0)).beforeFinalCharge,false);
+  assert.equal(scope.cutoffInfo(new Date("2026-09-05T03:00:00Z")).beforeFinalCharge,false);
+  assert.equal(scope.cutoffInfo(new Date("2026-09-09T11:00:00Z")).beforeFinalCharge,false);
+  assert.equal(scope.cutoffInfo(new Date("2026-09-09T11:00:01Z")).beforeFinalCharge,true);
+  assert.equal(scope.cutoffInfo(new Date("2026-09-26T14:59:59Z")).beforeFinalCharge,true);
+  assert.equal(scope.cutoffInfo(new Date("2026-09-26T15:00:00Z")).beforeFinalCharge,false);
 });
 
 test("bank transfer instructions use the configured Mizuho account",()=>{
@@ -47,7 +47,14 @@ test("bank transfer instructions use the configured Mizuho account",()=>{
 });
 
 test("pause months do not create settlement difference",()=>{
-  assert.match(gasSource,/if\(status==="休会"\)[\s\S]*?normal=550;[\s\S]*?paid=550;[\s\S]*?settlement=0;/);
+  for(const [at,paid] of [["2026-11-19T03:00:00Z",0],["2026-11-27T03:00:00Z",550]]){
+    const scope=vm.createContext({at:new Date(at),items:[
+      {target:"2026年10月",label:"初月会費",paid:4950,normal:7480},
+      {target:"2026年12月",label:"月会費",status:"休会",paid:550,normal:550}
+    ]});
+    vm.runInContext(extractFunction(gasSource,"tfgSettlementIsBeforeMonthlyCharge_")+extractFunction(gasSource,"tfgSettlementIsWithdrawalMonth_")+extractFunction(gasSource,"tfgSettlementCampaignProgress_")+extractFunction(gasSource,"tfgSettlementNormalizeItems_")+';this.saved=tfgSettlementNormalizeItems_(items,"2027-02-28",at,false,0);',scope);
+    assert.equal(scope.saved[1].paid,paid);assert.equal(scope.saved[1].normal,550);assert.equal(scope.saved[1].settlement,0);
+  }
 });
 
 test("payments after the twelfth do not recreate campaign settlement",()=>{
@@ -115,14 +122,18 @@ function fixture(joinDate,withdrawalDate,{pause=false,unpaid=false}={}){
   }
   return {joinDate,withdrawalDate,items};
 }
+function calculationDate(withdrawalDate,unpaid){
+  const [year,month]=withdrawalDate.split("-").map(Number);
+  return new Date(Date.UTC(year,month-2,unpaid?20:28,3));
+}
 function adminCalculate(source,data,unpaid){
-  const scope=vm.createContext({current:{...structuredClone(data),beforeFinalCharge:unpaid},cutoffInfo:()=>({beforeFinalCharge:unpaid})});
-  vm.runInContext(extractFunction(source,"minimumWithdrawalDate_")+extractFunction(source,"recalculateCampaign_")+";recalculateCampaign_();",scope);
+  const scope=vm.createContext({current:{...structuredClone(data),calculatedAt:calculationDate(data.withdrawalDate,unpaid)}});
+  vm.runInContext(extractFunction(source,"minimumWithdrawalDate_")+extractFunction(source,"isBeforeMonthlyCharge_")+extractFunction(source,"recalculateCampaign_")+";recalculateCampaign_();",scope);
   return scope.current;
 }
 function serverCalculate(data,unpaid){
-  const scope=vm.createContext({items:structuredClone(data.items),withdrawalDate:data.withdrawalDate,unpaid});
-  vm.runInContext(extractFunction(gasSource,"tfgSettlementIsWithdrawalMonth_")+extractFunction(gasSource,"tfgSettlementCampaignProgress_")+extractFunction(gasSource,"tfgSettlementNormalizeItems_")+";this.result=tfgSettlementNormalizeItems_(items,withdrawalDate,unpaid,false,0);",scope);
+  const scope=vm.createContext({items:structuredClone(data.items),withdrawalDate:data.withdrawalDate,calculatedAt:calculationDate(data.withdrawalDate,unpaid)});
+  vm.runInContext(extractFunction(gasSource,"tfgSettlementIsBeforeMonthlyCharge_")+extractFunction(gasSource,"tfgSettlementIsWithdrawalMonth_")+extractFunction(gasSource,"tfgSettlementCampaignProgress_")+extractFunction(gasSource,"tfgSettlementNormalizeItems_")+";this.result=tfgSettlementNormalizeItems_(items,withdrawalDate,calculatedAt,false,0);",scope);
   return scope.result;
 }
 for(const source of [adminSource,legacyAdminSource]){
@@ -183,10 +194,10 @@ test("month enumeration ends at withdrawal month across December and year bounda
 });
 test("legacy flat-plan and final-charge rules remain intact before exemption",()=>{
   const scope=vm.createContext({});
-  vm.runInContext(extractFunction(gasSource,"tfgSettlementIsWithdrawalMonth_")+extractFunction(gasSource,"tfgSettlementCampaignProgress_")+extractFunction(gasSource,"tfgSettlementNormalizeItems_"),scope);
+  vm.runInContext(extractFunction(gasSource,"tfgSettlementIsBeforeMonthlyCharge_")+extractFunction(gasSource,"tfgSettlementIsWithdrawalMonth_")+extractFunction(gasSource,"tfgSettlementCampaignProgress_")+extractFunction(gasSource,"tfgSettlementNormalizeItems_"),scope);
   for(const rate of [4180,3300]){
     const rows=fixture("2025-01-15","2025-03-31").items;
-    const result=scope.tfgSettlementNormalizeItems_(rows,"2025-03-31",true,true,rate);
+    const result=scope.tfgSettlementNormalizeItems_(rows,"2025-03-31",new Date("2025-02-20T03:00:00Z"),true,rate);
     assert.equal(result[2].settlement,0);
     assert.equal(result[2].normal,result[2].paid);
     assert.equal(result[3].normal,rate);
@@ -258,8 +269,8 @@ test("zero final month billing waives only the last month in both UI and stored 
     if(pause)data.items.at(-1).status="休会";
     const normal=adminCalculate(adminSource,{...data,finalMonthBilling:"NORMAL"},unpaid);
     const ui=adminCalculate(adminSource,data,unpaid);
-    const scope=vm.createContext({items:structuredClone(data.items),date:withdrawal,unpaid});
-    vm.runInContext(extractFunction(gasSource,"tfgSettlementMinimumWithdrawalDate_")+extractFunction(gasSource,"tfgSettlementIsWithdrawalMonth_")+extractFunction(gasSource,"tfgSettlementCampaignProgress_")+extractFunction(gasSource,"tfgSettlementNormalizeItems_")+';this.saved=tfgSettlementNormalizeItems_(items,date,unpaid,false,0,"ZERO","2026-07-14");',scope);
+    const scope=vm.createContext({items:structuredClone(data.items),date:withdrawal,calculatedAt:calculationDate(withdrawal,unpaid)});
+    vm.runInContext(extractFunction(gasSource,"tfgSettlementIsBeforeMonthlyCharge_")+extractFunction(gasSource,"tfgSettlementMinimumWithdrawalDate_")+extractFunction(gasSource,"tfgSettlementIsWithdrawalMonth_")+extractFunction(gasSource,"tfgSettlementCampaignProgress_")+extractFunction(gasSource,"tfgSettlementNormalizeItems_")+';this.saved=tfgSettlementNormalizeItems_(items,date,calculatedAt,false,0,"ZERO","2026-07-14");',scope);
     assert.equal(ui.items.at(-1).settlement,0);
     assert.equal(ui.items.at(-1).normal,0);
     assert.equal(scope.saved.at(-1).normal,0);
@@ -275,8 +286,8 @@ test("zero final month billing waives only the last month in both UI and stored 
 test("server zero billing does not waive an earlier month with a forged final-month flag",()=>{
   const data=fixture("2026-07-14","2026-12-31");
   data.items[3].isFinalMonth=true;
-  const scope=vm.createContext({items:data.items});
-  vm.runInContext(extractFunction(gasSource,"tfgSettlementIsWithdrawalMonth_")+extractFunction(gasSource,"tfgSettlementCampaignProgress_")+extractFunction(gasSource,"tfgSettlementNormalizeItems_")+';this.saved=tfgSettlementNormalizeItems_(items,"2026-12-31",false,false,0,"ZERO");',scope);
+  const scope=vm.createContext({items:data.items,calculatedAt:calculationDate(data.withdrawalDate,false)});
+  vm.runInContext(extractFunction(gasSource,"tfgSettlementIsBeforeMonthlyCharge_")+extractFunction(gasSource,"tfgSettlementIsWithdrawalMonth_")+extractFunction(gasSource,"tfgSettlementCampaignProgress_")+extractFunction(gasSource,"tfgSettlementNormalizeItems_")+';this.saved=tfgSettlementNormalizeItems_(items,"2026-12-31",calculatedAt,false,0,"ZERO");',scope);
   assert.ok(scope.saved[3].settlement>0);
   assert.equal(scope.saved.at(-1).settlement,0);
 });

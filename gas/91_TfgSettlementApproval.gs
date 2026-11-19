@@ -169,12 +169,17 @@ function createTfgSettlement_(body){
     if(!memberName||!/^\S+@\S+\.\S+$/.test(email)||!items.length)throw new Error("氏名・メール・精算明細が必要です。");
     if(body.withdrawalDate&&body.withdrawalDate!==withdrawalDate)throw new Error("退会予定日が変わりました。精算明細を再計算してください。");
     tfgSettlementValidateMonthRange_(items,joinDate,withdrawalDate);
+    if(body.calculatedAt){
+      const calculatedAt=new Date(String(body.calculatedAt));
+      if(!Number.isFinite(calculatedAt.getTime()))throw new Error("計算日時が不正です。精算明細を再計算してください。");
+      const chargeChanged=items.some(function(item){return item.label==="月会費"&&tfgSettlementIsBeforeMonthlyCharge_(item.target,calculatedAt)!==tfgSettlementIsBeforeMonthlyCharge_(item.target,now);});
+      if(chargeChanged)throw new Error("決済予定日をまたいだため、精算明細を再計算してください。");
+    }
     if(joinDate&&joinDate>withdrawalDate)throw new Error("退会予定日がスタート日より前です。");
-    const beforeFinalMonthCharge=tfgSettlementIsBeforeMonthlyCharge_(now);
     const sourceItems=legacyFlatPlan
       ? items.filter(function(x){return String((x&&x.label)||"").trim()!=="選べる特典";})
       : items;
-    const normalized=tfgSettlementNormalizeItems_(sourceItems,withdrawalDate,beforeFinalMonthCharge,legacyFlatPlan,legacyNormalMonthly,finalMonthBilling,joinDate);
+    const normalized=tfgSettlementNormalizeItems_(sourceItems,withdrawalDate,now,legacyFlatPlan,legacyNormalMonthly,finalMonthBilling,joinDate);
     const total=normalized.reduce(function(s,x){return s+x.settlement},0);
     if(total<0)throw new Error("精算金額が不正です。");
     const token=Utilities.getUuid()+Utilities.getUuid().replace(/-/g,"");
@@ -196,7 +201,7 @@ function createTfgSettlement_(body){
   }catch(e){return tfgSettlementJson_({ok:false,code:"CREATE_ERROR",message:e.message||"精算承認データを作成できませんでした。"});}
 }
 
-function tfgSettlementNormalizeItems_(sourceItems,withdrawalDate,beforeFinalMonthCharge,legacyFlatPlan,legacyNormalMonthly,finalMonthBilling,joinDate){
+function tfgSettlementNormalizeItems_(sourceItems,withdrawalDate,calculatedAt,legacyFlatPlan,legacyNormalMonthly,finalMonthBilling,joinDate){
   let sequence=0;
   const normalized=sourceItems.map(function(x){
       let normal=Number(x.normal||0);
@@ -209,9 +214,11 @@ function tfgSettlementNormalizeItems_(sourceItems,withdrawalDate,beforeFinalMont
       const firstMonth=label==="初月会費";
       const paymentSequence=isMonth&&!firstMonth&&status!=="休会"?++sequence:null;
       const isFinalMonth=isMonth&&tfgSettlementIsWithdrawalMonth_(x.target,withdrawalDate);
+      const pending=isMonth&&!firstMonth&&tfgSettlementIsBeforeMonthlyCharge_(x.target,calculatedAt);
+      if(pending){paid=0;settlement=Math.max(0,normal);}
       if(status==="休会"){
         normal=550;
-        paid=550;
+        paid=pending?0:550;
         settlement=0;
       }else if(legacyFlatPlan&&String(x.label||"").trim()==="初月会費"){
         normal=paid;
@@ -221,9 +228,6 @@ function tfgSettlementNormalizeItems_(sourceItems,withdrawalDate,beforeFinalMont
         settlement=0;
       }else if(paymentSequence!==null&&paymentSequence>12){
         settlement=0;
-      }else if(isFinalMonth&&beforeFinalMonthCharge){
-        paid=0;
-        settlement=Math.max(0,normal);
       }
       let note=String(x.note||"");
       if(isMonth){
@@ -686,13 +690,12 @@ function tfgSettlementPaymentNote_(value){
 function tfgSettlementJstParts_(date){
   return Utilities.formatDate(date,TFG_SETTLEMENT_CONFIG.TIMEZONE,"yyyy,M,d,H,m,s").split(",").map(Number);
 }
-function tfgSettlementIsBeforeMonthlyCharge_(date){
-  const p=tfgSettlementJstParts_(date);
-  const day=p[2],hour=p[3],minute=p[4],second=p[5];
-  const afterWithdrawalCutoff=
-    day>9||
-    (day===9&&(hour>20||(hour===20&&(minute>0||second>0))));
-  return afterWithdrawalCutoff&&day<=26;
+function tfgSettlementIsBeforeMonthlyCharge_(target,now){
+  const month=String(target||"").match(/^(\d{4})年(\d{1,2})月$/);
+  if(!month)throw new Error("月会費の対象月が不正です。");
+  // 対象月の前月27日0時（日本時間）までは未決済。
+  const chargeAt=Date.UTC(Number(month[1]),Number(month[2])-2,27,-9);
+  return now.getTime()<chargeAt;
 }
 function tfgSettlementIsWithdrawalMonth_(target,withdrawalDate){
   const d=String(withdrawalDate||"").match(/^(\d{4})-(\d{2})-/);
