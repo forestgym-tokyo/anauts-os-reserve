@@ -22,19 +22,20 @@ function minimumWithdrawalDate_(joinDate,items=[]){
   return new Date(Date.UTC(Math.floor(end/12),end%12+1,0)).toISOString().slice(0,10);
 }
 function cutoffInfo(now=new Date(),joinDate="",items=[]){
-  const y=now.getFullYear(),m=now.getMonth(),d=now.getDate(),h=now.getHours(),min=now.getMinutes(),sec=now.getSeconds();
+  const japan=new Date(now.getTime()+9*60*60*1000);
+  const y=japan.getUTCFullYear(),m=japan.getUTCMonth(),d=japan.getUTCDate(),h=japan.getUTCHours(),min=japan.getUTCMinutes(),sec=japan.getUTCSeconds();
   const before9=d<9||(d===9&&(h<20||(h===20&&min===0&&sec===0)));
   const after9=!before9;
   let wy=y,wm=m;
   if(after9){wm+=1;if(wm>11){wm=0;wy++}}
-  const last=new Date(wy,wm+1,0).getDate();
+  const last=new Date(Date.UTC(wy,wm+1,0)).getUTCDate();
   let withdrawalDate=`${wy}-${String(wm+1).padStart(2,"0")}-${String(last).padStart(2,"0")}`;
   const cutoffWithdrawalDate=withdrawalDate;
   if(joinDate)withdrawalDate=[withdrawalDate,minimumWithdrawalDate_(joinDate,items)].sort().pop();
   let expiry;
-  if(before9) expiry=new Date(y,m,9,20,0,1);
-  else if(d<=26) expiry=new Date(y,m,27,0,0,0);
-  else expiry=new Date(y,m+1,9,20,0,0);
+  if(before9) expiry=new Date(Date.UTC(y,m,9,11,0,1));
+  else if(d<=26) expiry=new Date(Date.UTC(y,m,26,15,0,0));
+  else expiry=new Date(Date.UTC(y,m+1,9,11,0,0));
   return {withdrawalDate,cutoffWithdrawalDate,expiry,beforeFinalCharge:after9&&d<=26};
 }
 function monthsBetween(joinDate,withdrawalDate){
@@ -212,7 +213,7 @@ function render(){
   }));
   const total=current.items.reduce((s,x)=>s+x.settlement,0);
   $("#settlementTotal").textContent=yen(total);
-  $("#settlementDeadlineBadge").textContent="退会予定 "+current.withdrawalDate+" ／ 有効期限 "+current.expiry.toLocaleString("ja-JP",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"});
+  $("#settlementDeadlineBadge").textContent="退会予定 "+current.withdrawalDate+" ／ 有効期限（日本時間） "+current.expiry.toLocaleString("ja-JP",{timeZone:"Asia/Tokyo",month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"});
   const campaignText=current.campaignCompleted
     ?"入会初月と休会月を除いた満12か月が経過しているため、キャンペーン差額の精算はありません。"
     :"入会初月と休会月を除いた満12か月が継続条件です。";

@@ -21,21 +21,21 @@ function extractFunction(source,name){
 test("9th 20:00 exactly is still current-month withdrawal; one second later is next month",()=>{
   const scope=vm.createContext({});
   vm.runInContext(extractFunction(adminSource,"cutoffInfo")+";this.cutoffInfo=cutoffInfo;",scope);
-  const exact=scope.cutoffInfo(new Date(2026,8,9,20,0,0));
-  const after=scope.cutoffInfo(new Date(2026,8,9,20,0,1));
+  const exact=scope.cutoffInfo(new Date("2026-09-09T11:00:00Z"));
+  const after=scope.cutoffInfo(new Date("2026-09-09T11:00:01Z"));
   assert.equal(exact.withdrawalDate,"2026-09-30");
   assert.equal(after.withdrawalDate,"2026-10-31");
-  assert.equal(exact.expiry.getTime(),new Date(2026,8,9,20,0,1).getTime());
+  assert.equal(exact.expiry.getTime(),new Date("2026-09-09T11:00:01Z").getTime());
 });
 
 test("withdrawal cutoff metadata retains its 9th and 27th boundaries",()=>{
   const scope=vm.createContext({});
   vm.runInContext(extractFunction(adminSource,"cutoffInfo")+";this.cutoffInfo=cutoffInfo;",scope);
-  assert.equal(scope.cutoffInfo(new Date(2026,8,5,12,0,0)).beforeFinalCharge,false);
-  assert.equal(scope.cutoffInfo(new Date(2026,8,9,20,0,0)).beforeFinalCharge,false);
-  assert.equal(scope.cutoffInfo(new Date(2026,8,9,20,0,1)).beforeFinalCharge,true);
-  assert.equal(scope.cutoffInfo(new Date(2026,8,26,23,59,59)).beforeFinalCharge,true);
-  assert.equal(scope.cutoffInfo(new Date(2026,8,27,0,0,0)).beforeFinalCharge,false);
+  assert.equal(scope.cutoffInfo(new Date("2026-09-05T03:00:00Z")).beforeFinalCharge,false);
+  assert.equal(scope.cutoffInfo(new Date("2026-09-09T11:00:00Z")).beforeFinalCharge,false);
+  assert.equal(scope.cutoffInfo(new Date("2026-09-09T11:00:01Z")).beforeFinalCharge,true);
+  assert.equal(scope.cutoffInfo(new Date("2026-09-26T14:59:59Z")).beforeFinalCharge,true);
+  assert.equal(scope.cutoffInfo(new Date("2026-09-26T15:00:00Z")).beforeFinalCharge,false);
 });
 
 test("bank transfer instructions use the configured Mizuho account",()=>{

@@ -24,8 +24,10 @@ const server=http.createServer((req,res)=>{
    {at:"2026-11-12T03:00:00Z",join:"2026-10-01",months:4,last:"2027年1月",total:"21,340円",billing:"ZERO",memberNo:"160710",date:"2027-01-31"},
    {at:"2026-11-19T03:00:00Z",join:"2026-10-15",months:4,last:"2027年1月",total:"28,820円",date:"2027-01-31"},
    {at:"2026-11-19T03:00:00Z",join:"2026-10-31",months:4,last:"2027年1月",total:"28,820円",date:"2027-01-31"},
-   {at:"2026-11-26T14:59:00Z",join:"2026-10-15",months:4,last:"2027年1月",total:"28,820円",date:"2027-01-31",decemberPaid:"0円"},
-   {at:"2026-11-26T15:00:00Z",join:"2026-10-15",months:4,last:"2027年1月",total:"23,870円",date:"2027-01-31",decemberPaid:"4,950円"},
+   {at:"2026-11-26T14:59:00Z",join:"2026-10-15",months:4,last:"2027年1月",total:"28,820円",date:"2027-01-31",decemberPaid:"0円",expectedExpiry:"11/27 00:00"},
+   {at:"2026-11-26T15:00:00Z",join:"2026-10-15",months:4,last:"2027年1月",total:"23,870円",date:"2027-01-31",decemberPaid:"4,950円",expectedExpiry:"12/9 20:00"},
+   {at:"2026-11-09T10:59:00Z",join:"2026-01-15",months:11,last:"2026年11月",total:"35,475円",date:"2026-11-30",expectedExpiry:"11/9 20:00"},
+   {at:"2026-11-09T11:01:00Z",join:"2026-01-15",months:12,last:"2026年12月",total:"42,735円",date:"2026-12-31",decemberPaid:"0円",expectedExpiry:"11/27 00:00"},
    {at:"2026-12-26T15:00:00Z",join:"2026-10-15",months:4,last:"2027年1月",total:"18,920円",date:"2027-01-31",decemberPaid:"4,950円"},
    {at:"2026-11-19T03:00:00Z",join:"2026-10-15",initialMonths:4,months:5,last:"2027年2月",total:"28,820円",date:"2027-02-28",minimumDate:"2027-02-28",pauseMonths:["2026年12月"],togglePause:true},
    {at:"2026-11-19T03:00:00Z",join:"2026-10-15",initialMonths:4,months:6,last:"2027年3月",total:"28,820円",date:"2027-03-31",minimumDate:"2027-03-31",pauseMonths:["2026年12月","2027年2月"]},
@@ -82,6 +84,7 @@ const server=http.createServer((req,res)=>{
      if(scenario.pause){assert.doesNotMatch(await monthlyRows.nth(2).innerText(),/\d+\/12/);assert.match(await monthlyRows.nth(3).innerText(),/継続月数 2\/12か月/);}
      assert.equal(await page.locator("#settlementRows tr").last().locator("td").first().innerText(),scenario.last);
      if(scenario.date)assert.match(await page.locator("#settlementDeadlineBadge").innerText(),new RegExp(scenario.date));
+     if(scenario.expectedExpiry)assert.ok((await page.locator("#settlementDeadlineBadge").innerText()).includes("有効期限（日本時間） "+scenario.expectedExpiry));
      if(scenario.join.startsWith("2026-10")&&scenario.months===4){
       assert.deepEqual(await monthlyRows.locator("td:first-child").allInnerTexts(),["2026年10月","2026年11月","2026年12月","2027年1月"]);
       assert.match(await page.locator("#settlementPaymentGuide").innerText(),/最短退会日：2027-01-31/);

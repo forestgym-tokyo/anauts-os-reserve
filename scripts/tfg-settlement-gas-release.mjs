@@ -81,12 +81,21 @@ try{
  try{new vm.Script(scripts.join('\n;\n'));}catch{fail('Combined staged GAS source has a syntax or declaration conflict');}
  notice('preflight_passed=true; retained_files='+Object.keys(before).length+'; changed_files='+changes.join(','));
  inspectVersionCapacity(config.scriptId);
+ const publishedProject=projectFile(path.join(scratch,'published-snapshot'),config.scriptId);
+ clasp(['pull','--versionNumber',String(oldVersion)],publishedProject);
+ const publishedMatchesLive=equal(before,hashes(path.join(scratch,'published-snapshot/gas')));
+ notice('published_snapshot_matches_live='+publishedMatchesLive+'; published_version='+oldVersion);
  if(phase==='deploy'){
   // Re-read before writing to avoid overwriting source changed since this run began.
   const recheck=projectFile(path.join(scratch,'recheck'),config.scriptId);clasp(['pull'],recheck);
   if(!equal(before,hashes(path.join(scratch,'recheck/gas'))))fail('Live source changed during preflight; nothing pushed');
   if(currentDeployment().versionNumber!==oldVersion)fail('Existing deployment changed during preflight; nothing pushed');
-  const backup=json(clasp(['create-version','Before TFG settlement release '+revision.slice(0,7)]),'backup version');backupVersion=backup.versionNumber;if(!Number.isInteger(backupVersion))fail('Native source backup could not be confirmed');
+  if(publishedMatchesLive){
+   backupVersion=oldVersion;
+   notice('native_backup_reused=true; verified_identical_published_version='+oldVersion);
+  }else{
+   const backup=json(clasp(['create-version','Before TFG settlement release '+revision.slice(0,7)]),'backup version');backupVersion=backup.versionNumber;if(!Number.isInteger(backupVersion))fail('Native source backup could not be confirmed');
+  }
   notice('native_backup_version='+backupVersion+'; rollback_version='+oldVersion);
   clasp(['push','--force']);notice('source_push_completed=true');
   const deployed=json(clasp(['update-deployment',deploymentId,'-d','TFG settlement: unpaid monthly fees by charge date '+revision.slice(0,7)]),'deployment');

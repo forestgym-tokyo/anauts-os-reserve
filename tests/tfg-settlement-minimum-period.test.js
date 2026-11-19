@@ -49,8 +49,8 @@ for(const file of ["admin/admin-settlement-v2.js","admin/admin-settlement.js"]){
     for(const [join,earliest] of [["2026-11-30","2027-02-28"],["2027-11-30","2028-02-29"],["2026-12-31","2027-03-31"]]){
       assert.equal(scope.minimumWithdrawalDate_(join),earliest);
     }
-    assert.equal(scope.cutoffInfo(new Date(2027,1,9,20,0,0),"2026-10-15").withdrawalDate,"2027-02-28");
-    assert.equal(scope.cutoffInfo(new Date(2027,1,9,20,0,1),"2026-10-15").withdrawalDate,"2027-03-31");
+    assert.equal(scope.cutoffInfo(new Date("2027-02-09T11:00:00Z"),"2026-10-15").withdrawalDate,"2027-02-28");
+    assert.equal(scope.cutoffInfo(new Date("2027-02-09T11:00:01Z"),"2026-10-15").withdrawalDate,"2027-03-31");
   });
   test(file+": pause changes extend and restore the period, monthly charges and remembered statuses",()=>{
     const source=fs.readFileSync(path.join(root,file),"utf8"),data=payload();
@@ -229,4 +229,21 @@ test("crossing the monthly charge date requires recalculation before any settlem
   body.items.slice(-2).forEach(item=>item.paid=0);
   const result=scope.createTfgSettlement_(body);
   assert.equal(result.ok,false);assert.match(result.message,/決済予定日をまたいだ/);assert.equal(scope.savedRows.length,0);
+});
+test("withdrawal cutoffs and expiry always use Japan time",()=>{
+  const server=gasScope();
+  for(const file of ["admin/admin-settlement-v2.js","admin/admin-settlement.js"]){
+    const scope=vm.createContext({});vm.runInContext(fn(fs.readFileSync(path.join(root,file),"utf8"),"cutoffInfo"),scope);
+    for(const [at,withdrawal,expiry] of [
+      ["2026-11-09T11:00:00Z","2026-11-30","2026-11-09T11:00:01Z"],
+      ["2026-11-09T11:00:01Z","2026-12-31","2026-11-26T15:00:00Z"],
+      ["2026-11-26T14:59:59Z","2026-12-31","2026-11-26T15:00:00Z"],
+      ["2026-11-26T15:00:00Z","2026-12-31","2026-12-09T11:00:00Z"]
+    ]){
+      const now=new Date(at),result=scope.cutoffInfo(now);
+      assert.equal(result.withdrawalDate,withdrawal);
+      assert.equal(result.expiry.getTime(),Date.parse(expiry));
+      assert.equal(server.tfgSettlementNextExpiry_(now).getTime(),result.expiry.getTime());
+    }
+  }
 });
