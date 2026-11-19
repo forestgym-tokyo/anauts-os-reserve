@@ -252,7 +252,7 @@ test("suspension in the already-excluded joining month does not extend exemption
 
 
 test("zero final month billing waives only the last month in both UI and stored calculations",()=>{
-  for(const withdrawal of ["2026-10-31","2026-12-31"])for(const unpaid of [false,true])for(const pause of [false,true]){
+  for(const withdrawal of ["2026-11-30","2026-12-31"])for(const unpaid of [false,true])for(const pause of [false,true]){
     const data=fixture("2026-07-14",withdrawal);
     data.finalMonthBilling="ZERO";
     if(pause)data.items.at(-1).status="休会";
