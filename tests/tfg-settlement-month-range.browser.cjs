@@ -20,12 +20,20 @@ const server=http.createServer((req,res)=>{
  const results=[],errors=[];
  try{
   const scenarios=[
-   {at:"2026-11-12T03:00:00Z",join:"2026-11-01",months:2,last:"2026年12月",total:"11,330円",billing:"ZERO",memberNo:"160708",date:"2026-12-31"},
-   {at:"2026-11-12T03:00:00Z",join:"2026-10-01",months:3,last:"2026年12月",total:"13,860円",billing:"ZERO",memberNo:"160710",date:"2026-12-31"},
-   {at:"2026-11-05T03:00:00Z",join:"2026-11-01",months:1,last:"2026年11月",total:"11,330円"},
-   {at:"2026-11-12T03:00:00Z",join:"2026-11-01",months:2,last:"2026年12月",total:"18,810円"},
-   {at:"2026-12-05T03:00:00Z",join:"2026-11-01",months:2,last:"2026年12月",total:"13,860円"},
-   {at:"2026-12-12T03:00:00Z",join:"2026-11-01",months:3,last:"2027年1月",total:"21,340円"},
+   {at:"2026-11-12T03:00:00Z",join:"2026-11-01",months:4,last:"2027年2月",total:"16,390円",billing:"ZERO",memberNo:"160708",date:"2027-02-28"},
+   {at:"2026-11-12T03:00:00Z",join:"2026-10-01",months:4,last:"2027年1月",total:"16,390円",billing:"ZERO",memberNo:"160710",date:"2027-01-31"},
+   {at:"2026-11-19T03:00:00Z",join:"2026-10-15",months:4,last:"2027年1月",total:"23,870円",date:"2027-01-31"},
+   {at:"2026-11-19T03:00:00Z",join:"2026-10-31",months:4,last:"2027年1月",total:"23,870円",date:"2027-01-31"},
+   {at:"2026-11-19T03:00:00Z",join:"2026-10-15",initialMonths:4,months:5,last:"2027年2月",total:"23,870円",date:"2027-02-28",minimumDate:"2027-02-28",pauseMonths:["2026年12月"],togglePause:true},
+   {at:"2026-11-19T03:00:00Z",join:"2026-10-15",initialMonths:4,months:6,last:"2027年3月",total:"23,870円",date:"2027-03-31",minimumDate:"2027-03-31",pauseMonths:["2026年12月","2027年2月"]},
+   {at:"2026-11-19T03:00:00Z",join:"2026-10-15",initialMonths:4,months:5,last:"2027年2月",total:"16,390円",billing:"ZERO",memberNo:"123456",date:"2027-02-28",minimumDate:"2027-02-28",pauseMonths:["2026年12月"]},
+   {at:"2026-11-19T03:00:00Z",join:"2026-10-15",months:4,last:"2027年1月",total:"21,340円",date:"2027-01-31",pauseMonths:["2026年10月"]},
+   {at:"2027-03-05T03:00:00Z",join:"2026-10-15",months:6,last:"2027年3月",total:"21,450円",date:"2027-03-31",minimumDate:"2027-01-31",pauseMonths:["2027年2月"]},
+   {at:"2026-11-05T03:00:00Z",join:"2026-11-01",months:4,last:"2027年2月",total:"18,920円"},
+   {at:"2026-11-12T03:00:00Z",join:"2026-11-01",months:4,last:"2027年2月",total:"23,870円"},
+   {at:"2026-12-05T03:00:00Z",join:"2026-11-01",months:4,last:"2027年2月",total:"18,920円"},
+   {at:"2026-12-12T03:00:00Z",join:"2026-11-01",months:4,last:"2027年2月",total:"23,870円"},
+   {at:"2027-02-12T03:00:00Z",join:"2026-11-01",months:5,last:"2027年3月",total:"26,400円",date:"2027-03-31"},
    {at:"2026-11-12T03:00:00Z",join:"2025-12-01",months:13,last:"2026年12月",total:"0円"},
    {at:"2026-12-05T03:00:00Z",join:"2026-01-01",months:12,last:"2026年12月",total:"37,895円"},
    {at:"2027-01-05T03:00:00Z",join:"2026-01-15",months:13,last:"2027年1月",total:"0円"},
@@ -43,7 +51,7 @@ const server=http.createServer((req,res)=>{
       window.apiPost=async payload=>{
        window.fixtureCalls.push(payload.action);
        if(payload.action==="createTfgSettlement")window.fixturePayload=payload;
-       if(payload.action==="createTfgSettlement")return {ok:true,data:{settlementId:"FIXTURE-SETTLEMENT",approvalUrl:"https://example.invalid/approval?token=fixture-token",total:window.fixtureOverrideTotal?window.fixtureSavedTotal:payload.items.reduce((sum,item)=>sum+Number(item.settlement||0),0)+(window.fixtureMismatch?1:0)}};
+       if(payload.action==="createTfgSettlement")return {ok:true,data:{settlementId:"FIXTURE-SETTLEMENT",approvalUrl:"https://example.invalid/approval?token=fixture-token",withdrawalDate:window.fixtureWrongDate?"2000-01-31":payload.withdrawalDate,total:window.fixtureOverrideTotal?window.fixtureSavedTotal:payload.items.reduce((sum,item)=>sum+Number(item.settlement||0),0)+(window.fixtureMismatch?1:0)}};
        if(payload.action==="sendTfgSettlementApproval")return {ok:true,data:{gmailDraftId:"fixture-draft"}};
        throw Error("Unexpected API action: "+payload.action);
       };
@@ -60,14 +68,22 @@ const server=http.createServer((req,res)=>{
      const started=Date.now();await page.locator("#settlementCalculate").click({timeout:5000});
      await page.locator("#settlementPreview").waitFor({state:"visible",timeout:5000});
      const elapsed=Date.now()-started,rows=page.locator("#settlementRows [data-status]");
-     assert.equal(await rows.count(),scenario.months);
+     assert.equal(await rows.count(),scenario.initialMonths||scenario.months);
      if(scenario.pause)await rows.nth(2).selectOption("休会");
+     for(const target of scenario.pauseMonths||[])await page.locator("#settlementRows tr").filter({hasText:target}).locator("[data-status]").selectOption("休会");
+     assert.equal(await rows.count(),scenario.months);
      const monthlyRows=page.locator("#settlementRows tr").filter({has:page.locator("[data-status]")});
      assert.match(await monthlyRows.first().innerText(),/満12か月の継続期間に含めない/);
      assert.doesNotMatch(await monthlyRows.first().innerText(),/\d+\/12/);
      if(scenario.months>1)assert.match(await monthlyRows.nth(1).innerText(),/継続月数 1\/12か月/);
      if(scenario.pause){assert.doesNotMatch(await monthlyRows.nth(2).innerText(),/\d+\/12/);assert.match(await monthlyRows.nth(3).innerText(),/継続月数 2\/12か月/);}
      assert.equal(await page.locator("#settlementRows tr").last().locator("td").first().innerText(),scenario.last);
+     if(scenario.date)assert.match(await page.locator("#settlementDeadlineBadge").innerText(),new RegExp(scenario.date));
+     if(scenario.join.startsWith("2026-10")&&scenario.months===4){
+      assert.deepEqual(await monthlyRows.locator("td:first-child").allInnerTexts(),["2026年10月","2026年11月","2026年12月","2027年1月"]);
+      assert.match(await page.locator("#settlementPaymentGuide").innerText(),/最短退会日：2027-01-31/);
+     }
+     if(scenario.minimumDate)assert.match(await page.locator("#settlementPaymentGuide").innerText(),new RegExp("最短退会日："+scenario.minimumDate));
      const total=await page.locator("#settlementTotal").innerText();if(scenario.total)assert.equal(total,scenario.total);
      assert.deepEqual(await page.evaluate(()=>fixtureCalls),[]);
      await page.locator("#settlementPreviewButton").click();await page.locator("#settlementInlineMemberPreview").waitFor({state:"visible"});
@@ -80,10 +96,26 @@ const server=http.createServer((req,res)=>{
       assert.equal(await page.evaluate(()=>fixturePayload.memberNo),scenario.memberNo);
       assert.equal(await page.locator("#settlementRows tr").last().locator("td").last().innerText(),"0円");
       assert.equal(await page.locator("#settlementRows tr").last().locator("td").nth(4).innerText(),"0円");
-      assert.match(await page.locator("#settlementInlineMemberPreviewBody").innerText(),/実質退会日：2026-11-30/);
+      assert.match(await page.locator("#settlementInlineMemberPreviewBody").innerText(),new RegExp("実質退会日："+scenario.date));
       assert.equal(await page.evaluate(()=>fixturePayload.items.at(-1).normal),0);
       assert.match(await page.locator("#settlementInlineMemberPreviewBody").innerText(),/最終月請求なし（0円）/);
       assert.match(await page.locator("#settlementInlineMemberPreviewBody").innerText(),new RegExp(scenario.date));
+     }
+     if(scenario.togglePause){
+      const december=()=>page.locator("#settlementRows tr").filter({hasText:"2026年12月"}).locator("[data-status]");
+      await december().selectOption("通常");
+      assert.equal(await rows.count(),4);
+      assert.match(await page.locator("#settlementDeadlineBadge").innerText(),/2027-01-31/);
+      assert.match(await page.locator("#settlementInlineMemberPreviewBody").innerText(),/2027-01-31/);
+      assert.equal(await page.locator("#settlementFallbackUrl").isVisible(),false);
+      assert.equal(await page.locator("#settlementSend").isDisabled(),true);
+      await december().selectOption("休会");
+      assert.equal(await rows.count(),5);
+      assert.match(await page.locator("#settlementInlineMemberPreviewBody").innerText(),/2027-02-28/);
+      const january=page.locator("#settlementRows tr").filter({hasText:"2027年1月"});
+      assert.equal(await january.locator("td").nth(3).innerText(),"4,950円");
+      assert.equal(await page.locator("#settlementRows tr").last().locator("td").nth(3).innerText(),"0円");
+      await page.screenshot({path:path.join(evidence,timezoneId.replace("/","-")+"-pause.png"),fullPage:true});
      }
      await page.evaluate(()=>{window.fixtureMismatch=true;});
      await page.locator("#settlementDraft").click();await page.waitForFunction(()=>document.querySelector("#settlementMessage").textContent.includes("計算額と保存額が一致しない"));
@@ -99,7 +131,11 @@ const server=http.createServer((req,res)=>{
        assert.equal(await page.locator("#settlementFallbackUrl").isVisible(),false);
       }
      }
-     if(scenario.at.startsWith("2026-11-12")&&scenario.months===2)await page.screenshot({path:path.join(evidence,timezoneId.replace("/","-")+".png"),fullPage:true});
+     await page.evaluate(()=>{window.fixtureMismatch=false;window.fixtureOverrideTotal=false;window.fixtureWrongDate=true;});
+     await page.locator("#settlementDraft").click();await page.waitForFunction(()=>document.querySelector("#settlementMessage").textContent.includes("退会予定日が一致しない"));
+     assert.equal(await page.evaluate(()=>fixtureCalls.filter(action=>action==="sendTfgSettlementApproval").length),1);
+     assert.equal(await page.locator("#settlementFallbackUrl").isVisible(),false);
+     assert.equal(await page.locator("#settlementSend").isDisabled(),true);
      if(scenario.billing){
       await page.locator("#settlementFinalMonthBilling").selectOption("NORMAL");
       assert.equal(await page.locator("#settlementDraft").isDisabled(),true);
@@ -107,8 +143,11 @@ const server=http.createServer((req,res)=>{
       await page.locator("#settlementCalculate").click();
       assert.equal(await page.locator("#settlementRows tr").last().locator("td").last().innerText(),"7,480円");
       assert.equal(await page.locator("#settlementRows tr").last().locator("td").nth(4).innerText(),"7,480円");
+      assert.equal(await rows.count(),scenario.months);
+      if(scenario.date)assert.match(await page.locator("#settlementDeadlineBadge").innerText(),new RegExp(scenario.date));
+      for(const target of scenario.pauseMonths||[])assert.equal(await page.locator("#settlementRows tr").filter({hasText:target}).locator("[data-status]").inputValue(),"休会");
      }
-     results.push({timezoneId,at:scenario.at,months:scenario.months,total,calculation_ms:elapsed});
+     results.push({timezoneId,at:scenario.at,joinDate:scenario.join,withdrawalDate:await page.evaluate(()=>fixturePayload.withdrawalDate),months:scenario.months,total,calculation_ms:elapsed});
     }finally{await context.close();}
    }
   }

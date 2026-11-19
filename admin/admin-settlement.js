@@ -9,19 +9,33 @@ const planRates={
 let current=null;
 let draft=null;
 
-function cutoffInfo(now=new Date()){
+function minimumWithdrawalDate_(joinDate,items=[]){
+  // 初月と休会月を除く3か月目の末日。達成後の休会は最短日を延ばさない。
+  const [y,m]=joinDate.split("-").map(Number);
+  const start=y*12+m-1,pauses=new Set();
+  for(const item of items){
+    const month=String(item.target||"").match(/^(\d{4})年(\d{1,2})月$/);
+    if(String(item.status||"").trim()==="休会"&&month&&(item.kind==="MONTH"||item.label==="初月会費"||item.label==="月会費"))pauses.add(Number(month[1])*12+Number(month[2])-1);
+  }
+  let end=start+3;
+  for(const month of [...pauses].sort((a,b)=>a-b))if(month>start&&month<=end)end++;
+  return new Date(Date.UTC(Math.floor(end/12),end%12+1,0)).toISOString().slice(0,10);
+}
+function cutoffInfo(now=new Date(),joinDate="",items=[]){
   const y=now.getFullYear(),m=now.getMonth(),d=now.getDate(),h=now.getHours(),min=now.getMinutes(),sec=now.getSeconds();
   const before9=d<9||(d===9&&(h<20||(h===20&&min===0&&sec===0)));
   const after9=!before9;
   let wy=y,wm=m;
   if(after9){wm+=1;if(wm>11){wm=0;wy++}}
   const last=new Date(wy,wm+1,0).getDate();
-  const withdrawalDate=`${wy}-${String(wm+1).padStart(2,"0")}-${String(last).padStart(2,"0")}`;
+  let withdrawalDate=`${wy}-${String(wm+1).padStart(2,"0")}-${String(last).padStart(2,"0")}`;
+  const cutoffWithdrawalDate=withdrawalDate;
+  if(joinDate)withdrawalDate=[withdrawalDate,minimumWithdrawalDate_(joinDate,items)].sort().pop();
   let expiry;
   if(before9) expiry=new Date(y,m,9,20,0,1);
   else if(d<=26) expiry=new Date(y,m,27,0,0,0);
   else expiry=new Date(y,m+1,9,20,0,0);
-  return {withdrawalDate,expiry,beforeFinalCharge:after9&&d<=26};
+  return {withdrawalDate,cutoffWithdrawalDate,expiry,beforeFinalCharge:after9&&d<=26};
 }
 function monthsBetween(joinDate,withdrawalDate){
   const j=new Date(joinDate+"T00:00:00"),w=new Date(withdrawalDate+"T00:00:00");
@@ -76,7 +90,11 @@ function calc(){
   const paymentMethod=$("#settlementPaymentMethod").value;
   if(!/^\d{6}$/.test(memberNo)){show("会員番号は6桁の数字で入力してください。",true);return}
   if(!memberName||!email||!joinDate){show("氏名・メールアドレス・入会日を入力してください。",true);return}
-  const cut=cutoffInfo(),months=monthsBetween(joinDate,cut.withdrawalDate);
+  const monthStatuses=current&&current.memberNo===memberNo&&current.joinDate===joinDate
+    ?Object.assign({},current.monthStatuses,Object.fromEntries(current.items.filter(item=>item.kind==="MONTH").map(item=>[item.target,item.status])))
+    :{};
+  const known=Object.entries(monthStatuses).map(([target,status])=>({target,status,kind:"MONTH"}));
+  const cut=cutoffInfo(new Date(),joinDate,known),months=monthsBetween(joinDate,cut.withdrawalDate);
   const items=[];
   items.push({target:"—",label:"初期費用",paid:initialPaid,normal:8800,settlement:Math.max(0,8800-initialPaid),note:"入会金・事務手数料",kind:"INITIAL",basePaid:initialPaid,baseNormal:8800});
   const benefitValue=benefitAmount(benefit,rate,joinDate,plan);
@@ -84,17 +102,30 @@ function calc(){
   months.forEach((x,i)=>{
     const target=`${x.y}年${x.m+1}月`;
     if(i===0){
-      items.push({target,label:"初月会費",paid:firstPaid,normal:firstNormal,settlement:Math.max(0,firstNormal-firstPaid),note:"日割り差額",kind:"MONTH",isFinalMonth:months.length===1,status:"通常",basePaid:firstPaid,baseNormal:firstNormal});
+      items.push({target,label:"初月会費",paid:firstPaid,normal:firstNormal,settlement:Math.max(0,firstNormal-firstPaid),note:"日割り差額",kind:"MONTH",isFinalMonth:months.length===1,status:monthStatuses[target]||"通常",basePaid:firstPaid,baseNormal:firstNormal});
       return;
     }
     const isFinal=i===months.length-1;
     let paid=rate.campaign;
     if(isFinal&&cut.beforeFinalCharge)paid=0;
-    items.push({target,label:"月会費",paid,normal:rate.normal,settlement:Math.max(0,rate.normal-paid),note:"",kind:"MONTH",isFinalMonth:isFinal,status:"通常",basePaid:paid,baseNormal:rate.normal});
+    items.push({target,label:"月会費",paid,normal:rate.normal,settlement:Math.max(0,rate.normal-paid),note:"",kind:"MONTH",isFinalMonth:isFinal,status:monthStatuses[target]||"通常",basePaid:paid,baseNormal:rate.normal});
   });
-  current={memberNo,memberName,email,joinDate,plan,benefit,paymentMethod,withdrawalDate:cut.withdrawalDate,expiry:cut.expiry,items};
+  current={monthStatuses,cutoffWithdrawalDate:cut.cutoffWithdrawalDate,beforeFinalCharge:cut.beforeFinalCharge,memberNo,memberName,email,joinDate,plan,benefit,paymentMethod,withdrawalDate:cut.withdrawalDate,expiry:cut.expiry,items};
   recalculateCampaign_();
   render();
+}
+function syncWithdrawalPeriod_(){
+  const months=current.items.filter(item=>item.kind==="MONTH");
+  const statuses=current.monthStatuses||(current.monthStatuses={});
+  months.forEach(item=>statuses[item.target]=item.status);
+  const known=Object.entries(statuses).map(([target,status])=>({target,status,kind:"MONTH"}));
+  current.withdrawalDate=[current.cutoffWithdrawalDate,minimumWithdrawalDate_(current.joinDate,known)].sort().pop();
+  const range=monthsBetween(current.joinDate,current.withdrawalDate),rate=rateFor(current.plan,current.joinDate),first=months[0];
+  current.items=current.items.filter(item=>item.kind!=="MONTH").concat(range.map((month,index)=>{
+    const target=`${month.y}年${month.m+1}月`;
+    return {target,label:index===0?"初月会費":"月会費",kind:"MONTH",status:statuses[target]||"通常",isFinalMonth:index===range.length-1,
+      basePaid:index===0?first.basePaid:rate.campaign,baseNormal:index===0?first.baseNormal:rate.normal};
+  }));
 }
 function recalculateCampaign_(){
   if(!current)return;
@@ -104,7 +135,7 @@ function recalculateCampaign_(){
     if(item.status==="休会"){
       item.paid=550; item.normal=550; item.settlement=0;
       item.paymentSequence=null;
-      item.note="休会期間（差額なし・満12か月の継続期間に含めない）";
+      item.note="休会期間（差額なし・満3か月と満12か月の継続期間に含めない）";
       return;
     }
     const isFirstMonth=index===0;
@@ -112,7 +143,7 @@ function recalculateCampaign_(){
     item.paymentSequence=isFirstMonth?null:sequence;
     item.normal=Number(item.baseNormal||0);
     item.paid=Number(item.basePaid||0);
-    if(item.isFinalMonth&&cutoffInfo().beforeFinalCharge)item.paid=0;
+    if(item.isFinalMonth&&current.beforeFinalCharge)item.paid=0;
     if(!isFirstMonth&&item.paid>0)completed++;
     item.settlement=sequence<=12?Math.max(0,item.normal-item.paid):0;
     item.note=isFirstMonth?"日割り差額（満12か月の継続期間に含めない）":sequence<=12?`継続月数 ${sequence}/12か月`:"継続条件達成後";
@@ -143,6 +174,7 @@ function render(){
   body.querySelectorAll("[data-status]").forEach(sel=>sel.addEventListener("change",e=>{
     const i=Number(e.target.dataset.status),item=current.items[i];
     item.status=e.target.value;
+    syncWithdrawalPeriod_();
     recalculateCampaign_();
     render();
   }));
@@ -180,17 +212,22 @@ async function createDraft(){
   try{
     if(typeof apiPost!=="function")throw new Error("管理APIを読み込めませんでした。");
     const expectedTotal=current.items.reduce((sum,item)=>sum+Number(item.settlement||0),0);
+    const expectedWithdrawalDate=current.withdrawalDate;
     const payload={
       action:"createTfgSettlement",
       memberNo:current.memberNo,
       memberName:current.memberName,
       email:current.email,
+      joinDate:current.joinDate,
+      plan:current.plan,
+      withdrawalDate:expectedWithdrawalDate,
       paymentMethod:current.paymentMethod,
       items:current.items.map(x=>({target:x.target,label:x.label,paid:x.paid,normal:x.normal,settlement:x.settlement,note:x.note,status:x.status||"",paymentSequence:x.paymentSequence||null,isFinalMonth:!!x.isFinalMonth}))
     };
     const r=await apiPost(payload);
     const savedTotal=r.data?.total;
     if(typeof savedTotal!=="number"||!Number.isFinite(savedTotal)||savedTotal!==expectedTotal)throw new Error("計算額と保存額が一致しないため、承認メールは作成していません。管理者に確認してください。");
+    if(r.data?.withdrawalDate!==expectedWithdrawalDate)throw new Error("計算時と保存時の退会予定日が一致しないため、承認メールは作成していません。精算明細を再計算してください。");
     draft={settlementId:r.data?.settlementId||"",approvalUrl:r.data?.approvalUrl||""};
     const fallback=$("#settlementFallbackUrl"),fallbackText=$("#settlementFallbackUrlText");
     const previewUrl=draft.approvalUrl+(draft.approvalUrl.includes("?")?"&":"?")+"preview="+Date.now();

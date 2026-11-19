@@ -117,7 +117,7 @@ function fixture(joinDate,withdrawalDate,{pause=false,unpaid=false}={}){
 }
 function adminCalculate(source,data,unpaid){
   const scope=vm.createContext({current:{...structuredClone(data),beforeFinalCharge:unpaid},cutoffInfo:()=>({beforeFinalCharge:unpaid})});
-  vm.runInContext(extractFunction(source,"recalculateCampaign_")+";recalculateCampaign_();",scope);
+  vm.runInContext(extractFunction(source,"minimumWithdrawalDate_")+extractFunction(source,"recalculateCampaign_")+";recalculateCampaign_();",scope);
   return scope.current;
 }
 function serverCalculate(data,unpaid){
@@ -252,18 +252,18 @@ test("suspension in the already-excluded joining month does not extend exemption
 
 
 test("zero final month billing waives only the last month in both UI and stored calculations",()=>{
-  for(const withdrawal of ["2026-07-31","2026-12-31"])for(const unpaid of [false,true])for(const pause of [false,true]){
+  for(const withdrawal of ["2026-11-30","2026-12-31"])for(const unpaid of [false,true])for(const pause of [false,true]){
     const data=fixture("2026-07-14",withdrawal);
     data.finalMonthBilling="ZERO";
     if(pause)data.items.at(-1).status="休会";
     const normal=adminCalculate(adminSource,{...data,finalMonthBilling:"NORMAL"},unpaid);
     const ui=adminCalculate(adminSource,data,unpaid);
     const scope=vm.createContext({items:structuredClone(data.items),date:withdrawal,unpaid});
-    vm.runInContext(extractFunction(gasSource,"tfgSettlementIsWithdrawalMonth_")+extractFunction(gasSource,"tfgSettlementCampaignProgress_")+extractFunction(gasSource,"tfgSettlementNormalizeItems_")+';this.saved=tfgSettlementNormalizeItems_(items,date,unpaid,false,0,"ZERO");',scope);
+    vm.runInContext(extractFunction(gasSource,"tfgSettlementMinimumWithdrawalDate_")+extractFunction(gasSource,"tfgSettlementIsWithdrawalMonth_")+extractFunction(gasSource,"tfgSettlementCampaignProgress_")+extractFunction(gasSource,"tfgSettlementNormalizeItems_")+';this.saved=tfgSettlementNormalizeItems_(items,date,unpaid,false,0,"ZERO","2026-07-14");',scope);
     assert.equal(ui.items.at(-1).settlement,0);
     assert.equal(ui.items.at(-1).normal,0);
     assert.equal(scope.saved.at(-1).normal,0);
-    assert.match(ui.items.at(-1).note,withdrawal==="2026-12-31"?/実質退会日：2026-11-30/:/実質退会日：2026-06-30/);
+    assert.match(ui.items.at(-1).note,withdrawal==="2026-12-31"?/実質退会日：2026-11-30/:/実質退会日：2026-10-31/);
     assert.match(ui.items.at(-1).note,/最終月請求なし（0円）/);
     assert.deepEqual(Array.from(ui.items,x=>x.settlement),Array.from(scope.saved,x=>x.settlement));
     assert.deepEqual(ui.items.slice(0,-1),normal.items.slice(0,-1));
