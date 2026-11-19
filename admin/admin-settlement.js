@@ -9,14 +9,20 @@ const planRates={
 let current=null;
 let draft=null;
 
-function cutoffInfo(now=new Date()){
+function minimumWithdrawalDate_(joinDate){
+  // 初月を除き、翌月から3か月目の末日。
+  const [y,m]=joinDate.split("-").map(Number);
+  return new Date(Date.UTC(y,m+3,0)).toISOString().slice(0,10);
+}
+function cutoffInfo(now=new Date(),joinDate=""){
   const y=now.getFullYear(),m=now.getMonth(),d=now.getDate(),h=now.getHours(),min=now.getMinutes(),sec=now.getSeconds();
   const before9=d<9||(d===9&&(h<20||(h===20&&min===0&&sec===0)));
   const after9=!before9;
   let wy=y,wm=m;
   if(after9){wm+=1;if(wm>11){wm=0;wy++}}
   const last=new Date(wy,wm+1,0).getDate();
-  const withdrawalDate=`${wy}-${String(wm+1).padStart(2,"0")}-${String(last).padStart(2,"0")}`;
+  let withdrawalDate=`${wy}-${String(wm+1).padStart(2,"0")}-${String(last).padStart(2,"0")}`;
+  if(joinDate)withdrawalDate=[withdrawalDate,minimumWithdrawalDate_(joinDate)].sort().pop();
   let expiry;
   if(before9) expiry=new Date(y,m,9,20,0,1);
   else if(d<=26) expiry=new Date(y,m,27,0,0,0);
@@ -76,7 +82,7 @@ function calc(){
   const paymentMethod=$("#settlementPaymentMethod").value;
   if(!/^\d{6}$/.test(memberNo)){show("会員番号は6桁の数字で入力してください。",true);return}
   if(!memberName||!email||!joinDate){show("氏名・メールアドレス・入会日を入力してください。",true);return}
-  const cut=cutoffInfo(),months=monthsBetween(joinDate,cut.withdrawalDate);
+  const cut=cutoffInfo(new Date(),joinDate),months=monthsBetween(joinDate,cut.withdrawalDate);
   const items=[];
   items.push({target:"—",label:"初期費用",paid:initialPaid,normal:8800,settlement:Math.max(0,8800-initialPaid),note:"入会金・事務手数料",kind:"INITIAL",basePaid:initialPaid,baseNormal:8800});
   const benefitValue=benefitAmount(benefit,rate,joinDate,plan);
@@ -180,17 +186,22 @@ async function createDraft(){
   try{
     if(typeof apiPost!=="function")throw new Error("管理APIを読み込めませんでした。");
     const expectedTotal=current.items.reduce((sum,item)=>sum+Number(item.settlement||0),0);
+    const expectedWithdrawalDate=current.withdrawalDate;
     const payload={
       action:"createTfgSettlement",
       memberNo:current.memberNo,
       memberName:current.memberName,
       email:current.email,
+      joinDate:current.joinDate,
+      plan:current.plan,
+      withdrawalDate:expectedWithdrawalDate,
       paymentMethod:current.paymentMethod,
       items:current.items.map(x=>({target:x.target,label:x.label,paid:x.paid,normal:x.normal,settlement:x.settlement,note:x.note,status:x.status||"",paymentSequence:x.paymentSequence||null,isFinalMonth:!!x.isFinalMonth}))
     };
     const r=await apiPost(payload);
     const savedTotal=r.data?.total;
     if(typeof savedTotal!=="number"||!Number.isFinite(savedTotal)||savedTotal!==expectedTotal)throw new Error("計算額と保存額が一致しないため、承認メールは作成していません。管理者に確認してください。");
+    if(r.data?.withdrawalDate!==expectedWithdrawalDate)throw new Error("計算時と保存時の退会予定日が一致しないため、承認メールは作成していません。精算明細を再計算してください。");
     draft={settlementId:r.data?.settlementId||"",approvalUrl:r.data?.approvalUrl||""};
     const fallback=$("#settlementFallbackUrl"),fallbackText=$("#settlementFallbackUrlText");
     const previewUrl=draft.approvalUrl+(draft.approvalUrl.includes("?")?"&":"?")+"preview="+Date.now();

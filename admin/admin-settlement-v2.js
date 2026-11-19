@@ -9,14 +9,20 @@ const planRates={
 let current=null;
 let draft=null;
 
-function cutoffInfo(now=new Date()){
+function minimumWithdrawalDate_(joinDate){
+  // 初月を除き、翌月から3か月目の末日。
+  const [y,m]=joinDate.split("-").map(Number);
+  return new Date(Date.UTC(y,m+3,0)).toISOString().slice(0,10);
+}
+function cutoffInfo(now=new Date(),joinDate=""){
   const y=now.getFullYear(),m=now.getMonth(),d=now.getDate(),h=now.getHours(),min=now.getMinutes(),sec=now.getSeconds();
   const before9=d<9||(d===9&&(h<20||(h===20&&min===0&&sec===0)));
   const after9=!before9;
   let wy=y,wm=m;
   if(after9){wm+=1;if(wm>11){wm=0;wy++}}
   const last=new Date(wy,wm+1,0).getDate();
-  const withdrawalDate=`${wy}-${String(wm+1).padStart(2,"0")}-${String(last).padStart(2,"0")}`;
+  let withdrawalDate=`${wy}-${String(wm+1).padStart(2,"0")}-${String(last).padStart(2,"0")}`;
+  if(joinDate)withdrawalDate=[withdrawalDate,minimumWithdrawalDate_(joinDate)].sort().pop();
   let expiry;
   if(before9) expiry=new Date(y,m,9,20,0,1);
   else if(d<=26) expiry=new Date(y,m,27,0,0,0);
@@ -89,7 +95,7 @@ function calc(){
   if(!/^\d{6}$/.test(memberNo)){show("会員番号は6桁の数字で入力してください。",true);return}
   if(!memberName||!email||!joinDate){show("氏名・メールアドレス・スタート日を入力してください。",true);return}
   const finalMonthBilling=$("#settlementFinalMonthBilling").value;
-  const cut=cutoffInfo(),months=monthsBetween(joinDate,cut.withdrawalDate);
+  const cut=cutoffInfo(new Date(),joinDate),months=monthsBetween(joinDate,cut.withdrawalDate);
   if(joinDate>cut.withdrawalDate){show("退会予定日がスタート日より前になるため計算できません。",true);return}
   const items=[];
   items.push({target:"—",label:"初期費用",paid:initialPaid,normal:8800,settlement:Math.max(0,8800-initialPaid),note:"入会金・事務手数料",kind:"INITIAL",basePaid:initialPaid,baseNormal:8800});
@@ -135,7 +141,8 @@ function recalculateCampaign_(){
     months.filter(item=>item.isFinalMonth).forEach(item=>{
       item.normal=0;
       item.settlement=0;
-      const effectiveDate=new Date(Date.UTC(Number(current.withdrawalDate.slice(0,4)),Number(current.withdrawalDate.slice(5,7))-1,0)).toISOString().slice(0,10);
+      const previousMonthEnd=new Date(Date.UTC(Number(current.withdrawalDate.slice(0,4)),Number(current.withdrawalDate.slice(5,7))-1,0)).toISOString().slice(0,10);
+      const effectiveDate=[previousMonthEnd,minimumWithdrawalDate_(current.joinDate)].sort().pop();
       item.note+="／最終月請求なし（0円）／実質退会日："+effectiveDate;
     });
   }
@@ -180,6 +187,7 @@ function render(){
     :(current.campaignCompleted
       ?campaignText
       :campaignText+"未達のためキャンペーン差額をご登録クレジットカードで精算します。");
+  $("#settlementPaymentGuide").textContent="入会初月を除く満3か月が経過する月末まで退会できません。最短退会日："+minimumWithdrawalDate_(current.joinDate)+"。 "+$("#settlementPaymentGuide").textContent;
   $("#settlementPreview").classList.remove("is-hidden");
   $("#settlementDraft").disabled=false;
   $("#settlementPreviewButton").disabled=false;
@@ -205,12 +213,14 @@ async function createDraft(){
   try{
     if(typeof apiPost!=="function")throw new Error("管理APIを読み込めませんでした。");
     const expectedTotal=current.items.reduce((sum,item)=>sum+Number(item.settlement||0),0);
+    const expectedWithdrawalDate=current.withdrawalDate;
     const payload={
       action:"createTfgSettlement",
       memberNo:current.memberNo,
       memberName:current.memberName,
       email:current.email,
       joinDate:current.joinDate,
+      withdrawalDate:expectedWithdrawalDate,
       plan:current.plan,
       paymentMethod:current.paymentMethod,
       finalMonthBilling:current.finalMonthBilling,
@@ -219,6 +229,7 @@ async function createDraft(){
     const r=await apiPost(payload);
     const savedTotal=r.data?.total;
     if(typeof savedTotal!=="number"||!Number.isFinite(savedTotal)||savedTotal!==expectedTotal)throw new Error("計算額と保存額が一致しないため、承認メールは作成していません。管理者に確認してください。");
+    if(r.data?.withdrawalDate!==expectedWithdrawalDate)throw new Error("計算時と保存時の退会予定日が一致しないため、承認メールは作成していません。精算明細を再計算してください。");
     draft={settlementId:r.data?.settlementId||"",approvalUrl:r.data?.approvalUrl||""};
     const fallback=$("#settlementFallbackUrl"),fallbackText=$("#settlementFallbackUrlText");
     const previewUrl=draft.approvalUrl+(draft.approvalUrl.includes("?")?"&":"?")+"preview="+Date.now();

@@ -158,21 +158,23 @@ function createTfgSettlement_(body){
     const now=new Date();
     const finalMonthBilling=String(body.finalMonthBilling||"NORMAL");
     if(["NORMAL","ZERO"].indexOf(finalMonthBilling)<0)throw new Error("最終月の請求額が不正です。");
-    const withdrawalDate=tfgSettlementWithdrawalDate_(now);
     const items=Array.isArray(body.items)?body.items:[];
     const joinDate=String(body.joinDate||"").trim();
+    const withdrawalDate=tfgSettlementWithdrawalDate_(now,joinDate);
     const plan=String(body.plan||"").trim().toUpperCase();
     const legacyFlatPlan=joinDate&&joinDate<"2026-03-01"&&["DAY","NIGHT365"].indexOf(plan)>=0;
     const legacyNormalMonthly=plan==="NIGHT365"?3300:(plan==="DAY"?4180:0);
     const paymentMethod=tfgSettlementNormalizePaymentMethod_(body.paymentMethod);
     if(!/^\d{6}$/.test(memberNo))throw new Error("会員番号は6桁の数字で入力してください。");
     if(!memberName||!/^\S+@\S+\.\S+$/.test(email)||!items.length)throw new Error("氏名・メール・精算明細が必要です。");
+    if(body.withdrawalDate&&body.withdrawalDate!==withdrawalDate)throw new Error("退会予定日が変わりました。精算明細を再計算してください。");
+    tfgSettlementValidateMonthRange_(items,joinDate,withdrawalDate);
     if(joinDate&&joinDate>withdrawalDate)throw new Error("退会予定日がスタート日より前です。");
     const beforeFinalMonthCharge=tfgSettlementIsBeforeMonthlyCharge_(now);
     const sourceItems=legacyFlatPlan
       ? items.filter(function(x){return String((x&&x.label)||"").trim()!=="選べる特典";})
       : items;
-    const normalized=tfgSettlementNormalizeItems_(sourceItems,withdrawalDate,beforeFinalMonthCharge,legacyFlatPlan,legacyNormalMonthly,finalMonthBilling);
+    const normalized=tfgSettlementNormalizeItems_(sourceItems,withdrawalDate,beforeFinalMonthCharge,legacyFlatPlan,legacyNormalMonthly,finalMonthBilling,joinDate);
     const total=normalized.reduce(function(s,x){return s+x.settlement},0);
     if(total<0)throw new Error("精算金額が不正です。");
     const token=Utilities.getUuid()+Utilities.getUuid().replace(/-/g,"");
@@ -190,11 +192,11 @@ function createTfgSettlement_(body){
     }
     const base=String(body.approvalBaseUrl||TFG_SETTLEMENT_CONFIG.APPROVAL_BASE_URL).trim();
     const approvalUrl=base+(base.indexOf("?")>=0?"&":"?")+"token="+encodeURIComponent(token);
-    return tfgSettlementJson_({ok:true,data:{settlementId:id,total:total,approvalUrl:approvalUrl,expiresAt:Utilities.formatDate(expires,TFG_SETTLEMENT_CONFIG.TIMEZONE,"yyyy-MM-dd HH:mm:ss"),paymentMethod:paymentMethod,status:"DRAFT"}});
+    return tfgSettlementJson_({ok:true,data:{settlementId:id,total:total,withdrawalDate:withdrawalDate,approvalUrl:approvalUrl,expiresAt:Utilities.formatDate(expires,TFG_SETTLEMENT_CONFIG.TIMEZONE,"yyyy-MM-dd HH:mm:ss"),paymentMethod:paymentMethod,status:"DRAFT"}});
   }catch(e){return tfgSettlementJson_({ok:false,code:"CREATE_ERROR",message:e.message||"精算承認データを作成できませんでした。"});}
 }
 
-function tfgSettlementNormalizeItems_(sourceItems,withdrawalDate,beforeFinalMonthCharge,legacyFlatPlan,legacyNormalMonthly,finalMonthBilling){
+function tfgSettlementNormalizeItems_(sourceItems,withdrawalDate,beforeFinalMonthCharge,legacyFlatPlan,legacyNormalMonthly,finalMonthBilling,joinDate){
   let sequence=0;
   const normalized=sourceItems.map(function(x){
       let normal=Number(x.normal||0);
@@ -230,7 +232,8 @@ function tfgSettlementNormalizeItems_(sourceItems,withdrawalDate,beforeFinalMont
       if(isMonth&&tfgSettlementIsWithdrawalMonth_(x.target,withdrawalDate)&&finalMonthBilling==="ZERO"){
         normal=0;
         settlement=0;
-        const effectiveDate=new Date(Date.UTC(Number(withdrawalDate.slice(0,4)),Number(withdrawalDate.slice(5,7))-1,0)).toISOString().slice(0,10);
+        const previousMonthEnd=new Date(Date.UTC(Number(withdrawalDate.slice(0,4)),Number(withdrawalDate.slice(5,7))-1,0)).toISOString().slice(0,10);
+        const effectiveDate=joinDate?[previousMonthEnd,tfgSettlementMinimumWithdrawalDate_(joinDate)].sort().pop():previousMonthEnd;
         note+="／最終月請求なし（0円）／実質退会日："+effectiveDate;
       }
       return{target:String(x.target||""),label:String(x.label||""),paid:paid,normal:normal,settlement:settlement,note:note,status:status,paymentSequence:paymentSequence,isFinalMonth:isFinalMonth};
@@ -698,14 +701,34 @@ function tfgSettlementIsWithdrawalMonth_(target,withdrawalDate){
   const ym1=d[1]+"-"+d[2],ym2=d[1]+"年"+Number(d[2])+"月",ym3=d[1]+"/"+Number(d[2]);
   return t.indexOf(ym1)>=0||t.indexOf(ym2)>=0||t.indexOf(ym3)>=0;
 }
-function tfgSettlementWithdrawalDate_(now){
+function tfgSettlementMinimumWithdrawalDate_(joinDate){
+  // 初月を除き、翌月から3か月目の末日。
+  const match=String(joinDate||"").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const parsed=match?new Date(Date.UTC(Number(match[1]),Number(match[2])-1,Number(match[3]))):null;
+  if(!parsed||!Number.isFinite(parsed.getTime())||parsed.toISOString().slice(0,10)!==joinDate)throw new Error("正しいスタート日を入力してください。");
+  return new Date(Date.UTC(Number(match[1]),Number(match[2])+3,0)).toISOString().slice(0,10);
+}
+function tfgSettlementValidateMonthRange_(items,joinDate,withdrawalDate){
+  const [jy,jm]=joinDate.split("-").map(Number);
+  const [wy,wm]=withdrawalDate.split("-").map(Number);
+  const start=jy*12+jm-1,count=wy*12+wm-1-start+1;
+  const months=items.filter(function(x){return x.label==="初月会費"||x.label==="月会費"||x.kind==="MONTH";});
+  if(months.length!==count)throw new Error("退会予定日までの月別明細が不足または重複しています。精算明細を再計算してください。");
+  months.forEach(function(item,index){
+    const month=start+index;
+    const target=Math.floor(month/12)+"年"+(month%12+1)+"月";
+    if(item.target!==target||item.label!==(index===0?"初月会費":"月会費"))throw new Error("退会予定日までの月別明細が一致しません。精算明細を再計算してください。");
+  });
+}
+function tfgSettlementWithdrawalDate_(now,joinDate){
   const p=tfgSettlementJstParts_(now);
   const y=p[0],m=p[1],d=p[2],h=p[3],min=p[4],sec=p[5];
   const afterCutoff=d>9||(d===9&&(h>20||(h===20&&(min>0||sec>0))));
   const first=new Date(Date.UTC(y,m-1+(afterCutoff?1:0),1));
   const ty=first.getUTCFullYear(),tm=first.getUTCMonth()+1;
   const lastDay=new Date(Date.UTC(ty,tm,0)).getUTCDate();
-  return String(ty)+"-"+String(tm).padStart(2,"0")+"-"+String(lastDay).padStart(2,"0");
+  const cutoffDate=String(ty)+"-"+String(tm).padStart(2,"0")+"-"+String(lastDay).padStart(2,"0");
+  return [cutoffDate,tfgSettlementMinimumWithdrawalDate_(joinDate)].sort().pop();
 }
 function tfgSettlementNextExpiry_(now){
   const p=tfgSettlementJstParts_(now);
