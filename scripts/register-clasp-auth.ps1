@@ -1,7 +1,8 @@
 ﻿#requires -Version 5.1
 [CmdletBinding()]
 param(
-    [string]$CredentialPath = (Join-Path $env:USERPROFILE '.clasprc.json')
+    [string]$CredentialPath = (Join-Path $env:USERPROFILE '.clasprc.json'),
+    [switch]$RenewGoogleAuth
 )
 
 $ErrorActionPreference = 'Stop'
@@ -15,6 +16,40 @@ try {
         if (-not $credentialConfig.tokens.default.refresh_token) { throw 'Missing refresh token' }
     } catch {
         throw 'Google認証ファイルを確認できません。先に npx.cmd --yes @google/clasp@3.4.1 login でログインしてください。'
+    }
+
+    if ($RenewGoogleAuth) {
+        Write-Host '現在のGoogle認証を無効にして、新しく作り直します。認証情報のコピーは不要です。'
+        [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+        $previousRefreshToken = [string]$credentialConfig.tokens.default.refresh_token
+        try {
+            Invoke-RestMethod -Method Post -Uri 'https://oauth2.googleapis.com/revoke' -ContentType 'application/x-www-form-urlencoded' -Body @{token = $previousRefreshToken} | Out-Null
+        } catch {
+            $revocationFailure = $_
+            $response = $revocationFailure.Exception.Response
+            $revocationErrorCode = ''
+            try { $revocationErrorCode = (ConvertFrom-Json -InputObject $revocationFailure.ErrorDetails.Message).error } catch {}
+            if (-not $response -or [int]$response.StatusCode -ne 400 -or $revocationErrorCode -ne 'invalid_token') {
+                throw '現在のGoogle認証を無効にできませんでした。認証情報を送らず、このエラー文だけお知らせください。'
+            }
+        }
+        $credentialJson = $null
+        $credentialConfig = $null
+        $npxCommand = Get-Command npx.cmd -CommandType Application -ErrorAction SilentlyContinue
+        if (-not $npxCommand) { throw 'Googleの再ログインに必要なnpx.cmdが見つかりません。' }
+        Write-Host 'Googleのログイン画面が開きます。予約用GASを管理するGoogleアカウントでログインしてください。'
+        & $npxCommand.Source --yes '@google/clasp@3.4.1' login
+        if ($LASTEXITCODE -ne 0) { throw 'Googleの再ログインが完了しませんでした。' }
+        try {
+            $credentialJson = [System.IO.File]::ReadAllText($CredentialPath)
+            $credentialConfig = ConvertFrom-Json -InputObject $credentialJson
+            $newRefreshToken = [string]$credentialConfig.tokens.default.refresh_token
+            if (-not $newRefreshToken -or $newRefreshToken -ceq $previousRefreshToken) { throw 'Credential was not renewed' }
+        } catch {
+            throw '新しいGoogle認証を確認できませんでした。古い認証は登録していません。'
+        }
+        $previousRefreshToken = $null
+        $newRefreshToken = $null
     }
 
     $ghCommand = Get-Command gh.exe -CommandType Application -ErrorAction SilentlyContinue
