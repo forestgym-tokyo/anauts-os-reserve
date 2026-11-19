@@ -54,11 +54,11 @@ for(const file of ["admin/admin-settlement-v2.js","admin/admin-settlement.js"]){
   });
   test(file+": pause changes extend and restore the period, monthly charges and remembered statuses",()=>{
     const source=fs.readFileSync(path.join(root,file),"utf8"),data=payload();
-    data.cutoffWithdrawalDate="2026-12-31";data.beforeFinalCharge=true;
+    data.cutoffWithdrawalDate="2026-12-31";data.calculatedAt=new Date("2026-11-19T03:00:00Z");
     data.items=data.items.map(item=>({...item,kind:item.label==="初期費用"?"INITIAL":"MONTH",basePaid:item.paid,baseNormal:item.normal}));
     const scope=vm.createContext({current:data});
     const rates=source.slice(source.indexOf("const planRates="),source.indexOf("let current="));
-    vm.runInContext(rates+["minimumWithdrawalDate_","monthsBetween","rateFor","syncWithdrawalPeriod_","recalculateCampaign_"].map(name=>fn(source,name)).join("\n"),scope);
+    vm.runInContext(rates+["minimumWithdrawalDate_","monthsBetween","rateFor","isBeforeMonthlyCharge_","syncWithdrawalPeriod_","recalculateCampaign_"].map(name=>fn(source,name)).join("\n"),scope);
     function change(target,status,date,count){
       scope.current.items.find(item=>item.target===target).status=status;
       scope.syncWithdrawalPeriod_();scope.recalculateCampaign_();
@@ -68,8 +68,8 @@ for(const file of ["admin/admin-settlement-v2.js","admin/admin-settlement.js"]){
       assert.equal(months.filter(item=>item.isFinalMonth).length,1);
       assert.equal(months.at(-1).isFinalMonth,true);
       assert.equal(months.at(-1).paid,0);
-      assert.equal(scope.current.items.reduce((sum,item)=>sum+item.settlement,0),23870);
-      for(const month of months.slice(1,-1))assert.equal(month.paid,month.status==="休会"?550:4950);
+      assert.equal(scope.current.items.reduce((sum,item)=>sum+item.settlement,0),28820);
+      for(const month of months.slice(1,-1))assert.equal(month.paid,month.target==="2026年11月"?4950:0);
       return months;
     }
     change("2026年12月","休会","2027-02-28",5);
@@ -128,7 +128,7 @@ test("saving an October join stores all four monthly lines through January with 
   const scope=gasScope(),result=scope.createTfgSettlement_(payload());
   assert.equal(result.ok,true);
   assert.equal(result.data.withdrawalDate,"2027-01-31");
-  assert.equal(result.data.total,23870);
+  assert.equal(result.data.total,28820);
   assert.equal(scope.savedRows.length,1);
   const row=scope.savedRows[0],items=JSON.parse(row[6]);
   assert.equal(row[5],"2027-01-31");
@@ -154,7 +154,7 @@ test("incomplete, duplicate, reordered or stale-date requests cannot save an ear
 test("waiving the last charge cannot move an October join's effective date before January 31",()=>{
   const scope=gasScope(),body=payload();body.finalMonthBilling="ZERO";
   const result=scope.createTfgSettlement_(body);
-  assert.equal(result.ok,true);assert.equal(result.data.total,16390);
+  assert.equal(result.ok,true);assert.equal(result.data.total,21340);
   const last=JSON.parse(scope.savedRows[0][6]).at(-1);
   assert.equal(last.normal,0);assert.equal(last.settlement,0);
   assert.match(last.note,/実質退会日：2027-01-31/);
@@ -168,10 +168,10 @@ test("an October join with December paused saves five months through February an
     body.items.push({target:"2027年2月",label:"月会費",paid:4950,normal:7480,status:"通常",isFinalMonth:true});
     const result=scope.createTfgSettlement_(body);
     assert.equal(result.ok,true);assert.equal(result.data.withdrawalDate,"2027-02-28");
-    assert.equal(result.data.total,billing==="ZERO"?16390:23870);
+    assert.equal(result.data.total,billing==="ZERO"?21340:28820);
     const saved=JSON.parse(scope.savedRows[0][6]);
     assert.deepEqual(saved.slice(1).map(item=>item.paymentSequence),[null,1,null,2,3]);
-    assert.deepEqual(saved.slice(1).map(item=>item.paid),[4950,4950,550,4950,0]);
+    assert.deepEqual(saved.slice(1).map(item=>item.paid),[4950,4950,0,0,0]);
     assert.equal(saved.filter(item=>item.isFinalMonth).length,1);
     assert.equal(saved.at(-1).isFinalMonth,true);
     if(billing==="ZERO")assert.match(saved.at(-1).note,/実質退会日：2027-02-28/);
@@ -185,4 +185,48 @@ test("an old January end date or missing February detail is rejected when Decemb
     assert.equal(scope.createTfgSettlement_(body).ok,false);
     assert.equal(scope.savedRows.length,0);
   }
+});
+test("monthly payments use the previous month's 27th in Japan time, including December and leap years",()=>{
+  const server=gasScope(),functions=[(target,at)=>server.tfgSettlementIsBeforeMonthlyCharge_(target,new Date(at))];
+  for(const file of ["admin/admin-settlement-v2.js","admin/admin-settlement.js"]){
+    const scope=vm.createContext({});vm.runInContext(fn(fs.readFileSync(path.join(root,file),"utf8"),"isBeforeMonthlyCharge_"),scope);
+    functions.push((target,at)=>scope.isBeforeMonthlyCharge_(target,new Date(at)));
+  }
+  for(const calculate of functions)for(const [target,at,pending] of [
+    ["2026年11月","2026-11-19T03:00:00Z",false],
+    ["2026年12月","2026-11-19T03:00:00Z",true],
+    ["2027年1月","2026-11-19T03:00:00Z",true],
+    ["2026年12月","2026-11-26T14:59:59.999Z",true],
+    ["2026年12月","2026-11-26T15:00:00.000Z",false],
+    ["2027年1月","2026-12-26T14:59:59.999Z",true],
+    ["2027年1月","2026-12-26T15:00:00.000Z",false],
+    ["2028年3月","2028-02-26T14:59:59.999Z",true],
+    ["2028年3月","2028-02-26T15:00:00.000Z",false]
+  ])assert.equal(calculate(target,at),pending,target+" at "+at);
+});
+test("saving an October join never stores December or January as paid before their scheduled charges",()=>{
+  for(const [at,paid,total] of [
+    ["2026-11-05T03:00:00Z",[4950,4950,0,0],28820],
+    ["2026-11-19T03:00:00Z",[4950,4950,0,0],28820],
+    ["2026-11-26T14:59:59Z",[4950,4950,0,0],28820],
+    ["2026-11-26T15:00:00Z",[4950,4950,4950,0],23870],
+    ["2026-12-26T15:00:00Z",[4950,4950,4950,4950],18920]
+  ]){
+    const scope=gasScope(at),result=scope.createTfgSettlement_(payload());
+    assert.equal(result.ok,true);assert.equal(result.data.total,total);
+    assert.deepEqual(JSON.parse(scope.savedRows[0][6]).slice(1).map(item=>item.paid),paid);
+  }
+});
+test("an entered first-month payment stays paid even before that month's scheduled date",()=>{
+  const scope=gasScope(),body=payload();body.joinDate="2026-12-01";body.withdrawalDate="2027-03-31";
+  body.items.slice(1).forEach((item,index)=>{item.target=["2026年12月","2027年1月","2027年2月","2027年3月"][index];});
+  body.items[1].paid=2874;body.items[1].normal=4342;
+  const result=scope.createTfgSettlement_(body);assert.equal(result.ok,true);
+  assert.deepEqual(JSON.parse(scope.savedRows[0][6]).slice(1).map(item=>item.paid),[2874,0,0,0]);
+});
+test("crossing the monthly charge date requires recalculation before any settlement is saved",()=>{
+  const scope=gasScope("2026-11-27T03:00:00Z"),body=payload();body.calculatedAt="2026-11-19T03:00:00Z";
+  body.items.slice(-2).forEach(item=>item.paid=0);
+  const result=scope.createTfgSettlement_(body);
+  assert.equal(result.ok,false);assert.match(result.message,/決済予定日をまたいだ/);assert.equal(scope.savedRows.length,0);
 });

@@ -46,6 +46,13 @@ function monthsBetween(joinDate,withdrawalDate){
   }
   return out;
 }
+function isBeforeMonthlyCharge_(target,now=new Date()){
+  const month=String(target||"").match(/^(\d{4})年(\d{1,2})月$/);
+  if(!month)throw new Error("月会費の対象月が不正です。");
+  // 対象月の前月27日0時（日本時間）までは未決済。
+  const chargeAt=Date.UTC(Number(month[1]),Number(month[2])-2,27,-9);
+  return now.getTime()<chargeAt;
+}
 function rateFor(plan,joinDate){
   const d=String(joinDate||"");
   return planRates[plan][d>="2026-03-01"?"after202603":"before202603"];
@@ -107,7 +114,7 @@ function calc(){
     :{};
   const known=Object.entries(monthStatuses).map(([target,status])=>({target,status,kind:"MONTH"}));
   const finalMonthBilling=$("#settlementFinalMonthBilling").value;
-  const cut=cutoffInfo(new Date(),joinDate,known),months=monthsBetween(joinDate,cut.withdrawalDate);
+  const calculatedAt=new Date(),cut=cutoffInfo(calculatedAt,joinDate,known),months=monthsBetween(joinDate,cut.withdrawalDate);
   if(joinDate>cut.withdrawalDate){show("退会予定日がスタート日より前になるため計算できません。",true);return}
   const items=[];
   items.push({target:"—",label:"初期費用",paid:initialPaid,normal:8800,settlement:Math.max(0,8800-initialPaid),note:"入会金・事務手数料",kind:"INITIAL",basePaid:initialPaid,baseNormal:8800});
@@ -121,10 +128,9 @@ function calc(){
     }
     const isFinal=i===months.length-1;
     let paid=rate.campaign;
-    if(isFinal&&cut.beforeFinalCharge)paid=0;
     items.push({target,label:"月会費",paid,normal:rate.normal,settlement:Math.max(0,rate.normal-paid),note:"",kind:"MONTH",isFinalMonth:isFinal,status:monthStatuses[target]||"通常",basePaid:paid,baseNormal:rate.normal});
   });
-  current={monthStatuses,finalMonthBilling,cutoffWithdrawalDate:cut.cutoffWithdrawalDate,beforeFinalCharge:cut.beforeFinalCharge,memberNo,memberName,email,joinDate,plan,benefit,paymentMethod,withdrawalDate:cut.withdrawalDate,expiry:cut.expiry,items};
+  current={calculatedAt,monthStatuses,finalMonthBilling,cutoffWithdrawalDate:cut.cutoffWithdrawalDate,memberNo,memberName,email,joinDate,plan,benefit,paymentMethod,withdrawalDate:cut.withdrawalDate,expiry:cut.expiry,items};
   recalculateCampaign_();
   render();
 }
@@ -145,9 +151,11 @@ function recalculateCampaign_(){
   if(!current)return;
   let sequence=0,completed=0;
   const months=current.items.filter(x=>x.kind==="MONTH");
+  const legacyFlatPlan=current.joinDate<"2026-03-01"&&["DAY","NIGHT365"].includes(current.plan);
   months.forEach((item,index)=>{
+    const pending=index>0&&isBeforeMonthlyCharge_(item.target,current.calculatedAt);
     if(item.status==="休会"){
-      item.paid=550; item.normal=550; item.settlement=0;
+      item.paid=pending?0:550; item.normal=550; item.settlement=0;
       item.paymentSequence=null;
       item.note="休会期間（差額なし・満3か月と満12か月の継続期間に含めない）";
       return;
@@ -157,9 +165,9 @@ function recalculateCampaign_(){
     item.paymentSequence=isFirstMonth?null:sequence;
     item.normal=Number(item.baseNormal||0);
     item.paid=Number(item.basePaid||0);
-    if(item.isFinalMonth&&current.beforeFinalCharge)item.paid=0;
+    if(pending)item.paid=0;
     if(!isFirstMonth&&item.paid>0)completed++;
-    item.settlement=sequence<=12?Math.max(0,item.normal-item.paid):0;
+    item.settlement=!legacyFlatPlan&&sequence<=12?Math.max(0,item.normal-item.paid):0;
     item.note=isFirstMonth?"日割り差額（満12か月の継続期間に含めない）":sequence<=12?`継続月数 ${sequence}/12か月`:"継続条件達成後";
   });
   if(current.finalMonthBilling==="ZERO"){
@@ -248,6 +256,7 @@ async function createDraft(){
       memberName:current.memberName,
       email:current.email,
       joinDate:current.joinDate,
+      calculatedAt:current.calculatedAt.toISOString(),
       withdrawalDate:expectedWithdrawalDate,
       plan:current.plan,
       paymentMethod:current.paymentMethod,

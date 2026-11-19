@@ -20,19 +20,22 @@ const server=http.createServer((req,res)=>{
  const results=[],errors=[];
  try{
   const scenarios=[
-   {at:"2026-11-12T03:00:00Z",join:"2026-11-01",months:4,last:"2027年2月",total:"16,390円",billing:"ZERO",memberNo:"160708",date:"2027-02-28"},
-   {at:"2026-11-12T03:00:00Z",join:"2026-10-01",months:4,last:"2027年1月",total:"16,390円",billing:"ZERO",memberNo:"160710",date:"2027-01-31"},
-   {at:"2026-11-19T03:00:00Z",join:"2026-10-15",months:4,last:"2027年1月",total:"23,870円",date:"2027-01-31"},
-   {at:"2026-11-19T03:00:00Z",join:"2026-10-31",months:4,last:"2027年1月",total:"23,870円",date:"2027-01-31"},
-   {at:"2026-11-19T03:00:00Z",join:"2026-10-15",initialMonths:4,months:5,last:"2027年2月",total:"23,870円",date:"2027-02-28",minimumDate:"2027-02-28",pauseMonths:["2026年12月"],togglePause:true},
-   {at:"2026-11-19T03:00:00Z",join:"2026-10-15",initialMonths:4,months:6,last:"2027年3月",total:"23,870円",date:"2027-03-31",minimumDate:"2027-03-31",pauseMonths:["2026年12月","2027年2月"]},
-   {at:"2026-11-19T03:00:00Z",join:"2026-10-15",initialMonths:4,months:5,last:"2027年2月",total:"16,390円",billing:"ZERO",memberNo:"123456",date:"2027-02-28",minimumDate:"2027-02-28",pauseMonths:["2026年12月"]},
-   {at:"2026-11-19T03:00:00Z",join:"2026-10-15",months:4,last:"2027年1月",total:"21,340円",date:"2027-01-31",pauseMonths:["2026年10月"]},
+   {at:"2026-11-12T03:00:00Z",join:"2026-11-01",months:4,last:"2027年2月",total:"26,290円",billing:"ZERO",memberNo:"160708",date:"2027-02-28"},
+   {at:"2026-11-12T03:00:00Z",join:"2026-10-01",months:4,last:"2027年1月",total:"21,340円",billing:"ZERO",memberNo:"160710",date:"2027-01-31"},
+   {at:"2026-11-19T03:00:00Z",join:"2026-10-15",months:4,last:"2027年1月",total:"28,820円",date:"2027-01-31"},
+   {at:"2026-11-19T03:00:00Z",join:"2026-10-31",months:4,last:"2027年1月",total:"28,820円",date:"2027-01-31"},
+   {at:"2026-11-26T14:59:00Z",join:"2026-10-15",months:4,last:"2027年1月",total:"28,820円",date:"2027-01-31",decemberPaid:"0円"},
+   {at:"2026-11-26T15:00:00Z",join:"2026-10-15",months:4,last:"2027年1月",total:"23,870円",date:"2027-01-31",decemberPaid:"4,950円"},
+   {at:"2026-12-26T15:00:00Z",join:"2026-10-15",months:4,last:"2027年1月",total:"18,920円",date:"2027-01-31",decemberPaid:"4,950円"},
+   {at:"2026-11-19T03:00:00Z",join:"2026-10-15",initialMonths:4,months:5,last:"2027年2月",total:"28,820円",date:"2027-02-28",minimumDate:"2027-02-28",pauseMonths:["2026年12月"],togglePause:true},
+   {at:"2026-11-19T03:00:00Z",join:"2026-10-15",initialMonths:4,months:6,last:"2027年3月",total:"28,820円",date:"2027-03-31",minimumDate:"2027-03-31",pauseMonths:["2026年12月","2027年2月"]},
+   {at:"2026-11-19T03:00:00Z",join:"2026-10-15",initialMonths:4,months:5,last:"2027年2月",total:"21,340円",billing:"ZERO",memberNo:"123456",date:"2027-02-28",minimumDate:"2027-02-28",pauseMonths:["2026年12月"]},
+   {at:"2026-11-19T03:00:00Z",join:"2026-10-15",months:4,last:"2027年1月",total:"26,290円",date:"2027-01-31",pauseMonths:["2026年10月"]},
    {at:"2027-03-05T03:00:00Z",join:"2026-10-15",months:6,last:"2027年3月",total:"21,450円",date:"2027-03-31",minimumDate:"2027-01-31",pauseMonths:["2027年2月"]},
-   {at:"2026-11-05T03:00:00Z",join:"2026-11-01",months:4,last:"2027年2月",total:"18,920円"},
-   {at:"2026-11-12T03:00:00Z",join:"2026-11-01",months:4,last:"2027年2月",total:"23,870円"},
-   {at:"2026-12-05T03:00:00Z",join:"2026-11-01",months:4,last:"2027年2月",total:"18,920円"},
-   {at:"2026-12-12T03:00:00Z",join:"2026-11-01",months:4,last:"2027年2月",total:"23,870円"},
+   {at:"2026-11-05T03:00:00Z",join:"2026-11-01",months:4,last:"2027年2月",total:"33,770円"},
+   {at:"2026-11-12T03:00:00Z",join:"2026-11-01",months:4,last:"2027年2月",total:"33,770円"},
+   {at:"2026-12-05T03:00:00Z",join:"2026-11-01",months:4,last:"2027年2月",total:"28,820円"},
+   {at:"2026-12-12T03:00:00Z",join:"2026-11-01",months:4,last:"2027年2月",total:"28,820円"},
    {at:"2027-02-12T03:00:00Z",join:"2026-11-01",months:5,last:"2027年3月",total:"26,400円",date:"2027-03-31"},
    {at:"2026-11-12T03:00:00Z",join:"2025-12-01",months:13,last:"2026年12月",total:"0円"},
    {at:"2026-12-05T03:00:00Z",join:"2026-01-01",months:12,last:"2026年12月",total:"37,895円"},
@@ -84,6 +87,10 @@ const server=http.createServer((req,res)=>{
       assert.match(await page.locator("#settlementPaymentGuide").innerText(),/最短退会日：2027-01-31/);
      }
      if(scenario.minimumDate)assert.match(await page.locator("#settlementPaymentGuide").innerText(),new RegExp("最短退会日："+scenario.minimumDate));
+     if(scenario.join.startsWith("2026-10")&&scenario.at==="2026-11-19T03:00:00Z"){
+      for(const target of ["2026年12月","2027年1月"])assert.equal(await page.locator("#settlementRows tr").filter({hasText:target}).locator("td").nth(3).innerText(),"0円");
+     }
+     if(scenario.decemberPaid)assert.equal(await page.locator("#settlementRows tr").filter({hasText:"2026年12月"}).locator("td").nth(3).innerText(),scenario.decemberPaid);
      const total=await page.locator("#settlementTotal").innerText();if(scenario.total)assert.equal(total,scenario.total);
      assert.deepEqual(await page.evaluate(()=>fixtureCalls),[]);
      await page.locator("#settlementPreviewButton").click();await page.locator("#settlementInlineMemberPreview").waitFor({state:"visible"});
@@ -113,7 +120,7 @@ const server=http.createServer((req,res)=>{
       assert.equal(await rows.count(),5);
       assert.match(await page.locator("#settlementInlineMemberPreviewBody").innerText(),/2027-02-28/);
       const january=page.locator("#settlementRows tr").filter({hasText:"2027年1月"});
-      assert.equal(await january.locator("td").nth(3).innerText(),"4,950円");
+      assert.equal(await january.locator("td").nth(3).innerText(),"0円");
       assert.equal(await page.locator("#settlementRows tr").last().locator("td").nth(3).innerText(),"0円");
       await page.screenshot({path:path.join(evidence,timezoneId.replace("/","-")+"-pause.png"),fullPage:true});
      }
