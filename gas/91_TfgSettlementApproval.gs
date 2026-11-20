@@ -590,6 +590,45 @@ function tfgSettlementSendDeferredConfirmation_(row,now){
   );
 }
 
+/** Resolve one member before changing approval state or the unpaid checkbox. */
+function getTfgSettlementOutstandingBalanceCell_(memberNo,email){
+  const ss=getTfgSettlementMemberMasterSpreadsheet_();
+  const props=PropertiesService.getScriptProperties();
+  const sheetName=String(props.getProperty("TFG_MEMBER_MASTER_SHEET_NAME")||"master").trim();
+  const sh=ss.getSheetByName(sheetName);
+  if(!sh)throw new Error("TFG_Master の会員シート「"+sheetName+"」が見つかりません。");
+  const lastRow=sh.getLastRow(),lastCol=sh.getLastColumn();
+  if(lastRow<2)throw new Error("TFG_Master に会員情報がありません。");
+  const values=sh.getRange(1,1,lastRow,lastCol).getDisplayValues();
+  let headerRow=-1,cols=null,unpaid=-1;
+  for(let i=0;i<Math.min(5,values.length);i++){
+    const detected=tfgSettlementDetectMemberColumns_(values[i]);
+    const unpaidIndex=values[i].map(tfgSettlementNormalizeHeader_).indexOf(tfgSettlementNormalizeHeader_("未払金"));
+    if(detected.memberNo>=0&&detected.email>=0&&unpaidIndex>=0){
+      headerRow=i;cols=detected;unpaid=unpaidIndex;break;
+    }
+  }
+  if(headerRow<0)throw new Error("TFG_Master の会員番号・メール・未払金の列を確認できません。");
+  const matches=[];
+  for(let i=headerRow+1;i<values.length;i++){
+    if(String(values[i][cols.memberNo]||"").replace(/\D/g,"")===memberNo)matches.push(i);
+  }
+  if(matches.length!==1)throw new Error("TFG_Master の対象会員を一意に確認できません。");
+  const index=matches[0];
+  if(String(values[index][cols.email]||"").trim().toLowerCase()!==email)throw new Error("TFG_Master の登録メールアドレスが一致しません。");
+  return sh.getRange(index+1,unpaid+1);
+}
+
+function clearTfgSettlementOutstandingBalance_(row,sh,cell){
+  const unpaidCell=cell||getTfgSettlementOutstandingBalanceCell_(row.memberNo,row.email);
+  // uncheck preserves checkbox validation, including custom checked/unchecked values.
+  unpaidCell.uncheck();
+  SpreadsheetApp.flush();
+  if(unpaidCell.isChecked()!==false)throw new Error("TFG_Master の未払金チェックを解除できませんでした。再度承認してください。");
+  sh.getRange(row.row,15).setValue("本人端末WEB承認");
+  SpreadsheetApp.flush();
+}
+
 function approveTfgSettlement_(body){
   const lock=LockService.getScriptLock(); let locked=false;
   try{
@@ -600,13 +639,23 @@ function approveTfgSettlement_(body){
     lock.waitLock(10000);locked=true;
     const row=findTfgSettlementByToken_(body&&body.token);
     if(!row)throw new Error("この承認URLは無効です。");
-    if(row.status==="APPROVED"){lock.releaseLock();locked=false;return tfgSettlementJson_({ok:true,data:{approvedAt:row.approvedAt,alreadyApproved:true}});}
+    if(memberNo!==row.memberNo||email!==row.email)throw new Error("会員番号または登録メールアドレスが一致しません。");
+    if(row.status==="APPROVED"){
+      // Retry only an interrupted update; old approvals must not clear later unpaid flags.
+      if(row.approvalMethod==="本人端末WEB承認（未払金チェック解除待ち）"){
+        clearTfgSettlementOutstandingBalance_(row,getTfgSettlementSheet_());
+      }
+      lock.releaseLock();locked=false;
+      return tfgSettlementJson_({ok:true,data:{approvedAt:row.approvedAt,alreadyApproved:true}});
+    }
     if(row.status!=="PENDING")throw new Error("この承認URLは無効になりました。最新の精算書をご確認ください。");
     if(tfgSettlementParseJst_(row.expiresAt).getTime()<Date.now())throw new Error("精算条件が更新されたため、この承認URLは無効になりました。最新の精算書をご確認ください。");
-    if(memberNo!==row.memberNo||email!==row.email)throw new Error("会員番号または登録メールアドレスが一致しません。");
+    const unpaidCell=getTfgSettlementOutstandingBalanceCell_(row.memberNo,row.email);
     const now=Utilities.formatDate(new Date(),TFG_SETTLEMENT_CONFIG.TIMEZONE,"yyyy-MM-dd HH:mm:ss");
     const sh=getTfgSettlementSheet_();
-    sh.getRange(row.row,11,1,5).setValues([["APPROVED",now,memberNo,email,"本人端末WEB承認"]]);
+    sh.getRange(row.row,11,1,5).setValues([["APPROVED",now,memberNo,email,"本人端末WEB承認（未払金チェック解除待ち）"]]);
+    SpreadsheetApp.flush();
+    clearTfgSettlementOutstandingBalance_(row,sh,unpaidCell);
     lock.releaseLock();locked=false;
     try{tfgSettlementSendApprovalConfirmation_(row,now);}catch(mailError){console.error(mailError);}
     return tfgSettlementJson_({ok:true,data:{approvedAt:now}});
@@ -671,7 +720,7 @@ function invalidatePreviousPendingTfgSettlements_(sheet,memberNo,keepId){
 function findTfgSettlementByToken_(token){
   token=String(token||"").trim();if(!token)return null;
   const hash=tfgSettlementHash_(token),sh=getTfgSettlementSheet_(),v=sh.getDataRange().getDisplayValues();
-  for(let i=1;i<v.length;i++){if(v[i][8]===hash)return{row:i+1,id:v[i][0],memberNo:v[i][2],memberName:v[i][3],email:String(v[i][4]||"").toLowerCase(),withdrawalDate:v[i][5],items:JSON.parse(v[i][6]||"[]"),total:Number(v[i][7]||0),expiresAt:v[i][9],status:v[i][10],approvedAt:v[i][11],paymentMethod:tfgSettlementNormalizePaymentMethod_(v[i][15]),paymentNote:String(v[i][16]||""),deferredAt:String(v[i][17]||""),deferReason:String(v[i][18]||"")};}
+  for(let i=1;i<v.length;i++){if(v[i][8]===hash)return{row:i+1,id:v[i][0],memberNo:v[i][2],memberName:v[i][3],email:String(v[i][4]||"").toLowerCase(),withdrawalDate:v[i][5],items:JSON.parse(v[i][6]||"[]"),total:Number(v[i][7]||0),expiresAt:v[i][9],status:v[i][10],approvedAt:v[i][11],approvalMethod:String(v[i][14]||""),paymentMethod:tfgSettlementNormalizePaymentMethod_(v[i][15]),paymentNote:String(v[i][16]||""),deferredAt:String(v[i][17]||""),deferReason:String(v[i][18]||"")};}
   return null;
 }
 
