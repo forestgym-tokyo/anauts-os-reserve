@@ -1,109 +1,22 @@
-name: MPG API Smoke
-
+name: 9ROUND requested shifts November 25 and 26
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/mpg-api-smoke.yml"
   workflow_dispatch:
-
+permissions:
+  contents: read
+concurrency:
+  group: anauts-soga-shift-maintenance
+  cancel-in-progress: false
 jobs:
-  smoke:
+  inspect:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: "22"
-
-      - name: Prepare clasp credentials
+          node-version: '22'
+      - name: Read requested shifts using existing owner credentials
         env:
           CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
           CLASP_JSON: ${{ secrets.CLASP_JSON }}
-        run: |
-          test -n "$CLASPRC_JSON"
-          test -n "$CLASP_JSON"
-          printf '%s' "$CLASPRC_JSON" > "$HOME/.clasprc.json"
-          printf '%s' "$CLASP_JSON" > .clasp.json
-
-      - name: Run Apps Script functions via clasp
-        shell: bash
-        run: |
-          set -uo pipefail
-          echo "===== clasp run health ====="
-          npx -y @google/clasp@3.4.1 run health || true
-          echo "===== clasp run getAvailableSlots MPG_TOUR45 2026-10-06 ====="
-          npx -y @google/clasp@3.4.1 run getAvailableSlots --params '[{"service_code":"MPG_TOUR45","date":"2026-10-06"}]' || true
-          echo "===== clasp run getAvailableSlots MPG_TOUR45 2026-10-08 ====="
-          npx -y @google/clasp@3.4.1 run getAvailableSlots --params '[{"service_code":"MPG_TOUR45","date":"2026-10-08"}]' || true
-
-      - name: Dry-run live MPG overlay
-        env:
-          CLASP_JSON: ${{ secrets.CLASP_JSON }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -rf .gas-live
-          mkdir -p .gas-live
-          node -e 'const fs=require("fs"); const cfg=JSON.parse(process.env.CLASP_JSON); if(!cfg.scriptId) throw new Error("scriptId missing"); fs.writeFileSync(".clasp.json", JSON.stringify({scriptId:cfg.scriptId,rootDir:".gas-live"}));'
-          npx -y @google/clasp@3.4.1 pull
-          test -f .gas-live/24_StaffShift.gs.js
-          test -f .gas-live/28_Availability.gs.js
-          test -f .gas-live/29_Reservation.gs.js
-          test -f .gas-live/32_UpdateReservation.gs.js
-          test -f .gas-live/40_ReservationMail.gs.js
-          test -f .gas-live/88_DietCounselingWorkflow.js
-          node --check scripts/gas-mpg-shift-overlay.mjs
-          node scripts/gas-mpg-shift-overlay.mjs
-          grep -q 'filterMpgSlotsAgainstHeadOfficeReservations_' .gas-live/28_Availability.gs.js
-          ! grep -q 'cleanupUnbookedMpgShifts();' .gas-live/28_Availability.gs.js
-          grep -q 'validateMpgHeadOfficeTravelForReservation_' .gas-live/29_Reservation.gs.js
-          grep -q 'validateMpgHeadOfficeTravelForReservation_' .gas-live/32_UpdateReservation.gs.js
-          grep -q '#81d8d0' .gas-live/40_ReservationMail.gs.js
-          grep -q 'MPG_TRAINING_SUPPORT45' .gas-live/40_ReservationMail.gs.js
-          grep -q 'mpgFindMpgTravelConflictForHeadOffice_' .gas-live/88_DietCounselingWorkflow.js
-          echo "Live overlay dry-run OK"
-
-      - name: List and probe Apps Script deployments
-        shell: bash
-        run: |
-          set -uo pipefail
-          npx -y @google/clasp@3.4.1 deployments | tee /tmp/deployments.txt
-          grep -oE 'AKfycb[A-Za-z0-9_-]+' /tmp/deployments.txt | sort -u > /tmp/ids.txt || true
-          echo "Deployment IDs:"
-          cat /tmp/ids.txt || true
-          while read -r id; do
-            [ -n "$id" ] || continue
-            url="https://script.google.com/macros/s/$id/exec?action=getServices&_=$(date +%s)"
-            code="$(curl -sSL -o /tmp/body.txt -w '%{http_code}' --max-time 60 "$url" || true)"
-            echo "===== $id HTTP $code ====="
-            head -c 1200 /tmp/body.txt || true
-            echo
-          done < /tmp/ids.txt
-
-      - name: Check configured MPG availability URL
-        shell: bash
-        run: |
-          set -uo pipefail
-          API='https://script.google.com/macros/s/AKfycbyvpQRxRpMRFpaQHtBar77dViCqPl-hdFW-2yMdozhN8RHtwcrFiNEM9cvEbny4x9q0/exec'
-          tests=(
-            'action=getServices'
-            'action=getServices&date=2026-10-06'
-            'action=getAvailableSlots'
-            'action=getAvailableSlots&service_code=MPG_TOUR45'
-            'action=getAvailableSlots&date=2026-10-06'
-            'action=getAvailableSlots&service_code=MPG_TOUR45&date=2026-10-06'
-            'action=getAvailableSlots&service_code=MPG_TRAINING_SUPPORT45&date=2026-10-06'
-            'action=getAvailableSlots&service_code=MPG_TOUR45&date=2026-10-08'
-          )
-          for query in "${tests[@]}"; do
-            echo "===== $query ====="
-            code="$(curl -sSL -o /tmp/body.txt -w '%{http_code}' --max-time 60 "$API?$query&_=$(date +%s)" || true)"
-            echo "HTTP $code"
-            head -c 1400 /tmp/body.txt || true
-            echo
-          done
+        run: node scripts/soga-shift-20261125-26.mjs
