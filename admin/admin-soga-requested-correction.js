@@ -115,23 +115,38 @@
     });
   }
 
+  function isTransportError(error) {
+    return /failed to fetch|fetch failed|networkerror|network request failed|load failed|通信が.+完了しません|タイムアウト/i.test(String(error?.message || "")) ||
+      ["AbortError", "TimeoutError"].includes(error?.name);
+  }
+  const wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
+  async function retryRead(get, action, params, pause = wait) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try { return await get(action, params); }
+      catch (error) {
+        // A timed-out GET already waited 60 seconds in the normal API client.
+        if (!isTransportError(error) || error?.name === "TimeoutError" || attempt === 2) throw error;
+        await pause(500 * (attempt + 1));
+      }
+    }
+  }
   async function readLive(get) {
-    const user = await get("getCurrentUser");
+    const user = await retryRead(get, "getCurrentUser");
     if (String((user.data?.profile || user.data)?.permission).toUpperCase() !== "ADMIN") {
       throw new Error("この変更はADMIN権限のアカウントでログインしてください。");
     }
-    const [board, publication, shifts] = await Promise.all([
-      get("getSogaShiftBoard", {month: MONTH, store_code: STORE}),
-      get("getStaffShiftPublication", {month: MONTH, store_code: STORE}),
-      get("getStaffShifts", {start_date: "2026-11-25", end_date: "2026-11-26", store_code: STORE})
-    ]);
+    // Serialize these reads while the rest of the admin screen is also loading.
+    const board = await retryRead(get, "getSogaShiftBoard", {month: MONTH, store_code: STORE});
+    const publication = await retryRead(get, "getStaffShiftPublication", {month: MONTH, store_code: STORE});
+    const shifts = await retryRead(get, "getStaffShifts", {start_date: "2026-11-25", end_date: "2026-11-26", store_code: STORE});
     if (typeof publication.data?.is_published !== "boolean") throw new Error("公開状態を確認できません。変更していません。");
     return {board: board.data, publication: publication.data, shifts: readRows(shifts)};
   }
 
   function boot(root) {
-    if (new URLSearchParams(root.location.search).get("sogaShiftCorrection") !== REQUEST) return;
-    let panel, status, button, reload, preview, busy = false, restorePublished = false;
+    const query = new URLSearchParams(root.location.search);
+    if (query.get("sogaShiftCorrection") !== REQUEST) return;
+    let panel, status, button, reload, preview, busy = false, restorePublished = query.get("publishCorrection") === "1", pendingPlan = null;
     const get = (...args) => apiGet(...args);
     const post = (...args) => apiPost(...args);
     function message(text, error = false) {
@@ -149,13 +164,22 @@
       message("現在のシフトを確認しています…");
       try {
         const live = await readLive(get);
+        if (pendingPlan) {
+          if (!verify(pendingPlan, live.board, live.shifts)) {
+            preview = null;
+            button.textContent = "保存結果の確認待ち";
+            message("保存結果をまだ確認できません。変更は再送せず、しばらく待ってから「保存結果を再確認」を押してください。", true);
+            return;
+          }
+          pendingPlan = null;
+        }
         const plan = makePlan(live.board, live.shifts);
         preview = {live, plan};
         if (!plan.changed && verify(plan, live.board, live.shifts)) {
-          if (restorePublished && !live.publication.is_published) {
+          if (!live.publication.is_published) {
             button.textContent = "変更済みのシフトをスタッフへ公開";
             button.disabled = false;
-            message("指定の変更は保存済みです。スタッフへの公開を再開できます。");
+            message("指定の変更は保存済みです。11月分をスタッフへ公開できます。");
           } else {
             button.textContent = "変更済み";
             message(resultText(live.publication.is_published));
@@ -163,14 +187,18 @@
         } else {
           button.textContent = live.publication.is_published || restorePublished ? "この2日分を変更して公開" : "この2日分を変更";
           button.disabled = false;
-          message(live.publication.is_published ? "変更後もスタッフに公開します。" : "変更内容を保存します。この月のシフトは現在、公開前です。");
+          message(live.publication.is_published || restorePublished ? "変更後に11月分をスタッフへ公開します。" : "変更内容を保存します。この月のシフトは現在、公開前です。");
         }
-      } catch (error) { preview = null; message(error.message || "内容を確認できませんでした。", true); }
-      finally { busy = false; reload.disabled = false; }
+      } catch (error) {
+        preview = null;
+        message(isTransportError(error) ? (pendingPlan ? "保存結果の確認中に通信が途切れました。変更は再送せず、「保存結果を再確認」を押してください。" : "シフトの読み込み中に通信が途切れました。「内容を再確認」を押してください。この読み取り確認では変更を送信していません。") : error.message || "内容を確認できませんでした。", true);
+      }
+      finally { busy = false; reload.disabled = false; reload.textContent = pendingPlan ? "保存結果を再確認" : "内容を再確認"; }
     }
     async function apply() {
       if (busy || !preview) return;
       busy = true; button.disabled = true; reload.disabled = true;
+      let phase = "before-save";
       message("最新のシフトを確認しています…");
       try {
         const live = await readLive(get);
@@ -178,22 +206,46 @@
         if (signature(live.board.assignments) !== signature(preview.live.board.assignments) || live.publication.is_published !== preview.live.publication.is_published) {
           throw new Error("確認後にシフトが更新されました。「内容を再確認」を押してから変更してください。まだ保存していません。");
         }
-        restorePublished = restorePublished || live.publication.is_published;
+        // When changes are already saved, this button explicitly offers publication.
+        restorePublished = restorePublished || live.publication.is_published || !plan.changed;
         let saved = live;
         if (plan.changed) {
           message("指定の2日分を保存しています…");
+          phase = "save-requested";
+          pendingPlan = plan;
           let saveError;
           try { await post({action: "saveSogaShiftAssignments", month: MONTH, store_code: STORE, assignments: plan.assignments}); }
           catch (error) { saveError = error; }
-          saved = await readLive(get);
-          if (!verify(plan, saved.board, saved.shifts)) {
-            throw new Error((saveError?.message || "保存後の内容が一致しません。") + " 現在のシフトを再確認してください。公開処理は行っていません。");
+          message("保存結果を確認しています…");
+          let confirmed = false, readError;
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              saved = await readLive(get);
+              if (verify(plan, saved.board, saved.shifts)) { confirmed = true; break; }
+            } catch (error) {
+              if (!isTransportError(error)) throw error;
+              readError = error;
+              if (error?.name === "TimeoutError") break;
+            }
+            if (saveError && !isTransportError(saveError)) break;
+            if (attempt < 2) await wait(1000 * (attempt + 1));
           }
+          if (!confirmed) {
+            if (saveError && !isTransportError(saveError)) {
+              pendingPlan = null;
+              throw new Error(saveError.message + " 現在のシフトを再確認してください。公開処理は行っていません。");
+            }
+            if (readError) throw readError;
+            throw new Error("保存後の内容が一致しません。保存処理が続いている可能性があります。変更は再送せず、「保存結果を再確認」を押してください。公開処理は行っていません。");
+          }
+          pendingPlan = null;
+          phase = "save-confirmed";
         } else if (!verify(plan, live.board, live.shifts)) {
           throw new Error("勤務データの一致を確認できません。現在のシフトを再確認してください。");
         }
         if (restorePublished && !saved.publication.is_published) {
           message("保存を確認しました。スタッフへ公開しています…");
+          phase = "publish-requested";
           // Do not retry a write after a timeout: read the authoritative state instead.
           try { await post({action: "publishStaffShiftMonth", month: MONTH, store_code: STORE}); }
           catch (_) { /* A timed-out request may have committed; verify below. */ }
@@ -206,8 +258,16 @@
         button.textContent = "変更済み";
         if (typeof clearFastLocalCaches_ === "function") clearFastLocalCaches_();
         message(resultText(saved.publication.is_published));
-      } catch (error) { message(error.message || "変更結果を確認できません。内容を再確認してください。", true); }
-      finally { busy = false; reload.disabled = false; }
+      } catch (error) {
+        let text = error.message || "変更結果を確認できません。内容を再確認してください。";
+        if (isTransportError(error)) {
+          text = phase === "before-save" ? "保存前の確認中に通信が途切れました。変更はまだ送信していません。「内容を再確認」を押してください。" :
+            phase === "publish-requested" ? "変更の保存は確認済みですが、公開結果を確認する通信が途切れました。「内容を再確認」を押してください。保存はやり直しません。" :
+            "保存結果の確認中に通信が途切れました。変更は再送せず、「保存結果を再確認」を押してください。";
+        }
+        message(text, true);
+      }
+      finally { busy = false; reload.disabled = false; reload.textContent = pendingPlan ? "保存結果を再確認" : "内容を再確認"; }
     }
     function mount() {
       if (panel) return;
@@ -240,5 +300,5 @@
     root.addEventListener("anauts:admin-core-ready", ready);
     ready();
   }
-  return {canonical, signature, makePlan, verify, readLive, boot};
+  return {canonical, signature, makePlan, verify, isTransportError, retryRead, readLive, boot};
 });
