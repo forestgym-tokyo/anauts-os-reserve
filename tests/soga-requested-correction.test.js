@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const {makePlan, verify, signature, readLive} = require('../admin/admin-soga-requested-correction.js');
+const {makePlan, verify, signature, readLive, retryRead} = require('../admin/admin-soga-requested-correction.js');
 
 const {fixture} = require('./helpers/soga-correction-fixture.cjs');
 
@@ -83,4 +83,35 @@ test('ordinary short afternoon shift rules still require the complete morning',(
     board.assignments.push(morning);shifts.push(morning);
   }
   assert.equal(makePlan(board,shifts).changed,true);
+});
+
+test('transient failed-to-fetch reads retry with a bound and keep their action and parameters',async()=>{
+  let calls=0; const pauses=[],params={month:'2026-11'};
+  const value=await retryRead(async(action,actual)=>{
+    calls++;assert.equal(action,'getSogaShiftBoard');assert.equal(actual,params);
+    if(calls<3)throw new TypeError('Failed to fetch');
+    return {ok:true};
+  },'getSogaShiftBoard',params,async ms=>pauses.push(ms));
+  assert.equal(value.ok,true);assert.equal(calls,3);assert.deepEqual(pauses,[500,1000]);
+  calls=0;
+  await assert.rejects(()=>retryRead(async()=>{calls++;throw new TypeError('Failed to fetch')},'getCurrentUser',{},async()=>{}),/Failed to fetch/);
+  assert.equal(calls,3);
+});
+
+test('authorization failures and already-timed-out reads are not retried',async()=>{
+  for(const error of [new Error('ログイン情報が無効または期限切れです。'),Object.assign(new Error('通信が60秒以内に完了しませんでした。'),{name:'TimeoutError'})]){
+    let calls=0;
+    await assert.rejects(()=>retryRead(async()=>{calls++;throw error},'getCurrentUser',{},async()=>{}));
+    assert.equal(calls,1);
+  }
+});
+
+test('live confirmation serializes reads instead of sending concurrent GAS requests',async()=>{
+  const {board,shifts}=fixture();let active=0,maxActive=0;const actions=[];
+  await readLive(async action=>{
+    actions.push(action);active++;maxActive=Math.max(maxActive,active);
+    await new Promise(resolve=>setImmediate(resolve));active--;
+    return {data:action==='getCurrentUser'?{permission:'ADMIN'}:action==='getSogaShiftBoard'?board:action==='getStaffShiftPublication'?{is_published:true}:shifts};
+  });
+  assert.equal(maxActive,1);assert.deepEqual(actions,['getCurrentUser','getSogaShiftBoard','getStaffShiftPublication','getStaffShifts']);
 });
