@@ -1,6 +1,9 @@
 const expectedScriptId = '1ut7-MxLbw1mmyGFZkIRnJZz0RhXZUAhVxyIyLRwLT8LhVdr-YJbtaEjG';
 const dates = new Set(['2026-11-25', '2026-11-26']);
-function stop(message) { throw new Error(message); }
+function stop(message) {
+  console.error('::error title=9ROUND connection diagnosis::' + message);
+  process.exit(1);
+}
 const config = JSON.parse(process.env.CLASP_JSON || '{}');
 const claspAuth = JSON.parse(process.env.CLASPRC_JSON || '{}');
 if (config.scriptId !== expectedScriptId) stop('Expected existing A-nauts project does not match; no changes made');
