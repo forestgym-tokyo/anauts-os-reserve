@@ -616,6 +616,10 @@
           parts:parts.sort((a,b)=>String(a.start_time).localeCompare(String(b.start_time)))};
       }).sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.start_time).localeCompare(String(b.start_time)));
     }
+    function monthlyShiftTimeLabel_(row){
+      const work=row.isSogaPeriod&&row.parts.length===1?row.parts[0]:row;
+      return String(work.start_time).slice(0,5)+"〜"+String(work.end_time).slice(0,5);
+    }
     function sogaPeriodStaffHtml_(period,people,details){
       const parts=period.parts||[],start=sogaPrintMinutes_(period.start_time),end=sogaPrintMinutes_(period.end_time);
       let current=start;
@@ -630,7 +634,7 @@
         if(from>current)gap(current,from);
         const partColor=staffColor_(part,people);
         const partial=from>start||to<end;
-        const times=partial?' <small>('+esc(part.start_time)+'〜'+esc(part.end_time)+')</small>':'';
+        const times=parts.length>1&&partial?' <small>('+esc(part.start_time)+'〜'+esc(part.end_time)+')</small>':'';
         labels.push('<span class="soga-period-person" style="--staff-color:'+esc(partColor)+'">'+esc(personLabel(part,people))+times+'</span>');
         current=Math.max(current,to);
       }
@@ -655,7 +659,7 @@
         const day=i-offset+1;
         if(day<1||day>last){cells+='<div class="mcal-day out"></div>';continue}
         const date=`${ym}-${String(day).padStart(2,"0")}`,rows=by.get(date)||[];
-        cells+=`<div class="mcal-day ${date===today?'today':''}" data-mdate="${date}"><div class="mcal-num">${day}</div>${rows.map(x=>{const color=staffColor_(x,people);return `<span class="mcal-event" style="--staff-color:${color}"><b>${esc(String(x.start_time).slice(0,5))}〜${esc(String(x.end_time).slice(0,5))}</b>${x.isSogaPeriod?sogaPeriodStaffHtml_(x,people,false):`<span class="mcal-event-name"><i class="mcal-event-dot"></i>${esc(personLabel(x,people))}</span>`}<small class="mcal-event-store">${esc(x.store_code||"")}</small></span>`}).join("")}</div>`;
+        cells+=`<div class="mcal-day ${date===today?'today':''}" data-mdate="${date}"><div class="mcal-num">${day}</div>${rows.map(x=>{const color=staffColor_(x,people);return `<span class="mcal-event" style="--staff-color:${color}"><b>${esc(monthlyShiftTimeLabel_(x))}</b>${x.isSogaPeriod?sogaPeriodStaffHtml_(x,people,false):`<span class="mcal-event-name"><i class="mcal-event-dot"></i>${esc(personLabel(x,people))}</span>`}<small class="mcal-event-store">${esc(x.store_code||"")}</small></span>`}).join("")}</div>`;
       }
       board.innerHTML=`<div class="mcal-wrap"><div class="mcal"><div class="mcal-week"><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div>土</div><div>日</div></div><div class="mcal-grid">${cells}</div></div></div>`;
       board.querySelectorAll("[data-mdate]").forEach(c=>c.onclick=()=>showDay(c.dataset.mdate));
@@ -663,7 +667,7 @@
     function showDay(date){
       const detail=document.querySelector("#mDetail"),people=new Map(state.staff.map(x=>[String(x.staff_code),x])),rows=(sogaStaffRestricted_()||(document.querySelector("#mStore")?.value==="SOGA")?sogaPeriodRows_(filtered().filter(x=>x.date===date)):displayShiftBlocks_(filtered().filter(x=>x.date===date)));
       detail.classList.remove("is-hidden");
-      detail.innerHTML=`<h3>${esc(date)} の予定</h3>${rows.length?rows.map(x=>{const color=staffColor_(x,people);return `<div class="mcal-detail-row" style="--staff-color:${color}"><i class="mcal-detail-dot"></i><strong>${esc(String(x.start_time).slice(0,5))}〜${esc(String(x.end_time).slice(0,5))}</strong>${x.isSogaPeriod?sogaPeriodStaffHtml_(x,people,true):`<span>${esc(personLabel(x,people))}</span>`}<small class="mcal-detail-store">${esc(x.store_code||"")}</small></div>`}).join(""):'<div>予定はありません。</div>'}`;
+      detail.innerHTML=`<h3>${esc(date)} の予定</h3>${rows.length?rows.map(x=>{const color=staffColor_(x,people);return `<div class="mcal-detail-row" style="--staff-color:${color}"><i class="mcal-detail-dot"></i><strong>${esc(monthlyShiftTimeLabel_(x))}</strong>${x.isSogaPeriod?sogaPeriodStaffHtml_(x,people,true):`<span>${esc(personLabel(x,people))}</span>`}<small class="mcal-detail-store">${esc(x.store_code||"")}</small></div>`}).join(""):'<div>予定はありません。</div>'}`;
       detail.scrollIntoView({behavior:"smooth",block:"nearest"});
     }
 
