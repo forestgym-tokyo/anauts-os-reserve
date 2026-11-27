@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="A-nauts OS">
   <title>A-nauts OS | ホーム画面に追加</title>
-  <link rel="manifest" href="./manifest.webmanifest?v=20261127-staff-tabs">
+  <link rel="manifest" href="./manifest.webmanifest?v=20261127-launch">
   <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon-white-v2.png">
   <link rel="icon" type="image/svg+xml" href="./icons/admin-app-mark-white-v2.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/favicon-white-v2-32.png">
@@ -41,13 +41,13 @@
       <strong>Android</strong>
       <ol><li>Chromeのメニューを開く</li><li>「ホーム画面に追加」または「アプリをインストール」を選択</li></ol>
     </div>
-    <a href="./?v=20261127-staff-tabs">A-nauts OSを開く</a>
+    <a href="./">A-nauts OSを開く</a>
     <small>ホーム画面から起動した場合は、自動的に管理画面へ移動します。</small>
   </main>
   <script>
     (function(){
       var standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-      if (standalone) location.replace('./?v=20261127-staff-tabs');
+      if (standalone) location.replace('./');
     })();
   </script>
 </body>

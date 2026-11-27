@@ -10,14 +10,14 @@ const manifest = JSON.parse(
   fs.readFileSync(path.join(adminRoot, "manifest.webmanifest"), "utf8")
 );
 
-assert.match(indexHtml, /rel="manifest" href="\.\/manifest\.webmanifest\?v=20261127-staff-tabs"/);
+assert.match(indexHtml, /rel="manifest" href="\.\/manifest\.webmanifest\?v=20261127-launch"/);
 assert.match(indexHtml, /rel="apple-touch-icon" sizes="180x180" href="\.\/icons\/apple-touch-icon-white-v2\.png"/);
 assert.match(indexHtml, /rel="icon" type="image\/svg\+xml" href="\.\/icons\/admin-app-mark-white-v2\.svg"/);
 assert.match(indexHtml, /rel="icon" type="image\/png" sizes="32x32" href="\.\/icons\/favicon-white-v2-32\.png"/);
 assert.match(indexHtml, /rel="icon" type="image\/png" sizes="192x192" href="\.\/icons\/icon-white-v2-192\.png"/);
 assert.match(indexHtml, /name="apple-mobile-web-app-capable" content="yes"/);
 
-assert.equal(manifest.start_url, "./?v=20261127-staff-tabs");
+assert.equal(manifest.start_url, "./");
 assert.equal(manifest.scope, "./");
 assert.equal(manifest.display, "standalone");
 assert.deepEqual(

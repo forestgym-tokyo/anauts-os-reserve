@@ -2,7 +2,7 @@
   "name": "A-nauts OS Reserve",
   "short_name": "A-nauts OS",
   "id": "./",
-  "start_url": "./?v=20261127-staff-tabs",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#080a09",
