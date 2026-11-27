@@ -1161,7 +1161,7 @@ input::placeholder,textarea::placeholder{color:#647067}
   }
 }
 
-/* 9ROUNDスタッフにはシフト・SOGA予定・9ROUND予約を表示する。 */
-.soga-staff-restricted .topnav .nav-button:not([data-view="myShift"]):not([data-view="monthlySchedule"]):not([data-view="sogaShift"]):not([data-view="nineRoundBooking"]){
+/* 蘇我スタッフに表示する管理画面のタブ。 */
+.soga-staff-restricted .topnav .nav-button:not([data-view="myShift"]):not([data-view="monthlySchedule"]):not([data-view="sogaShift"]):not([data-view="nineRoundBooking"]):not([data-view="campaignCalculation"]){
   display:none!important;
 }

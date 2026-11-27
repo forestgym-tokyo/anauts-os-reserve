@@ -59,10 +59,10 @@
 
   function build_(){
     if(SG.built)return;SG.built=true;SG.mode=management()?"final":"request";injectCss_();
-    const nav=document.createElement("button");nav.id="sogaShiftNav";nav.className="nav-button";nav.dataset.view="sogaShift";nav.innerHTML=management()?"<span>🥊</span>9ROUNDシフト":"<span>🥊</span>希望シフト";
+    const nav=document.createElement("button");nav.id="sogaShiftNav";nav.className="nav-button";nav.dataset.view="sogaShift";nav.textContent="9Rシフト";
     const topnav=q(".topnav"),registration=topnav?.querySelector('[data-view="registration"]');if(registration)topnav.insertBefore(nav,registration);else topnav?.appendChild(nav);
     const section=document.createElement("section");section.id="sogaShiftView";section.className="view";section.innerHTML=`
-      <div class="page-heading"><div><p class="eyebrow">9ROUND ARIO SOGA</p><h1>9ROUNDシフト</h1><p>希望シフトの提出と、公開前の月次シフト調整を行います。</p></div></div>
+      <div class="page-heading"><div><p class="eyebrow">9ROUND ARIO SOGA</p><h1>9Rシフト</h1><p>希望シフトの提出と、公開前の月次シフト調整を行います。</p></div></div>
       <div class="soga-shell">
         <div class="soga-toolbar card"><div class="toolbar-group"><button id="sogaPrev" class="icon-button" type="button">‹</button><button id="sogaNext" class="icon-button" type="button">›</button></div><div class="soga-toolbar-center"><strong id="sogaMonthLabel"></strong><small>10:15〜14:00 / 16:15〜20:45</small></div><select id="sogaStore" class="soga-store-select"></select></div>
         <div id="sogaModeTabs" class="soga-mode-tabs"></div><div id="sogaShiftMessage" class="form-message is-hidden"></div><div id="sogaShiftBody"></div>

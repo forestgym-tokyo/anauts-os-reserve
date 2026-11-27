@@ -54,7 +54,7 @@
     button.className = "nav-button is-hidden";
     button.type = "button";
     button.dataset.view = "counselingLinks";
-    button.innerHTML = "<span>✉️</span>回答URL送信";
+    button.textContent = "回答URL送信";
     nav.appendChild(button);
 
     const view = document.createElement("section");

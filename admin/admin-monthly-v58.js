@@ -13,7 +13,7 @@
       buildMonthly();
       syncMonthlyPrintPermission_();
       const monthlyNav=document.querySelector('[data-view="monthlySchedule"]');
-      if(monthlyNav)monthlyNav.innerHTML=sogaStaffRestricted_()?"<span>📅</span>9ROUND予定":"<span>📅</span>予定一覧";
+      if(monthlyNav)monthlyNav.textContent=sogaStaffRestricted_()?"9R予定":"予定一覧";
       if(typeof enforceSogaStaffUi_==="function")enforceSogaStaffUi_();
     };
     canUseMyShift=function(){return !!state.authUser?.staff_code;};
@@ -441,7 +441,7 @@
       const b=document.createElement("button");
       b.className="nav-button";
       b.dataset.view="monthlySchedule";
-      b.innerHTML=sogaStaffRestricted_()?"<span>📅</span>9ROUND予定":"<span>📅</span>予定一覧";
+      b.textContent=sogaStaffRestricted_()?"9R予定":"予定一覧";
       nav.insertBefore(b,nav.querySelector('[data-view="registration"]'));
       const v=document.createElement("section");
       v.id="monthlyScheduleView";
@@ -647,7 +647,7 @@
       const store=sogaStaffRestricted_()?"SOGA":(document.querySelector("#mStore")?.value||"ALL"),view=document.querySelector("#monthlyScheduleView");
       if(!view)return;
       view.querySelector(".eyebrow").textContent=store==="SOGA"?"9ROUND ARIO SOGA":"MONTHLY SCHEDULE";
-      view.querySelector("h1").textContent=store==="SOGA"?"9ROUNDシフト":"予定一覧";
+      view.querySelector("h1").textContent=store==="SOGA"?"9R予定":"予定一覧";
       view.querySelector(".page-heading p:last-child").textContent=store==="SOGA"?"アリオ蘇我店の確定シフトを月間カレンダーで確認します。":"月間カレンダーでスタッフ・トレーナーの勤務予定を確認します。";
       const printButton=document.querySelector("#mPrint");if(printButton){printButton.innerHTML=store==="SOGA"?"🖨 A4縦印刷 / PDF":"🖨 A4印刷";printButton.title=store==="SOGA"?"見本形式の9ROUNDシフトをA4縦1枚で印刷・PDF保存":"選択した部門・店舗の月間予定をA4一枚で印刷"}
     }

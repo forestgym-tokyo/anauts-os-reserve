@@ -45,16 +45,16 @@ test("SOGA staff UI exposes personal shifts, the fixed schedule, shift wishes an
   const monthly = read("admin/admin-monthly-v58.js");
   const css = read("admin/admin.css");
 
-  assert.match(admin, /new Set\(\["myShift","monthlySchedule","sogaShift","nineRoundBooking"\]\)/);
+  assert.match(admin, /new Set\(\["myShift","monthlySchedule","sogaShift","nineRoundBooking","campaignCalculation"\]\)/);
   assert.match(admin, /targetView=activeButton\?\.dataset\.view\|\|"myShift"/);
-  assert.match(admin, /storeChip\.textContent="9ROUND \/ SOGA"/);
+  assert.match(admin, /storeChip\.textContent="9R \/ SOGA"/);
   assert.match(css, /\.soga-staff-restricted[\s\S]*data-view="myShift"[\s\S]*data-view="monthlySchedule"[\s\S]*data-view="sogaShift"[\s\S]*data-view="nineRoundBooking"/);
 
   assert.match(monthly, /state\.monthlyStore=sogaStaffRestricted_\(\)\?"SOGA"/);
   assert.match(monthly, /if\(sogaStaffRestricted_\(\)\)params\.store_code="SOGA"/);
   assert.match(monthly, /select\.disabled=true/);
   assert.match(monthly, /9ROUND アリオ蘇我店 \(SOGA\)/);
-  assert.match(monthly, /9ROUND予定/);
+  assert.match(monthly, /9R予定/);
 });
 
 test("SOGA staff personal shift request stays available and is store-fixed", () => {

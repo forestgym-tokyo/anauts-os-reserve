@@ -228,7 +228,7 @@ function enforceSogaStaffUi_(){
 
   document.body?.classList.add("soga-staff-restricted");
 
-  const allowedViews=new Set(["myShift","monthlySchedule","sogaShift","nineRoundBooking"]);
+  const allowedViews=new Set(["myShift","monthlySchedule","sogaShift","nineRoundBooking","campaignCalculation"]);
   $$(".topnav .nav-button").forEach(button=>{
     const allowed=allowedViews.has(String(button.dataset.view||""));
     if(allowed)return;
@@ -248,14 +248,15 @@ function enforceSogaStaffUi_(){
   });
 
   const storeChip=document.querySelector(".store-chip");
-  if(storeChip)storeChip.textContent="9ROUND / SOGA";
+  if(storeChip)storeChip.textContent="9R / SOGA";
 }
 function applyPermissionUi(){
   if(!authEnabled())return;
   const permission=String(state.authUser?.permission||"STAFF").toUpperCase();
   const isManagement=permission==="ADMIN"||permission==="MANAGER";
   document.querySelectorAll('[data-view="registration"]').forEach(el=>el.classList.toggle("is-hidden",!isManagement));
-  document.querySelectorAll('[data-view="settlement"], [data-view="campaignCalculation"]').forEach(el=>el.classList.toggle("is-hidden",!isManagement));
+  document.querySelectorAll('[data-view="settlement"]').forEach(el=>el.classList.toggle("is-hidden",!isManagement));
+  $('[data-view="campaignCalculation"]')?.classList.toggle("is-hidden",!state.authUser);
   $("#myShiftNav")?.classList.toggle("is-hidden",!state.authUser?.staff_code);
   $("#authUserArea")?.classList.remove("is-hidden");
   if($("#authUserName"))$("#authUserName").textContent=roleHonorific(state.authUser);
@@ -473,6 +474,7 @@ function logout(){
   window.ANAUTS_LOGIN_MONTH_PREFETCH=null;
   if(typeof window.ANAUTS_INVALIDATE_MONTHLY_CACHE==="function")window.ANAUTS_INVALIDATE_MONTHLY_CACHE();
   resetSogaStaffUi_(true);
+  $('[data-view="campaignCalculation"]')?.classList.add("is-hidden");
 
   if(authEnabled()){
     $("#authUserArea")?.classList.add("is-hidden");

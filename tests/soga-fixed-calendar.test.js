@@ -12,7 +12,7 @@ test("SOGA fixed shifts reuse the existing monthly endpoint and filter in the br
 
   assert.match(monthly, /id="mStore"/);
   assert.match(monthly, /store==="ALL"\|\|String\(x\.store_code\)===store/);
-  assert.match(monthly, /store==="SOGA"\?"9ROUNDシフト"/);
+  assert.match(monthly, /store==="SOGA"\?"9R予定"/);
   assert.match(monthly, /9ROUND ARIO SOGA/);
   assert.match(monthly, /function staffColor_/);
   assert.match(monthly, /\?color:"#63d179"/);

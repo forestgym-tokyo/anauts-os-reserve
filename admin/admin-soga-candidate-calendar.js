@@ -3,7 +3,8 @@
   // Manager-only preview: group contiguous 45-minute source slots into one visible work period.
   // This view is intentionally read-only and never publishes or writes confirmed staff shifts.
   const PAGE_ID="sogaCandidateCalendarView";
-  const NAV_ID="sogaCandidateCalendarNav";
+  const PREVIEW_BUTTON_ID="sogaCandidateCalendarButton";
+  const SHIFT_NAV_ID="sogaShiftNav";
   const CAL={month:"2026-11",mode:"assignments",data:null,publication:null,loading:false,requestSerial:0};
   const q=s=>document.querySelector(s);
   const escapeHtml=value=>String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -25,7 +26,7 @@
   }
   function show(){
     if(!manager())return;
-    document.querySelectorAll(".nav-button").forEach(el=>el.classList.toggle("is-active",el.id===NAV_ID));
+    document.querySelectorAll(".nav-button").forEach(el=>el.classList.toggle("is-active",el.id===SHIFT_NAV_ID));
     document.querySelectorAll(".view").forEach(el=>el.classList.toggle("is-active",el.id===PAGE_ID));
     load();
   }
@@ -72,20 +73,19 @@
   function build(){
     if(q("#"+PAGE_ID))return;
     installStyle();
-    const nav=document.createElement("button");
-    nav.id=NAV_ID;
-    nav.type="button";
-    nav.className="nav-button";
-    nav.dataset.view="sogaCandidateCalendar";
-    nav.innerHTML="<span>🥊</span>希望予定表";
-    const top=q(".topnav");
-    const anchor=top?.querySelector('[data-view="registration"]');
-    if(anchor)top.insertBefore(nav,anchor);else top?.appendChild(nav);
+    const heading=q("#sogaShiftView .page-heading");
+    if(!heading)return;
+    const previewButton=document.createElement("button");
+    previewButton.id=PREVIEW_BUTTON_ID;
+    previewButton.type="button";
+    previewButton.className="ghost-button";
+    previewButton.textContent="希望予定表を見る";
+    heading.appendChild(previewButton);
     const section=document.createElement("section");
     section.id=PAGE_ID;
     section.className="view";
     section.innerHTML=`
-      <div class="page-heading"><div><p class="eyebrow">9ROUND ARIO SOGA · MANAGEMENT ONLY</p><h1>9ROUND 希望シフト予定表</h1><p>勤務時間をまとめたシフトと元の提出希望を切り替えて確認できます。</p></div></div>
+      <div class="page-heading"><div><p class="eyebrow">9ROUND ARIO SOGA · MANAGEMENT ONLY</p><h1>9R 希望シフト予定表</h1><p>勤務時間をまとめたシフトと元の提出希望を切り替えて確認できます。</p></div><button id="sogaPreviewBack" class="ghost-button" type="button">9Rシフトに戻る</button></div>
       <div class="soga-preview-saved" id="sogaPreviewProposalLinks"><strong>2026年11月シフト（各時間帯1名・スタッフ別カラー）</strong><div class="soga-preview-linkrow"><a href="https://docs.google.com/spreadsheets/d/1YCMXS_ngE34QvZw0-P_sVuvteOjDmvbz7mAFH4W-jzA/edit#gid=20261125" target="_blank" rel="noopener noreferrer">11月シフト予定表を開く ↗</a><a href="https://docs.google.com/spreadsheets/d/1YCMXS_ngE34QvZw0-P_sVuvteOjDmvbz7mAFH4W-jzA/edit#gid=20261126" target="_blank" rel="noopener noreferrer">スタッフ別勤務時間 ↗</a><a href="https://docs.google.com/spreadsheets/d/1YCMXS_ngE34QvZw0-P_sVuvteOjDmvbz7mAFH4W-jzA/edit#gid=20261124" target="_blank" rel="noopener noreferrer">勤務明細 ↗</a></div><p id="sogaPreviewProposalNote">11月1日は店休。11月26日16:15〜17:45の未配置箇所は要調整です。</p></div>
       <div class="soga-preview-head">
         <div class="soga-preview-status">管理者・マネージャー専用／<span id="sogaPreviewPublishIndicator">公開状態を確認中</span>　<span id="sogaPreviewState">希望候補</span></div>
@@ -102,7 +102,8 @@
       <p class="soga-preview-status" style="margin-top:13px">前半 10:15〜14:00 ／ 後半 16:15〜20:45 ／ ＊後半 17:45〜20:45。全日希望は前半・後半の2行で表示します。ここでは確定・公開処理は行いません。</p>
     `;
     q("main.main")?.appendChild(section);
-    nav.addEventListener("click",show);
+    previewButton.addEventListener("click",show);
+    q("#sogaPreviewBack").addEventListener("click",()=>q("#"+SHIFT_NAV_ID)?.click());
     q("#sogaPreviewPrev").addEventListener("click",()=>nextMonth(-1));
     q("#sogaPreviewNext").addEventListener("click",()=>nextMonth(1));
     q("#sogaPreviewReload").addEventListener("click",load);
@@ -222,8 +223,8 @@
   function syncAuth(){
     if(typeof state==="undefined"||typeof apiGet!=="function")return;
     if(manager())build();
-    const nav=q("#"+NAV_ID),view=q("#"+PAGE_ID);
-    if(nav)nav.classList.toggle("is-hidden",!manager());
+    const previewButton=q("#"+PREVIEW_BUTTON_ID),view=q("#"+PAGE_ID);
+    if(previewButton)previewButton.classList.toggle("is-hidden",!manager());
     if(view&&!manager())view.classList.remove("is-active");
   }
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",syncAuth,{once:true});

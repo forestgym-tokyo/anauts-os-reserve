@@ -70,7 +70,7 @@
     const navigation = q(".topnav");
     nav = document.createElement("button"); nav.type = "button"; nav.id = "nineRoundBookingNav";
     nav.className = "nav-button"; nav.dataset.view = "nineRoundBooking";
-    nav.setAttribute("aria-controls", "nineRoundBookingView"); nav.textContent = "🥊 9ROUND予約";
+    nav.setAttribute("aria-controls", "nineRoundBookingView"); nav.textContent = "9R予約";
     nav.addEventListener("click", activate);
     navigation.insertBefore(nav, navigation.querySelector('[data-view="registration"]'));
     const css = document.createElement("link"); css.rel = "stylesheet";
