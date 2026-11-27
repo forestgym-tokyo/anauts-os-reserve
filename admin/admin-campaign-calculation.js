@@ -157,7 +157,7 @@
     const data = Object.fromEntries(new FormData(form));
     const result = calculate(data);
     const rows = [];
-    for (let row = 10; row <= 34; row++) {
+    for (let row = 10; row <= 38; row++) {
       const [label, amount, due, note] = result.rows[row] || [];
       const tr = document.createElement("tr");
       tr.classList.toggle("campaign-emphasis", row === 15 || (row >= 22 && row <= 24));

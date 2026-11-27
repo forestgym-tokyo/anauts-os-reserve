@@ -205,10 +205,6 @@
   margin: 1px 6mm 0 auto;
 }
 
-.campaign-table tbody tr:last-child td {
-  height: 3.3mm;
-}
-
 .campaign-print-value {
   display: none;
 }
