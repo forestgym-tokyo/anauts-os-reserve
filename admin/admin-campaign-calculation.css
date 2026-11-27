@@ -205,6 +205,10 @@
   margin: 1px 6mm 0 auto;
 }
 
+.campaign-member-number.is-name-empty {
+  visibility: hidden;
+}
+
 .campaign-print-value {
   display: none;
 }

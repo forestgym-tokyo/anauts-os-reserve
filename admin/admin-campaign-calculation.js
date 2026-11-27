@@ -143,17 +143,25 @@
     return [field, value];
   });
 
+  const memberNameField = form.elements.namedItem("memberName");
+  const memberNumberLabel = form.querySelector(".campaign-member-number");
+
+  function updateMemberNumberVisibility() {
+    memberNumberLabel.classList.toggle("is-name-empty", !memberNameField.value.trim());
+  }
+
   function updatePrintFields() {
     for (const [field, value] of printFields) {
       const text = field.value.trim();
       value.textContent = field.name === "memberName" && text ? `${text} さま` : formatDate(text);
       const label = field.closest("label");
       label.classList.toggle("campaign-print-empty-member",
-        (field.name === "memberName" || field.name === "memberNumber") && !text);
+        field.name === "memberName" && !text);
     }
   }
 
   function render() {
+    updateMemberNumberVisibility();
     const data = Object.fromEntries(new FormData(form));
     const result = calculate(data);
     const rows = [];
@@ -186,6 +194,7 @@
     updatePrintFields();
   });
   view.querySelector("#campaignCalculationPrint").addEventListener("click", () => window.print());
+  memberNameField.addEventListener("input", updateMemberNumberVisibility);
   form.addEventListener("change", render);
   form.addEventListener("submit", event => event.preventDefault());
   form.addEventListener("reset", () => queueMicrotask(render));
