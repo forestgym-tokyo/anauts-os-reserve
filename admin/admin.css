@@ -455,16 +455,34 @@ input::placeholder,textarea::placeholder{color:#647067}
 }
 
 /* Mobile polish */
-@media(max-width:1100px){
-  .topbar{gap:14px}
-  .topnav{max-width:100%;overflow-x:auto}
+@media(max-width:1400px){
+  .topbar{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto auto;
+    align-items:center;
+    gap:10px 14px;
+  }
+  .topbar-right{display:contents}
+  .topbar .brand{grid-column:1;grid-row:1}
+  .topbar .context-meta{grid-column:2;grid-row:1}
+  .topbar .auth-user-area{grid-column:3;grid-row:1;justify-self:end}
+  .topbar .topnav{
+    grid-column:1/-1;
+    grid-row:2;
+    flex-wrap:wrap;
+    overflow:visible;
+  }
 }
 @media(max-width:700px){
   .topbar{
     min-height:auto;
     padding:13px 14px;
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr);
     gap:12px
   }
+  .topbar .auth-user-area{grid-column:2;min-width:0}
+  .topbar .auth-user-text{min-width:0}
+  .topbar .auth-user-text strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .brand-mark{width:40px;height:40px;border-radius:12px}
   .main{width:min(100% - 20px,1480px);padding-top:20px}
   .page-heading h1{font-size:30px}
