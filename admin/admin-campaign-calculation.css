@@ -189,7 +189,6 @@
 }
 
 .campaign-issuer {
-  position: relative;
   grid-column: 2;
   grid-row: 3 / 8;
   justify-self: end;
@@ -203,15 +202,7 @@
   display: block;
   width: 29mm;
   height: auto;
-  margin: 1px 19mm 0 auto;
-}
-
-.campaign-seal {
-  position: absolute;
-  right: 0;
-  bottom: 1mm;
-  width: 17mm;
-  height: auto;
+  margin: 1px 6mm 0 auto;
 }
 
 .campaign-table tbody tr:last-child td {
