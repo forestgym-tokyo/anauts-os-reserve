@@ -2,9 +2,6 @@
   "use strict";
 
   // 「計算書」 I1:I3, O2:R7. O8 is the blank choice in the plan list.
-  const year = 2026;
-  const month = 11;
-  const days = 30;
   const plans = {
     "キャンペーンレギュラー": [4950, 5940, 7480],
     "キャンペーン平日DAY": [4180, 4510, 6050],
@@ -14,37 +11,62 @@
     "NIGHT365": [4950, 3960, 4950]
   };
 
-  const date = day => new Date(Date.UTC(year, month - 1, day)).toISOString().slice(0, 10);
-  const dates = count => Array.from({length: count}, (_, index) => date(index + 1));
-  const joinDates = dates(35); // J5:J39
-  const startDates = dates(31); // H5:H35
-  const paymentCycle = date(27); // O12
+  const tokyoDate = new Intl.DateTimeFormat("sv-SE", {timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit"});
+  const date = (year, month, day) => new Date(Date.UTC(year, month - 1, day)).toISOString().slice(0, 10);
   const dayOf = value => Number(value.slice(-2));
-  const monthOf = value => Number(value.slice(5, 7)) || 1;
-  const defaults = {created: date(25), start: date(25), method: "クレジット",
-    plan: "キャンペーンレギュラー", benefit: "パーソナル無料", enrollment: "WEB／見学日入会"};
-  const lists = {
-    created: joinDates,
+  const monthOf = value => Number(value.slice(5, 7));
+  const monthKey = (year, month) => date(year, month, 1).slice(0, 7);
+  const titles = {
+    "2026-11": "秋の超得プラスキャンペーン",
+    "2026-12": "2026年末感謝プラスキャンペーン"
+  };
+  const defaultFields = {method: "クレジット", plan: "キャンペーンレギュラー",
+    benefit: "パーソナル無料", enrollment: "WEB／見学日入会"};
+  const commonLists = {
     method: ["", "口座振替", "クレジット"],
     plan: [...Object.keys(plans), ""],
     benefit: ["", "パーソナル無料", "2か月目会費無料"],
-    start: startDates,
     enrollment: ["－", "WEB／見学日入会", ""]
   };
+
+  function availableMonths(now, channel) {
+    const today = tokyoDate.format(now);
+    const [year, month, day] = today.split("-").map(Number);
+    const current = monthKey(year, month);
+    return channel === "store" && day >= 27 ? [current, monthKey(year, month + 1)] : [current];
+  }
+
+  function campaignPeriod(key) {
+    const [year, month] = key.split("-").map(Number);
+    const days = dayOf(date(year, month + 1, 0));
+    const previousDays = dayOf(date(year, month, 0));
+    const inMonth = day => date(year, month, day);
+    const earliestDay = 27 - previousDays;
+    const created = Array.from({length: days + 5 - earliestDay + 1}, (_, i) => inMonth(earliestDay + i));
+    const start = Array.from({length: days + (key === "2026-11" ? 1 : 0)}, (_, i) => inMonth(i + 1));
+    return {year, month, days, created, start, inMonth, title: titles[key] || `${year}年${month}月プラスキャンペーン`};
+  }
+
+  const defaults = {created: "2026-11-25", start: "2026-11-25", ...defaultFields};
+  const november = campaignPeriod("2026-11");
+  const lists = {...commonLists, created: november.created, start: november.start};
   const lookupError = "#N/A";
   const valueError = "#VALUE!";
 
-  function calculate({created, start, method, plan, benefit, enrollment}) {
+  function calculate({created, start, method, plan, benefit, enrollment}, key = "2026-11") {
+    const {year, month, days, created: joinDates, start: startDates, inMonth} = campaignPeriod(key);
+    const paymentCycle = inMonth(27);
+    const firstDay = inMonth(1);
     const campaign = plan.includes("キャンペーン");
     const plus = campaign && enrollment === "WEB／見学日入会"; // B19
     const freeSecond = benefit === "2か月目会費無料";
     // The revised fee lookups include NIGHT365 in row 7.
     const rates = plans[plan];
     const [monthly, permanent, normal] = rates || [];
-    const createdIndex = joinDates.indexOf(created);
-    const afterCreated = createdIndex < 0 ? lookupError : date(createdIndex + 2);
-    const earlierMonth = monthOf(created) < monthOf(start); // G5, L5:L9
-    const createdDay = earlierMonth ? 0 : dayOf(created);
+    const validCreated = joinDates.includes(created);
+    const afterCreated = validCreated ? date(Number(created.slice(0, 4)), monthOf(created), dayOf(created) + 1) : lookupError;
+    const earlierMonth = created < firstDay; // G5, L5:L9
+    const createdDay = earlierMonth || (key === "2026-11" && monthOf(created) < monthOf(start)) ? 0 : dayOf(created);
     const credit = method === "クレジット";
     const bank = method === "口座振替";
     const thirdMonth = freeSecond || (credit ? createdDay >= 27 : createdDay > 8); // G21, B24
@@ -56,13 +78,13 @@
     const plusDiscount = plus ? ({ "パーソナル無料": -6600, "2か月目会費無料": -monthly })[benefit] ?? "" : "";
     const prorate = day => Math.trunc(monthly - (day - 1) * (monthly / days)); // I5:I35
     const first = rates && startDates.includes(start) ? prorate(dayOf(start)) || "-" : lookupError;
-    const firstDate = first === lookupError ? first : first === "-" ? "" : bank ? created : afterCreated;
+    const firstDate = first === lookupError ? first : first === "-" ? "" : bank && key === "2026-11" ? created : afterCreated;
     let secondDate; // D23 reads L5:L39 on the credit path.
-    if (monthOf(created) < month) secondDate = date(27); // H31
+    if (earlierMonth) secondDate = paymentCycle; // H31
     else if (bank) secondDate = dayOf(created) < 9 ? paymentCycle : firstDate;
-    else if (createdIndex < 0) secondDate = lookupError;
-    else secondDate = (createdIndex < 5 && earlierMonth) || dayOf(created) < 27 ? paymentCycle : afterCreated;
-    const thirdDate = thirdMonth ? `${year}/${month + 1}/27` : ""; // D24 is text in Excel.
+    else if (!validCreated) secondDate = lookupError;
+    else secondDate = dayOf(created) < 27 ? paymentCycle : afterCreated;
+    const thirdDate = thirdMonth ? inMonth(days + 27) : ""; // D24 is text in Excel.
     const loyalty = rates ? permanent - normal : lookupError;
     // B36 and C36 are blank for non-campaign plans.
     const totalLabel = campaign ? "初年度キャンペーン値引計" : "";
@@ -84,18 +106,18 @@
         14: [campaign ? "　初期費用値引計" : "　初期費用計", initial, plus ? "" : created, campaign ? "" : "初期費用は入会日決済"],
         15: [campaign ? "　初期費用計" : "", campaign ? 0 : ""],
         16: [campaign ? "・超得2 月会費値引特典" : "", campaign ? normal : ""],
-        17: [campaign ? "　月会費値引（初年度）" : "■月会費", monthDiscount, "", campaign ? `${year + 1}月${month}月会費まで毎月値引` : ""],
+        17: [campaign ? "　月会費値引（初年度）" : "■月会費", monthDiscount, "", campaign ? `${year + 1}年${month}月会費まで毎月値引` : ""],
         19: [plus ? "・プラス割 選べる特典" : "", plusDiscount, "",
           plus ? (freeSecond ? "2か月目会費0円" : "パーソナルトレーニング（プライム）１回券プレゼント") : ""],
         20: [plus ? "　注）プラス割はWEB直接／見学当日入会のみ。 見学→後日WEB入会は対象外" : ""],
         21: ["■決済スケジュール"],
-        22: [`　${month}月会費`, first, firstDate, credit ?
+        22: [`　${month}月会費`, first, firstDate, (credit || key !== "2026-11") ?
           (firstDate === lookupError ? lookupError : firstDate && firstDate === afterCreated ? "初月会費は入会日翌日決済" : "") :
           "初月会費はご入会日現金決済"],
-        23: [`　${month + 1}月会費`, freeSecond ? 0 : monthly ?? lookupError, secondDate,
+        23: [`　${monthOf(inMonth(days + 1))}月会費`, freeSecond ? 0 : monthly ?? lookupError, secondDate,
           freeSecond ? "選べる特典／2か月目無料" : dayOf(created) === 27 ? "" :
             secondDate === lookupError ? lookupError : dayOf(secondDate) === 27 ? "通常決済サイクル" : ""],
-        24: thirdMonth ? ["　1月会費", monthly ?? lookupError, thirdDate,
+        24: thirdMonth ? [`　${monthOf(inMonth(days + 32))}月会費`, monthly ?? lookupError, thirdDate,
           secondDate === lookupError ? lookupError : dayOf(secondDate) > 27 ? "通常決済サイクル" : ""] : [],
         25: [], // B25 is empty, so D25 and E25 both return empty.
         26: ["長期継続割引", loyalty || "", "", loyalty === lookupError ? lookupError : loyalty ? "2年目以降長期継続値引（永久値引）が適用されます。" : ""],
@@ -110,7 +132,7 @@
     };
   }
 
-  if (typeof module !== "undefined") module.exports = {calculate, defaults, lists};
+  if (typeof module !== "undefined") module.exports = {calculate, defaults, lists, availableMonths, campaignPeriod};
   if (typeof document === "undefined") return;
 
   const form = document.querySelector("#campaignCalculationForm");
@@ -127,13 +149,39 @@
     return regularPrice ? `（通常${amount}）` : amount;
   };
 
-  for (const [name, choices] of Object.entries(lists)) {
-    const field = form.elements.namedItem(name);
-    for (const value of choices) {
-      const option = new Option(formatDate(value) || "（空欄）", value, value === defaults[name]);
-      field.add(option);
-    }
-    field.value = defaults[name];
+  if (!view.querySelector("#campaignCalculationChannel")) {
+    view.querySelector("#campaignCalculationPrint").insertAdjacentHTML("beforebegin",
+      '<label>受付 <select id="campaignCalculationChannel"><option value="store">見学・店頭</option><option value="web">WEB</option></select></label> ' +
+      '<label>対象月 <select id="campaignCalculationMonth"></select></label>');
+  }
+  const channelField = view.querySelector("#campaignCalculationChannel");
+  const monthField = view.querySelector("#campaignCalculationMonth");
+  const title = view.querySelector(".campaign-title");
+  let selectedMonth = "";
+
+  function setChoices(field, choices, selected) {
+    field.replaceChildren(...choices.map(value =>
+      new Option(formatDate(value) || "（空欄）", value, value === selected)));
+    field.value = selected;
+  }
+
+  for (const [name, choices] of Object.entries(commonLists)) {
+    setChoices(form.elements.namedItem(name), choices, defaultFields[name]);
+  }
+
+  function refreshCampaign(now = new Date()) {
+    const months = availableMonths(now, channelField.value);
+    const allowed = Array.from(monthField.options, option => option.value);
+    const nextMonth = months.includes(monthField.value) ? monthField.value : months[0];
+    if (months.join() !== allowed.join()) setChoices(monthField, months, nextMonth);
+    monthField.disabled = months.length === 1;
+    if (selectedMonth === nextMonth) return;
+    selectedMonth = nextMonth;
+    const period = campaignPeriod(nextMonth);
+    const today = tokyoDate.format(now);
+    setChoices(form.elements.namedItem("created"), period.created, period.created.includes(today) ? today : period.created[0]);
+    setChoices(form.elements.namedItem("start"), period.start, period.start.includes(today) ? today : period.start[0]);
+    title.textContent = period.title;
   }
 
   const printFields = Array.from(form.querySelectorAll("input, select"), field => {
@@ -163,9 +211,10 @@
   }
 
   function render() {
+    refreshCampaign();
     updateMemberNumberVisibility();
     const data = Object.fromEntries(new FormData(form));
-    const result = calculate(data);
+    const result = calculate(data, selectedMonth);
     const rows = [];
     for (let row = 10; row <= 38; row++) {
       const [label, amount, due, note] = result.rows[row] || [];
@@ -288,6 +337,21 @@
   window.addEventListener("afterprint", () => sheet.classList.remove("campaign-paper"));
   printButton.addEventListener("click", () => window.print());
   pdfButton.addEventListener("click", savePdf);
+  channelField.addEventListener("change", render);
+  monthField.addEventListener("change", render);
+  function refreshAtTokyoMidnight() {
+    const now = new Date();
+    const [year, month, day] = tokyoDate.format(now).split("-").map(Number);
+    const midnight = Date.UTC(year, month - 1, day + 1) - 9 * 60 * 60 * 1000;
+    window.setTimeout(() => {
+      render();
+      refreshAtTokyoMidnight();
+    }, Math.max(1, midnight - now.getTime()));
+  }
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) render();
+  });
+  refreshAtTokyoMidnight();
   memberNameField.addEventListener("input", updateMemberNumberVisibility);
   form.addEventListener("change", render);
   form.addEventListener("submit", event => event.preventDefault());
