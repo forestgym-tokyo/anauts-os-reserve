@@ -161,20 +161,20 @@
 }
 
 @media screen and (max-width: 580px) {
-  .campaign-fields {
+  .campaign-sheet:not(.campaign-paper) .campaign-fields {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: none;
     row-gap: 4px;
   }
 
-  .campaign-fields .campaign-created {
+  .campaign-sheet:not(.campaign-paper) .campaign-fields .campaign-created {
     grid-column: 1;
     grid-row: auto;
     grid-template-columns: 110px minmax(0, 1fr);
     justify-self: stretch;
   }
 
-  .campaign-fields .campaign-issuer {
+  .campaign-sheet:not(.campaign-paper) .campaign-fields .campaign-issuer {
     grid-column: 1;
     grid-row: auto;
     margin: 10px 0;
@@ -184,6 +184,9 @@
 .campaign-actions {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
   width: min(100%, 210mm);
   margin: 0 auto 12px;
 }
@@ -211,6 +214,63 @@
 
 .campaign-print-value {
   display: none;
+}
+
+@media screen and (min-width: 761px) {
+  .campaign-sheet:not(.campaign-paper) {
+    zoom: 1.12;
+    padding: 9mm 7mm;
+  }
+}
+
+.campaign-pdf-stage {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.campaign-sheet.campaign-paper {
+  width: 190mm;
+  padding: 9mm 7mm;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  break-inside: avoid;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.campaign-paper .campaign-fields input,
+.campaign-paper .campaign-fields select,
+.campaign-paper .campaign-fields .campaign-name-input {
+  display: none;
+}
+
+.campaign-paper .campaign-fields .campaign-print-value {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.campaign-paper .campaign-created .campaign-print-value {
+  text-align: right;
+}
+
+.campaign-paper .campaign-fields .campaign-print-empty-member > span:first-child {
+  visibility: hidden;
+}
+
+.campaign-paper .campaign-fields .campaign-print-underlined {
+  border-bottom: 1px solid #20252d;
+}
+
+.campaign-paper .campaign-table-wrap {
+  overflow: visible;
+}
+
+.campaign-paper .campaign-table {
+  min-width: 0;
 }
 
 @media print {
@@ -244,44 +304,7 @@
     animation: none;
   }
 
-  .campaign-sheet {
-    width: 209.9mm;
-    min-height: 0;
-    border: 0;
-    border-radius: 0;
-    break-inside: avoid;
-    print-color-adjust: exact;
-    -webkit-print-color-adjust: exact;
-  }
-
-  .campaign-fields input,
-  .campaign-fields select,
-  .campaign-fields .campaign-name-input {
-    display: none;
-  }
-
-  .campaign-fields .campaign-print-value {
-    display: block;
-    overflow-wrap: anywhere;
-  }
-
-  .campaign-created .campaign-print-value {
-    text-align: right;
-  }
-
-  .campaign-fields .campaign-print-empty-member > span:first-child {
-    visibility: hidden;
-  }
-
-  .campaign-fields label:has(select):not(.campaign-created) {
-    border-bottom: 1px solid #20252d;
-  }
-
-  .campaign-table-wrap {
-    overflow: visible;
-  }
-
-  .campaign-table {
-    min-width: 0;
+  #campaignCalculationView .campaign-paper {
+    zoom: 1.1;
   }
 }

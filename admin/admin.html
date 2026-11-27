@@ -20,7 +20,7 @@
 <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin>
 <link rel="preconnect" href="https://securetoken.googleapis.com" crossorigin>
 <link rel="stylesheet" href="./admin.css?v=20260920-shift-import-status-v1-20261127-tablet-tabs-staff-tabs">
-<link rel="stylesheet" href="./admin-campaign-calculation.css?v=20261127-member-name">
+<link rel="stylesheet" href="./admin-campaign-calculation.css?v=20261127-direct-pdf">
 <style>
 @media(max-width:700px){
   #myShiftView .registered-shift-row{
@@ -817,7 +817,9 @@
 </section>
 <section id="campaignCalculationView" class="view" aria-labelledby="campaignCalculationHeading">
   <div class="campaign-actions">
-    <button id="campaignCalculationPrint" class="ghost-button" type="button">印刷 / PDF保存</button>
+    <button id="campaignCalculationPrint" class="ghost-button" type="button">印刷</button>
+    <button id="campaignCalculationPdf" class="ghost-button" type="button">PDF保存</button>
+    <span id="campaignCalculationPdfStatus" role="status"></span>
   </div>
   <article class="campaign-sheet">
     <h1 id="campaignCalculationHeading" class="campaign-sr-only">入会計算書</h1>
@@ -873,6 +875,6 @@
 <script src="./admin-monthly-v58.js?v=20261126-soga-worked-hours-staff-tabs" defer></script>
 <script src="./admin-soga-shifts.js?v=20261024-kevin-sunday-rule-v3-staff-tabs" defer></script>
 <script src="./admin-soga-candidate-calendar.js?v=20261024-published-shifts-v3-staff-tabs" defer></script>
-<script src="./admin-campaign-calculation.js?v=20261127-member-name" defer></script>
+<script src="./admin-campaign-calculation.js?v=20261127-direct-pdf" defer></script>
 </body>
 </html>

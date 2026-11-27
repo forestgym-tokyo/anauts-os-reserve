@@ -139,7 +139,9 @@
   const printFields = Array.from(form.querySelectorAll("input, select"), field => {
     const value = document.createElement("span");
     value.className = "campaign-print-value";
-    field.closest("label").append(value);
+    const label = field.closest("label");
+    label.append(value);
+    if (field.tagName === "SELECT" && field.name !== "created") label.classList.add("campaign-print-underlined");
     return [field, value];
   });
 
@@ -189,11 +191,68 @@
     form.elements.benefit.closest("label").classList.toggle("campaign-no-benefit-label", !data.plan.includes("キャンペーン"));
   }
 
+  const sheet = view.querySelector(".campaign-sheet");
+  const pdfButton = view.querySelector("#campaignCalculationPdf");
+  const pdfStatus = view.querySelector("#campaignCalculationPdfStatus");
+
+  function loadPdfLibrary(path, isLoaded) {
+    if (isLoaded()) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = path;
+      script.onload = () => isLoaded() ? resolve() : reject(new Error(path));
+      script.onerror = () => {
+        script.remove();
+        reject(new Error(path));
+      };
+      document.head.append(script);
+    });
+  }
+
+  async function savePdf() {
+    pdfButton.disabled = true;
+    pdfStatus.textContent = "PDFを作成中…";
+    const stage = document.createElement("div");
+    stage.className = "campaign-pdf-stage";
+    stage.setAttribute("aria-hidden", "true");
+    try {
+      render();
+      updatePrintFields();
+      const copy = sheet.cloneNode(true);
+      copy.classList.add("campaign-paper");
+      copy.querySelectorAll("[id]").forEach(element => element.removeAttribute("id"));
+      stage.append(copy);
+      document.body.append(stage);
+      await Promise.all([
+        loadPdfLibrary("./vendor/html2canvas.min.js", () => typeof window.html2canvas === "function"),
+        loadPdfLibrary("./vendor/jspdf.umd.min.js", () => typeof window.jspdf?.jsPDF === "function"),
+        document.fonts.ready,
+        ...Array.from(copy.querySelectorAll("img"), image => image.decode())
+      ]);
+      const canvas = await window.html2canvas(copy, {scale: 2.5, backgroundColor: "#fff", logging: false});
+      const pdf = new window.jspdf.jsPDF({unit: "mm", format: "a4", compress: true});
+      const scale = Math.min(209 / canvas.width, 295 / canvas.height);
+      const width = canvas.width * scale;
+      pdf.addImage(canvas, "PNG", (210 - width) / 2, 1, width, canvas.height * scale);
+      pdf.save("入会計算書.pdf");
+      pdfStatus.textContent = "";
+    } catch (error) {
+      console.error("Campaign PDF generation failed", error);
+      pdfStatus.textContent = "PDFを作成できませんでした。もう一度お試しください。";
+    } finally {
+      stage.remove();
+      pdfButton.disabled = false;
+    }
+  }
+
   window.addEventListener("beforeprint", () => {
     render();
     updatePrintFields();
+    sheet.classList.add("campaign-paper");
   });
+  window.addEventListener("afterprint", () => sheet.classList.remove("campaign-paper"));
   view.querySelector("#campaignCalculationPrint").addEventListener("click", () => window.print());
+  pdfButton.addEventListener("click", savePdf);
   memberNameField.addEventListener("input", updateMemberNumberVisibility);
   form.addEventListener("change", render);
   form.addEventListener("submit", event => event.preventDefault());
