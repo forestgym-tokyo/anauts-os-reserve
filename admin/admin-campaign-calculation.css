@@ -1,0 +1,164 @@
+.campaign-sheet {
+  --sheet-ink: #20252d;
+  --sheet-rule: #a2acb8;
+  --sheet-blue: #dce8f5;
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: clamp(16px, 3.5vw, 44px);
+  color: var(--sheet-ink);
+  background: #fff;
+  border: 1px solid #dce1e7;
+  border-radius: 8px;
+  font: 14px/1.55 "HG丸ゴシックM-PRO", "Hiragino Maru Gothic ProN", "Yu Gothic", "Noto Sans CJK JP", sans-serif;
+}
+
+.campaign-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.campaign-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 380px) 1fr;
+  gap: 4px 24px;
+}
+
+.campaign-fields label {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  grid-column: 1;
+  min-width: 0;
+  color: inherit;
+  font-size: inherit;
+}
+
+.campaign-fields .campaign-created {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
+  grid-template-columns: auto minmax(132px, 1fr);
+}
+
+.campaign-fields input,
+.campaign-fields select {
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  padding: 4px 8px;
+  color: var(--sheet-ink);
+  background: #f8fafd;
+  border: 0;
+  border-bottom: 1px solid #8797aa;
+  border-radius: 3px 3px 0 0;
+  font: inherit;
+}
+
+.campaign-fields input:focus-visible,
+.campaign-fields select:focus-visible {
+  outline: 2px solid #3e6697;
+  outline-offset: 2px;
+}
+
+.campaign-name-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.campaign-name-input input:placeholder-shown + span,
+.campaign-no-benefit-label > span {
+  visibility: hidden;
+}
+
+.campaign-title {
+  margin: 18px 0 5px;
+  font-size: 17px;
+  line-height: 1.5;
+}
+
+.campaign-table-wrap {
+  overflow-x: auto;
+}
+
+.campaign-table {
+  width: 100%;
+  min-width: 670px;
+  table-layout: fixed;
+  border: 2px solid #37475a;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.campaign-table col:nth-child(1) { width: 29%; }
+.campaign-table col:nth-child(2) { width: 16%; }
+.campaign-table col:nth-child(3) { width: 14%; }
+.campaign-table col:nth-child(4) { width: 41%; }
+
+.campaign-table th,
+.campaign-table td {
+  height: 26px;
+  padding: 3px 8px;
+  border: 1px solid var(--sheet-rule);
+  vertical-align: middle;
+}
+
+.campaign-table th {
+  border-bottom: 3px double #37475a;
+  text-align: center;
+}
+
+.campaign-table th,
+.campaign-table .campaign-blue {
+  background-color: var(--sheet-blue);
+}
+
+.campaign-table td:nth-child(2) {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.campaign-table td:nth-child(3) {
+  text-align: center;
+}
+
+.campaign-table .campaign-emphasis td:first-child,
+.campaign-table .campaign-emphasis td:nth-child(2) {
+  font-weight: 700;
+}
+
+.campaign-negative {
+  color: #b41625;
+}
+
+.campaign-total {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 20px;
+  margin: 14px 0 0;
+}
+
+.campaign-total output {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 660px) {
+  .campaign-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .campaign-fields .campaign-created {
+    grid-column: 1;
+    grid-row: auto;
+    grid-template-columns: 110px minmax(0, 1fr);
+    justify-self: stretch;
+  }
+}
