@@ -228,6 +228,21 @@
     });
   }
 
+  function preparePdfTable(pdfTable) {
+    // html2canvas paints both sides of collapsed cell borders. Paint each shared edge once.
+    pdfTable.style.borderCollapse = "separate";
+    pdfTable.style.borderSpacing = "0";
+    const rows = Array.from(pdfTable.rows);
+    for (const [rowIndex, row] of rows.entries()) {
+      for (const [cellIndex, cell] of Array.from(row.cells).entries()) {
+        cell.style.borderTopWidth = "0";
+        cell.style.borderLeftWidth = "0";
+        if (cellIndex === row.cells.length - 1) cell.style.borderRightWidth = "0";
+        if (rowIndex === rows.length - 1) cell.style.borderBottomWidth = "0";
+      }
+    }
+  }
+
   async function savePdf() {
     pdfButton.disabled = true;
     pdfStatus.textContent = "PDFを作成中…";
@@ -239,6 +254,7 @@
       updatePrintFields();
       const copy = sheet.cloneNode(true);
       copy.classList.add("campaign-paper");
+      preparePdfTable(copy.querySelector(".campaign-table"));
       copy.querySelectorAll("[id]").forEach(element => element.removeAttribute("id"));
       stage.append(copy);
       document.body.append(stage);
