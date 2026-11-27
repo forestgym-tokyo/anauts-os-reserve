@@ -192,8 +192,27 @@
   }
 
   const sheet = view.querySelector(".campaign-sheet");
-  const pdfButton = view.querySelector("#campaignCalculationPdf");
-  const pdfStatus = view.querySelector("#campaignCalculationPdfStatus");
+  const printButton = view.querySelector("#campaignCalculationPrint");
+  let pdfButton = view.querySelector("#campaignCalculationPdf");
+  let pdfStatus = view.querySelector("#campaignCalculationPdfStatus");
+  // A standalone iPad window can retain older HTML while its scripts refresh.
+  if (!pdfButton) {
+    printButton.textContent = "印刷";
+    pdfButton = document.createElement("button");
+    pdfButton.id = "campaignCalculationPdf";
+    pdfButton.type = "button";
+    pdfButton.className = "ghost-button";
+    pdfButton.textContent = "PDF保存";
+    pdfStatus = document.createElement("span");
+    pdfStatus.id = "campaignCalculationPdfStatus";
+    pdfStatus.setAttribute("role", "status");
+    printButton.after(pdfButton, pdfStatus);
+
+    const stylesheet = document.createElement("link");
+    stylesheet.rel = "stylesheet";
+    stylesheet.href = "./admin-campaign-calculation.css?v=20261127-direct-pdf";
+    document.head.append(stylesheet);
+  }
 
   function loadPdfLibrary(path, isLoaded) {
     if (isLoaded()) return Promise.resolve();
@@ -251,7 +270,7 @@
     sheet.classList.add("campaign-paper");
   });
   window.addEventListener("afterprint", () => sheet.classList.remove("campaign-paper"));
-  view.querySelector("#campaignCalculationPrint").addEventListener("click", () => window.print());
+  printButton.addEventListener("click", () => window.print());
   pdfButton.addEventListener("click", savePdf);
   memberNameField.addEventListener("input", updateMemberNumberVisibility);
   form.addEventListener("change", render);

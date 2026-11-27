@@ -230,7 +230,6 @@ document.addEventListener("DOMContentLoaded", function () {
     "./admin-tour-ui-polish.js?v=20260828-event-driven-v1",
     "./admin-auto-reassign-enforce.js?v=20260920-head-office-counsel-v2",
     "./admin-daily-report.js?v=20260903-daily-save-required-v5",
-    "./admin-soga-shifts.js?v=20260926-a4-shift-print-v1-staff-tabs",
     "./admin-mpg-shifts.js?v=20261003-mpg-trigger-v3",
     "../9round-booking/config.js?v=20261017-os-management",
     "../9round-booking/api.js?v=20261017-os-management",

@@ -58,7 +58,7 @@
   }
 
   function build_(){
-    if(SG.built)return;SG.built=true;SG.mode=management()?"final":"request";injectCss_();
+    if(SG.built||q("#sogaShiftNav"))return;SG.built=true;SG.mode=management()?"final":"request";injectCss_();
     const nav=document.createElement("button");nav.id="sogaShiftNav";nav.className="nav-button";nav.dataset.view="sogaShift";nav.textContent="9Rシフト";
     const topnav=q(".topnav"),registration=topnav?.querySelector('[data-view="registration"]');if(registration)topnav.insertBefore(nav,registration);else topnav?.appendChild(nav);
     const section=document.createElement("section");section.id="sogaShiftView";section.className="view";section.innerHTML=`
