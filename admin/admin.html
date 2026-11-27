@@ -20,7 +20,7 @@
 <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin>
 <link rel="preconnect" href="https://securetoken.googleapis.com" crossorigin>
 <link rel="stylesheet" href="./admin.css?v=20260920-shift-import-status-v1-9round-20261017">
-<link rel="stylesheet" href="./admin-campaign-calculation.css?v=20261127">
+<link rel="stylesheet" href="./admin-campaign-calculation.css?v=20261127-print">
 <style>
 @media(max-width:700px){
   #myShiftView .registered-shift-row{
@@ -816,6 +816,9 @@
 </section>
 </section>
 <section id="campaignCalculationView" class="view" aria-labelledby="campaignCalculationHeading">
+  <div class="campaign-actions">
+    <button id="campaignCalculationPrint" class="ghost-button" type="button">印刷 / PDF保存</button>
+  </div>
   <article class="campaign-sheet">
     <h1 id="campaignCalculationHeading" class="campaign-sr-only">入会計算書</h1>
     <form id="campaignCalculationForm" class="campaign-fields" autocomplete="off">
@@ -827,6 +830,17 @@
       <label><span>選べる特典</span><select name="benefit" aria-label="選べる特典"></select></label>
       <label><span>スタート日</span><select name="start"></select></label>
       <label><span>ご入会区分</span><select name="enrollment"></select></label>
+      <address class="campaign-issuer">
+        <div>
+          276-0040<br>
+          千葉県八千代市緑が丘西2丁目2－1<br>
+          The Forest Gym 八千代緑が丘<br>
+          047－459－5623<br>
+          www.theforestgym.com
+          <img class="campaign-logo" src="./assets/campaign-forest-gym-logo.png" width="303" height="135" alt="The Forest Gym 24h Fitness">
+        </div>
+        <img class="campaign-seal" src="./assets/campaign-company-seal.png" width="136" height="142" alt="A-Nauts合同会社の角印">
+      </address>
     </form>
     <h2 class="campaign-title">秋の超得プラスキャンペーン</h2>
     <div class="campaign-table-wrap" role="region" aria-label="入会計算書の明細" tabindex="0">
@@ -860,6 +874,6 @@
 <script src="./admin-monthly-v58.js?v=20261126-soga-worked-hours" defer></script>
 <script src="./admin-soga-shifts.js?v=20261024-kevin-sunday-rule-v3" defer></script>
 <script src="./admin-soga-candidate-calendar.js?v=20261024-published-shifts-v3" defer></script>
-<script src="./admin-campaign-calculation.js?v=20261127-revised" defer></script>
+<script src="./admin-campaign-calculation.js?v=20261127-print" defer></script>
 </body>
 </html>

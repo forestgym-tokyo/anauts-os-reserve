@@ -118,7 +118,6 @@
   const view = document.querySelector("#campaignCalculationView");
   const table = view.querySelector("tbody");
   const fullWidthRows = new Set([20, 29, 30, 31, 32, 33]);
-  const blueRows = new Set([11, 15, 19, 21, 29]);
   const number = new Intl.NumberFormat("ja-JP", {maximumFractionDigits: 0});
   const formatDate = value => /^\d{4}-\d{2}-\d{2}$/.test(value) ?
     value.split("-").map(Number).join("/") : value;
@@ -137,6 +136,23 @@
     field.value = defaults[name];
   }
 
+  const printFields = Array.from(form.querySelectorAll("input, select"), field => {
+    const value = document.createElement("span");
+    value.className = "campaign-print-value";
+    field.closest("label").append(value);
+    return [field, value];
+  });
+
+  function updatePrintFields() {
+    for (const [field, value] of printFields) {
+      const text = field.value.trim();
+      value.textContent = field.name === "memberName" && text ? `${text} さま` : formatDate(text);
+      const label = field.closest("label");
+      label.classList.toggle("campaign-print-empty-member",
+        (field.name === "memberName" || field.name === "memberNumber") && !text);
+    }
+  }
+
   function render() {
     const data = Object.fromEntries(new FormData(form));
     const result = calculate(data);
@@ -144,7 +160,6 @@
     for (let row = 10; row <= 34; row++) {
       const [label, amount, due, note] = result.rows[row] || [];
       const tr = document.createElement("tr");
-      tr.classList.toggle("campaign-blue", blueRows.has(row));
       tr.classList.toggle("campaign-emphasis", row === 15 || (row >= 22 && row <= 24));
       const cells = fullWidthRows.has(row) ? [label] :
         [label, formatMoney(amount, row === 11 || row === 16), formatDate(due || ""), note];
@@ -166,6 +181,11 @@
     form.elements.benefit.closest("label").classList.toggle("campaign-no-benefit-label", !data.plan.includes("キャンペーン"));
   }
 
+  window.addEventListener("beforeprint", () => {
+    render();
+    updatePrintFields();
+  });
+  view.querySelector("#campaignCalculationPrint").addEventListener("click", () => window.print());
   form.addEventListener("change", render);
   form.addEventListener("submit", event => event.preventDefault());
   form.addEventListener("reset", () => queueMicrotask(render));

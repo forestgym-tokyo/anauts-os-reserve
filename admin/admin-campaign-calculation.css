@@ -1,15 +1,16 @@
 .campaign-sheet {
   --sheet-ink: #20252d;
-  --sheet-rule: #a2acb8;
+  --sheet-rule: #36598e;
   --sheet-blue: #dce8f5;
-  max-width: 1040px;
+  width: min(100%, 210mm);
+  min-height: 297mm;
   margin: 0 auto;
-  padding: clamp(16px, 3.5vw, 44px);
+  padding: 19mm 17mm 19mm 19mm;
   color: var(--sheet-ink);
   background: #fff;
   border: 1px solid #dce1e7;
   border-radius: 8px;
-  font: 14px/1.55 "HG丸ゴシックM-PRO", "Hiragino Maru Gothic ProN", "Yu Gothic", "Noto Sans CJK JP", sans-serif;
+  font: 8.5pt/1.38 "HG丸ゴシックM-PRO", "Hiragino Maru Gothic ProN", "Yu Gothic", "Noto Sans CJK JP", sans-serif;
 }
 
 .campaign-sr-only {
@@ -22,13 +23,14 @@
 
 .campaign-fields {
   display: grid;
-  grid-template-columns: minmax(0, 380px) 1fr;
-  gap: 4px 24px;
+  grid-template-columns: 42% 1fr;
+  grid-template-rows: repeat(7, minmax(6.15mm, auto));
+  column-gap: 5mm;
 }
 
 .campaign-fields label {
   display: grid;
-  grid-template-columns: 110px minmax(0, 1fr);
+  grid-template-columns: 51% minmax(0, 1fr);
   align-items: center;
   gap: 8px;
   grid-column: 1;
@@ -40,16 +42,15 @@
 .campaign-fields .campaign-created {
   grid-column: 2;
   grid-row: 1;
-  justify-self: end;
-  grid-template-columns: auto minmax(132px, 1fr);
+  grid-template-columns: minmax(0, 1fr) 30mm;
 }
 
 .campaign-fields input,
 .campaign-fields select {
   width: 100%;
   min-width: 0;
-  min-height: 32px;
-  padding: 4px 8px;
+  min-height: 5.8mm;
+  padding: 1px 4px;
   color: var(--sheet-ink);
   background: #f8fafd;
   border: 0;
@@ -77,9 +78,11 @@
 }
 
 .campaign-title {
-  margin: 18px 0 5px;
-  font-size: 17px;
-  line-height: 1.5;
+  margin: 0;
+  min-height: 6mm;
+  display: flex;
+  align-items: center;
+  font-size: 9pt;
 }
 
 .campaign-table-wrap {
@@ -88,33 +91,33 @@
 
 .campaign-table {
   width: 100%;
-  min-width: 670px;
+  min-width: 595px;
   table-layout: fixed;
-  border: 2px solid #37475a;
+  border: 2px solid #294f88;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: 8pt;
 }
 
-.campaign-table col:nth-child(1) { width: 29%; }
-.campaign-table col:nth-child(2) { width: 16%; }
-.campaign-table col:nth-child(3) { width: 14%; }
-.campaign-table col:nth-child(4) { width: 41%; }
+.campaign-table col:nth-child(1) { width: 23%; }
+.campaign-table col:nth-child(2) { width: 16.5%; }
+.campaign-table col:nth-child(3) { width: 13%; }
+.campaign-table col:nth-child(4) { width: 47.5%; }
 
 .campaign-table th,
 .campaign-table td {
-  height: 26px;
-  padding: 3px 8px;
+  height: 6.15mm;
+  padding: 1px 3px;
   border: 1px solid var(--sheet-rule);
   vertical-align: middle;
 }
 
 .campaign-table th {
-  border-bottom: 3px double #37475a;
+  border-bottom: 3px double #294f88;
   text-align: center;
 }
 
 .campaign-table th,
-.campaign-table .campaign-blue {
+.campaign-table tbody tr:nth-child(even) {
   background-color: var(--sheet-blue);
 }
 
@@ -150,9 +153,18 @@
   font-variant-numeric: tabular-nums;
 }
 
-@media (max-width: 660px) {
+@media screen and (max-width: 760px) {
+  .campaign-sheet {
+    min-height: 0;
+    padding: clamp(12px, 3vw, 24px);
+  }
+}
+
+@media screen and (max-width: 580px) {
   .campaign-fields {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    row-gap: 4px;
   }
 
   .campaign-fields .campaign-created {
@@ -160,5 +172,125 @@
     grid-row: auto;
     grid-template-columns: 110px minmax(0, 1fr);
     justify-self: stretch;
+  }
+
+  .campaign-fields .campaign-issuer {
+    grid-column: 1;
+    grid-row: auto;
+    margin: 10px 0;
+  }
+}
+
+.campaign-actions {
+  display: flex;
+  justify-content: flex-end;
+  width: min(100%, 210mm);
+  margin: 0 auto 12px;
+}
+
+.campaign-issuer {
+  position: relative;
+  grid-column: 2;
+  grid-row: 3 / 8;
+  justify-self: end;
+  width: min(100%, 55mm);
+  margin: 0;
+  color: inherit;
+  font: normal 8.5pt/1.18 "HG丸ゴシックM-PRO", "Yu Gothic", sans-serif;
+}
+
+.campaign-logo {
+  display: block;
+  width: 29mm;
+  height: auto;
+  margin: 1px 19mm 0 auto;
+}
+
+.campaign-seal {
+  position: absolute;
+  right: 0;
+  bottom: 1mm;
+  width: 17mm;
+  height: auto;
+}
+
+.campaign-table tbody tr:last-child td {
+  height: 3.3mm;
+}
+
+.campaign-print-value {
+  display: none;
+}
+
+@media print {
+  @page campaign-calculation {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  html:has(#campaignCalculationView.is-active),
+  body:has(#campaignCalculationView.is-active),
+  body:has(#campaignCalculationView.is-active) .app-shell,
+  body:has(#campaignCalculationView.is-active) .main {
+    width: auto;
+    max-width: none;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+    background: white;
+  }
+
+  body:has(#campaignCalculationView.is-active) > :not(.app-shell),
+  body:has(#campaignCalculationView.is-active) .app-shell > :not(.main),
+  body:has(#campaignCalculationView.is-active) .main > :not(#campaignCalculationView),
+  #campaignCalculationView .campaign-actions {
+    display: none !important;
+  }
+
+  #campaignCalculationView.is-active {
+    page: campaign-calculation;
+    animation: none;
+  }
+
+  .campaign-sheet {
+    width: 209.9mm;
+    min-height: 0;
+    border: 0;
+    border-radius: 0;
+    break-inside: avoid;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .campaign-fields input,
+  .campaign-fields select,
+  .campaign-fields .campaign-name-input {
+    display: none;
+  }
+
+  .campaign-fields .campaign-print-value {
+    display: block;
+    overflow-wrap: anywhere;
+  }
+
+  .campaign-created .campaign-print-value {
+    text-align: right;
+  }
+
+  .campaign-fields .campaign-print-empty-member > span:first-child {
+    visibility: hidden;
+  }
+
+  .campaign-fields label:has(select):not(.campaign-created) {
+    border-bottom: 1px solid #20252d;
+  }
+
+  .campaign-table-wrap {
+    overflow: visible;
+  }
+
+  .campaign-table {
+    min-width: 0;
   }
 }
