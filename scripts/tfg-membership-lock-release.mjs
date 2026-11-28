@@ -3,6 +3,7 @@ import vm from 'node:vm';
 
 const legacyDeployment = 'AKfycbynTLgYkJCjz2cyE9wgNhRF5yyBlccfsGt-3lFm6sHgrrSiASeZeEzoZzSzkYA3u8mzoA';
 const librarySymbol = 'TfgMembershipNumbers';
+const libraryTitle = 'TFG 会員番号 採番ロック';
 const legacyWriter = /^function\s+registerToMaster_\s*\(/gm;
 const lockSource = `
 /** Serializes assignments to the membership master. */
@@ -213,14 +214,25 @@ export async function prepareTfgNumberLockRelease(authFile, adminProject, adminV
         version = oldVersion;
         return {library: existing, drainStart: Date.parse(deployment.updateTime) || Date.now()};
       }
-      const created = await script('', 'create private TFG number lock library', 'POST', {title: 'TFG 会員番号 採番ロック'});
-      const lib = '/' + created.scriptId;
-      await script(lib + '/content', 'install private shared lock', 'PUT', {files: [
-        {name:'appsscript',type:'JSON',source:JSON.stringify({timeZone:'Asia/Tokyo',runtimeVersion:'V8'})},
-        {name:'Code',type:'SERVER_JS',source:lockSource}
-      ]});
-      const libraryVersion = await script(lib + '/versions', 'version private shared lock', 'POST', {description: 'TFG master allocation'});
-      const library = {...placeholder, libraryId: created.scriptId, version: String(libraryVersion.versionNumber)};
+      let library;
+      for (const candidate of candidates.filter(file => file.name === libraryTitle)) {
+        const saved = await script('/' + candidate.id + '/content?versionNumber=1', 'read prior shared lock', 'GET', undefined, true);
+        const code = saved?.files?.filter(file => file.type === 'SERVER_JS') || [];
+        if (code.length === 1 && code[0].source.trim() === lockSource && await projectOwner(candidate.id)) {
+          library = {...placeholder, libraryId: candidate.id};
+          break;
+        }
+      }
+      if (!library) {
+        const created = await script('', 'create private TFG number lock library', 'POST', {title: libraryTitle});
+        const lib = '/' + created.scriptId;
+        await script(lib + '/content', 'install private shared lock', 'PUT', {files: [
+          {name:'appsscript',type:'JSON',source:JSON.stringify({timeZone:'Asia/Tokyo',runtimeVersion:'V8'})},
+          {name:'Code',type:'SERVER_JS',source:lockSource}
+        ]});
+        const libraryVersion = await script(lib + '/versions', 'version private shared lock', 'POST', {description: 'TFG master allocation'});
+        library = {...placeholder, libraryId: created.scriptId, version: String(libraryVersion.versionNumber)};
+      }
       stagedWeb = stageLegacyWeb(legacy.files, library);
       stagedWebFingerprint = fingerprint(stagedWeb);
       wroteSource = true;
