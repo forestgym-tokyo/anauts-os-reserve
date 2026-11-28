@@ -108,15 +108,22 @@ export async function prepareTfgNumberLockRelease(authFile, adminProject, adminV
   const base = '/' + id;
   const deploymentPath = base + '/deployments/' + legacyDeployment;
   const oldVersion = deployment.deploymentConfig.versionNumber;
+  async function projectOwner(projectId) {
+    const scriptProject = await script('/' + projectId, 'read Apps Script project metadata');
+    const fileId = scriptProject.parentId || projectId;
+    const file = await drive('/' + fileId + '?fields=owners(me),capabilities(canEdit)', 'verify project container ownership');
+    return file.owners?.some(owner => owner.me);
+  }
   const [legacy, legacyPublished, admin, adminPublished, legacyOwner, adminOwner] = await Promise.all([
     script(base + '/content', 'read WEB source'),
     script(base + '/content?versionNumber=' + oldVersion, 'read deployed WEB source'),
     script('/' + adminProject + '/content', 'read admin source'),
     script('/' + adminProject + '/content?versionNumber=' + adminVersion, 'read deployed admin source'),
-    drive(base + '?fields=owners(me),capabilities(canEdit)', 'verify WEB project ownership'),
-    drive('/' + adminProject + '?fields=owners(me),capabilities(canEdit)', 'verify admin project ownership')
+    projectOwner(id),
+    projectOwner(adminProject)
   ]);
-  if (!legacyOwner.owners?.some(owner => owner.me) || !adminOwner.owners?.some(owner => owner.me)) {
+  notice('common_library_owner_verified=' + Boolean(legacyOwner && adminOwner));
+  if (!legacyOwner || !adminOwner) {
     throw new Error('Both enrollment projects must be able to use the new owner-private library');
   }
   if (fingerprint(legacy.files) !== fingerprint(legacyPublished.files)) throw new Error('WEB project has unpublished source changes');
