@@ -261,7 +261,7 @@
 
     const stylesheet = document.createElement("link");
     stylesheet.rel = "stylesheet";
-    stylesheet.href = "./admin-campaign-calculation.css?v=20261128-pdf-display";
+    stylesheet.href = "./admin-campaign-calculation.css?v=20261128-thin-rules";
     document.head.append(stylesheet);
   }
 
@@ -279,21 +279,6 @@
     });
   }
 
-  function preparePdfTable(pdfTable) {
-    // html2canvas paints both sides of collapsed cell borders. Paint each shared edge once.
-    pdfTable.style.borderCollapse = "separate";
-    pdfTable.style.borderSpacing = "0";
-    const rows = Array.from(pdfTable.rows);
-    for (const [rowIndex, row] of rows.entries()) {
-      for (const [cellIndex, cell] of Array.from(row.cells).entries()) {
-        cell.style.borderTopWidth = "0";
-        cell.style.borderLeftWidth = "0";
-        if (cellIndex === row.cells.length - 1) cell.style.borderRightWidth = "0";
-        if (rowIndex === rows.length - 1) cell.style.borderBottomWidth = "0";
-      }
-    }
-  }
-
   async function savePdf() {
     const name = memberNameField.value.trim();
     const filename = name ? `計算書／${name}さま.pdf` : "計算書.pdf";
@@ -307,7 +292,6 @@
       updatePrintFields();
       const copy = sheet.cloneNode(true);
       copy.classList.add("campaign-paper");
-      preparePdfTable(copy.querySelector(".campaign-table"));
       copy.querySelectorAll("[id]").forEach(element => element.removeAttribute("id"));
       stage.append(copy);
       document.body.append(stage);

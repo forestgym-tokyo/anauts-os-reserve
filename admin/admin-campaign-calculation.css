@@ -111,7 +111,8 @@
   min-width: 595px;
   table-layout: fixed;
   border: 2px solid #294f88;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 8pt;
 }
 
@@ -124,8 +125,31 @@
 .campaign-table td {
   height: 6.15mm;
   padding: 1px 3px;
-  border: 1px solid var(--sheet-rule);
+  position: relative;
+  border: 0;
   vertical-align: middle;
+}
+
+.campaign-table tr > :not(:last-child)::after,
+.campaign-table tbody tr:not(:last-child) > td::before {
+  content: "";
+  position: absolute;
+  background: var(--sheet-rule);
+  pointer-events: none;
+}
+
+.campaign-table tr > :not(:last-child)::after {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 0.55px;
+}
+
+.campaign-table tbody tr:not(:last-child) > td::before {
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 0.55px;
 }
 
 .campaign-table th {
@@ -289,7 +313,9 @@
   visibility: hidden;
 }
 
-.campaign-paper .campaign-fields .campaign-print-underlined {
+.campaign-paper .campaign-fields .campaign-print-underlined,
+.campaign-paper .campaign-member-name:not(.is-name-empty),
+.campaign-paper .campaign-member-number:not(.is-name-empty) {
   border-bottom: 1px solid #20252d;
 }
 
