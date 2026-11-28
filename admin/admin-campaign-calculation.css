@@ -271,7 +271,8 @@
 
 .campaign-paper .campaign-fields input,
 .campaign-paper .campaign-fields select,
-.campaign-paper .campaign-fields .campaign-name-input {
+.campaign-paper .campaign-fields .campaign-name-input,
+.campaign-paper .campaign-total {
   display: none;
 }
 
@@ -322,7 +323,8 @@
   body:has(#campaignCalculationView.is-active) > :not(.app-shell),
   body:has(#campaignCalculationView.is-active) .app-shell > :not(.main),
   body:has(#campaignCalculationView.is-active) .main > :not(#campaignCalculationView),
-  #campaignCalculationView .campaign-actions {
+  #campaignCalculationView .campaign-actions,
+  #campaignCalculationView .campaign-total {
     display: none !important;
   }
 

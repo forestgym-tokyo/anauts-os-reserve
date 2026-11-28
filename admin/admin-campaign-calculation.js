@@ -261,7 +261,7 @@
 
     const stylesheet = document.createElement("link");
     stylesheet.rel = "stylesheet";
-    stylesheet.href = "./admin-campaign-calculation.css?v=20261128-pdf-name-red";
+    stylesheet.href = "./admin-campaign-calculation.css?v=20261128-pdf-display";
     document.head.append(stylesheet);
   }
 
