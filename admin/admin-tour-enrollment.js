@@ -1,56 +1,449 @@
-(()=>{
+(() => {
   "use strict";
-  const ACTION="createTourSameDayEnrollment";
-  const PLANS=[["CP_REG","キャンペーン レギュラー"],["CP_DAY","キャンペーン 平日DAY"],["CP_NIGHT","キャンペーン NIGHT365"],["REG","レギュラー"],["DAY","平日DAY"],["NIGHT","NIGHT365"]];
-  const BENEFITS=[["SECOND_MONTH_FREE","2か月目会費無料"],["PT60_FREE","無料パーソナルトレーニング60分"]];
-  function esc(v){return String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;")}
-  function isTour(r){return String(r?.service_code||"").trim().toUpperCase()==="TOUR"}
-  function localYmd(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),day=String(d.getDate()).padStart(2,"0");return `${y}-${m}-${day}`}
-  function startDateRange(){const now=new Date(),end=new Date(now.getFullYear(),now.getMonth()+1,0);return {min:localYmd(now),max:localYmd(end)}}
-  function injectCss(){if(document.querySelector("#tourEnrollmentCss"))return;const s=document.createElement("style");s.id="tourEnrollmentCss";s.textContent=`.tour-enroll-button{margin-left:7px;white-space:nowrap}.reservation-manage-button{color:#111!important}.tour-enroll-overlay{position:fixed;inset:0;z-index:10020;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:18px}.tour-enroll-modal{width:min(620px,100%);max-height:92vh;overflow:auto;background:#fff;color:#111;border-radius:18px;box-shadow:0 24px 80px rgba(0,0,0,.4)}.tour-enroll-head{padding:20px 22px 14px;border-bottom:1px solid #e5e7eb}.tour-enroll-head h2{margin:0 0 6px}.tour-enroll-head p{margin:0;color:#667085;font-size:13px}.tour-enroll-body{padding:18px 22px}.tour-enroll-source{background:#f6f7f8;padding:12px 14px;border-radius:12px;margin-bottom:16px;line-height:1.7}.tour-enroll-type{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}.tour-enroll-type button{min-height:42px;border:1px solid #d0d5dd;border-radius:10px;background:#fff;color:#111!important;font-weight:800;cursor:pointer}.tour-enroll-type button.is-active{background:#173d2e;color:#fff!important;border-color:#173d2e}.tour-enroll-grid{display:grid;gap:14px}.tour-enroll-grid label{display:grid;gap:7px;font-size:13px;font-weight:800}.tour-enroll-grid select,.tour-enroll-grid input{min-height:44px;padding:9px 11px;border:1px solid #d0d5dd;border-radius:10px;font:inherit;background:#fff;color:#111}.tour-enroll-date-field{display:grid;gap:7px;font-size:13px;font-weight:800}.tour-enroll-date-row{display:flex;gap:8px}.tour-enroll-date-row input{flex:1;min-width:0;cursor:pointer}.tour-enroll-date-row button{min-height:44px;padding:8px 13px;border:1px solid #173d2e;border-radius:10px;background:#173d2e;color:#fff;font:inherit;font-weight:800;cursor:pointer;white-space:nowrap}.tour-enroll-calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;padding:12px;border:1px solid #d0d5dd;border-radius:10px;background:#fff}.tour-enroll-calendar[hidden]{display:none!important}.tour-enroll-calendar .tour-enroll-month{grid-column:1/-1;text-align:center;padding:4px 0 8px;font-size:14px}.tour-enroll-calendar .tour-enroll-weekday{text-align:center;font-size:11px;font-weight:700;color:#667085}.tour-enroll-calendar button{min-width:0;min-height:38px;padding:5px 0;border:1px solid #d0d5dd;border-radius:8px;background:#fff;color:#111;font:inherit;cursor:pointer}.tour-enroll-calendar button[aria-pressed="true"]{background:#173d2e;color:#fff;border-color:#173d2e}.tour-enroll-calendar button:hover{border-color:#173d2e}.tour-enroll-calendar .tour-enroll-empty{min-height:1px}@media(max-width:420px){.tour-enroll-date-row{flex-wrap:wrap}.tour-enroll-date-row button{width:100%}}.tour-enroll-benefit.is-hidden{display:none}.tour-enroll-note{font-size:12px;color:#667085;line-height:1.6}.tour-enroll-message{min-height:20px;margin-top:12px;color:#b42318;font-size:13px}.tour-enroll-actions{display:flex;gap:10px;justify-content:flex-end;padding:14px 22px 20px}.tour-enroll-actions button{min-height:42px}.tour-enroll-actions .ghost-button{background:#fff!important;color:#111!important;border:1px solid #d0d5dd!important}.tour-enroll-complete{background:#ecfdf3;border:1px solid #abefc6;border-radius:12px;padding:12px;margin-top:12px;color:#067647}@media(max-width:680px){.tour-enroll-type{grid-template-columns:1fr}.tour-enroll-actions{flex-direction:column-reverse}.tour-enroll-actions button{width:100%}.tour-enroll-button{margin-left:0;margin-top:6px}}`;document.head.appendChild(s)}
-  function close(){document.querySelector(".tour-enroll-overlay")?.remove()}
-  function source(r){return {name:r.customer_name||"",email:r.customer_email||"",phone:r.customer_phone||"",address:r.customer_address||r.address||""}}
-  function open(r){injectCss();close();const src=source(r),o=document.createElement("div");o.className="tour-enroll-overlay";o.innerHTML=`<div class="tour-enroll-modal" role="dialog" aria-modal="true"><div class="tour-enroll-head"><h2>入会手続き</h2><p>本人・家族・友達の入会をこの見学予約から登録できます。</p></div><div class="tour-enroll-body"><div class="tour-enroll-source"><strong>見学予約者：${esc(src.name||"氏名未登録")}</strong><br>${esc(src.email)}<br>${esc(src.phone)}<br>${esc(src.address)}</div><div class="tour-enroll-type"><button type="button" data-kind="SELF" class="is-active">本人</button><button type="button" data-kind="FAMILY">家族</button><button type="button" data-kind="FRIEND">友達</button></div><div class="tour-enroll-grid"><label>氏名<input id="tourEnrollName" autocomplete="name"></label><label>メールアドレス<input id="tourEnrollEmail" type="email" autocomplete="email"></label><label>電話番号<input id="tourEnrollPhone" type="tel" autocomplete="tel"></label><label>住所<input id="tourEnrollAddress" autocomplete="street-address"></label><label>プラン<select id="tourEnrollPlan">${PLANS.map(x=>`<option value="${x[0]}">${x[1]}</option>`).join("")}</select></label><div class="tour-enroll-date-field"><label for="tourEnrollStart">スタート日</label><div class="tour-enroll-date-row"><input id="tourEnrollStart" type="text" readonly required placeholder="日付を選択" aria-haspopup="dialog" aria-controls="tourEnrollCalendar"><button id="tourEnrollCalendarButton" type="button" aria-expanded="false" aria-controls="tourEnrollCalendar">📅 日付を選択</button></div><div id="tourEnrollCalendar" class="tour-enroll-calendar" role="group" aria-label="スタート日を選択" hidden></div><span class="tour-enroll-note">本日から当月末まで選択できます。</span></div><label id="tourEnrollBenefitWrap" class="tour-enroll-benefit">キャンペーン特典<select id="tourEnrollBenefit">${BENEFITS.map(x=>`<option value="${x[0]}">${x[1]}</option>`).join("")}</select><span class="tour-enroll-note">特典はいずれか1つを選択します。</span></label></div><div id="tourEnrollMessage" class="tour-enroll-message"></div></div><div class="tour-enroll-actions"><button id="tourEnrollClose" class="ghost-button" type="button">閉じる</button><button id="tourEnrollSubmit" class="primary-button" type="button">送信</button></div></div>`;document.body.appendChild(o);
-    const $=q=>o.querySelector(q),plan=$("#tourEnrollPlan"),benefit=$("#tourEnrollBenefitWrap"),start=$("#tourEnrollStart"),name=$("#tourEnrollName"),email=$("#tourEnrollEmail"),phone=$("#tourEnrollPhone"),address=$("#tourEnrollAddress");let kind="SELF";
-    const range=startDateRange();start.value=range.min;
-        const calendar=$("#tourEnrollCalendar"),calendarButton=$("#tourEnrollCalendarButton");
-        function renderStartCalendar(){
-          calendar.replaceChildren();
-          const first=new Date(range.min+"T12:00:00");
-          const last=new Date(range.max+"T12:00:00");
-          const title=document.createElement("div");title.className="tour-enroll-month";
-          title.textContent=first.getFullYear()+"年"+(first.getMonth()+1)+"月";calendar.appendChild(title);
-          ["日","月","火","水","木","金","土"].forEach(w=>{const heading=document.createElement("span");heading.className="tour-enroll-weekday";heading.textContent=w;calendar.appendChild(heading)});
-          for(let i=0;i<first.getDay();i++){const empty=document.createElement("span");empty.className="tour-enroll-empty";empty.setAttribute("aria-hidden","true");calendar.appendChild(empty)}
-          for(let day=first.getDate();day<=last.getDate();day++){
-            const date=new Date(first.getFullYear(),first.getMonth(),day,12);
-            const value=localYmd(date),button=document.createElement("button");
-            button.type="button";button.dataset.date=value;button.textContent=String(day);
-            button.setAttribute("aria-label",value+"を選択");
-            button.setAttribute("aria-pressed",String(start.value===value));
-            calendar.appendChild(button);
-          }
-        }
-        function setStartCalendarOpen(shouldOpen){
-          if(shouldOpen)renderStartCalendar();
-          calendar.hidden=!shouldOpen;
-          calendarButton.setAttribute("aria-expanded",String(shouldOpen));
-          start.setAttribute("aria-expanded",String(shouldOpen));
-        }
-        start.addEventListener("click",()=>setStartCalendarOpen(calendar.hidden));
-        start.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();setStartCalendarOpen(calendar.hidden)}else if(e.key==="Escape")setStartCalendarOpen(false)});
-        calendarButton.addEventListener("click",()=>setStartCalendarOpen(calendar.hidden));
-        calendar.addEventListener("click",e=>{
-          const button=e.target.closest("button[data-date]");if(!button)return;
-          start.value=button.dataset.date;
-          start.dispatchEvent(new Event("change",{bubbles:true}));
-          setStartCalendarOpen(false);
-        });
-    const fill=k=>{kind=k;o.querySelectorAll("[data-kind]").forEach(b=>b.classList.toggle("is-active",b.dataset.kind===k));if(k==="SELF"){name.value=src.name;email.value=src.email;phone.value=src.phone;address.value=src.address}else if(k==="FAMILY"){name.value="";email.value="";phone.value="";address.value=src.address}else{name.value="";email.value="";phone.value="";address.value=""}$("#tourEnrollMessage").textContent=""};o.querySelectorAll("[data-kind]").forEach(b=>b.onclick=()=>fill(b.dataset.kind));fill("SELF");
-    const sync=()=>benefit.classList.toggle("is-hidden",!String(plan.value).startsWith("CP_"));plan.onchange=sync;sync();$("#tourEnrollClose").onclick=close;o.onclick=e=>{if(e.target===o)close()};
-    $("#tourEnrollSubmit").onclick=async()=>{const b=$("#tourEnrollSubmit"),m=$("#tourEnrollMessage"),vals={name:name.value.trim(),email:email.value.trim(),phone:phone.value.trim(),address:address.value.trim()};if(!vals.name||!vals.email||!vals.phone||!vals.address){m.textContent="氏名・メールアドレス・電話番号・住所をすべて入力してください。";return}if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(vals.email)){m.textContent="メールアドレスを確認してください。";return}if(!start.value){m.textContent="スタート日を選択してください。";return}if(start.value<range.min||start.value>range.max){m.textContent=`スタート日は${range.min}から${range.max}までの範囲で選択してください。`;return}const kindName=kind==="SELF"?"本人":kind==="FAMILY"?"家族":"友達",planName=plan.options[plan.selectedIndex].text,benefitName=String(plan.value).startsWith("CP_")?$("#tourEnrollBenefit").options[$("#tourEnrollBenefit").selectedIndex].text:"なし";if(!confirm(`以下の内容で入会登録します。\n\n入会者：${kindName}\n氏名：${vals.name}\nメール：${vals.email}\n電話：${vals.phone}\n住所：${vals.address}\nプラン：${planName}\nスタート日：${start.value}\n特典：${benefitName}`))return;b.disabled=true;b.textContent="登録・PDF・下書き作成中…";m.textContent="";try{if(typeof apiPost!=="function")throw new Error("管理画面APIを利用できません。");const payload={action:ACTION,reservation_id:r.reservation_id,enrollment_type:kind,customer_name:vals.name,customer_email:vals.email,customer_phone:vals.phone,customer_address:vals.address,plan_code:plan.value,start_date:start.value,benefit_code:String(plan.value).startsWith("CP_")?$("#tourEnrollBenefit").value:""};const j=await apiPost(payload),d=j.data||{};if(!d.member_no||!d.pdf_created||!d.draft_created)throw new Error("会員マスター登録、PDFまたはメール下書き作成を確認できませんでした。");m.style.color="#067647";m.innerHTML=`<div class="tour-enroll-complete"><strong>${d.already_created?"登録済みの内容を確認しました。":"会員マスター登録、PDF作成、メール下書き作成が完了しました。"}</strong><br>PDFはメール下書きに添付済みです。メールは自動送信されていません。${d.member_no?`<br>会員番号：<strong>${esc(d.member_no)}</strong>`:""}${d.initial_amount!==undefined?`<br>初回決済額：${esc(d.initial_amount)}円`:""}<br><br>続けて別の方を登録できます。</div>`;b.disabled=false;b.textContent="別の方を登録";b.onclick=()=>{fill("SELF");plan.selectedIndex=0;sync();const nextRange=startDateRange();start.min=nextRange.min;start.max=nextRange.max;start.value=nextRange.min;m.textContent="";b.textContent="送信";b.onclick=null;close();open(r)}}catch(e){m.style.color="#b42318";m.textContent=e.message||"入会手続きに失敗しました。";b.disabled=false;b.textContent="送信"}};
+
+  const applicantTypes = {SELF: "本人", FAMILY: "家族", FRIEND: "友達"};
+  const paymentLabels = {card: "クレジットカード", bank: "口座振替"};
+  const tokyoDate = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit"
+  });
+  const yen = new Intl.NumberFormat("ja-JP");
+
+  function injectCss() {
+    if (document.getElementById("tourEnrollmentCss")) return;
+    const style = document.createElement("style");
+    style.id = "tourEnrollmentCss";
+    style.textContent = `
+      .tour-enroll-button{margin-left:7px;white-space:nowrap}
+      .reservation-manage-button{color:#111!important}
+      .tour-enroll-overlay{position:fixed;inset:0;z-index:10020;display:grid;place-items:center;
+        padding:18px;background:rgba(0,0,0,.65)}
+      .tour-enroll-modal{width:min(620px,100%);max-height:92vh;max-height:92dvh;overflow:auto;
+        background:#fff;color:#111;border-radius:18px;box-shadow:0 24px 80px rgba(0,0,0,.4)}
+      .tour-enroll-head{padding:20px 22px 14px;border-bottom:1px solid #e5e7eb}
+      .tour-enroll-head h2{margin:0}
+      .tour-enroll-head p{margin:6px 0 0;color:#475467;font-size:13px}
+      .tour-enroll-body{padding:18px 22px}
+      .tour-enroll-fields{min-width:0;margin:0;padding:0;border:0}
+      .tour-enroll-type{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+      .tour-enroll-type button{min-height:42px;border:1px solid #d0d5dd;border-radius:10px;
+        background:#fff;color:#111;font-weight:800;cursor:pointer}
+      .tour-enroll-type button[aria-pressed=true]{background:#173d2e;color:#fff;border-color:#173d2e}
+      .tour-enroll-grid{display:grid;gap:14px}
+      .tour-enroll-grid label,.tour-enroll-date-field{display:grid;gap:7px;font-size:13px;font-weight:800}
+      .tour-enroll-grid select,.tour-enroll-grid input:not([type=checkbox]){min-height:44px;
+        padding:9px 11px;border:1px solid #d0d5dd;border-radius:10px;background:#fff;color:#111;font:inherit}
+      .tour-enroll-date-row{display:flex;gap:8px}
+      .tour-enroll-date-row input{flex:1;min-width:0;cursor:pointer}
+      .tour-enroll-date-row button{min-height:44px;padding:8px 13px;border:1px solid #173d2e;
+        border-radius:10px;background:#173d2e;color:#fff;font:inherit;cursor:pointer;white-space:nowrap}
+      .tour-enroll-calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;
+        padding:12px;border:1px solid #d0d5dd;border-radius:10px;background:#fff}
+      .tour-enroll-modal [hidden]{display:none!important}
+      .tour-enroll-month{grid-column:1/-1;text-align:center;padding:8px 0;font-size:14px}
+      .tour-enroll-weekday{text-align:center;font-size:11px;color:#475467}
+      .tour-enroll-calendar button{min-width:0;min-height:38px;border:1px solid #d0d5dd;border-radius:8px;
+        background:#fff;color:#111;font:inherit;cursor:pointer}
+      .tour-enroll-calendar button[aria-pressed=true]{background:#173d2e;color:#fff;border-color:#173d2e}
+      .tour-enroll-calendar button:hover{border-color:#173d2e}
+      .tour-enroll-note{font-size:12px;color:#475467;font-weight:400;line-height:1.6}
+      .tour-enroll-confirmations{display:grid;gap:12px;padding:13px 14px;border:1px solid #d0d5dd;border-radius:10px}
+      .tour-enroll-grid .tour-enroll-check{display:flex;align-items:center;gap:9px;min-height:30px}
+      .tour-enroll-check input{width:18px;height:18px;margin:0;flex:none;accent-color:#173d2e}
+      .tour-enroll-receipts{display:grid;gap:5px;margin:0 0 7px;padding-left:26px;font-size:13px}
+      .tour-enroll-message{margin:0;color:#b42318;font-size:13px;line-height:1.7;overflow-wrap:anywhere}
+      .tour-enroll-message:not(:empty){margin-top:12px}
+      .tour-enroll-message.is-complete{background:#ecfdf3;border:1px solid #abefc6;border-radius:12px;
+        padding:12px;color:#067647;white-space:pre-line}
+      .tour-enroll-actions{display:flex;gap:10px;justify-content:flex-end;padding:0 22px 20px}
+      .tour-enroll-actions button{min-height:42px}
+      .tour-enroll-actions .ghost-button{background:#fff;color:#111;border:1px solid #d0d5dd}
+      @media(max-width:420px){
+        .tour-enroll-date-row{flex-wrap:wrap}
+        .tour-enroll-date-row button{width:100%}
+      }
+    `;
+    document.head.appendChild(style);
   }
-  function decorateFromData(d){const board=document.querySelector("#staffScheduleBoard");if(!board)return;const reservations=(Array.isArray(d?.reservations)?d.reservations:[]).filter(r=>String(r.status||"").trim().toUpperCase()!=="CANCELLED");const shifts=Array.isArray(d?.shifts)?d.shifts:[];const staffCodes=[...new Set([...shifts.map(x=>x.staff_code),...reservations.map(x=>x.staff_code)].filter(Boolean))];const ordered=[];staffCodes.forEach(code=>reservations.filter(x=>x.staff_code===code).sort((a,b)=>String(a.start_time||"").localeCompare(String(b.start_time||""))).forEach(r=>ordered.push(r)));const rows=[...board.querySelectorAll(".staff-reservation-row")];rows.forEach((row,i)=>{const r=ordered[i];if(!r||!isTour(r)||row.querySelector(".tour-enroll-button"))return;const anchor=row.querySelector(".tour-print-button");let actions=anchor?.closest(".tour-row-actions")||row.querySelector(".tour-row-actions");if(!actions){actions=document.createElement("span");actions.className="tour-row-actions";row.appendChild(actions)}const b=document.createElement("button");b.type="button";b.className="primary-button tour-enroll-button";b.textContent="入会手続き";b.onclick=()=>open(r);actions.appendChild(b)});}
-  function boot(){injectCss();if(typeof renderStaffSchedule!=="function"||renderStaffSchedule.__tourEnrollHooked)return;const original=renderStaffSchedule;const wrapped=function(d){original(d);setTimeout(()=>decorateFromData(d),0)};wrapped.__tourEnrollHooked=true;renderStaffSchedule=wrapped;if(typeof state!=="undefined"&&state.staffSchedule)decorateFromData(state.staffSchedule)}
-  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot);else boot();
+
+  function startDatesFor(rules, today) {
+    return rules.availableMonthsForDate(today, "store").map(month =>
+      rules.campaignPeriod(month).start.filter(date => date >= today && date.startsWith(month + "-")));
+  }
+
+  function renderCalendar(calendar, months, selected) {
+    const monthName = new Intl.DateTimeFormat("ja-JP", {year: "numeric", month: "long", timeZone: "UTC"});
+    const elements = [];
+    for (const dates of months) {
+      if (!dates.length) continue;
+      const first = new Date(dates[0] + "T00:00:00Z");
+      const title = document.createElement("div");
+      title.className = "tour-enroll-month";
+      title.textContent = monthName.format(first);
+      elements.push(title);
+
+      for (const day of ["日", "月", "火", "水", "木", "金", "土"]) {
+        const heading = document.createElement("span");
+        heading.className = "tour-enroll-weekday";
+        heading.textContent = day;
+        elements.push(heading);
+      }
+      for (let i = 0; i < first.getUTCDay(); i++) {
+        const spacer = document.createElement("span");
+        spacer.setAttribute("aria-hidden", "true");
+        elements.push(spacer);
+      }
+      for (const date of dates) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.dataset.date = date;
+        button.textContent = String(Number(date.slice(-2)));
+        button.setAttribute("aria-label", date + "を選択");
+        button.setAttribute("aria-pressed", String(date === selected));
+        elements.push(button);
+      }
+    }
+    calendar.replaceChildren(...elements);
+  }
+
+  function open(reservation, trigger, rules) {
+    if (document.querySelector(".tour-enroll-overlay")) return;
+    const source = {
+      customer_name: reservation.customer_name || "",
+      customer_email: reservation.customer_email || "",
+      customer_phone: reservation.customer_phone || "",
+      customer_address: reservation.customer_address || reservation.address || ""
+    };
+
+    const overlay = document.createElement("div");
+    overlay.className = "tour-enroll-overlay";
+    overlay.innerHTML = `
+      <form class="tour-enroll-modal" role="dialog" aria-modal="true" aria-labelledby="tourEnrollTitle">
+        <div class="tour-enroll-head">
+          <h2 id="tourEnrollTitle" tabindex="-1">入会手続き</h2>
+          <p id="tourEnrollSource"></p>
+        </div>
+        <div class="tour-enroll-body">
+          <fieldset class="tour-enroll-fields" aria-label="入会者情報">
+            <div class="tour-enroll-type">
+              <button type="button" data-kind="SELF">本人</button>
+              <button type="button" data-kind="FAMILY">家族</button>
+              <button type="button" data-kind="FRIEND">友達</button>
+            </div>
+            <div class="tour-enroll-grid">
+              <label>氏名<input id="tourEnrollName" name="customer_name" autocomplete="name" required></label>
+              <label>メールアドレス<input id="tourEnrollEmail" name="customer_email" type="email" autocomplete="email" required></label>
+              <label>電話番号<input id="tourEnrollPhone" name="customer_phone" type="tel" autocomplete="tel" required></label>
+              <label>住所<input id="tourEnrollAddress" name="customer_address" autocomplete="street-address" required></label>
+              <label>支払方法
+                <select id="tourEnrollPayment" name="payment_method" required>
+                  <option value="">支払方法を選択</option>
+                  <option value="card">クレジットカード</option>
+                  <option value="bank">口座振替</option>
+                </select>
+              </label>
+              <label>プラン<select id="tourEnrollPlan" name="plan_code"></select></label>
+              <div class="tour-enroll-date-field">
+                <label for="tourEnrollStart">スタート日</label>
+                <div class="tour-enroll-date-row">
+                  <input id="tourEnrollStart" name="start_date" type="text" readonly
+                    aria-controls="tourEnrollCalendar" aria-expanded="false">
+                  <button id="tourEnrollCalendarButton" type="button" aria-expanded="false"
+                    aria-controls="tourEnrollCalendar">日付を選択</button>
+                </div>
+                <div id="tourEnrollCalendar" class="tour-enroll-calendar" role="group" aria-label="スタート日を選択" hidden></div>
+                <span class="tour-enroll-note">27日以降は翌月のスタート日も選べます。</span>
+              </div>
+              <label id="tourEnrollBenefitWrap">キャンペーン特典
+                <select id="tourEnrollBenefit" name="benefit_code"></select>
+              </label>
+              <div class="tour-enroll-confirmations">
+                <label class="tour-enroll-check"><input id="tourEnrollConsent" type="checkbox">入会者ご本人の同意を確認した</label>
+                <label id="tourEnrollCardCheck" class="tour-enroll-check" hidden>
+                  <input id="tourEnrollCardRegistered" type="checkbox">月額パンダのクレカ登録を確認した
+                </label>
+                <div id="tourEnrollBankCheck" hidden>
+                  <ul id="tourEnrollReceiptFees" class="tour-enroll-receipts"></ul>
+                  <label class="tour-enroll-check"><input id="tourEnrollBankReceived" type="checkbox">上記の会費を店頭で受領した</label>
+                </div>
+              </div>
+            </div>
+          </fieldset>
+          <p id="tourEnrollMessage" class="tour-enroll-message" role="status"></p>
+        </div>
+        <div class="tour-enroll-actions">
+          <button id="tourEnrollClose" class="ghost-button" type="button">閉じる</button>
+          <button id="tourEnrollSubmit" class="primary-button" type="submit" disabled>送信</button>
+        </div>
+      </form>
+    `;
+    document.body.appendChild(overlay);
+
+    const find = id => overlay.querySelector("#tourEnroll" + id);
+    const form = overlay.querySelector("form");
+    const fields = form.elements;
+    const fieldset = form.querySelector("fieldset");
+    const types = Array.from(form.querySelectorAll("[data-kind]"));
+    const plan = find("Plan");
+    const benefit = find("Benefit");
+    const start = find("Start");
+    const payment = find("Payment");
+    const calendar = find("Calendar");
+    const calendarButton = find("CalendarButton");
+    const consent = find("Consent");
+    const card = find("CardRegistered");
+    const bank = find("BankReceived");
+    const message = find("Message");
+    const submit = find("Submit");
+    const closeButton = find("Close");
+    let kind = "SELF";
+    let created = tokyoDate.format(new Date());
+    let busy = false;
+    let completed = false;
+
+    find("Source").textContent = "見学予約者　" + (source.customer_name || "氏名未登録");
+    plan.replaceChildren(...Object.entries(rules.tourPlanCodes).map(([label, code]) =>
+      new Option(label.replace(/^キャンペーン/, "キャンペーン "), code)));
+    benefit.replaceChildren(new Option("2か月目会費無料", "SECOND_MONTH_FREE"),
+      new Option("無料パーソナルトレーニング60分", "PT60_FREE"));
+    start.value = created;
+
+    function calculateFees() {
+      const calculation = {
+        created, start: start.value,
+        method: payment.value === "bank" ? "口座振替" : "クレジット",
+        plan: Object.keys(rules.tourPlanCodes).find(label => rules.tourPlanCodes[label] === plan.value),
+        benefit: plan.value.startsWith("CP_") ?
+          Object.keys(rules.tourBenefitCodes).find(label => rules.tourBenefitCodes[label] === benefit.value) : "",
+        enrollment: "WEB／見学日入会"
+      };
+      return rules.calculateTourEnrollment(calculation, start.value.slice(0, 7));
+    }
+
+    function updateSubmit() {
+      submit.disabled = busy || !consent.checked ||
+        !(payment.value === "card" && card.checked || payment.value === "bank" && bank.checked);
+    }
+
+    function updateConfirmations() {
+      consent.checked = card.checked = bank.checked = false;
+      find("BenefitWrap").hidden = !plan.value.startsWith("CP_");
+      find("CardCheck").hidden = payment.value !== "card";
+      find("BankCheck").hidden = payment.value !== "bank";
+
+      const fees = payment.value === "bank" ? calculateFees().receiptFees : [];
+      find("ReceiptFees").replaceChildren(...fees.map(({label, amount}) => {
+        const row = document.createElement("li");
+        row.textContent = `${label}　${yen.format(amount)}円`;
+        return row;
+      }));
+      message.textContent = "";
+      updateSubmit();
+    }
+
+    function fillApplicant(type) {
+      kind = type;
+      for (const button of types) button.setAttribute("aria-pressed", String(button.dataset.kind === type));
+      for (const [field, value] of Object.entries(source)) {
+        fields[field].value = type === "SELF" || (type === "FAMILY" && field === "customer_address") ? value : "";
+      }
+      updateConfirmations();
+    }
+
+    function setCalendarOpen(visible) {
+      if (visible) {
+        refreshDate();
+        renderCalendar(calendar, startDatesFor(rules, created), start.value);
+      }
+      calendar.hidden = !visible;
+      calendarButton.setAttribute("aria-expanded", String(visible));
+      start.setAttribute("aria-expanded", String(visible));
+    }
+
+    function refreshDate() {
+      const today = tokyoDate.format(new Date());
+      if (today === created) return false;
+      created = today;
+      if (!startDatesFor(rules, today).some(dates => dates.includes(start.value))) start.value = today;
+      updateConfirmations();
+      message.textContent = "作成日が変わりました。スタート日と確認欄をもう一度ご確認ください。";
+      return true;
+    }
+
+    function close() {
+      if (busy) return;
+      overlay.remove();
+      trigger.focus();
+    }
+
+    fillApplicant("SELF");
+    for (const button of types) {
+      button.addEventListener("click", () => {
+        if (button.dataset.kind !== kind) fillApplicant(button.dataset.kind);
+      });
+    }
+    fieldset.addEventListener("change", event => {
+      if (event.target.type === "checkbox") updateSubmit();
+      else updateConfirmations();
+    });
+    start.addEventListener("click", () => setCalendarOpen(calendar.hidden));
+    start.addEventListener("keydown", event => {
+      if (!["Enter", " "].includes(event.key)) return;
+      event.preventDefault();
+      setCalendarOpen(calendar.hidden);
+    });
+    calendarButton.addEventListener("click", () => setCalendarOpen(calendar.hidden));
+    calendar.addEventListener("click", event => {
+      const button = event.target.closest("[data-date]");
+      if (!button) return;
+      start.value = button.dataset.date;
+      setCalendarOpen(false);
+      calendarButton.focus();
+      updateConfirmations();
+    });
+    closeButton.addEventListener("click", close);
+    overlay.addEventListener("click", event => { if (event.target === overlay) close(); });
+    overlay.addEventListener("keydown", event => {
+      if (event.key !== "Escape") return;
+      if (calendar.hidden) close();
+      else {
+        setCalendarOpen(false);
+        calendarButton.focus();
+      }
+    });
+
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      if (busy) return;
+      if (completed) {
+        close();
+        open(reservation, trigger, rules);
+        return;
+      }
+      if (refreshDate() || submit.disabled) return;
+      const applicant = Object.fromEntries(Object.keys(source).map(field => [field, fields[field].value.trim()]));
+      if (Object.values(applicant).some(value => !value)) {
+        message.textContent = "氏名・メールアドレス・電話番号・住所をすべて入力してください。";
+        return;
+      }
+      if (!/^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(applicant.customer_email)) {
+        message.textContent = "メールアドレスを確認してください。";
+        return;
+      }
+      const quote = calculateFees();
+      const firstMonthFee = quote.rows[22][1];
+      const receipts = quote.receiptFees || [];
+      if (!Number.isInteger(firstMonthFee) || (payment.value === "bank" && receipts.length === 0)) {
+        message.textContent = "会費を計算できません。スタート日とプランを確認してください。";
+        return;
+      }
+
+      const selectedBenefit = benefit.closest("label").hidden ? "" : benefit.value;
+      const summary = [
+        "次の内容で登録し、Gmailの下書きを作成します。",
+        "",
+        `入会者　${applicant.customer_name}（${applicantTypes[kind]}）`,
+        `宛先　${applicant.customer_email}`,
+        `電話番号　${applicant.customer_phone}`,
+        `住所　${applicant.customer_address}`,
+        `支払方法　${paymentLabels[payment.value]}`,
+        `プラン　${plan.selectedOptions[0].text}`,
+        `スタート日　${start.value}`,
+        ...(selectedBenefit ? [`キャンペーン特典　${benefit.selectedOptions[0].text}`] : [])
+      ].join("\n");
+      if (!window.confirm(summary)) return;
+      if (refreshDate()) return;
+
+      busy = true;
+      fieldset.disabled = submit.disabled = closeButton.disabled = true;
+      submit.textContent = "登録・下書き作成中…";
+      setCalendarOpen(false);
+      message.textContent = "";
+      try {
+        const response = await apiPost({
+          action: "createTourEnrollmentDraftFromForm",
+          reservation_id: reservation.reservation_id,
+          enrollment_type: kind,
+          ...applicant,
+          payment_method: payment.value,
+          plan_code: plan.value,
+          start_date: start.value,
+          benefit_code: selectedBenefit,
+          created_date: created,
+          consent_confirmed: consent.checked,
+          card_registered: payment.value === "card" && card.checked,
+          first_month_fee: firstMonthFee,
+          receipts: bank.checked ? receipts.map(({row, amount}) => ({row, amount})) : []
+        });
+        const result = response.data;
+        if (result?.status !== "draft" || !result.member_id) throw new Error("入会登録と下書き作成を確認できませんでした。");
+        completed = true;
+        fieldset.hidden = true;
+        message.classList.add("is-complete");
+        const status = result.already_created ? "登録済みの下書きを確認しました。" :
+          "TFGマスターに登録し、計算書を添付したGmail下書きを作成しました。";
+        message.textContent = `${status}\n会員番号　${result.member_id}\n宛先　${result.email}`;
+        submit.textContent = "別の方を登録";
+      } catch (error) {
+        message.textContent = error.message || "入会手続きに失敗しました。";
+        submit.textContent = "送信";
+      } finally {
+        busy = false;
+        closeButton.disabled = false;
+        if (completed) submit.disabled = false;
+        else {
+          fieldset.disabled = false;
+          updateSubmit();
+        }
+      }
+    });
+
+    find("Title").focus();
+  }
+
+  function decorateFromData(data) {
+    const reservations = new Map((Array.isArray(data?.reservations) ? data.reservations : [])
+      .filter(row => String(row.service_code).trim().toUpperCase() === "TOUR" &&
+        !/^(CANCELLED|CANCELED)$/.test(String(row.status).trim().toUpperCase()))
+      .map(row => [String(row.reservation_id || ""), row]));
+
+    for (const row of document.querySelectorAll("#staffScheduleBoard .staff-reservation-row")) {
+      const id = row.querySelector(".reservation-manage-button")?.dataset.reservationId;
+      const reservation = id && reservations.get(id);
+      if (!reservation || row.querySelector(".tour-enroll-button")) continue;
+
+      let actions = row.querySelector(".tour-row-actions");
+      if (!actions) {
+        actions = document.createElement("span");
+        actions.className = "tour-row-actions";
+        row.appendChild(actions);
+      }
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "primary-button tour-enroll-button";
+      button.textContent = "入会手続き";
+      button.addEventListener("click", () => {
+        const rules = globalThis.CampaignCalculationRules;
+        if (rules) open(reservation, button, rules);
+        else window.alert("計算書を読み込めませんでした。画面を更新してください。");
+      });
+      actions.appendChild(button);
+    }
+  }
+
+  function boot() {
+    injectCss();
+    if (typeof renderStaffSchedule !== "function" || renderStaffSchedule.__tourEnrollHooked) return;
+    const original = renderStaffSchedule;
+    const wrapped = function (data) {
+      const result = original.apply(this, arguments);
+      setTimeout(() => decorateFromData(data), 0);
+      return result;
+    };
+    wrapped.__tourEnrollHooked = true;
+    renderStaffSchedule = wrapped;
+    if (typeof state !== "undefined" && state.staffSchedule) decorateFromData(state.staffSchedule);
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot, {once: true});
+  else boot();
 })();

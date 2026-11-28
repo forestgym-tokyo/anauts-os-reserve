@@ -35,9 +35,8 @@ assert.ok(
 assert.match(source, /TOUR_JOIN_REQUIRED_HEADERS/);
 assert.match(source, /"gender"/);
 assert.match(source, /"Gmail下書きID"/);
-assert.match(ui, /会員マスター登録、PDF作成、メール下書き作成が完了しました/);
-assert.match(ui, /PDFはメール下書きに添付済みです/);
-assert.match(ui, /メールは自動送信されていません/);
+assert.match(ui, /createTourEnrollmentDraftFromForm/);
+assert.match(ui, /TFGマスターに登録し、計算書を添付したGmail下書きを作成しました/);
 assert.doesNotMatch(ui, /setTimeout\(boot/);
 assert.match(config, /admin-tour-enrollment\.js\?v=[A-Za-z0-9.-]+/);
 

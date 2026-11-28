@@ -803,9 +803,11 @@ function doPost(e) {
        * 見学同時入会
        * =====================================================
        */
+      case "createTourEnrollmentDraftFromForm":
       case "createTourEnrollmentCalculationDraft": {
         const tourEnrollmentAuth = requireNonRestrictedAdminFeature_(body, ["ADMIN", "MANAGER", "STAFF"]);
-        return withTfgMemberNumberLock_(() => createTourEnrollmentCalculationDraft(body, tourEnrollmentAuth));
+        const fromForm = action === "createTourEnrollmentDraftFromForm";
+        return withTfgMemberNumberLock_(() => createTourEnrollmentCalculationDraft(body, tourEnrollmentAuth, fromForm));
       }
 
       case "createTourSameDayEnrollment":

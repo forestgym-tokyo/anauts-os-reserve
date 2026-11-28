@@ -677,18 +677,6 @@
       actions.appendChild(button);
 
       if(isTour_(r)){
-        const reservationId=row.querySelector(".reservation-manage-button")?.dataset.reservationId;
-        if(reservationId && reservationId===String(r.reservation_id)){
-          const calculation=document.createElement("button");
-          calculation.type="button";
-          calculation.className="ghost-button tour-calculation-button";
-          calculation.textContent="計算書";
-          calculation.onclick=e=>{
-            e.stopPropagation();
-            window.openTourEnrollmentCalculation?.(reservationId);
-          };
-          actions.appendChild(calculation);
-        }
         actions.appendChild(mail);
       }
 

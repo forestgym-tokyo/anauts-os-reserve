@@ -57,13 +57,15 @@ function fixture(today = "2026-11-09") {
       return {getBlob: () => blob};
     }},
     DriveApp: {createFile(pdf) {
-      const file = {pdf, getId: () => `test-pdf-${files.length}`, setTrashed: value => { file.trashed = value; }};
+      const id = `test-pdf-${files.length + 1}`;
+      const file = {pdf, getId: () => id, setTrashed: value => { file.trashed = value; }};
       files.push(file);
       return file;
     }},
     GmailApp: {createDraft(to, subject, body, options) {
-      const draft = {to, subject, body, options, getId: () => "test-draft",
-        getMessage: () => ({getId: () => "test-draft-message"}), deleteDraft: () => { draft.deleted = true; }};
+      const id = `test-draft-${drafts.length + 1}`;
+      const draft = {to, subject, body, options, getId: () => id,
+        getMessage: () => ({getId: () => id + "-message"}), deleteDraft: () => { draft.deleted = true; }};
       drafts.push(draft);
       return draft;
     }}
@@ -72,17 +74,18 @@ function fixture(today = "2026-11-09") {
     vm.runInContext(fs.readFileSync(path.join(root, file), "utf8"), context, {filename: file});
   }
 
-  function request({payment = "bank", created = today, start = today, benefit = "パーソナル無料"} = {}) {
+  function request({payment = "bank", created = today, start = today,
+      benefit = "パーソナル無料", plan = "キャンペーンNIGHT365"} = {}) {
     const fields = {created, start, method: payment === "card" ? "クレジット" : "口座振替",
-      plan: "キャンペーンNIGHT365", enrollment: "WEB／見学日入会", benefit};
+      plan, enrollment: "WEB／見学日入会", benefit};
     const calc = rules.calculateTourEnrollment(fields, start.slice(0, 7), true);
     return {reservation_id: "test-booking", confirmed_email: reservation.customer_email, payment_method: payment,
-      created_date: created, start_date: start, plan_code: "CP_NIGHT", benefit_code: rules.tourBenefitCodes[benefit],
+      created_date: created, start_date: start, plan_code: rules.tourPlanCodes[plan], benefit_code: rules.tourBenefitCodes[benefit] || "",
       consent_confirmed: true, card_registered: payment === "card", first_month_fee: calc.rows[22][1],
       receipts: (calc.receiptFees || []).map(({row, amount}) => ({row, amount}))};
   }
   return {context, reservation, values, drafts, files, layout, request,
-    create: body => context.createTourEnrollmentCalculationDraft(body, {staff_code: "TEST"}).data};
+    create: (body, fromForm = false) => context.createTourEnrollmentCalculationDraft(body, {staff_code: "TEST"}, fromForm).data};
 }
 
 test("口座振替は入会日が8日までなら初月分、9日以降なら初月と翌月分を受領する", () => {
@@ -153,6 +156,63 @@ test("未確認の同意、クレカ登録、各月の受領、および異な�
   assert.equal(drafts.length, 0);
   assert.equal(files.length, 0);
   assert.equal(values[2][4], "");
+});
+
+test("既に本人が登録された予約でも家族と友達を個別に登録し、登録済みの方を重複させない", () => {
+  const {context, reservation, drafts, files, values, layout, request, create} = fixture();
+  const representative = create(request());
+  // Deployed versions before the enrollment form did not record the applicant type.
+  const oldNote = values[2][7];
+  const prefix = "TOUR_CALC_COMPLETION=";
+  const details = JSON.parse(decodeURIComponent(oldNote.split(prefix)[1]));
+  delete details.enrollmentType;
+  values[2][7] = oldNote.split(prefix)[0] + prefix + encodeURIComponent(JSON.stringify(details));
+
+  const family = {...request({payment: "card", plan: "キャンペーン平日DAY"}),
+    enrollment_type: "FAMILY", customer_name: "家族　テスト", customer_email: "FAMILY@example.invalid",
+    customer_phone: "0123-45-6789", customer_address: "八千代市　テスト住所"};
+  assert.throws(() => create({...family, card_registered: false}, true), /クレカ登録/);
+  assert.throws(() => create({...family, enrollment_type: "SELF"}, true), /ご本人は登録済み/);
+  assert.equal(create(family, true).member_id, "FWD000013");
+  assert.equal(drafts[1].to, "family@example.invalid");
+  assert.equal(drafts[1].options.attachments[0].name, "計算書／家族　テストさま.pdf");
+  const familyPdf = layout["B1:F38"].setValues[0];
+  assert.equal(familyPdf[1][1], "FWD000013");
+  assert.equal(familyPdf[21][3], "初月会費は入会日翌日決済");
+  assert.match(values[1][7], /入会区分=家族.*電話番号=0123-45-6789.*住所=八千代市　テスト住所/);
+  assert.equal(values[1][14], "登録済");
+  assert.equal(values[1][18], "クレジット");
+
+  const friend = {...request({plan: "レギュラー", benefit: ""}),
+    enrollment_type: "FRIEND", customer_name: "友達テスト", customer_email: "friend@example.invalid",
+    customer_phone: "0123-45-6710", customer_address: "八千代市　別の住所"};
+  assert.throws(() => create({...friend, receipts: friend.receipts.slice(0, 1)}, true), /受領/);
+  assert.equal(create(friend, true).member_id, "FRG000020");
+  assert.equal(drafts[2].to, friend.customer_email);
+  const friendPdf = layout["B1:F38"].setValues[0];
+  assert.equal(friendPdf[21][3], "店頭で受領済み");
+  assert.equal(friendPdf[22][3], "店頭で受領済み");
+  assert.equal(values[7][18], "口座振替");
+  assert.match(values[7][7], /入会区分=友達.*11月会費受領済=.*12月会費受領済=/);
+
+  assert.equal(create({...family, customer_name: "家族 テスト"}, true).already_created, true);
+  assert.equal(create(friend, true).member_id, "FRG000020");
+  assert.equal(context.getTourEnrollmentCalculation(request()).data.member_id, representative.member_id);
+  assert.equal(values[2][2], reservation.customer_email);
+  assert.equal(drafts.length, 3);
+  assert.equal(files.length, 3);
+});
+
+test("予約の連絡先が空欄でも、入会手続きに入力されたご本人の情報で作成する", () => {
+  const {reservation, drafts, request, create} = fixture("2026-11-28");
+  reservation.customer_name = reservation.customer_email = "";
+  const body = {...request({payment: "card", start: "2026-12-01"}),
+    enrollment_type: "SELF", customer_name: "ご本人テスト", customer_email: "self@example.invalid",
+    customer_phone: "0123-45-6712", customer_address: "八千代市 テスト"};
+  assert.throws(() => create({...body, customer_email: "other@example.com,self@example.invalid"}, true), /メールアドレス/);
+  assert.equal(create(body, true).member_id, "NGT000012");
+  assert.equal(drafts[0].to, body.customer_email);
+  assert.match(drafts[0].body, /2026年末感謝プラスキャンペーン/);
 });
 
 test("PDF作成中に空き番号が使用されたら作成を中止し、元の会員を上書きしない", () => {

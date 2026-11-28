@@ -44,11 +44,13 @@ async function verifyServices(){
 }
 async function verifyDraftRoutes(){
  const base='https://script.google.com/macros/s/'+deploymentId+'/exec';
- const tests=[
-  [base+'?action=getTourEnrollmentCalculation',{}],
-  [base,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'createTourEnrollmentCalculationDraft'})}]
- ];
- for(let attempt=0;attempt<5;attempt++){
+ const draftActions=['createTourEnrollmentCalculationDraft','createTourEnrollmentDraftFromForm'];
+ const verifyDeadline=Date.now()+150000;
+ do{
+  const tests=[
+   [base+'?action=getTourEnrollmentCalculation&_='+Date.now(),{}],
+   ...draftActions.map(action=>[base+'?_='+Date.now(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action})}])
+  ];
   try{
    const results=await Promise.all(tests.map(async ([url,init])=>{
     const response=await fetch(url,{...init,signal:AbortSignal.timeout(15000)});
@@ -57,8 +59,8 @@ async function verifyDraftRoutes(){
    }));
    if(results.every(Boolean))return;
   }catch{}
-  if(attempt<4)await new Promise(resolve=>setTimeout(resolve,3000));
- }
+  if(Date.now()<verifyDeadline)await new Promise(resolve=>setTimeout(resolve,5000));
+ }while(Date.now()<verifyDeadline);
  fail('Enrollment draft routes did not enforce existing staff authentication');
 }
 try{

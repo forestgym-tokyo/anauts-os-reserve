@@ -19,19 +19,19 @@ function getTourEnrollmentCalculation(params) {
   return successResponse(tourCompletionResult_(visitor, entry));
 }
 
-function createTourEnrollmentCalculationDraft(body, auth) {
+function createTourEnrollmentCalculationDraft(body, auth, fromForm = false) {
   const lock = LockService.getScriptLock();
   lock.waitLock(15000);
   let draft, file, writeStarted = false;
   try {
-    const visitor = getTourCompletionReservation_(body.reservation_id);
-    if (body.confirmed_email !== visitor.customerEmail) {
+    const visitor = fromForm ? getTourCompletionApplicant_(body) : getTourCompletionReservation_(body.reservation_id);
+    if (!fromForm && body.confirmed_email !== visitor.customerEmail) {
       throw new Error("見学予約のメールアドレスが変わりました。計算書を開き直してください。");
     }
 
     let master = readTourCompletionMaster_();
     const existing = findTourCompletionEntry_(master, visitor);
-    if (existing) return successResponse(tourCompletionResult_(visitor, existing));
+    if (existing) return successResponse(tourCompletionResult_(visitor, existing, true));
 
     const selection = validateTourCompletionSelection_(body);
     assertTourJoinEmailAvailable_(master.values, master.header, visitor.customerEmail);
@@ -51,20 +51,25 @@ function createTourEnrollmentCalculationDraft(body, auth) {
     if (findTourCompletionEntry_(master, visitor)) throw new Error("入会情報が更新されました。計算書を開き直してください。");
     const latest = findSmallestTourCompletionMember_(master);
     if (latest.number !== candidate.number) throw new Error("空き会員番号が更新されました。下書き作成をもう一度お試しください。");
-    const refreshed = getTourCompletionReservation_(visitor.reservationId);
-    if (refreshed.customerEmail !== visitor.customerEmail || refreshed.customerName !== visitor.customerName) {
-      throw new Error("見学予約の情報が変わりました。計算書を開き直してください。");
+    let confirmedApplicant = visitor;
+    if (fromForm) {
+      requireActiveTourCompletionReservation_(visitor.reservationId);
+    } else {
+      confirmedApplicant = getTourCompletionReservation_(visitor.reservationId);
+      if (confirmedApplicant.customerEmail !== visitor.customerEmail || confirmedApplicant.customerName !== visitor.customerName) {
+        throw new Error("見学予約の情報が変わりました。計算書を開き直してください。");
+      }
     }
     const draftId = draft.getId();
     if (!draftId) throw new Error("Gmail下書きIDを取得できませんでした。");
     const details = {
-      reservationId: visitor.reservationId, memberId, draftId,
+      reservationId: visitor.reservationId, enrollmentType: visitor.enrollmentType, memberId, draftId,
       staffCode: String(auth.staff_code || "")
     };
     const pdfId = file.getId();
     const draftMessageId = draft.getMessage().getId();
     writeStarted = true;
-    saveTourCompletionMember_(master, latest.row, refreshed, selection, details, pdfId, draftMessageId);
+    saveTourCompletionMember_(master, latest.row, confirmedApplicant, selection, details, pdfId, draftMessageId);
     SpreadsheetApp.flush();
 
     const committed = readTourCompletionMaster_();
@@ -92,7 +97,7 @@ function createTourEnrollmentCalculationDraft(body, auth) {
   }
 }
 
-function getTourCompletionReservation_(reservationId) {
+function requireActiveTourCompletionReservation_(reservationId) {
   const id = String(reservationId || "").trim();
   const found = id && findReservationRecordForUpdate_(id);
   const record = found && found.record;
@@ -101,6 +106,21 @@ function getTourCompletionReservation_(reservationId) {
       (store && store !== "YACHIYO") || /^(CANCELLED|CANCELED)$/.test(String(record.status || "").trim().toUpperCase())) {
     throw new Error("八千代緑が丘店の有効な見学予約を確認できません。");
   }
+  return record;
+}
+
+function getTourCompletionApplicant_(body) {
+  const applicant = normalizeTourJoinInput_(body);
+  validateTourJoinInput_(applicant);
+  if (!/^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(applicant.customerEmail)) {
+    throw new Error("メールアドレスを確認してください。");
+  }
+  requireActiveTourCompletionReservation_(applicant.reservationId);
+  return applicant;
+}
+
+function getTourCompletionReservation_(reservationId) {
+  const record = requireActiveTourCompletionReservation_(reservationId);
   const customerName = String(record.customer_name || "").trim();
   const customerEmail = String(record.customer_email || "").trim().toLowerCase();
   if (!customerName || !/^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(customerEmail)) {
@@ -108,7 +128,7 @@ function getTourCompletionReservation_(reservationId) {
   }
   const noteText = value => String(value || "").replace(/[\r\n]+/g, " ").trim();
   return {
-    reservationId: id, enrollmentType: "SELF", customerName, customerEmail,
+    reservationId: String(reservationId).trim(), enrollmentType: "SELF", customerName, customerEmail,
     customerPhone: noteText(record.customer_phone),
     customerAddress: noteText(record.customer_address || record.address)
   };
@@ -127,27 +147,43 @@ function readTourCompletionMaster_() {
 
 function findTourCompletionEntry_(master, visitor) {
   const {values, header} = master;
-  const legacyKey = "JOIN_KEY=" + makeTourJoinKey_(visitor.reservationId, visitor.customerEmail);
+  const reservationKey = "JOIN_KEY=" + makeTourJoinKey_(visitor.reservationId, "");
   let entry = null;
   let legacy = false;
+  const normalizeName = name => String(name || "").normalize("NFKC").replace(/\s+/g, "");
+  const applicantName = normalizeName(visitor.customerName);
   for (let i = 1; i < values.length; i++) {
     const data = values[i];
     const note = String(data[header.note] || "");
+    if (!note) continue;
     const end = note.split("\n").pop();
-    if (end.startsWith(TOUR_COMPLETION_NOTE)) {
-      const details = JSON.parse(decodeURIComponent(end.slice(TOUR_COMPLETION_NOTE.length)));
-      if (details.reservationId !== visitor.reservationId) continue;
-      if (entry) throw new Error("同じ見学予約の入会記録が複数あります。TFG_Masterを確認してください。");
-      if (String(data[header.email] || "").trim().toLowerCase() !== visitor.customerEmail ||
-          String(data[header.name] || "").trim() !== visitor.customerName ||
-          makeTourJoinMemberId_(data[header["プラン"]], String(data[0]).trim()) !== details.memberId ||
-          !details.draftId || !data[header["PDFファイルID"]] || !data[header["Gmail下書きID"]]) {
-        throw new Error("登録済みの会員情報と見学予約が一致しません。TFG_Masterを確認してください。");
+    const details = end.startsWith(TOUR_COMPLETION_NOTE) ?
+      JSON.parse(decodeURIComponent(end.slice(TOUR_COMPLETION_NOTE.length))) : null;
+    const legacyFields = details ? [] : note.split(/\n| \/ /);
+    const sameReservation = details ? details.reservationId === visitor.reservationId :
+      legacyFields.some(field => field.startsWith(reservationKey));
+    if (!sameReservation) continue;
+
+    const sameApplicant = normalizeName(data[header.name]) === applicantName &&
+      String(data[header.email] || "").trim().toLowerCase() === visitor.customerEmail;
+    if (!sameApplicant) {
+      const registeredSelf = details ? !details.enrollmentType || details.enrollmentType === "SELF" :
+        legacyFields.includes("入会区分=本人");
+      if (visitor.enrollmentType === "SELF" && registeredSelf) {
+        throw new Error("この見学予約のご本人は登録済みです。TFG_Masterをご確認ください。");
       }
-      entry = {row: i + 1, details, note, data};
-    } else if (note.split(/\n| \/ /).includes(legacyKey)) {
-      legacy = true;
+      continue;
     }
+    if (!details) {
+      legacy = true;
+      continue;
+    }
+    if (entry) throw new Error("同じ入会者の記録が複数あります。TFG_Masterを確認してください。");
+    if (makeTourJoinMemberId_(data[header["プラン"]], String(data[0]).trim()) !== details.memberId ||
+        !details.draftId || !data[header["PDFファイルID"]] || !data[header["Gmail下書きID"]]) {
+      throw new Error("登録済みの会員情報と見学予約が一致しません。TFG_Masterを確認してください。");
+    }
+    entry = {row: i + 1, details, note, data};
   }
   if (!entry && legacy) throw new Error("この見学予約は入会手続きから登録済みです。既存の登録・下書きを確認してください。");
   return entry;
@@ -228,7 +264,10 @@ function saveTourCompletionMember_(master, rowNumber, visitor, selection, detail
   const row = values[rowNumber - 1].slice();
   formulas.forEach((formula, index) => { if (formula) row[index + 1] = formula; });
   const receipts = (selection.result.receiptFees || []).map(({label, amount}) => " / " + label + "受領済=" + amount + "円").join("");
-  const note = buildTourJoinMasterNote_(visitor, makeTourJoinKey_(visitor.reservationId, visitor.customerEmail)) +
+  const noteText = value => String(value || "").replace(/[\r\n]+/g, " ").replace(/ \/ /g, " ／ ");
+  const note = buildTourJoinMasterNote_({
+    ...visitor, customerPhone: noteText(visitor.customerPhone), customerAddress: noteText(visitor.customerAddress)
+  }, makeTourJoinKey_(visitor.reservationId, visitor.customerEmail)) +
     " / 支払方法=" + selection.fields.method + " / 入会同意確認済" + receipts;
   const record = {
     name: visitor.customerName.startsWith("=") ? "'" + visitor.customerName : visitor.customerName,
@@ -245,11 +284,12 @@ function saveTourCompletionMember_(master, rowNumber, visitor, selection, detail
   range.setValues([row.slice(1)]);
 }
 
-function tourCompletionResult_(visitor, entry) {
+function tourCompletionResult_(visitor, entry, alreadyCreated = false) {
   return {
     email: visitor.customerEmail,
     status: entry ? "draft" : "new",
-    member_id: entry ? entry.details.memberId : ""
+    member_id: entry ? entry.details.memberId : "",
+    already_created: alreadyCreated
   };
 }
 

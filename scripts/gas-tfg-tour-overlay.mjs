@@ -8,6 +8,7 @@ import {fileURLToPath} from 'node:url';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const base='410406868548308d7e9745cd9f45689aa296f967';
 const deployed='81993fb927b368bae8c496b7616364b27d2c27a4';
+const calculationDraftRelease='f29aa07a4c5c869fabc9e1d3af8926f7a93b0424';
 const live=path.resolve(process.argv[2]||'.gas-live');
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'tfg-tour-overlay-'));
 const files=['21_Service.gs.js','28_Availability.gs.js','29_Reservation.gs.js','40_ReservationMail.gs.js','46_TourQuestionnairePrint.js','46_1_TourQuestionnairePrintFast.js','60_StoreAwareAssignment.js'];
@@ -44,8 +45,16 @@ try{
  }
  const mainName='99_Main.js',mainPath=path.join(live,mainName);
  if(!fs.existsSync(mainPath))throw Error('Required live file missing: '+mainName);
- const priorMain=execFileSync('git',['show',deployed+':gas/'+mainName],{cwd:root,encoding:'utf8'});
- pending.push([mainPath,applyHunks(fs.readFileSync(mainPath,'utf8'),patchBetween(priorMain,fs.readFileSync(path.join(root,'gas',mainName),'utf8'),5),mainName)]);
+ const currentMain=fs.readFileSync(mainPath,'utf8');
+ const desiredMain=fs.readFileSync(path.join(root,'gas',mainName),'utf8');
+ const patchMain=ref=>{
+  const priorMain=execFileSync('git',['show',ref+':gas/'+mainName],{cwd:root,encoding:'utf8'});
+  return applyHunks(currentMain,patchBetween(priorMain,desiredMain,5),mainName);
+ };
+ let stagedMain;
+ try{stagedMain=patchMain(calculationDraftRelease);}
+ catch{stagedMain=patchMain(deployed);}
+ pending.push([mainPath,stagedMain]);
  const moduleName='94_TfgTourBooking.js',moduleSource=fs.readFileSync(path.join(root,'gas','94_TfgTourBooking.gs'),'utf8');
  const modulePath=path.join(live,moduleName);
  if(fs.existsSync(modulePath)&&fs.readFileSync(modulePath,'utf8')!==moduleSource)throw Error('94 module already exists with different content');
@@ -72,8 +81,11 @@ try{
   ['96_CampaignCalculationRules.js','admin/campaign-calculation-rules.js']
  ]){
   const target=path.join(live,name),source=fs.readFileSync(path.join(root,sourcePath),'utf8');
-  if(fs.existsSync(target)&&fs.readFileSync(target,'utf8')!==source)throw Error(name+' already exists with different content');
-  pending.push([target,source]);
+  const current=fs.existsSync(target)?fs.readFileSync(target,'utf8'):null;
+  if(current===null||current===source){pending.push([target,source]);continue;}
+  if(name!=='96_TourEnrollmentCompletion.js')throw Error(name+' already exists with different content');
+  const prior=execFileSync('git',['show',calculationDraftRelease+':'+sourcePath],{cwd:root,encoding:'utf8'});
+  pending.push([target,applyHunks(current,patchBetween(prior,source,5),name)]);
  }
  for(const [target,source] of pending)fs.writeFileSync(target,source);
  console.log(JSON.stringify({status:'patched',files:pending.map(([file])=>path.basename(file))}));
