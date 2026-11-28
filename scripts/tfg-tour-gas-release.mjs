@@ -9,7 +9,7 @@ import {fileURLToPath} from 'node:url';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const phase=process.argv[2]||'preflight';
 const deploymentId='AKfycbyvpQRxRpMRfpaQHtBar77dViCqPl-hdFW-2yMdozhN8RHtwcrFiNEM9cvEbny4x9q0';
-const permitted=new Set(['21_Service.gs.js','28_Availability.gs.js','29_Reservation.gs.js','40_ReservationMail.gs.js','46_TourQuestionnairePrint.js','46_1_TourQuestionnairePrintFast.js','60_StoreAwareAssignment.js','94_TfgTourBooking.js','95_TfgTourPerformance.js','99_Main.js']);
+const permitted=new Set(['21_Service.gs.js','28_Availability.gs.js','29_Reservation.gs.js','40_ReservationMail.gs.js','46_TourQuestionnairePrint.js','46_1_TourQuestionnairePrintFast.js','60_StoreAwareAssignment.js','94_TfgTourBooking.js','95_TfgTourPerformance.js','96_TourEnrollmentCompletion.js','96_CampaignCalculationRules.js','99_Main.js']);
 const revision=String(spawnSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).stdout||'').trim();
 let scratch,authFile,project,oldVersion,newVersion,backupVersion,updated=false;
 function notice(message){console.log('::notice title=TFG GAS release::'+message);if(process.env.GITHUB_STEP_SUMMARY)fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,message+'\n\n');}

@@ -282,6 +282,10 @@ function doGet(e) {
               : "0"
         });
 
+      case "getTourEnrollmentCalculation":
+        requireNonRestrictedAdminFeature_(params, ["ADMIN", "MANAGER", "STAFF"]);
+        return getTourEnrollmentCalculation(params);
+
       case "getStaffSchedule":
         requireNonRestrictedAdminFeature_(
           params,
@@ -799,6 +803,11 @@ function doPost(e) {
        * 見学同時入会
        * =====================================================
        */
+      case "createTourEnrollmentCalculationDraft": {
+        const tourEnrollmentAuth = requireNonRestrictedAdminFeature_(body, ["ADMIN", "MANAGER", "STAFF"]);
+        return createTourEnrollmentCalculationDraft(body, tourEnrollmentAuth);
+      }
+
       case "createTourSameDayEnrollment":
         requireNonRestrictedAdminFeature_(
           body,

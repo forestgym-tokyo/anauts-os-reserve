@@ -67,6 +67,14 @@ try{
  }
  pending.push([modulePath,moduleSource]);
  pending.push([performancePath,stagedPerformance]);
+ for(const [name,sourcePath] of [
+  ['96_TourEnrollmentCompletion.js','gas/96_TourEnrollmentCompletion.gs'],
+  ['96_CampaignCalculationRules.js','admin/campaign-calculation-rules.js']
+ ]){
+  const target=path.join(live,name),source=fs.readFileSync(path.join(root,sourcePath),'utf8');
+  if(fs.existsSync(target)&&fs.readFileSync(target,'utf8')!==source)throw Error(name+' already exists with different content');
+  pending.push([target,source]);
+ }
  for(const [target,source] of pending)fs.writeFileSync(target,source);
  console.log(JSON.stringify({status:'patched',files:pending.map(([file])=>path.basename(file))}));
 }finally{fs.rmSync(temp,{recursive:true,force:true});}
