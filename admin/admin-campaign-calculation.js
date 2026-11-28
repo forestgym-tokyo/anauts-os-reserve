@@ -261,7 +261,7 @@
 
     const stylesheet = document.createElement("link");
     stylesheet.rel = "stylesheet";
-    stylesheet.href = "./admin-campaign-calculation.css?v=20261128-header";
+    stylesheet.href = "./admin-campaign-calculation.css?v=20261128-header-aligned";
     document.head.append(stylesheet);
   }
 
