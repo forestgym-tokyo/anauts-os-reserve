@@ -261,7 +261,7 @@
 
     const stylesheet = document.createElement("link");
     stylesheet.rel = "stylesheet";
-    stylesheet.href = "./admin-campaign-calculation.css?v=20261128-header-aligned";
+    stylesheet.href = "./admin-campaign-calculation.css?v=20261128-pdf-name-red";
     document.head.append(stylesheet);
   }
 
@@ -295,6 +295,8 @@
   }
 
   async function savePdf() {
+    const name = memberNameField.value.trim();
+    const filename = name ? `計算書／${name}さま.pdf` : "計算書.pdf";
     pdfButton.disabled = true;
     pdfStatus.textContent = "PDFを作成中…";
     const stage = document.createElement("div");
@@ -320,7 +322,7 @@
       const scale = Math.min(209 / canvas.width, 295 / canvas.height);
       const width = canvas.width * scale;
       pdf.addImage(canvas, "PNG", (210 - width) / 2, 1, width, canvas.height * scale);
-      pdf.save("入会計算書.pdf");
+      pdf.save(filename);
       pdfStatus.textContent = "";
     } catch (error) {
       console.error("Campaign PDF generation failed", error);
