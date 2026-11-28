@@ -5,6 +5,7 @@ import vm from 'node:vm';
 import crypto from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+import {inspectTfgMembershipWriters} from './inspect-tfg-membership-writers.mjs';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const phase=process.argv[2]||'preflight';
@@ -48,6 +49,12 @@ try{
  scratch=fs.mkdtempSync(path.join(os.tmpdir(),'tfg-tour-release-'));authFile=path.join(scratch,'.clasprc.json');fs.writeFileSync(authFile,process.env.CLASPRC_JSON,{mode:0o600});
  const baseline=path.join(scratch,'baseline'),stage=path.join(scratch,'stage');project=projectFile(baseline,config.scriptId);
  const current=currentDeployment();oldVersion=current.versionNumber;notice('phase='+phase+'; target_verified=true; previous_version='+oldVersion+'; revision='+revision);
+ if(phase!=='preflight')fail('Member number audit is read-only');
+ try {
+  notice('membership_writer_audit='+JSON.stringify(await inspectTfgMembershipWriters(authFile,config.scriptId)));
+ } catch {
+  notice('membership_writer_audit=unavailable');
+ }
  clasp(['pull']);const baselineSource=path.join(baseline,'gas'),before=hashes(baselineSource);
  project=projectFile(stage,config.scriptId);const stageSource=path.join(stage,'gas');fs.cpSync(baselineSource,stageSource,{recursive:true});
  const overlay=spawnSync(process.execPath,[path.join(root,'scripts/gas-tfg-tour-overlay.mjs'),stageSource],{cwd:root,encoding:'utf8',maxBuffer:16*1024*1024});
