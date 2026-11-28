@@ -136,6 +136,34 @@ export async function prepareTfgNumberLockRelease(authFile, adminProject, adminV
   }
   if (fingerprint(legacy.files) !== fingerprint(legacyPublished.files)) throw new Error('WEB project has unpublished source changes');
   if (fingerprint(admin.files) !== fingerprint(adminPublished.files)) throw new Error('Admin project has unpublished source changes');
+  const versions = [];
+  let pageToken;
+  do {
+    const params = new URLSearchParams({pageSize: '50'});
+    if (pageToken) params.set('pageToken', pageToken);
+    const page = await script('/' + adminProject + '/versions?' + params, 'inspect admin version capacity');
+    versions.push(...(page.versions || []));
+    pageToken = page.nextPageToken;
+  } while (pageToken);
+  notice('admin_version_count=' + versions.length + '; rollback_version=' + adminVersion);
+  if (versions.length >= 200) {
+    const active = (await script('/' + adminProject + '/deployments', 'inspect active admin versions')).deployments || [];
+    const deployed = new Set(active.map(item => item.deploymentConfig.versionNumber));
+    const inventory = versions.sort((a, b) => a.versionNumber - b.versionNumber);
+    const pairs = inventory.flatMap((version, index) => {
+      if (index === 0 || deployed.has(version.versionNumber) || version.versionNumber >= adminVersion ||
+          !/\b(before|backup)\b/i.test(version.description || '')) return [];
+      return [[version.versionNumber, inventory[index - 1].versionNumber]];
+    }).reverse().slice(0, 6);
+    for (const [candidate, retained] of pairs) {
+      const snapshots = await Promise.all([candidate, retained].map(number =>
+        script('/' + adminProject + '/content?versionNumber=' + number, 'verify identical historical versions')));
+      if (fingerprint(snapshots[0].files) === fingerprint(snapshots[1].files)) {
+        notice('unused_duplicate_version=' + candidate + '; retained_identical_version=' + retained);
+      }
+    }
+    throw new Error('Existing admin Apps Script reached the 200-version limit before any change');
+  }
   const existing = findLibrary(legacy.files);
   const adminLibrary = findLibrary(admin.files);
   if (adminLibrary && (!existing || !sameLibrary(adminLibrary, existing))) throw new Error('Published enrollment library bindings differ');

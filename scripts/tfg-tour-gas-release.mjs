@@ -21,7 +21,7 @@ function cliError(text){
  if(/permission|PERMISSION_DENIED|access_denied/i.test(text))return 'Google account lacks the required operation permission';
  if(/SERVICE_DISABLED|has not enabled|has not been used/i.test(text))return 'Required Google API is disabled';
  if(/live source drift|ambiguous patch/i.test(text))return 'Live source differs from the reviewed patch';
- if(/quota|too many versions|maximum number of versions/i.test(text))return 'Google version or request quota exceeded';
+ if(/quota|too many.*versions|(?:max|maximum|limit)[^\n]{0,100}versions|versions[^\n]{0,100}(?:limit|maximum)|RESOURCE_EXHAUSTED/i.test(text))return 'Google version or request quota exceeded';
  return 'operation failed; no credential details logged';
 }
 function clasp(args,projectFile=project){
@@ -99,8 +99,8 @@ try{
   while(drainEnd>Date.now())await new Promise(resolve=>setTimeout(resolve,Math.min(60000,drainEnd-Date.now())));
   await webRollout.verify();
   recheckAdmin('before-admin-drafts');
-  const backup=json(clasp(['create-version','Before TFG tour release '+revision.slice(0,7)]),'backup version');backupVersion=backup.versionNumber;if(!Number.isInteger(backupVersion))fail('Native source backup could not be confirmed');
-  notice('native_backup_version='+backupVersion+'; rollback_version='+oldVersion);
+  backupVersion=oldVersion;
+  notice('native_backup_reused=true; verified_identical_published_version='+backupVersion);
   wroteAdmin=true;
   clasp(['push','--force']);notice('source_push_completed=true');
   newVersion=json(clasp(['create-version','TFG enrollment calculation drafts '+revision.slice(0,7)]),'new deployment version').versionNumber;
