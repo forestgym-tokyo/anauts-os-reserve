@@ -2,6 +2,16 @@
 const TOUR_COMPLETION_SUBJECT = "【The Forest Gym】ご入会手続き完了のお知らせ";
 const TOUR_COMPLETION_NOTE = "TOUR_CALC_COMPLETION=";
 
+function withTfgMemberNumberLock_(operation) {
+  return TfgMembershipNumbers.withMemberNumberLock(() => {
+    try {
+      return operation();
+    } finally {
+      SpreadsheetApp.flush();
+    }
+  });
+}
+
 function getTourEnrollmentCalculation(params) {
   const visitor = getTourCompletionReservation_(params.reservation_id);
   const master = readTourCompletionMaster_();

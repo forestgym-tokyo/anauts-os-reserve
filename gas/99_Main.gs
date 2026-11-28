@@ -805,7 +805,7 @@ function doPost(e) {
        */
       case "createTourEnrollmentCalculationDraft": {
         const tourEnrollmentAuth = requireNonRestrictedAdminFeature_(body, ["ADMIN", "MANAGER", "STAFF"]);
-        return createTourEnrollmentCalculationDraft(body, tourEnrollmentAuth);
+        return withTfgMemberNumberLock_(() => createTourEnrollmentCalculationDraft(body, tourEnrollmentAuth));
       }
 
       case "createTourSameDayEnrollment":
@@ -817,9 +817,7 @@ function doPost(e) {
             "STAFF"
           ]
         );
-        return createTourSameDayEnrollment(
-          body
-        );
+        return withTfgMemberNumberLock_(() => createTourSameDayEnrollment(body));
 
       case "updateTourCustomerAddress":
         requireNonRestrictedAdminFeature_(
