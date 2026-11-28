@@ -149,7 +149,7 @@
 
     const stylesheet = document.createElement("link");
     stylesheet.rel = "stylesheet";
-    stylesheet.href = "./admin-campaign-calculation.css?v=20261128-calculation-header";
+    stylesheet.href = "./admin-campaign-calculation.css?v=20261128-calculation-grid";
     document.head.append(stylesheet);
   }
 

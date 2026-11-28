@@ -62,6 +62,11 @@
   grid-template-columns: minmax(0, 1fr) max-content;
 }
 
+.campaign-sheet:not(.campaign-paper) .campaign-fields .campaign-plan {
+  grid-column: 1 / 3;
+  grid-template-columns: 37% minmax(0, 1fr);
+}
+
 .campaign-fields input,
 .campaign-fields select {
   width: 100%;
@@ -74,6 +79,10 @@
   border-bottom: 1px solid #8797aa;
   border-radius: 3px 3px 0 0;
   font: inherit;
+}
+
+.campaign-fields .campaign-plan select {
+  width: min(100%, 16em);
 }
 
 .campaign-fields input:focus-visible,
@@ -132,22 +141,15 @@
   vertical-align: middle;
 }
 
-.campaign-table tr > :not(:last-child)::after,
+.campaign-table tr > :not(:last-child) {
+  border-right: 1px solid rgba(54, 89, 142, 0.45);
+}
+
 .campaign-table tbody tr:not(:last-child) > td::before {
   content: "";
   position: absolute;
   background: var(--sheet-rule);
   pointer-events: none;
-}
-
-.campaign-table tr > :not(:last-child)::after {
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 0.55px;
-}
-
-.campaign-table tbody tr:not(:last-child) > td::before {
   right: 0;
   bottom: 0;
   left: 0;
@@ -221,6 +223,11 @@
     grid-row: auto;
     grid-template-columns: 110px minmax(0, 1fr);
     justify-self: stretch;
+  }
+
+  .campaign-sheet:not(.campaign-paper) .campaign-fields .campaign-plan {
+    grid-column: 1;
+    grid-template-columns: max-content minmax(0, 1fr);
   }
 
   .campaign-sheet:not(.campaign-paper) .campaign-fields .campaign-issuer {

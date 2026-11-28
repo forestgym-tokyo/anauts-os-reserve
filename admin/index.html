@@ -20,7 +20,7 @@
 <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin>
 <link rel="preconnect" href="https://securetoken.googleapis.com" crossorigin>
 <link rel="stylesheet" href="./admin.css?v=20260920-shift-import-status-v1-20261127-tablet-tabs-staff-tabs">
-<link rel="stylesheet" href="./admin-campaign-calculation.css?v=20261128-calculation-header">
+<link rel="stylesheet" href="./admin-campaign-calculation.css?v=20261128-calculation-grid">
 <style>
 @media(max-width:700px){
   #myShiftView .registered-shift-row{
@@ -927,7 +927,7 @@
       <label class="campaign-created"><span>作成日</span><select name="created"></select></label>
       <label class="campaign-member-number is-name-empty"><span>会員番号</span><input name="memberNumber" type="text"></label>
       <label><span>お支払方法</span><select name="method"></select></label>
-      <label><span>ご入会種別</span><select name="plan"></select></label>
+      <label class="campaign-plan"><span>ご入会種別</span><select name="plan"></select></label>
       <label><span>選べる特典</span><select name="benefit" aria-label="選べる特典"></select></label>
       <label><span>スタート日</span><select name="start"></select></label>
       <label><span>ご入会区分</span><select name="enrollment"></select></label>
@@ -975,6 +975,6 @@
 <script src="./admin-soga-candidate-calendar.js?v=20261024-published-shifts-v3-staff-tabs" defer></script>
 <script src="./admin-soga-requested-correction.js?v=20261125-read-recovery-v2" defer></script>
 <script src="./campaign-calculation-rules.js?v=20261128-tour-calculation" defer></script>
-<script src="./admin-campaign-calculation.js?v=20261128-calculation-header" defer></script>
+<script src="./admin-campaign-calculation.js?v=20261128-calculation-grid" defer></script>
 </body>
 </html>
