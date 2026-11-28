@@ -137,25 +137,21 @@
   }
 
   function calculateTourEnrollment(fields, key, bankReceived = false) {
-    if (fields.method !== "口座振替") return calculate(fields, key);
-    const result = calculate({...fields, method: "クレジット"}, key);
-    const receiptFees = tourDueFees(result, fields.created);
-    for (const {row} of receiptFees) {
-      const [label, amount] = result.rows[row];
-      result.rows[row] = [label, amount, fields.created, bankReceived ? "店頭で受領済み" : "ご入会日店頭払い"];
+    const result = calculate(fields, key);
+    if (fields.method !== "口座振替") return result;
+
+    const receiptFees = [];
+    const firstDue = result.rows[22][2];
+    if (!firstDue || firstDue === lookupError) return {...result, receiptFees};
+    const status = bankReceived ? "店頭で受領済み" : "ご入会日店頭払い";
+    // D23 matches D22 when the next month's dues are collected at enrollment.
+    for (const row of [22, 23]) {
+      const [label, amount, due] = result.rows[row];
+      if (due !== firstDue || !Number.isInteger(amount) || amount <= 0) continue;
+      receiptFees.push({row, label: label.trim(), amount});
+      result.rows[row] = [label, amount, fields.created, status];
     }
     return {...result, receiptFees};
-  }
-
-  function tourDueFees(result, created) {
-    const nextDay = result.rows[22][2];
-    // A regular 27th billing date can also be tomorrow for an enrollment on the 26th.
-    const nextMonthDue = dayOf(created) >= 27 && result.rows[23][2] === nextDay;
-    const rows = nextMonthDue ? [22, 23] : [22];
-    return rows.flatMap(row => {
-      const [label, amount] = result.rows[row];
-      return Number.isInteger(amount) && amount > 0 ? [{row, label: label.trim(), amount}] : [];
-    });
   }
 
   const rules = {

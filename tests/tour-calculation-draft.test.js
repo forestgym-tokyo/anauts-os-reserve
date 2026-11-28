@@ -10,7 +10,7 @@ const headers = ["memberNo", "name", "email", "gender", "status", "dupOk", "admi
   "キャンペーン", "特典", "スタート日", "初期費用", "初月日割り会費", "クレカ登録状況", "PDFファイルID",
   "下書き作成日時", "Gmail下書きID", "支払方法", "extension"];
 
-function fixture(today = "2026-11-27") {
+function fixture(today = "2026-11-09") {
   const blank = (number, extra = {}) => headers.map((field, index) => index === 0 ? number : extra[field] ?? "");
   const values = [headers, blank("000013"), blank("000012"), blank("000003", {name: "退会済み"}),
     blank("000011"), blank(11), blank("000005", {adminUnlimited: true}), blank("000020")];
@@ -85,26 +85,34 @@ function fixture(today = "2026-11-27") {
     create: body => context.createTourEnrollmentCalculationDraft(body, {staff_code: "TEST"}).data};
 }
 
-test("口座振替の受領は既存クレカの翌日決済明細ごとに表示する", () => {
+test("口座振替は入会日が8日までなら初月分、9日以降なら初月と翌月分を受領する", () => {
   const fields = {...rules.defaults, plan: "キャンペーンNIGHT365", created: "2026-11-27", start: "2026-11-27"};
   const card = rules.calculate(fields, "2026-11");
   assert.deepEqual(rules.calculateTourEnrollment(fields, "2026-11", true), card);
   assert.deepEqual(card.rows[22].slice(1, 3), [440, "2026-11-28"]);
   assert.deepEqual(card.rows[23].slice(1, 3), [3300, "2026-11-28"]);
-  const bank = {...fields, method: "口座振替"};
-  const paid = rules.calculateTourEnrollment(bank, "2026-11", true);
-  assert.deepEqual(paid.rows[22].slice(1), [440, "2026-11-27", "店頭で受領済み"]);
-  assert.deepEqual(paid.rows[23].slice(1), [3300, "2026-11-27", "店頭で受領済み"]);
-  const before = rules.calculateTourEnrollment({...bank, created: "2026-11-26"}, "2026-11", true);
+  const bank = {...fields, method: "口座振替", created: "2026-11-09", start: "2026-11-20"};
+  const before = rules.calculateTourEnrollment({...bank, created: "2026-11-08"}, "2026-11", true);
   assert.deepEqual(before.receiptFees.map(({row}) => row), [22]);
+  assert.deepEqual(before.rows[22].slice(1), [1210, "2026-11-08", "店頭で受領済み"]);
   assert.equal(before.rows[23][2], "2026-11-27");
   assert.equal(before.rows[23][3], "通常決済サイクル");
+  assert.deepEqual(before.rows[24], []);
+  const paid = rules.calculateTourEnrollment(bank, "2026-11", true);
+  assert.deepEqual(paid.rows[22].slice(1), [1210, "2026-11-09", "店頭で受領済み"]);
+  assert.deepEqual(paid.rows[23].slice(1), [3300, "2026-11-09", "店頭で受領済み"]);
+  assert.equal(paid.rows[24][2], "2026-12-27");
+  assert.equal(rules.calculateTourEnrollment(bank, "2026-11").rows[23][3], "ご入会日店頭払い");
   const free = rules.calculateTourEnrollment({...bank, benefit: "2か月目会費無料"}, "2026-11", true);
   assert.deepEqual(free.receiptFees.map(({row}) => row), [22]);
   assert.equal(free.rows[23][1], 0);
-  const early = rules.calculateTourEnrollment({...bank, start: "2026-12-01"}, "2026-12", true);
+  const early = rules.calculateTourEnrollment({...bank, created: "2026-11-27", start: "2026-12-01"}, "2026-12", true);
   assert.deepEqual(early.receiptFees.map(({row}) => row), [22]);
+  assert.equal(early.rows[22][2], "2026-11-27");
   assert.equal(early.rows[23][2], "2026-12-27");
+  const december = rules.calculateTourEnrollment({...bank, created: "2026-12-09", start: "2026-12-20"}, "2026-12", true);
+  assert.deepEqual(december.receiptFees.map(({row}) => row), [22, 23]);
+  assert.deepEqual(december.rows[23].slice(1), [3300, "2026-12-09", "店頭で受領済み"]);
 });
 
 test("最小の空き番号でマスターを登録し、同じ予約の下書きは1件作成する", () => {
@@ -115,7 +123,7 @@ test("最小の空き番号でマスターを登録し、同じ予約の下書�
   assert.equal(values[2][0], "000012");
   assert.equal(values[2][4], "ACT");
   assert.equal(values[2][14], "未登録");
-  assert.match(values[2][7], /11月会費受領済=440円 \/ 12月会費受領済=3300円/);
+  assert.match(values[2][7], /11月会費受領済=2420円 \/ 12月会費受領済=3300円/);
   assert.equal(values[2][19], "=1+2");
   assert.equal(drafts[0].to, "tour@example.invalid");
   assert.equal(drafts[0].subject, "【The Forest Gym】ご入会手続き完了のお知らせ");
