@@ -65,13 +65,42 @@ export async function inspectTfgMembershipWriters(authFile, adminProject) {
   if (!match) return summary;
   summary.sameProject = adminProject === match.project;
   summary.deployedVersion = match.version;
-  const {status, data} = await read(scriptsApi + encodeURIComponent(match.project) + '/content?versionNumber=' + encodeURIComponent(match.version));
+  const projectUrl = scriptsApi + encodeURIComponent(match.project);
+  const [deployed, head, owner] = await Promise.all([
+    read(projectUrl + '/content?versionNumber=' + encodeURIComponent(match.version)),
+    read(projectUrl + '/content'),
+    read('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(match.project) + '?fields=capabilities(canEdit)')
+  ]);
+  const {status, data} = deployed;
   summary.sourceStatus = status;
+  summary.canEdit = owner.data?.capabilities?.canEdit;
   if (!data?.files) return summary;
+  function contentHash(files) {
+    return files.map(({type,name,source}) => JSON.stringify({type,name,source})).sort().join('\n');
+  }
+  summary.headMatchesDeployment = Boolean(head.data?.files && contentHash(head.data.files) === contentHash(data.files));
+  const manifest = JSON.parse(data.files.find(file => file.type === 'JSON' && file.name === 'appsscript').source);
+  summary.runtimeVersion = manifest.runtimeVersion || 'unspecified';
+  summary.executeAs = manifest.webapp?.executeAs;
+  summary.otherLibraries = (manifest.dependencies?.libraries || []).length;
   const files = data.files.filter(file => file.type === 'SERVER_JS').map(file => String(file.source || ''));
   const source = files.join('\n');
+  const sections = [];
+  for (const file of files) {
+    const functions = Array.from(file.matchAll(/^function\s+([$_A-Za-z][$_A-Za-z0-9]{0,59})\s*\(/gm));
+    for (let i = 0; i < functions.length; i++) {
+      const text = file.slice(functions[i].index, functions[i + 1]?.index);
+      const name = functions[i][1];
+      const reads = /getSpreadsheet|getSheetByName|getDataRange|\.getValues\(|\.openById\(/.test(text);
+      const writes = /\.setValues?\s*\(|\.appendRow\s*\(/.test(text);
+      if (name === 'doPost' || reads || writes) sections.push({
+        name, reads, writes, masterRef: text.includes(master) || /['"]master['"]/i.test(text),
+        mailOrWebhook: /(?:GmailApp|MailApp)\.|UrlFetchApp\.fetch/.test(text)
+      });
+    }
+  }
   return {
-    ...summary,
+    ...summary, sections,
     hasMasterId: source.includes(master),
     hasMasterSheetName: /['"]master['"]/i.test(source),
     hasMemberNumberFields: /\bmemberNo\b|会員番号/.test(source),
