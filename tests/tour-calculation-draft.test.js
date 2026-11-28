@@ -28,8 +28,16 @@ function fixture(today = "2026-11-09") {
       };
     }
   });
-  const temp = {getRange: range, getSheetId: () => 1, setHiddenGridlines() {}, setRowHeights() {},
-    setColumnWidth() {}, insertRowsBefore() {}, insertImage: () => range("logo")};
+  const temp = {getRange: range, getSheetId: () => 1, setHiddenGridlines() {},
+    setRowHeights(first, count, height) {
+      layout.rowHeights ??= {};
+      for (let row = first; row < first + count; row++) layout.rowHeights[row] = height;
+    },
+    setColumnWidth() {},
+    insertImage(_logo, ...anchor) {
+      range("logo").anchor(...anchor);
+      return range("logo");
+    }};
   const sheet = {
     getDataRange: () => ({getValues: () => values.map(row => row.slice())}),
     getRange(row, column) {
@@ -132,12 +140,18 @@ test("最小の空き番号でマスターを登録し、同じ予約の下書�
   assert.equal(drafts[0].subject, "【The Forest Gym】ご入会手続き完了のお知らせ");
   assert.match(drafts[0].body, /会員ID\nNGT000012/);
   assert.equal(drafts[0].options.attachments[0].name, "計算書／テスト会員さま.pdf");
-  const pdfRows = layout["B1:F38"].setValues[0];
+  const pdfRows = layout["B1:G38"].setValues[0];
   assert.equal(pdfRows[0][1], "テスト会員 さま");
   assert.equal(pdfRows[1][1], "NGT000012");
+  assert.equal(pdfRows[0][4], "作成日");
+  assert.equal(pdfRows[2][4].split("\n").length, 5);
+  assert.deepEqual(layout["F3:G6"].merge, []);
+  assert.deepEqual(layout["F3:G6"].setFontSize, [10]);
+  assert.equal(layout.logo.anchor[1], 7);
+  assert.ok(layout.logo.anchor[3] + layout.logo.setHeight[0] <= layout.rowHeights[7] + layout.rowHeights[8]);
   assert.equal(pdfRows[21][3], "店頭で受領済み");
   assert.equal(pdfRows[22][3], "店頭で受領済み");
-  assert.notEqual(layout["B1:F38"].setBackgrounds[0][21][0], layout["B1:F38"].setBackgrounds[0][22][0]);
+  assert.notEqual(layout["B1:G38"].setBackgrounds[0][21][0], layout["B1:G38"].setBackgrounds[0][22][0]);
   assert.equal(layout["B1:C2"].setBorder[5], true);
   assert.equal(layout.deleted, true);
   assert.equal(create(body).status, "draft");
@@ -176,7 +190,7 @@ test("既に本人が登録された予約でも家族と友達を個別に登�
   assert.equal(create(family, true).member_id, "FWD000013");
   assert.equal(drafts[1].to, "family@example.invalid");
   assert.equal(drafts[1].options.attachments[0].name, "計算書／家族　テストさま.pdf");
-  const familyPdf = layout["B1:F38"].setValues[0];
+  const familyPdf = layout["B1:G38"].setValues[0];
   assert.equal(familyPdf[1][1], "FWD000013");
   assert.equal(familyPdf[21][3], "初月会費は入会日翌日決済");
   assert.match(values[1][7], /入会区分=家族.*電話番号=0123-45-6789.*住所=八千代市　テスト住所/);
@@ -189,7 +203,7 @@ test("既に本人が登録された予約でも家族と友達を個別に登�
   assert.throws(() => create({...friend, receipts: friend.receipts.slice(0, 1)}, true), /受領/);
   assert.equal(create(friend, true).member_id, "FRG000020");
   assert.equal(drafts[2].to, friend.customer_email);
-  const friendPdf = layout["B1:F38"].setValues[0];
+  const friendPdf = layout["B1:G38"].setValues[0];
   assert.equal(friendPdf[21][3], "店頭で受領済み");
   assert.equal(friendPdf[22][3], "店頭で受領済み");
   assert.equal(values[7][18], "口座振替");

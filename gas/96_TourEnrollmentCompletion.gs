@@ -402,61 +402,67 @@ function writeTourCompletionPdf_(sheet, name, memberId, fields, title, result, l
     return regularPrice ? "（通常" + formatted + "）" : formatted;
   };
   const safeText = value => String(value).startsWith("=") ? "'" + value : value;
-  const values = Array.from({length: 38}, () => Array(5).fill(""));
-  const backgrounds = Array.from({length: 38}, () => Array(5).fill(white));
-  const colors = Array.from({length: 38}, () => Array(5).fill(dark));
+  const values = Array.from({length: 38}, () => Array(6).fill(""));
+  const backgrounds = Array.from({length: 38}, () => Array(6).fill(white));
+  const colors = Array.from({length: 38}, () => Array(6).fill(dark));
+  const issuer = ["276-0040", "千葉県八千代市緑が丘西2丁目2－1", "The Forest Gym 八千代緑が丘",
+    "047－459－5623", "www.theforestgym.com"].join("\n");
 
-  values[0] = [name ? "お名前" : "", name ? safeText(name + " さま") : "", "計算書", "作成日", dateLabel(fields.created)];
-  values[1] = [name ? "会員番号" : "", name ? memberId : "", "", "", ""];
-  values[2] = ["お支払方法", fields.method, "", "", "276-0040"];
-  values[3] = ["ご入会種別", fields.plan, "", "", "千葉県八千代市緑が丘西2丁目2－1"];
-  values[4] = [fields.plan.includes("キャンペーン") ? "選べる特典" : "", fields.benefit, "", "", "The Forest Gym 八千代緑が丘"];
-  values[5] = ["スタート日", dateLabel(fields.start), "", "", "047－459－5623"];
-  values[6] = ["ご入会区分", fields.enrollment, "", "", "www.theforestgym.com"];
+  values[0] = [name ? "お名前" : "", name ? safeText(name + " さま") : "", "計算書", "", "作成日", dateLabel(fields.created)];
+  values[1] = [name ? "会員番号" : "", name ? memberId : "", "", "", "", ""];
+  values[2] = ["お支払方法", fields.method, "", "", issuer, ""];
+  values[3] = ["ご入会種別", fields.plan, "", "", "", ""];
+  values[4] = [fields.plan.includes("キャンペーン") ? "選べる特典" : "", fields.benefit, "", "", "", ""];
+  values[5] = ["スタート日", dateLabel(fields.start), "", "", "", ""];
+  values[6] = ["ご入会区分", fields.enrollment, "", "", "", ""];
   values[7][0] = title;
-  values[8] = ["項目", "金額（税込）", "決済予定日", "摘要欄", ""];
+  values[8] = ["項目", "金額（税込）", "決済予定日", "摘要欄", "", ""];
   backgrounds[8].fill(blue);
 
   for (let row = 10; row <= 38; row++) {
     const [item, amount, due, note] = result.rows[row] || [];
-    values[row - 1] = [item || "", money(amount, row === 11 || row === 16), dateLabel(due), note || "", ""];
+    values[row - 1] = [item || "", money(amount, row === 11 || row === 16), dateLabel(due), note || "", "", ""];
     backgrounds[row - 1].fill(row % 2 === 1 ? blue : white);
     if (typeof amount === "number" && amount < 0) colors[row - 1][1] = negative;
   }
   sheet.setHiddenGridlines(true);
-  // E:F is one remarks column in the detail table. E is a gutter for the issuer details above it.
-  [170, 122, 100, 112, 233].forEach((width, index) => sheet.setColumnWidth(index + 2, width));
+  // F and G position the date independently. E:G retain one remarks column of the same width.
+  const columnWidths = [170, 122, 100, 112, 104, 129];
+  columnWidths.forEach((width, index) => sheet.setColumnWidth(index + 2, width));
   sheet.setRowHeights(1, 38, 23);
-  sheet.getRange("B1:F38").setNumberFormat("@").setValues(values).setBackgrounds(backgrounds)
+  sheet.setRowHeights(1, 2, 28);
+  sheet.setRowHeights(8, 1, 44);
+  sheet.getRange("B1:G38").setNumberFormat("@").setValues(values).setBackgrounds(backgrounds)
     .setFontColors(colors).setFontFamily("Arial").setFontSize(9).setVerticalAlignment("middle");
-  sheet.getRange("B8:F8").merge().setFontWeight("bold");
-  sheet.getRange("D1").setHorizontalAlignment("center").setFontSize(12).setFontWeight("bold");
-  sheet.getRange("F1").setHorizontalAlignment("right");
-  sheet.getRange("F3:F7").setHorizontalAlignment("left").setFontSize(8);
+  sheet.getRange("B8:E8").merge().setFontWeight("bold").setVerticalAlignment("bottom");
+  sheet.getRange("D1").setHorizontalAlignment("right").setFontSize(11).setFontWeight("bold");
+  sheet.getRange("F1:G1").setHorizontalAlignment("right");
+  sheet.getRange("G1").setFontSize(10);
+  sheet.getRange("F3:G6").merge().setHorizontalAlignment("left").setWrap(true).setFontSize(10);
   if (name) sheet.getRange("B1:C2").setBorder(null, null, true, null, null, true, dark, SpreadsheetApp.BorderStyle.SOLID);
   sheet.getRange("B3:C7").setBorder(null, null, true, null, null, true, dark, SpreadsheetApp.BorderStyle.SOLID);
   sheet.getRange("C10:C38").setHorizontalAlignment("right");
   sheet.getRange("D10:D38").setHorizontalAlignment("center");
-  sheet.getRange("B9:F38").setBorder(true, true, true, true, true, true, rule, SpreadsheetApp.BorderStyle.SOLID);
+  sheet.getRange("B9:G38").setBorder(true, true, true, true, true, true, rule, SpreadsheetApp.BorderStyle.SOLID);
   const fullWidthRows = new Set([20, 29, 30, 31, 32, 33]);
   for (let row = 9; row <= 38; row++) {
-    if (fullWidthRows.has(row)) sheet.getRange(row, 2, 1, 5).merge();
-    else sheet.getRange(row, 5, 1, 2).merge();
+    if (fullWidthRows.has(row)) sheet.getRange(row, 2, 1, 6).merge();
+    else sheet.getRange(row, 5, 1, 3).merge();
   }
-  sheet.getRange("B9:F38").setBorder(true, true, true, true, null, null, outline, SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
-  sheet.getRange("B9:F9").setHorizontalAlignment("center").setFontWeight("bold")
+  sheet.getRange("B9:G38").setBorder(true, true, true, true, null, null, outline, SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
+  sheet.getRange("B9:G9").setHorizontalAlignment("center").setFontWeight("bold")
     .setBorder(null, null, true, null, null, null, outline, SpreadsheetApp.BorderStyle.DOUBLE);
   sheet.getRange("B15:C15").setFontWeight("bold");
   sheet.getRange("B22:C24").setFontWeight("bold");
-  sheet.insertRowsBefore(8, 2);
-  sheet.setRowHeights(8, 2, 25);
-  sheet.insertImage(logo, 6, 8, 116, 0).setWidth(111).setHeight(49);
+  const logoWidth = 130;
+  const logoOffset = columnWidths[4] + columnWidths[5] - logoWidth - 9;
+  sheet.insertImage(logo, 6, 7, logoOffset, 6).setWidth(logoWidth).setHeight(Math.round(logoWidth * 135 / 303));
 }
 
 function exportTourCompletionPdf_(spreadsheetId, sheetId, filename) {
   const url = "https://docs.google.com/spreadsheets/d/" + spreadsheetId + "/export" +
     "?format=pdf&gid=" + sheetId +
-    "&r1=0&c1=1&r2=40&c2=6&size=A4&portrait=true&scale=4" +
+    "&r1=0&c1=1&r2=38&c2=7&size=A4&portrait=true&scale=4" +
     "&top_margin=0.30&bottom_margin=0.30&left_margin=0.40&right_margin=0.40" +
     "&sheetnames=false&printtitle=false&pagenumbers=false&gridlines=false&fzr=false";
   const response = UrlFetchApp.fetch(url, {headers:{Authorization:"Bearer " + ScriptApp.getOAuthToken()}});
