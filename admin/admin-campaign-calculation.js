@@ -197,7 +197,9 @@
   const memberNumberLabel = form.querySelector(".campaign-member-number");
 
   function updateMemberNumberVisibility() {
-    memberNumberLabel.classList.toggle("is-name-empty", !memberNameField.value.trim());
+    const empty = !memberNameField.value.trim();
+    memberNameField.closest("label").classList.toggle("is-name-empty", empty);
+    memberNumberLabel.classList.toggle("is-name-empty", empty);
   }
 
   function updatePrintFields() {
@@ -259,7 +261,7 @@
 
     const stylesheet = document.createElement("link");
     stylesheet.rel = "stylesheet";
-    stylesheet.href = "./admin-campaign-calculation.css?v=20261127-direct-pdf";
+    stylesheet.href = "./admin-campaign-calculation.css?v=20261128-header";
     document.head.append(stylesheet);
   }
 

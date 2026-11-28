@@ -39,9 +39,18 @@
   font-size: inherit;
 }
 
-.campaign-fields .campaign-created {
+.campaign-document-title {
   grid-column: 2;
   grid-row: 1;
+  align-self: center;
+  margin: 0;
+  font-size: 12pt;
+  font-weight: 700;
+}
+
+.campaign-fields .campaign-created {
+  grid-column: 2;
+  grid-row: 2;
   grid-template-columns: minmax(0, 1fr) 30mm;
 }
 
@@ -167,6 +176,8 @@
     row-gap: 4px;
   }
 
+  .campaign-sheet:not(.campaign-paper) .campaign-document-title { grid-column: 1; grid-row: 1; }
+
   .campaign-sheet:not(.campaign-paper) .campaign-fields .campaign-created {
     grid-column: 1;
     grid-row: auto;
@@ -207,6 +218,10 @@
   height: auto;
   margin: 1px 6mm 0 auto;
 }
+
+.campaign-member-name.is-name-empty > span:first-child { visibility: hidden; }
+
+.campaign-member-name.is-name-empty input { border-bottom-color: transparent; }
 
 .campaign-member-number.is-name-empty {
   visibility: hidden;
