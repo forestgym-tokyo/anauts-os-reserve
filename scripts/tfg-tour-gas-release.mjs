@@ -5,6 +5,7 @@ import vm from 'node:vm';
 import crypto from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+import {proveMembershipLibrary} from './prove-tfg-membership-lock.mjs';
 import {inspectTfgMembershipWriters} from './inspect-tfg-membership-writers.mjs';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
@@ -55,6 +56,7 @@ try{
  } catch {
   notice('membership_writer_audit=unavailable');
  }
+ notice('membership_lock_proof='+JSON.stringify(await proveMembershipLibrary(authFile)));
  clasp(['pull']);const baselineSource=path.join(baseline,'gas'),before=hashes(baselineSource);
  project=projectFile(stage,config.scriptId);const stageSource=path.join(stage,'gas');fs.cpSync(baselineSource,stageSource,{recursive:true});
  const overlay=spawnSync(process.execPath,[path.join(root,'scripts/gas-tfg-tour-overlay.mjs'),stageSource],{cwd:root,encoding:'utf8',maxBuffer:16*1024*1024});
