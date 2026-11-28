@@ -9,6 +9,7 @@ const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const base='410406868548308d7e9745cd9f45689aa296f967';
 const deployed='81993fb927b368bae8c496b7616364b27d2c27a4';
 const calculationDraftRelease='f29aa07a4c5c869fabc9e1d3af8926f7a93b0424';
+const enrollmentFormRelease='8ab107d12a49f4579fe32b76a531e35a85d080af';
 const live=path.resolve(process.argv[2]||'.gas-live');
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'tfg-tour-overlay-'));
 const files=['21_Service.gs.js','28_Availability.gs.js','29_Reservation.gs.js','40_ReservationMail.gs.js','46_TourQuestionnairePrint.js','46_1_TourQuestionnairePrintFast.js','60_StoreAwareAssignment.js'];
@@ -84,8 +85,14 @@ try{
   const current=fs.existsSync(target)?fs.readFileSync(target,'utf8'):null;
   if(current===null||current===source){pending.push([target,source]);continue;}
   if(name!=='96_TourEnrollmentCompletion.js')throw Error(name+' already exists with different content');
-  const prior=execFileSync('git',['show',calculationDraftRelease+':'+sourcePath],{cwd:root,encoding:'utf8'});
-  pending.push([target,applyHunks(current,patchBetween(prior,source,5),name)]);
+  const patchCompletion=ref=>{
+   const prior=execFileSync('git',['show',ref+':'+sourcePath],{cwd:root,encoding:'utf8'});
+   return applyHunks(current,patchBetween(prior,source,5),name);
+  };
+  let staged;
+  try{staged=patchCompletion(enrollmentFormRelease);}
+  catch{staged=patchCompletion(calculationDraftRelease);}
+  pending.push([target,staged]);
  }
  for(const [target,source] of pending)fs.writeFileSync(target,source);
  console.log(JSON.stringify({status:'patched',files:pending.map(([file])=>path.basename(file))}));

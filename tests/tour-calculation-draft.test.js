@@ -203,14 +203,16 @@ test("既に本人が登録された予約でも家族と友達を個別に登�
   assert.equal(files.length, 3);
 });
 
-test("予約の連絡先が空欄でも、入会手続きに入力されたご本人の情報で作成する", () => {
-  const {reservation, drafts, request, create} = fixture("2026-11-28");
+test("予約の連絡先と入会手続きの住所が空欄でも、入力されたご本人の情報で作成する", () => {
+  const {reservation, drafts, values, request, create} = fixture("2026-11-28");
   reservation.customer_name = reservation.customer_email = "";
   const body = {...request({payment: "card", start: "2026-12-01"}),
     enrollment_type: "SELF", customer_name: "ご本人テスト", customer_email: "self@example.invalid",
-    customer_phone: "0123-45-6712", customer_address: "八千代市 テスト"};
+    customer_phone: "0123-45-6712", customer_address: ""};
+  assert.throws(() => create({...body, customer_phone: ""}, true), /電話番号/);
   assert.throws(() => create({...body, customer_email: "other@example.com,self@example.invalid"}, true), /メールアドレス/);
   assert.equal(create(body, true).member_id, "NGT000012");
+  assert.match(values[2][7], /住所= \/ 支払方法=/);
   assert.equal(drafts[0].to, body.customer_email);
   assert.match(drafts[0].body, /2026年末感謝プラスキャンペーン/);
 });

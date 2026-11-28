@@ -133,7 +133,7 @@
               <label>氏名<input id="tourEnrollName" name="customer_name" autocomplete="name" required></label>
               <label>メールアドレス<input id="tourEnrollEmail" name="customer_email" type="email" autocomplete="email" required></label>
               <label>電話番号<input id="tourEnrollPhone" name="customer_phone" type="tel" autocomplete="tel" required></label>
-              <label>住所<input id="tourEnrollAddress" name="customer_address" autocomplete="street-address" required></label>
+              <label>住所（任意）<input id="tourEnrollAddress" name="customer_address" autocomplete="street-address"></label>
               <label>支払方法
                 <select id="tourEnrollPayment" name="payment_method" required>
                   <option value="">支払方法を選択</option>
@@ -321,8 +321,8 @@
       }
       if (refreshDate() || submit.disabled) return;
       const applicant = Object.fromEntries(Object.keys(source).map(field => [field, fields[field].value.trim()]));
-      if (Object.values(applicant).some(value => !value)) {
-        message.textContent = "氏名・メールアドレス・電話番号・住所をすべて入力してください。";
+      if (!applicant.customer_name || !applicant.customer_email || !applicant.customer_phone) {
+        message.textContent = "氏名・メールアドレス・電話番号をすべて入力してください。";
         return;
       }
       if (!/^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(applicant.customer_email)) {
@@ -344,7 +344,7 @@
         `入会者　${applicant.customer_name}（${applicantTypes[kind]}）`,
         `宛先　${applicant.customer_email}`,
         `電話番号　${applicant.customer_phone}`,
-        `住所　${applicant.customer_address}`,
+        ...(applicant.customer_address ? [`住所　${applicant.customer_address}`] : []),
         `支払方法　${paymentLabels[payment.value]}`,
         `プラン　${plan.selectedOptions[0].text}`,
         `スタート日　${start.value}`,

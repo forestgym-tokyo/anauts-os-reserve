@@ -111,9 +111,17 @@ function requireActiveTourCompletionReservation_(reservationId) {
 
 function getTourCompletionApplicant_(body) {
   const applicant = normalizeTourJoinInput_(body);
-  validateTourJoinInput_(applicant);
+  if (!applicant.reservationId) throw new Error("見学予約IDを取得できません。");
+  if (!applicant.customerName) throw new Error("氏名を入力してください。");
+  if (!applicant.customerEmail) throw new Error("メールアドレスを入力してください。");
   if (!/^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(applicant.customerEmail)) {
     throw new Error("メールアドレスを確認してください。");
+  }
+  if (!applicant.customerPhone) throw new Error("電話番号を入力してください。");
+  if (!applicant.planCode) throw new Error("プランを選択してください。");
+  if (!applicant.startDate) throw new Error("スタート日を選択してください。");
+  if (!["SELF", "FAMILY", "FRIEND"].includes(applicant.enrollmentType)) {
+    throw new Error("入会区分が正しくありません。");
   }
   requireActiveTourCompletionReservation_(applicant.reservationId);
   return applicant;
