@@ -47,11 +47,19 @@ async function connect(authFile) {
 
 const fingerprint = files => files.map(({name,type,source}) =>
   JSON.stringify([name,type,type === 'JSON' ? JSON.parse(source) : source])).sort().join('\n');
+const sameLibrary = (left, right) => left.libraryId === right.libraryId &&
+  Number(left.version) === Number(right.version) && !left.developmentMode && !right.developmentMode;
+const findLibrary = files => JSON.parse(files.find(file => file.type === 'JSON' && file.name === 'appsscript').source)
+  .dependencies?.libraries?.find(library => library.userSymbol === librarySymbol);
 
 export function addTfgMemberNumberLibrary(manifest, library) {
   const deps = manifest.dependencies || {};
   const libraries = deps.libraries || [];
-  if (libraries.some(item => item.userSymbol === librarySymbol)) throw new Error('Member number library already exists');
+  const present = libraries.find(item => item.userSymbol === librarySymbol);
+  if (present) {
+    if (!sameLibrary(present, library)) throw new Error('Member number library binding differs');
+    return manifest;
+  }
   return {...manifest, dependencies: {...deps, libraries: [...libraries, library]}};
 }
 
@@ -128,11 +136,24 @@ export async function prepareTfgNumberLockRelease(authFile, adminProject, adminV
   }
   if (fingerprint(legacy.files) !== fingerprint(legacyPublished.files)) throw new Error('WEB project has unpublished source changes');
   if (fingerprint(admin.files) !== fingerprint(adminPublished.files)) throw new Error('Admin project has unpublished source changes');
+  const existing = findLibrary(legacy.files);
+  const adminLibrary = findLibrary(admin.files);
+  if (adminLibrary && (!existing || !sameLibrary(adminLibrary, existing))) throw new Error('Published enrollment library bindings differ');
   const placeholder = {userSymbol: librarySymbol, libraryId: 'preflight', version: '1', developmentMode: false};
-  const preflight = stageLegacyWeb(legacy.files, placeholder);
-  const changed = preflight.filter((file,index) => file.source !== legacy.files[index].source);
-  if (changed.length !== 2 || !changed.some(file => file.type === 'JSON' && file.name === 'appsscript')) throw new Error('Unexpected WEB scope');
-  notice('web_signup_preflight_passed=true; current_version=' + oldVersion + '; edited_files=2');
+  if (existing) {
+    const library = await script('/' + existing.libraryId + '/content?versionNumber=' + existing.version, 'verify existing shared lock');
+    const files = library.files.filter(file => file.type === 'SERVER_JS');
+    if (existing.developmentMode || files.length !== 1 || files[0].source.trim() !== lockSource ||
+        !legacy.files.some(file => file.source.includes('function registerToMasterWithCurrentRules_(') &&
+          file.source.includes('TfgMembershipNumbers.withMemberNumberLock('))) {
+      throw new Error('The existing WEB shared lock could not be verified');
+    }
+  } else {
+    const preflight = stageLegacyWeb(legacy.files, placeholder);
+    const changed = preflight.filter((file,index) => file.source !== legacy.files[index].source);
+    if (changed.length !== 2 || !changed.some(file => file.type === 'JSON' && file.name === 'appsscript')) throw new Error('Unexpected WEB scope');
+  }
+  notice('web_signup_preflight_passed=true; current_version=' + oldVersion + '; edited_files=' + (existing ? 0 : 2));
 
   let version, stagedWeb, stagedWebFingerprint, wroteSource = false;
   async function deploymentVersion() {
@@ -160,6 +181,10 @@ export async function prepareTfgNumberLockRelease(authFile, adminProject, adminV
           fingerprint((await script(base + '/content', 'recheck WEB source')).files) !== fingerprint(legacy.files)) {
         throw new Error('WEB project changed during preflight');
       }
+      if (existing) {
+        version = oldVersion;
+        return {library: existing, drainStart: Date.parse(deployment.updateTime) || Date.now()};
+      }
       const created = await script('', 'create private TFG number lock library', 'POST', {title: 'TFG 会員番号 採番ロック'});
       const lib = '/' + created.scriptId;
       await script(lib + '/content', 'install private shared lock', 'PUT', {files: [
@@ -179,7 +204,7 @@ export async function prepareTfgNumberLockRelease(authFile, adminProject, adminV
       await setDeployment(version);
       await verifyWebInitialization();
       notice('web_signup_lock_live=true; version=' + version + '; previous_version=' + oldVersion);
-      return library;
+      return {library, drainStart: Date.now()};
     },
     async verify() {
       if (await deploymentVersion() !== version) throw new Error('WEB deployment changed before admin activation');

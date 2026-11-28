@@ -168,3 +168,31 @@ test("PDF作成中に空き番号が使用されたら作成を中止し、元�
   assert.equal(drafts[0].deleted, true);
   assert.equal(files[0].trashed, true);
 });
+
+test("会員マスターへの書き込みを共通ロックの解除前に確定する", () => {
+  const {context} = fixture();
+  const events = [];
+  context.TfgMembershipNumbers = {withMemberNumberLock(callback) {
+    events.push("lock");
+    try { return callback(); }
+    finally { events.push("unlock"); }
+  }};
+  context.SpreadsheetApp.flush = () => events.push("flush");
+  const result = context.withTfgMemberNumberLock_(() => {
+    events.push("master write");
+    return "draft";
+  });
+  assert.equal(result, "draft");
+  assert.deepEqual(events, ["lock", "master write", "flush", "unlock"]);
+});
+
+test("再デプロイ時に同じライブラリを再利用し、既存の依存関係を保持する", async () => {
+  const {addTfgMemberNumberLibrary} = await import("../scripts/tfg-membership-lock-release.mjs");
+  const original = {dependencies: {enabledAdvancedServices: [{userSymbol: "Calendar"}]}};
+  const library = {userSymbol: "TfgMembershipNumbers", libraryId: "test-only", version: "1", developmentMode: false};
+  const staged = addTfgMemberNumberLibrary(original, library);
+  assert.deepEqual(staged.dependencies.enabledAdvancedServices, original.dependencies.enabledAdvancedServices);
+  assert.deepEqual(staged.dependencies.libraries, [library]);
+  assert.equal(addTfgMemberNumberLibrary(staged, library), staged);
+  assert.throws(() => addTfgMemberNumberLibrary(staged, {...library, version: "2"}), /binding differs/);
+});

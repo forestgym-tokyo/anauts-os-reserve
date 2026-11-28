@@ -88,14 +88,15 @@ try{
    if(currentDeployment().versionNumber!==oldVersion)fail('Existing deployment changed during preflight; nothing pushed');
   }
   recheckAdmin('before-web-lock');
-  const library=await webRollout.activateWebLock();
+  const {library,drainStart}=await webRollout.activateWebLock();
   const manifestPath=path.join(stageSource,'appsscript.json');
   const manifest=addTfgMemberNumberLibrary(JSON.parse(fs.readFileSync(manifestPath,'utf8')),library);
   fs.writeFileSync(manifestPath,JSON.stringify(manifest,null,2)+'\n');
   stagedAdmin=hashes(stageSource);
   // Earlier WEB executions may still be running without the library lock.
-  notice('waiting_for_previous_web_executions=true; seconds=360');
-  for(let minute=0;minute<6;minute++)await new Promise(resolve=>setTimeout(resolve,60000));
+  const drainEnd=drainStart+360000;
+  if(drainEnd>Date.now())notice('waiting_for_previous_web_executions=true; seconds='+Math.ceil((drainEnd-Date.now())/1000));
+  while(drainEnd>Date.now())await new Promise(resolve=>setTimeout(resolve,Math.min(60000,drainEnd-Date.now())));
   await webRollout.verify();
   recheckAdmin('before-admin-drafts');
   const backup=json(clasp(['create-version','Before TFG tour release '+revision.slice(0,7)]),'backup version');backupVersion=backup.versionNumber;if(!Number.isInteger(backupVersion))fail('Native source backup could not be confirmed');
