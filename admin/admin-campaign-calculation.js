@@ -12,7 +12,7 @@
   else {
     // A previously installed home-screen app can load this script with cached HTML.
     const script = document.createElement("script");
-    script.src = "./campaign-calculation-rules.js?v=20261128-tour-enrollment";
+    script.src = "./campaign-calculation-rules.js?v=20261128-tour-calculation";
     script.onload = () => initialize(globalThis.CampaignCalculationRules);
     document.head.append(script);
   }
@@ -154,8 +154,11 @@
     const {consent, cardRegistered, bankReceived} = confirmation.elements;
     const bank = data.method === "口座振替";
     const card = data.method === "クレジット";
+    const preview = session.status === "preview";
     const receiptFees = result.receiptFees || [];
-    cardRegistered.closest("label").hidden = !card;
+    consent.closest("label").hidden = preview;
+    cardRegistered.closest("label").hidden = !card || preview;
+    if (preview) confirmation.hidden = !bank;
     bankReceived.closest("label").hidden = !bank;
     receiptList.hidden = !bank || !receiptFees.length;
     receiptList.replaceChildren(...receiptFees.map(({label, amount}) => {
@@ -192,7 +195,7 @@
         <form class="tour-calculation-confirmation" autocomplete="off" hidden>
           <label><input type="checkbox" name="consent"> ご本人の入会同意を確認した</label>
           <label><input type="checkbox" name="cardRegistered"> 月額パンダのクレカ登録を確認した</label>
-          <label><input type="checkbox" name="bankReceived"> 次の会費を店頭で受領した</label>
+          <label><input type="checkbox" name="bankReceived"> <span>次の会費を店頭で受領した</span></label>
           <ul></ul>
         </form>
         <div class="tour-calculation-actions"><p role="status"></p><button class="primary-button" type="button" data-submit disabled>下書き作成</button></div>
@@ -281,6 +284,14 @@
       applyStatus(data, data.status === "draft" ? `登録済みです。会員番号 ${data.member_id} のメールをGmailで確認してください。` : "");
     } catch (error) {
       if (tour !== session || !dialog.open) return;
+      if (error.message === "指定されたactionは存在しません。") {
+        session.status = "preview";
+        session.submit.hidden = true;
+        session.confirmation.elements.bankReceived.nextElementSibling.textContent = "受領済みの表示を確認する";
+        status.textContent = "会費の確認用です。会員登録とGmail下書き作成はサーバー更新後に利用できます。";
+        render();
+        return;
+      }
       status.textContent = error.message || "見学予約を取得できませんでした。";
     }
   };
@@ -304,7 +315,7 @@
 
     const stylesheet = document.createElement("link");
     stylesheet.rel = "stylesheet";
-    stylesheet.href = "./admin-campaign-calculation.css?v=20261128-tour-enrollment";
+    stylesheet.href = "./admin-campaign-calculation.css?v=20261128-tour-calculation";
     document.head.append(stylesheet);
   }
 
