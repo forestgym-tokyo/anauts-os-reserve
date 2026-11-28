@@ -327,6 +327,78 @@
   min-width: 0;
 }
 
+.tour-calculation-button {
+  white-space: nowrap;
+}
+
+.tour-calculation-dialog {
+  width: min(980px, calc(100% - 24px));
+  max-width: none;
+  max-height: 94vh;
+  max-height: 94dvh;
+  padding: 0;
+  overflow: auto;
+  border: 1px solid #d4dedb;
+  border-radius: 16px;
+  background: #edf2f0;
+  color: #20252d;
+  box-shadow: 0 24px 80px #101b1a59;
+}
+
+.tour-calculation-dialog::backdrop { background: #10201dcc; }
+
+.tour-calculation-dialog > header,
+.tour-calculation-dialog > footer {
+  padding: 14px clamp(12px, 3vw, 26px);
+  background: #fff;
+}
+
+.tour-calculation-dialog > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid #d6e1dd;
+}
+
+.tour-calculation-dialog > header h2 { margin: 0; font-size: 1.08rem; }
+
+.tour-calculation-dialog > footer { border-top: 1px solid #d6e1dd; }
+
+.tour-calculation-mount { padding: 14px clamp(8px, 2vw, 18px); }
+
+.tour-calculation-mount #campaignCalculationView { display: block; animation: none; }
+
+.tour-calculation-mount .campaign-actions > label:first-child,
+.tour-calculation-mount .campaign-actions > button,
+.tour-calculation-mount #campaignCalculationPdfStatus { display: none; }
+
+.tour-calculation-mount .campaign-member-name,
+.tour-calculation-mount .campaign-member-number { visibility: hidden; }
+
+.tour-calculation-mount .campaign-fields select:disabled { opacity: 1; }
+
+.tour-calculation-email { margin: 0 0 8px; overflow-wrap: anywhere; font-weight: 700; }
+
+.tour-calculation-confirmation label { display: block; padding: 5px 0; cursor: pointer; }
+
+.tour-calculation-confirmation input { margin-right: 4px; accent-color: #235942; }
+
+.tour-calculation-confirmation ul { margin: 2px 0 0; padding-inline-start: 2.6em; }
+
+.tour-calculation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: end;
+  align-items: center;
+  gap: 8px 20px;
+  margin-top: 8px;
+}
+
+.tour-calculation-actions p { margin: 0 auto 0 0; }
+
+.tour-calculation-dialog [hidden] { display: none; }
+
 @media print {
   @page campaign-calculation {
     size: A4 portrait;

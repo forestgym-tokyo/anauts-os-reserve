@@ -1,140 +1,28 @@
-(() => {
+(function loadCampaignCalculation(initialize) {
   "use strict";
 
-  // 「計算書」 I1:I3, O2:R7. O8 is the blank choice in the plan list.
-  const plans = {
-    "キャンペーンレギュラー": [4950, 5940, 7480],
-    "キャンペーン平日DAY": [4180, 4510, 6050],
-    "キャンペーンNIGHT365": [3300, 3960, 4950],
-    "レギュラー": [7480, 5940, 7480],
-    "平日DAY": [6050, 4510, 6050],
-    "NIGHT365": [4950, 3960, 4950]
-  };
-
-  const tokyoDate = new Intl.DateTimeFormat("sv-SE", {timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit"});
-  const date = (year, month, day) => new Date(Date.UTC(year, month - 1, day)).toISOString().slice(0, 10);
-  const dayOf = value => Number(value.slice(-2));
-  const monthOf = value => Number(value.slice(5, 7));
-  const monthKey = (year, month) => date(year, month, 1).slice(0, 7);
-  const titles = {
-    "2026-11": "秋の超得プラスキャンペーン",
-    "2026-12": "2026年末感謝プラスキャンペーン"
-  };
-  const defaultFields = {method: "クレジット", plan: "キャンペーンレギュラー",
-    benefit: "パーソナル無料", enrollment: "WEB／見学日入会"};
-  const commonLists = {
-    method: ["", "口座振替", "クレジット"],
-    plan: [...Object.keys(plans), ""],
-    benefit: ["", "パーソナル無料", "2か月目会費無料"],
-    enrollment: ["－", "WEB／見学日入会", ""]
-  };
-
-  function availableMonths(now, channel) {
-    const today = tokyoDate.format(now);
-    const [year, month, day] = today.split("-").map(Number);
-    const current = monthKey(year, month);
-    return channel === "store" && day >= 27 ? [current, monthKey(year, month + 1)] : [current];
+  if (typeof module !== "undefined") {
+    module.exports = require("./campaign-calculation-rules.js");
+    return;
   }
 
-  function campaignPeriod(key) {
-    const [year, month] = key.split("-").map(Number);
-    const days = dayOf(date(year, month + 1, 0));
-    const previousDays = dayOf(date(year, month, 0));
-    const inMonth = day => date(year, month, day);
-    const earliestDay = 27 - previousDays;
-    const created = Array.from({length: days + 5 - earliestDay + 1}, (_, i) => inMonth(earliestDay + i));
-    const start = Array.from({length: days + (key === "2026-11" ? 1 : 0)}, (_, i) => inMonth(i + 1));
-    return {year, month, days, created, start, inMonth, title: titles[key] || `${year}年${month}月プラスキャンペーン`};
-  }
-
-  const defaults = {created: "2026-11-25", start: "2026-11-25", ...defaultFields};
-  const november = campaignPeriod("2026-11");
-  const lists = {...commonLists, created: november.created, start: november.start};
-  const lookupError = "#N/A";
-  const valueError = "#VALUE!";
-
-  function calculate({created, start, method, plan, benefit, enrollment}, key = "2026-11") {
-    const {year, month, days, created: joinDates, start: startDates, inMonth} = campaignPeriod(key);
-    const paymentCycle = inMonth(27);
-    const firstDay = inMonth(1);
-    const campaign = plan.includes("キャンペーン");
-    const plus = campaign && enrollment === "WEB／見学日入会"; // B19
-    const freeSecond = benefit === "2か月目会費無料";
-    // The revised fee lookups include NIGHT365 in row 7.
-    const rates = plans[plan];
-    const [monthly, permanent, normal] = rates || [];
-    const validCreated = joinDates.includes(created);
-    const afterCreated = validCreated ? date(Number(created.slice(0, 4)), monthOf(created), dayOf(created) + 1) : lookupError;
-    const earlierMonth = created < firstDay; // G5, L5:L9
-    const createdDay = earlierMonth || (key === "2026-11" && monthOf(created) < monthOf(start)) ? 0 : dayOf(created);
-    const credit = method === "クレジット";
-    const bank = method === "口座振替";
-    const thirdMonth = freeSecond || (credit ? createdDay >= 27 : createdDay > 8); // G21, B24
-
-    const joiningFee = campaign ? -5500 : 5500; // C12
-    const processingFee = campaign ? -3300 : 3300; // C13
-    const initial = joiningFee + processingFee; // C14
-    const monthDiscount = rates ? (campaign ? monthly - normal : normal) : lookupError; // C17
-    const plusDiscount = plus ? ({ "パーソナル無料": -6600, "2か月目会費無料": -monthly })[benefit] ?? "" : "";
-    const prorate = day => Math.trunc(monthly - (day - 1) * (monthly / days)); // I5:I35
-    const first = rates && startDates.includes(start) ? prorate(dayOf(start)) || "-" : lookupError;
-    const firstDate = first === lookupError ? first : first === "-" ? "" : bank && key === "2026-11" ? created : afterCreated;
-    let secondDate; // D23 reads L5:L39 on the credit path.
-    if (earlierMonth) secondDate = paymentCycle; // H31
-    else if (bank) secondDate = dayOf(created) < 9 ? paymentCycle : firstDate;
-    else if (!validCreated) secondDate = lookupError;
-    else secondDate = dayOf(created) < 27 ? paymentCycle : afterCreated;
-    const thirdDate = thirdMonth ? inMonth(days + 27) : ""; // D24 is text in Excel.
-    const loyalty = rates ? permanent - normal : lookupError;
-    // B36 and C36 are blank for non-campaign plans.
-    const totalLabel = campaign ? "初年度キャンペーン値引計" : "";
-    let total = "";
-    if (campaign) {
-      if (first === lookupError) total = lookupError;
-      else if (first === "-" || plusDiscount === "") total = valueError;
-      else total = (monthly - normal) * first / prorate(1) + initial + plusDiscount + monthDiscount * 12;
-    }
-    const enrollmentNote = {WEB: "見学不要・WEB入会で全額値引", 見学: "見学当日入会で半額額値引"};
-
-    // Row numbers correspond to the printed sheet, with C36 shown below it.
-    return {
-      rows: {
-        10: [campaign ? "■キャンペーン値引明細" : ""],
-        11: [campaign ? "・超得１ 初期費用値引特典" : "■初期費用", campaign ? 8800 : ""],
-        12: [campaign ? "　入会金値引き" : "　入会金", joiningFee, "", enrollmentNote[enrollment]],
-        13: [campaign ? "　事務手数料値引" : "　事務手数料", processingFee, "", enrollmentNote[enrollment]],
-        14: [campaign ? "　初期費用値引計" : "　初期費用計", initial, plus ? "" : created, campaign ? "" : "初期費用は入会日決済"],
-        15: [campaign ? "　初期費用計" : "", campaign ? 0 : ""],
-        16: [campaign ? "・超得2 月会費値引特典" : "", campaign ? normal : ""],
-        17: [campaign ? "　月会費値引（初年度）" : "■月会費", monthDiscount, "", campaign ? `${year + 1}年${month}月会費まで毎月値引` : ""],
-        19: [plus ? "・プラス割 選べる特典" : "", plusDiscount, "",
-          plus ? (freeSecond ? "2か月目会費0円" : "パーソナルトレーニング（プライム）１回券プレゼント") : ""],
-        20: [plus ? "　注）プラス割はWEB直接／見学当日入会のみ。 見学→後日WEB入会は対象外" : ""],
-        21: ["■決済スケジュール"],
-        22: [`　${month}月会費`, first, firstDate, (credit || key !== "2026-11") ?
-          (firstDate === lookupError ? lookupError : firstDate && firstDate === afterCreated ? "初月会費は入会日翌日決済" : "") :
-          "初月会費はご入会日現金決済"],
-        23: [`　${monthOf(inMonth(days + 1))}月会費`, freeSecond ? 0 : monthly ?? lookupError, secondDate,
-          freeSecond ? "選べる特典／2か月目無料" : dayOf(created) === 27 ? "" :
-            secondDate === lookupError ? lookupError : dayOf(secondDate) === 27 ? "通常決済サイクル" : ""],
-        24: thirdMonth ? [`　${monthOf(inMonth(days + 32))}月会費`, monthly ?? lookupError, thirdDate,
-          secondDate === lookupError ? lookupError : dayOf(secondDate) > 27 ? "通常決済サイクル" : ""] : [],
-        25: [], // B25 is empty, so D25 and E25 both return empty.
-        26: ["長期継続割引", loyalty || "", "", loyalty === lookupError ? lookupError : loyalty ? "2年目以降長期継続値引（永久値引）が適用されます。" : ""],
-        29: [campaign ? "本キャンペーン値引き適用に際するご注意点" : ""],
-        30: [campaign ? `1．本キャンペーンは、${year + 1}年${month}月末以降までのご利用が前提となります。` : ""],
-        31: [campaign ? `2．ご入会後、満3か月間経過したのちはいつでも退会可能ですが、${year + 1}年${month}月末より前に退会（早期退会）の場合` : ""],
-        32: [campaign ? "　　キャンペーン価格が適用されず、上記①から③の値引き額が精算対象となります。" : ""],
-        33: [campaign ? "3．休会期間中は、継続期間に含めないため、初年度値引期日、継続条件期日の双方が休会期間分延長されます。" : ""]
-      },
-      totalLabel,
-      total
-    };
-  }
-
-  if (typeof module !== "undefined") module.exports = {calculate, defaults, lists, availableMonths, campaignPeriod};
   if (typeof document === "undefined") return;
+  const rules = globalThis.CampaignCalculationRules;
+  if (rules) initialize(rules);
+  else {
+    // A previously installed home-screen app can load this script with cached HTML.
+    const script = document.createElement("script");
+    script.src = "./campaign-calculation-rules.js?v=20261128-tour-calculation";
+    script.onload = () => initialize(globalThis.CampaignCalculationRules);
+    document.head.append(script);
+  }
 
+})(function initializeCampaignCalculation(rules) {
+  "use strict";
+
+  const {calculate, calculateTourEnrollment, campaignPeriod, availableMonthsForDate, commonLists, defaultFields,
+    tourPlanCodes, tourBenefitCodes} = rules;
+  const tokyoDate = new Intl.DateTimeFormat("sv-SE", {timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit"});
   const form = document.querySelector("#campaignCalculationForm");
   if (!form) return;
   const view = document.querySelector("#campaignCalculationView");
@@ -158,6 +46,7 @@
   const monthField = view.querySelector("#campaignCalculationMonth");
   const title = view.querySelector(".campaign-title");
   let selectedMonth = "";
+  let tour = null;
 
   function setChoices(field, choices, selected) {
     field.replaceChildren(...choices.map(value =>
@@ -170,18 +59,27 @@
   }
 
   function refreshCampaign(now = new Date()) {
-    const months = availableMonths(now, channelField.value);
+    const today = tokyoDate.format(now);
+    const months = availableMonthsForDate(today, channelField.value);
     const allowed = Array.from(monthField.options, option => option.value);
     const nextMonth = months.includes(monthField.value) ? monthField.value : months[0];
     if (months.join() !== allowed.join()) setChoices(monthField, months, nextMonth);
     monthField.disabled = months.length === 1;
-    if (selectedMonth === nextMonth) return;
-    selectedMonth = nextMonth;
-    const period = campaignPeriod(nextMonth);
-    const today = tokyoDate.format(now);
-    setChoices(form.elements.namedItem("created"), period.created, period.created.includes(today) ? today : period.created[0]);
-    setChoices(form.elements.namedItem("start"), period.start, period.start.includes(today) ? today : period.start[0]);
-    title.textContent = period.title;
+    if (selectedMonth !== nextMonth) {
+      const period = campaignPeriod(nextMonth);
+      selectedMonth = nextMonth;
+      setChoices(form.elements.created, period.created, period.created.includes(today) ? today : period.created[0]);
+      setChoices(form.elements.start, period.start, period.start.includes(today) ? today : period.start[0]);
+      title.textContent = period.title;
+    }
+    if (tour) {
+      form.elements.created.value = today;
+      const start = form.elements.start;
+      for (const option of start.options) {
+        option.hidden = option.disabled = option.value < today || !option.value.startsWith(`${selectedMonth}-`);
+      }
+      if (start.selectedOptions[0]?.disabled) start.value = Array.from(start.options).find(option => !option.disabled)?.value || "";
+    }
   }
 
   const printFields = Array.from(form.querySelectorAll("input, select"), field => {
@@ -215,8 +113,16 @@
   function render() {
     refreshCampaign();
     updateMemberNumberVisibility();
-    const data = Object.fromEntries(new FormData(form));
-    const result = calculate(data, selectedMonth);
+    const data = Object.fromEntries(printFields.map(([field]) => [field.name, field.value]));
+    if (tour) {
+      const selection = [selectedMonth, data.created, data.method, data.plan, data.benefit, data.start].join("|");
+      if (tour.selection !== selection) {
+        tour.confirmation.querySelectorAll("input").forEach(input => { input.checked = false; });
+        tour.selection = selection;
+      }
+    }
+    const result = tour ? calculateTourEnrollment(data, selectedMonth, tour.confirmation.elements.bankReceived.checked) :
+      calculate(data, selectedMonth);
     const rows = [];
     for (let row = 10; row <= 38; row++) {
       const [label, amount, due, note] = result.rows[row] || [];
@@ -240,7 +146,155 @@
     total.textContent = formatMoney(result.total).replace(/^([^▲#]+)円$/, "$1");
     total.classList.toggle("campaign-negative", result.total < 0);
     form.elements.benefit.closest("label").classList.toggle("campaign-no-benefit-label", !data.plan.includes("キャンペーン"));
+    if (tour) syncTourControls(tour, data, result);
   }
+
+  function syncTourControls(session, data, result) {
+    const {confirmation, submit, receiptList} = session;
+    const {consent, cardRegistered, bankReceived} = confirmation.elements;
+    const bank = data.method === "口座振替";
+    const card = data.method === "クレジット";
+    const preview = session.status === "preview";
+    const receiptFees = result.receiptFees || [];
+    consent.closest("label").hidden = preview;
+    cardRegistered.closest("label").hidden = !card || preview;
+    if (preview) confirmation.hidden = !bank;
+    bankReceived.closest("label").hidden = !bank;
+    receiptList.hidden = !bank || !receiptFees.length;
+    receiptList.replaceChildren(...receiptFees.map(({label, amount}) => {
+      const item = document.createElement("li");
+      item.textContent = `${label} ${formatMoney(amount)}`;
+      return item;
+    }));
+    const planCode = tourPlanCodes[data.plan];
+    const benefitCode = tourBenefitCodes[data.benefit] || "";
+    const validPlan = planCode && (!planCode.startsWith("CP_") || benefitCode);
+    const firstMonthFee = result.rows[22][1];
+    const paymentConfirmed = (card && cardRegistered.checked) || (bank && bankReceived.checked && receiptFees.length > 0);
+    submit.disabled = session.status !== "new" || session.submitting || !validPlan || !consent.checked ||
+      !paymentConfirmed || !Number.isInteger(firstMonthFee);
+    session.request = {
+      action: "createTourEnrollmentCalculationDraft", reservation_id: session.reservationId,
+      confirmed_email: session.email, payment_method: bank ? "bank" : "card",
+      created_date: data.created, start_date: data.start, plan_code: planCode, benefit_code: benefitCode,
+      consent_confirmed: consent.checked, card_registered: card && cardRegistered.checked, first_month_fee: firstMonthFee,
+      receipts: bank && bankReceived.checked ? receiptFees.map(({row, amount}) => ({row, amount})) : []
+    };
+  }
+
+  window.openTourEnrollmentCalculation = async function (reservationId) {
+    if (tour || !reservationId) return;
+    const dialog = document.createElement("dialog");
+    dialog.className = "tour-calculation-dialog";
+    dialog.setAttribute("aria-labelledby", "tourCalculationTitle");
+    dialog.innerHTML = `
+      <header><h2 id="tourCalculationTitle">見学からの入会計算書</h2><button class="ghost-button" type="button" data-close>閉じる</button></header>
+      <div class="tour-calculation-mount"></div>
+      <footer>
+        <p class="tour-calculation-email" hidden></p>
+        <form class="tour-calculation-confirmation" autocomplete="off" hidden>
+          <label><input type="checkbox" name="consent"> ご本人の入会同意を確認した</label>
+          <label><input type="checkbox" name="cardRegistered"> 月額パンダのクレカ登録を確認した</label>
+          <label><input type="checkbox" name="bankReceived"> <span>次の会費を店頭で受領した</span></label>
+          <ul></ul>
+        </form>
+        <div class="tour-calculation-actions"><p role="status"></p><button class="primary-button" type="button" data-submit disabled>下書き作成</button></div>
+      </footer>`;
+    const mount = dialog.querySelector(".tour-calculation-mount");
+    const status = dialog.querySelector('[role="status"]');
+    const email = dialog.querySelector(".tour-calculation-email");
+    const session = {
+      dialog, reservationId, status: "loading", email: "", submitting: false,
+      confirmation: dialog.querySelector(".tour-calculation-confirmation"),
+      receiptList: dialog.querySelector(".tour-calculation-confirmation ul"),
+      submit: dialog.querySelector("[data-submit]")
+    };
+    const previous = {channel: channelField.value, month: monthField.value,
+      fields: printFields.map(([field]) => ({field, value: field.value, disabled: field.disabled}))};
+    const marker = document.createComment("campaign calculation location");
+    view.before(marker);
+    mount.append(view);
+    tour = session;
+    channelField.value = "store";
+    monthField.value = "";
+    selectedMonth = "";
+    for (const [field] of printFields) {
+      if (field.name in defaultFields) field.value = defaultFields[field.name];
+      if (field.name === "memberName" || field.name === "memberNumber") field.value = "";
+    }
+    form.elements.created.disabled = form.elements.enrollment.disabled = true;
+    dialog.querySelector("[data-close]").onclick = () => dialog.close();
+    dialog.addEventListener("cancel", event => { if (session.submitting) event.preventDefault(); });
+    dialog.addEventListener("close", () => {
+      tour = null;
+      marker.replaceWith(view);
+      dialog.remove();
+      channelField.value = previous.channel;
+      monthField.value = previous.month;
+      selectedMonth = "";
+      refreshCampaign();
+      for (const {field, value, disabled} of previous.fields) {
+        if (field.tagName !== "SELECT" || Array.from(field.options).some(option => option.value === value)) field.value = value;
+        field.disabled = disabled;
+      }
+      render();
+    }, {once: true});
+    session.confirmation.addEventListener("submit", event => event.preventDefault());
+    session.confirmation.addEventListener("change", render);
+    session.submit.addEventListener("click", async () => {
+      render();
+      if (session.submit.disabled) return;
+      const request = session.request;
+      session.submitting = true;
+      status.textContent = "計算書PDFと下書きを作成中…";
+      dialog.querySelector("[data-close]").disabled = true;
+      session.confirmation.inert = mount.inert = true;
+      render();
+      try {
+        const reply = await apiPost(request);
+        if (reply.data?.status !== "draft") throw new Error("下書きの作成を確認できませんでした。");
+        applyStatus(reply.data, `TFGマスターに登録し、Gmail下書きを作成しました。会員番号 ${reply.data.member_id}`);
+      } catch (error) {
+        status.textContent = error.message || "下書きを作成できませんでした。";
+      } finally {
+        session.submitting = false;
+        session.confirmation.inert = mount.inert = false;
+        dialog.querySelector("[data-close]").disabled = false;
+        render();
+      }
+    });
+    function applyStatus(data, message = "") {
+      session.status = data.status;
+      session.email = data.email;
+      email.textContent = `宛先　${data.email}`;
+      email.hidden = false;
+      status.textContent = message;
+      const completed = data.status === "draft";
+      session.confirmation.hidden = mount.hidden = session.submit.hidden = completed;
+      render();
+    }
+    status.textContent = "見学予約を確認中…";
+    document.body.append(dialog);
+    dialog.showModal();
+    render();
+    try {
+      const {data} = await apiGet("getTourEnrollmentCalculation", {reservation_id: reservationId});
+      if (tour !== session || !dialog.open) return;
+      if (!data?.email || !["new", "draft"].includes(data.status)) throw new Error("見学予約を確認できませんでした。");
+      applyStatus(data, data.status === "draft" ? `登録済みです。会員番号 ${data.member_id} のメールをGmailで確認してください。` : "");
+    } catch (error) {
+      if (tour !== session || !dialog.open) return;
+      if (error.message === "指定されたactionは存在しません。") {
+        session.status = "preview";
+        session.submit.hidden = true;
+        session.confirmation.elements.bankReceived.nextElementSibling.textContent = "受領済みの表示を確認する";
+        status.textContent = "会費の確認用です。会員登録とGmail下書き作成はサーバー更新後に利用できます。";
+        render();
+        return;
+      }
+      status.textContent = error.message || "見学予約を取得できませんでした。";
+    }
+  };
 
   const sheet = view.querySelector(".campaign-sheet");
   const printButton = view.querySelector("#campaignCalculationPrint");
@@ -261,7 +315,7 @@
 
     const stylesheet = document.createElement("link");
     stylesheet.rel = "stylesheet";
-    stylesheet.href = "./admin-campaign-calculation.css?v=20261128-thin-rules";
+    stylesheet.href = "./admin-campaign-calculation.css?v=20261128-tour-calculation";
     document.head.append(stylesheet);
   }
 
@@ -346,4 +400,4 @@
   form.addEventListener("reset", () => queueMicrotask(render));
   document.querySelector("#logoutButton")?.addEventListener("click", () => form.reset());
   render();
-})();
+});
